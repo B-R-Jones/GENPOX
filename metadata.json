@@ -1,0 +1,6 @@
+{
+  "name": "Genetic Combinator P.O.X. Game",
+  "description": "An idle game and handheld P.O.X. toy emulator where you generate genetic sequences, spend them to construct 64-character bio-monsters, view their genetic breakdown, and trade them with nearby simulated users.",
+  "requestFramePermissions": ["geolocation", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
