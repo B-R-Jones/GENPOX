@@ -234,7 +234,7 @@ export const LeafletScannerMap: React.FC<LeafletScannerMapProps> = ({
         <div style="background-color: #0c100e; color: #A855F7; border: 1px solid #581c87; padding: 5px 9px; font-family: monospace; font-size: 9px; border-radius: 4px; line-height: 1.3;">
           <b style="color: white; font-size: 10px;">${anom.name}</b><br/>
           HEAT ZONE: <span style="color: ${colorHex}; font-weight: bold;">${heatZoneDiameter} FT DIA</span><br/>
-          DIST: ${anom.distance.toFixed(1)} FT &bull; SIGN: ${anom.codon}<br/>
+          DIST: ${anom.distance.toFixed(1)} FT &bull; SIGN: ${anom.gene}<br/>
           MIN/MAX CHANCE: Center 100% / Edge 0%
         </div>
       `, {
@@ -302,10 +302,10 @@ export const LeafletScannerMap: React.FC<LeafletScannerMapProps> = ({
           <div style="border-b: 1px solid #581c87; padding-bottom: 4px; margin-bottom: 5px; color: white; font-weight: bold; font-size: 11px; text-transform: uppercase;">
              ${iconAvatar} ${mission.creatureName}
           </div>
-          <p style="margin: 0 0 4px 0; font-size: 8px; color: #a8a29e;">MISSION STATUS: <strong style="color: ${mission.isCompleted ? '#d8b4fe' : '#eab308'}; font-weight: bold;">${mission.isCompleted ? 'READY FOR RETRIEVAL' : 'EXTRACTING CODON SEQUENCES'}</strong></p>
+          <p style="margin: 0 0 4px 0; font-size: 8px; color: #a8a29e;">MISSION STATUS: <strong style="color: ${mission.isCompleted ? '#d8b4fe' : '#eab308'}; font-weight: bold;">${mission.isCompleted ? 'READY FOR RETRIEVAL' : 'EXTRACTING GENE SEQUENCES'}</strong></p>
           <div style="background-color: #000; padding: 4px; border-radius: 3px; font-size: 8.5px; border: 1px solid #581c87; margin-bottom: 4px;">
-            <b>CODON PACKETS:</b> ${mission.harvestedCodons.length}/4 INFLOW<br/>
-            <b>ACQUIRED:</b> <span style="color: white; font-weight: bold;">${mission.harvestedCodons.join(", ") || "SCANNING..."}</span>
+            <b>GENE PACKETS:</b> ${mission.harvestedGenes.length}/4 INFLOW<br/>
+            <b>ACQUIRED:</b> <span style="color: white; font-weight: bold;">${mission.harvestedGenes.join(", ") || "SCANNING..."}</span>
           </div>
           <div style="display: flex; justify-content: space-between; font-size: 8.5px; color: #a8a29e; margin-top: 4px;">
             <span>PROGRESS: <b>${progressPercent}%</b></span>

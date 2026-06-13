@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Python script to scan and replace all gameplay, flavor, and structural references to 'core' or 'cores' with suitable terms ('unit', 'gene', 'reactor', 'system', 'node', 'shell') while ignoring system library references (e.g. androidx.compose.animation.core).",
+  "updatedAt": "2026-06-13T16:38:00.039598800Z"
+}

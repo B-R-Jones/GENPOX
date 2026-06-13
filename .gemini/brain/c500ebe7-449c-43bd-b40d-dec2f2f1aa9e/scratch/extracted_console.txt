@@ -1,0 +1,781 @@
+5040:                 {activeTab === 'combinator' && (
+5041:                   <motion.div 
+5042:                     key="combinator"
+5043:                     initial={{ opacity: 0, y: 10 }}
+5044:                     animate={{ opacity: 1, y: 0 }}
+5045:                     exit={{ opacity: 0, y: -10 }}
+5046:                     className="flex flex-col h-full space-y-3"
+5047:                   >
+5048:                     {/* Top level sub-tabs for Bio-Lab */}
+5049:                     <div className="flex border-b border-green-950/40 pb-2 gap-2 select-none shrink-0 font-mono">
+5050:                       <button
+5051:                         type="button"
+5052:                         onClick={() => {
+5053:                           sound.playBeep(520, 0.05, "sine");
+5054:                           setBioLabSubTab('pox');
+5055:                         }}
+5056:                         className={`px-4 py-1.5 text-[10px] font-bold border rounded transition-all uppercase tracking-wider cursor-pointer ${
+5057:                           bioLabSubTab === 'pox'
+5058:                             ? "bg-green-950/20 border-[#00FF41] text-[#00FF41] shadow-[0_0_8px_rgba(0,255,65,0.1)] font-extrabold"
+5059:                             : "bg-black/40 border-green-955/40 text-green-700 hover:text-green-400"
+5060:                         }`}
+5061:                       >
+5062:                         P.O.X. Reactor
+5063:                       </button>
+5064:                       <button
+5065:                         type="button"
+5066:                         onClick={() => {
+5067:                           sound.playBeep(520, 0.05, "sine");
+5068:                           setBioLabSubTab('anomaly');
+5069:                         }}
+5070:                         className={`px-4 py-1.5 text-[10px] font-bold border rounded transition-all uppercase tracking-wider cursor-pointer ${
+5071:                           bioLabSubTab === 'anomaly'
+5072:                             ? "bg-purple-950/20 border-purple-500 text-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.15)] font-extrabold"
+5073:                             : "bg-black/40 border-green-955/40 text-purple-800 hover:text-purple-400"
+5074:                         }`}
+5075:                       >
+5076:                         {bioLabSubTab === 'anomaly' ? <FlickeringPurpleText text="Anomaly Engine" /> : "Anomaly Engine"}
+5077:                       </button>
+5078:                     </div>
+5079: 
+5080:                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow overflow-hidden">
+5081:                       
+5082:                       {/* Panel 1: Genetic Combinator (Left) */}
+5083:                       <div className={`bg-neutral-900/20 p-4 rounded flex flex-col justify-between relative overflow-y-auto custom-pox-scrollbar min-h-[300px] border transition-all ${
+5084:                         bioLabSubTab === 'anomaly' ? "border-purple-900/40" : "border-green-900/40"
+5085:                       }`}>
+5086:                       {isCodonLogPopupOpen && (
+5087:                         <motion.div
+5088:                           key="codon-log-popup"
+5089:                           initial={{ opacity: 0, scale: 0.98 }}
+5090:                           animate={{ opacity: 1, scale: 1 }}
+5091:                           exit={{ opacity: 0, scale: 0.98 }}
+5092:                           className="absolute inset-0 bg-[#020d04]/99 border border-[#00FF41]/80 rounded-md p-4 flex flex-col z-40 overflow-hidden font-mono text-left shadow-[0_0_30px_rgba(0,255,65,0.15)]"
+5093:                         >
+5094:                           {/* Title header */}
+5095:                           <div className="flex justify-between items-center border-b border-green-955 pb-2 mb-2.5 select-none">
+5096:                             <span className="text-[10px] text-[#00FF41] font-bold tracking-widest uppercase flex items-center gap-1.5">
+5097:                               <span className="w-1.5 h-1.5 bg-[#00FF41] rounded-full animate-pulse" />
+5098:                               [ GENE SYNTHESIS LOG ]
+5099:                             </span>
+5100:                             <div className="flex items-center gap-2">
+5101:                               <button
+5102:                                 type="button"
+5103:                                 onClick={() => {
+5104:                                   sound.playBeep(440, 0.05, "sine");
+5105:                                   setDiscoveredPacketsLog([]);
+5106:                                   setDiscoverySelectedCodon(null);
+5107:                                   triggerLog("GENE ARCHIVE: Cleared all packet records.", "info");
+5108:                                 }}
+5109:                                 className="px-2 py-0.5 bg-red-950/20 hover:bg-red-900 border border-red-900/60 text-red-400 hover:text-white rounded text-[8px] cursor-pointer font-bold select-none transition-colors"
+5110:                               >
+5111:                                 ✕ CLEAR ALL
+5112:                               </button>
+5113:                               <button
+5114:                                 type="button"
+5115:                                 onClick={() => {
+5116:                                   sound.playBeep(440, 0.05, "sine");
+5117:                                   setIsCodonLogPopupOpen(false);
+5118:                                 }}
+5119:                                 className="px-2 py-0.5 bg-green-950/80 hover:bg-green-900 border border-green-800 text-[#00FF41] hover:text-white rounded text-[8.5px] cursor-pointer font-bold tracking-wider"
+5120:                               >
+5121:                                 ✕ CLOSE
+5122:                               </button>
+5123:                             </div>
+5124:                           </div>
+5125: 
+5126:                           {/* Conditionally Rendered Single Pane Layout */}
+5127:                           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+5128:                             {!discoverySelectedCodon ? (
+5129:                               /* Spliced Packets Register / Log List */
+5130:                               <div className="flex-1 flex flex-col min-h-0 overflow-hidden space-y-2">
+5131:                                 {/* Top Flavor Text Bar replacing filter entry box as requested */}
+5132:                                 <div className="flex items-center justify-center gap-2 bg-green-950/15 border border-green-950/50 p-2.5 rounded-sm shrink-0 font-mono text-[8.5px] text-green-400 select-none uppercase tracking-wider text-center">
+5133:                                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block animate-ping" />
+5134:                                   <span>Select any gene block to load detailed analysis</span>
+5135:                                 </div>
+5136: 
+5137:                                 <div className="flex-1 overflow-y-auto space-y-2 pr-0.5 custom-pox-scrollbar">
+5138:                                   {(() => {
+5139:                                     const filtered = discoveredPacketsLog.filter(packet => {
+5140:                                       if (!discoverySearchText) return true;
+5141:                                       return packet.codons.some(c => c.sequence.toUpperCase().includes(discoverySearchText));
+5142:                                     });
+5143: 
+5144:                                     if (filtered.length === 0) {
+5145:                                       return (
+5146:                                         <div className="text-center py-12 text-[9px] text-green-700 font-mono italic uppercase">
+5147:                                           No packets discovered match the search term.
+5148:                                         </div>
+5149:                                       );
+5150:                                     }
+5151: 
+5152:                                     return filtered.map((packet, pIdx) => {
+5153:                                       const uniqueCount = packet.codons.filter(c => c.isNew).length;
+5154:                                       const timeStr = new Date(packet.timestamp).toLocaleTimeString();
+5155:                                       return (
+5156:                                         <div key={packet.id || pIdx} className="border border-green-950/60 bg-black/40 p-2 rounded-sm space-y-1.5 hover:border-green-800/40 transition-colors">
+5157:                                           <div className="flex justify-between items-center text-[7.5px] text-green-500 border-b border-green-950/30 pb-1 select-none">
+5158:                                             <span className="font-bold flex items-center gap-1">
+5159:                                               <span className="text-neutral-600">#{discoveredPacketsLog.length - pIdx}</span> PACKET SPLICED
+5160:                                             </span>
+5161:                                             <span className="font-mono flex items-center gap-2">
+5162:                                               <span className="text-cyan-500 font-bold">{uniqueCount} NEW CORES</span>
+5163:                                               <span className="text-neutral-500">{timeStr}</span>
+5164:                                             </span>
+5165:                                           </div>
+5166:                                           <div className="grid grid-cols-4 gap-1">
+5167:                                             {packet.codons.map((codon, cIdx) => {
+5168:                                               const isAnom = isAnomalousCodon(codon.sequence);
+5169:                                               const isSelected = discoverySelectedCodon === codon.sequence;
+5170:                                               return (
+5171:                                                 <button
+5172:                                                   key={cIdx}
+5173:                                                   onClick={() => {
+5174:                                                     sound.playBeep(450, 0.05, "sine");
+5175:                                                     setDiscoverySelectedCodon(codon.sequence);
+5176:                                                   }}
+5177:                                                   className={`px-1 py-1 border text-center font-mono rounded-sm select-none transition-all text-[8.5px] font-bold cursor-pointer hover:scale-[1.02] ${
+5178:                                                     isSelected
+5179:                                                       ? isAnom
+5180:                                                         ? "border-purple-400 bg-purple-950/50 text-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.3)] font-extrabold"
+5181:                                                         : "border-[#00FF41] bg-green-900/30 text-[#00FF41] shadow-[0_0_8px_rgba(0,255,65,0.2)]"
+5182:                                                       : codon.isNew
+5183:                                                         ? isAnom
+5184:                                                           ? "border-purple-650 bg-purple-950/20 text-purple-400 animate-pulse"
+5185:                                                           : "border-green-500/50 bg-green-950/10 text-[#00FF41] animate-pulse"
+5186:                                                         : isAnom
+5187:                                                           ? "border-purple-950/60 bg-purple-950/5 text-purple-300/70"
+5188:                                                           : "border-sky-950/50 bg-sky-950/10 text-sky-400/80"
+5189:                                                   }`}
+5190:                                                 >
+5191:                                                   {codon.sequence}
+5192:                                                 </button>
+5193:                                               );
+5194:                                             })}
+5195:                                           </div>
+5196:                                         </div>
+5197:                                       );
+5198:                                     });
+5199:                                   })()}
+5200:                                 </div>
+5201:                               </div>
+5202:                             ) :
+5203:                               /* 2. Detailed Gene analysis view occupied over the log list */
+5204:                               (() => {
+5205:                                 const seq = discoverySelectedCodon;
+5206:                                 const isAnom = isAnomalousCodon(seq);
+5207:                                 
+5208:                                 // Count composition
+5209:                                 let a = 0, t = 0, c = 0, g = 0, q = 0;
+5210:                                 for (const char of seq) {
+5211:                                   if (char === 'A') a++;
+5212:                                   else if (char === 'T') t++;
+5213:                                   else if (char === 'C') c++;
+5214:                                   else if (char === 'G') g++;
+5215:                                   else q++;
+5216:                                 }
+5217:                                 const len = seq.length || 1;
+5218:                                 const pA = Math.round((a / len) * 100);
+5219:                                 const pT = Math.round((t / len) * 100);
+5220:                                 const pC = Math.round((c / len) * 100);
+5221:                                 const pG = Math.round((g / len) * 100);
+5222:                                 const pQ = Math.round((q / len) * 100);
+5223: 
+5224:                                 const inventoryItem = sequences.find(item => item.sequence === seq && item.count > 0);
+5225:                                 const stockCount = inventoryItem ? inventoryItem.count : 0;
+5226: 
+5227:                                 return (
+5228:                                   <div className={`flex-1 flex flex-col justify-between border p-4 rounded-sm bg-black/60 font-mono text-left animate-fade-in min-h-0 overflow-y-auto custom-pox-scrollbar ${
+5229:                                     isAnom ? "border-purple-500/50 shadow-[0_0_12px_rgba(168,85,247,0.15)]" : "border-green-955/65"
+5230:                                   }`}>
+5231:                                     <div className="space-y-3.5 min-h-0 overflow-y-auto custom-pox-scrollbar">
+5232:                                       {/* Header with BACK button */}
+5233:                                       <div className="flex items-center justify-between border-b border-green-955/20 pb-2 mb-3 shrink-0">
+5234:                                         <button
+5235:                                           onClick={() => {
+5236:                                             sound.playBeep(440, 0.05, "sine");
+5237:                                             setDiscoverySelectedCodon(null);
+5238:                                           }}
+5239:                                           className="px-2 py-1 bg-green-950/65 hover:bg-green-900/85 border border-green-800 text-[#00FF41] font-bold text-[8px] rounded-sm cursor-pointer transition-colors flex items-center justify-center gap-1 shadow-sm select-none animate-pulse"
+5240:                                         >
+5241:                                           ◀ RETURN TO LOG
+5242:                                         </button>
+5243:                                         <div className={`text-[7.5px] font-bold uppercase tracking-wider ${isAnom ? "text-purple-400" : "text-emerald-500"}`}>
+5244:                                           {isAnom ? "🌌 ANOMALOUS COSMIC LINK" : "🧬 STANDARD GENE STRAND"}
+5245:                                         </div>
+5246:                                       </div>
+5247: 
+5248:                                       {/* Sequence display */}
+5249:                                       <div>
+5250:                                         <div className="text-[7px] text-neutral-500 uppercase tracking-widest leading-none mb-1">Gene String Sequence</div>
+5251:                                         <div className={`text-base font-black tracking-widest break-all select-all ${
+5252:                                           isAnom ? "text-purple-300 filter drop-shadow-[0_0_2px_#a855f7]" : "text-white"
+5253:                                         }`}>
+5254:                                           {seq}
+5255:                                         </div>
+5256:                                       </div>
+5257: 
+5258:                                       {/* Molecular Stats */}
+5259:                                       <div className="space-y-2 border-t border-green-950/50 pt-2.5 text-[8px]">
+5260:                                         <span className="text-neutral-500 uppercase tracking-widest block mb-1">Base Composition</span>
+5261:                                         
+5262:                                         {/* A */}
+5263:                                         <div>
+5264:                                           <div className="flex justify-between text-neutral-450 text-[7px] leading-none uppercase font-bold">
+5265:                                             <span>A (ADENINE)</span>
+5266:                                             <span>{pA}%</span>
+5267:                                           </div>
+5268:                                           <div className="w-full bg-neutral-950 h-1.5 rounded-sm overflow-hidden mt-1 border border-green-950/20">
+5269:                                             <div className="bg-[#00FF41] h-full" style={{ width: `${pA}%` }} />
+5270:                                           </div>
+5271:                                         </div>
+5272: 
+5273:                                         {/* T */}
+5274:                                         <div>
+5275:                                           <div className="flex justify-between text-neutral-450 text-[7px] leading-none uppercase font-bold">
+5276:                                             <span>T (THYMINE)</span>
+5277:                                             <span>{pT}%</span>
+5278:                                           </div>
+5279:                                           <div className="w-full bg-neutral-950 h-1.5 rounded-sm overflow-hidden mt-1 border border-green-950/20">
+5280:                                             <div className="bg-sky-400 h-full" style={{ width: `${pT}%` }} />
+5281:                                           </div>
+5282:                                         </div>
+5283: 
+5284:                                         {/* C */}
+5285:                                         <div>
+5286:                                           <div className="flex justify-between text-neutral-450 text-[7px] leading-none uppercase font-bold">
+5287:                                             <span>C (CYTOSINE)</span>
+5288:                                             <span>{pC}%</span>
+5289:                                           </div>
+5290:                                           <div className="w-full bg-neutral-950 h-1.5 rounded-sm overflow-hidden mt-1 border border-green-950/20">
+5291:                                             <div className="bg-amber-400 h-full" style={{ width: `${pC}%` }} />
+5292:                                           </div>
+5293:                                         </div>
+5294: 
+5295:                                         {/* G */}
+5296:                                         <div>
+5297:                                           <div className="flex justify-between text-neutral-450 text-[7px] leading-none uppercase font-bold">
+5298:                                             <span>G (GUANINE)</span>
+5299:                                             <span>{pG}%</span>
+5300:                                           </div>
+5301:                                           <div className="w-full bg-neutral-950 h-1.5 rounded-sm overflow-hidden mt-1 border border-green-950/20">
+5302:                                             <div className="bg-emerald-500 h-full" style={{ width: `${pG}%` }} />
+5303:                                           </div>
+5304:                                         </div>
+5305: 
+5306:                                         {/* Quantum bits */}
+5307:                                         {q > 0 && (
+5308:                                           <div>
+5309:                                             <div className="flex justify-between text-purple-400 text-[7px] leading-none uppercase font-bold">
+5310:                                               <span>QUANTUM MATRIX BIND</span>
+5311:                                               <span>{pQ}%</span>
+5312:                                             </div>
+5313:                                             <div className="w-full bg-neutral-950 h-1.5 rounded-sm overflow-hidden mt-1 border border-purple-950/20">
+5314:                                               <div className="bg-purple-500 h-full animate-pulse" style={{ width: `${pQ}%` }} />
+5315:                                             </div>
+5316:                                           </div>
+5317:                                         )}
+5318:                                       </div>
+5319: 
+5320:                                       {/* Splicing Status */}
+5321:                                       <div className="border-t border-green-950/50 pt-2.5 text-[8px]">
+5322:                                         <div className="flex justify-between items-center bg-black/50 p-1.5 border border-green-950 rounded-sm">
+5323:                                           <span className="text-neutral-500 font-bold uppercase">Splicer Hold:</span>
+5324:                                           <span className={`font-black uppercase tracking-wider ${stockCount > 0 ? "text-[#00FF41]" : "text-amber-500"}`}>
+5325:                                             {stockCount > 0 ? `DEPOSITED (x${stockCount})` : "OUT OF STOCK"}
+5326:                                           </span>
+5327:                                         </div>
+5328:                                       </div>
+5329:                                     </div>
+5330: 
+5331:                                     {/* Buttons / Actions */}
+5332:                                     <div className="border-t border-green-950/50 pt-2 mt-2 space-y-1.5 select-none shrink-0">
+5333:                                       {/* Play signature sound */}
+5334:                                       <button
+5335:                                         onClick={() => {
+5336:                                           sound.playBeep(520, 0.05, "sine");
+5337:                                           sound.playCreatureSequenceAudio(seq);
+5338:                                         }}
+5339:                                         className="w-full py-1.5 text-[8px] font-bold text-cyan-400 hover:text-white bg-cyan-950/25 hover:bg-cyan-900/40 border border-cyan-800/40 hover:border-cyan-400 rounded-sm cursor-pointer transition-all flex items-center justify-center gap-1.5 uppercase select-none active:scale-[0.98]"
+5340:                                       >
+5341:                                         <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+5342:                                         <span>SYNTHESIZE MOTIF</span>
+5343:                                       </button>
+5344: 
+5345:                                       {/* Copy */}
+5346:                                       <button
+5347:                                         onClick={() => {
+5348:                                           navigator.clipboard.writeText(seq);
+5349:                                           sound.playBeep(880, 0.08, "sine");
+5350:                                           triggerLog(`DUPLICATED CODON: ${seq}`, "success");
+5351:                                         }}
+5352:                                         className="w-full py-1.5 text-[8px] font-bold text-green-400 hover:text-white bg-green-950/25 hover:bg-[#00FF41]/20 border border-green-800/40 hover:border-green-400 rounded-sm cursor-pointer transition-all flex items-center justify-center gap-1.5 uppercase select-none active:scale-[0.98]"
+5353:                                       >
+5354:                                         <Check className="w-3.5 h-3.5 text-green-500" />
+5355:                                         <span>COPY SEQUENCE</span>
+5356:                                       </button>
+5357:                                     </div>
+5358:                                   </div>
+5359:                                 );
+5360:                               })()}
+5361:                           </div>
+5362: 
+5363:                           {/* Reset logs footer */}
+5364:                           <div className="pt-2 mt-2.5 border-t border-green-950 text-[8px] text-neutral-500 flex justify-between items-center select-none font-mono shrink-0">
+5365:                             <span className="text-[#00FF41]/80 animate-pulse flex items-center gap-1 uppercase">
+5366:                               <span className="w-1 h-1 bg-[#00FF41] rounded-full inline-block" /> 
+5367:                               Standard Gene Search Active
+5368:                             </span>
+5369:                             <span className="text-green-800 uppercase tracking-widest text-[7.5px]">
+5370:                               Secure connection: AIS-DEV-ENV
+5371:                             </span>
+5372:                           </div>
+5373:                         </motion.div>
+5374:                       )}
+5375: 
+5376:                        {bioLabSubTab === 'pox' ? (
+5377:                         <div>
+5378:                           <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-green-700">
+5379:                             <span>[ G.E.N. P.O.X. Tide Pool Reactor V2.4 ]</span>
+5380:                             <span className="text-[#00FF41]">SYSTEMS ON</span>
+5381:                           </div>
+5382:                           <h2 className="text-xs font-bold text-white tracking-wider mb-3 uppercase">Single-Node Cybernetic Synthesizer</h2>
+5383: 
+5384:                           {/* Top-Level Counts section as requested */}
+5385:                           <div className="grid grid-cols-2 gap-2 mb-4 border-t border-b border-green-950/70 py-2.5 bg-black/40 px-2 rounded-sm font-mono text-left">
+5386:                             <div>
+5387:                               <span className="block text-[8.5px] text-green-600 uppercase tracking-widest leading-none">Unique Gene IDs</span>
+5388:                               <span className="text-lg font-bold text-white leading-none block mt-1">
+5389:                                 <span className="text-[#00FF41]">⬢</span> {sequences.length}
+5390:                               </span>
+5391:                             </div>
+5392:                             <div className="border-l border-green-950/85 pl-3">
+5393:                               <span className="block text-[8.5px] text-green-600 uppercase tracking-widest leading-none">Multi-Count Gene IDs</span>
+5394:                               <span className="text-lg font-bold text-white leading-none block mt-1">
+5395:                                 <span className="text-[#00FF41]">⬢</span> {sequences.filter(s => s.count > 1).length}
+5396:                               </span>
+5397:                             </div>
+5398:                           </div>
+5399: 
+5400:                           {/* Dynamic Daily Base-Pair Wave HUD Display */}
+5401:                           <div className={`mb-2 border rounded-sm p-2 flex items-center justify-between gap-2.5 bg-black/60 font-mono text-[9px] ${
+5402:                             todayWave.isSuppressed 
+5403:                               ? "border-red-950/80 text-red-500 bg-red-955/5 animate-pulse" 
+5404:                               : "border-green-955 text-neutral-300"
+5405:                           }`}>
+5406:                             <div className="flex items-center gap-1.5 min-w-0">
+5407:                               <Zap className={`w-3.5 h-3.5 ${todayWave.isSuppressed ? "text-red-500" : "text-amber-400 animate-pulse"}`} />
+5408:                               <div>
+5409:                                 <span className="text-[7.5px] text-green-600 block leading-none font-bold select-none uppercase">TODAY'S BASE-PAIR WAVE</span>
+5410:                                 <span className="text-white font-bold tracking-wider uppercase truncate">
+5411:                                   {todayWave.isSuppressed ? "DORMANT (CONGESTED DECAY)" : `ACTIVE: ${todayWave.pair} WAVE`}
+5412:                                 </span>
+5413:                               </div>
+5414:                             </div>
+5415:                             {!todayWave.isSuppressed && (
+5416:                               <div className="text-right shrink-0">
+5417:                                 <span className="text-[10px] text-[#00FF41] font-bold block leading-none font-mono">{todayWave.primary} ➔ {todayWave.secondary}</span>
+5418:                                 <span className="text-[7px] text-green-600 block leading-none font-bold mt-0.5">1.12x &amp; 1.62x BOOST</span>
+5419:                               </div>
+5420:                             )}
+5421:                             {todayWave.isSuppressed && (
+5422:                               <span className="text-[7px] text-red-400 bg-red-955/30 px-1 border border-red-955 rounded font-bold uppercase select-none">NULL</span>
+5423:                             )}
+5424:                           </div>
+5425: 
+5426:                           {/* Forecast Calendar Waves Compact Layout */}
+5427:                           <div className="grid grid-cols-2 gap-2 mb-3">
+5428:                             {/* Tomorrow's Wave */}
+5429:                             <div className={`border rounded-sm p-1.5 flex items-center justify-between gap-1 bg-black/45 font-mono text-[8px] ${
+5430:                               tomorrowWave.isSuppressed ? "border-red-955/60 text-red-400 bg-red-955/5 animate-pulse" : "border-neutral-900/60 text-neutral-450"
+5431:                             }`}>
+5432:                               <div className="min-w-0">
+5433:                                 <span className="text-[6.5px] text-green-700 block leading-none font-bold select-none uppercase">TOMORROW BASE-PAIR</span>
+5434:                                 <span className="text-white font-bold tracking-wider uppercase truncate text-[8px] mt-0.5 block">
+5435:                                   {tomorrowWave.isSuppressed ? "DORMANT" : `${tomorrowWave.pair} WAVE`}
+5436:                                 </span>
+5437:                               </div>
+5438:                               {!tomorrowWave.isSuppressed && (
+5439:                                 <span className="text-[8.5px] text-[#00FF41] font-bold font-mono pl-1 shrink-0">{tomorrowWave.primary}➔{tomorrowWave.secondary}</span>
+5440:                               )}
+5441:                             </div>
+5442: 
+5443:                             {/* Day After's Wave */}
+5444:                             <div className={`border rounded-sm p-1.5 flex items-center justify-between gap-1 bg-black/45 font-mono text-[8px] ${
+5445:                               dayAfterWave.isSuppressed ? "border-red-955/60 text-red-400 bg-red-955/5 animate-pulse" : "border-neutral-900/60 text-neutral-450"
+5446:                             }`}>
+5447:                               <div className="min-w-0">
+5448:                                 <span className="text-[6.5px] text-green-700 block leading-none font-bold select-none uppercase">DAY AFTER TOMORROW</span>
+5449:                                 <span className="text-white font-bold tracking-wider uppercase truncate text-[8px] mt-0.5 block">
+5450:                                   {dayAfterWave.isSuppressed ? "DORMANT" : `${dayAfterWave.pair} WAVE`}
+5451:                                 </span>
+5452:                               </div>
+5453:                               {!dayAfterWave.isSuppressed && (
+5454:                                 <span className="text-[8.5px] text-[#00FF41] font-bold font-mono pl-1 shrink-0">{dayAfterWave.primary}➔{dayAfterWave.secondary}</span>
+5455:                               )}
+5456:                             </div>
+5457:                           </div>
+5458:                         </div>
+5459:                       ) : (
+5460:                         <div>
+5461:                           <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-purple-400">
+5462:                             <span>[ WARNING: UNKNOWN REACTOR ]</span>
+5463:                             <span className="text-purple-300 animate-pulse">SYSTEMS ON</span>
+5464:                           </div>
+5465:                           <div className="mb-3">
+5466:                             <FlickeringAnomalyTitle />
+5467:                           </div>
+5468: 
+5469:                           {/* Top-Level Counts section as requested */}
+5470:                           <div className="grid grid-cols-2 gap-2 mb-4 border-t border-b border-purple-900/50 py-2.5 bg-black/40 px-2 rounded-sm font-mono text-left">
+5471:                             <div 
+5472:                               onClick={() => { sound.playBeep(600,0.05,"sine"); setIsAnomalousLedgerExpanded(true); }}
+5473:                               className="cursor-pointer group hover:bg-purple-950/20 p-1 rounded-sm transition-all flex flex-col justify-between"
+5474:                               title="Click to Decrypt Anomaly Vault"
+5475:                             >
+5476:                               <span className="block text-[8.5px] text-purple-400 uppercase tracking-widest leading-none group-hover:text-purple-300">Anomalous Gene IDs</span>
+5477:                               <div className="text-lg font-bold text-white leading-none mt-1 flex items-center justify-between">
+5478:                                 <span><span className="text-purple-400">⬢</span> {sequences.filter(s => isAnomalousCodon(s.sequence)).length}</span>
+5479:                                 <span className="text-[6.5px] text-purple-400 bg-purple-950/60 border border-purple-500/20 px-1 py-0.5 rounded opacity-70 group-hover:opacity-100 transition-opacity">OPEN ➔</span>
+5480:                               </div>
+5481:                             </div>
+5482:                             <div className="border-l border-purple-900/50 pl-3 pt-1">
+5483:                               <span className="block text-[8.5px] text-purple-400 uppercase tracking-widest leading-none">Total Gene Stock</span>
+5484:                               <span className="text-lg font-bold text-white leading-none block mt-1">
+5485:                                 <span className="text-[#00FF41]">⬢</span> {sequences.length}
+5486:                               </span>
+5487:                             </div>
+5488:                           </div>
+5489:                         </div>
+5490:                       )}
+5491: 
+5492:                       <div className="flex-1 flex flex-col items-center justify-center space-y-2.5 my-1">
+5493:                         <div className={`text-xl md:text-2xl font-bold tracking-widest bg-black border-2 px-4 py-2 rounded select-all shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] font-mono ${
+5494:                           isForcedLoopActive 
+5495:                             ? "border-red-500 text-red-500 animate-[pulse_3s_infinite]" 
+5496:                             : bioLabSubTab === 'anomaly'
+5497:                               ? "border-purple-500 text-purple-300 animate-[pulse_5s_infinite]"
+5498:                               : "border-green-500 text-[#00FF41]"
+5499:                         }`}>
+5500:                           {isForcedLoopActive 
+5501:                             ? "--------" 
+5502:                             : bioLabSubTab === 'anomaly'
+5503:                               ? (!anomalyEngineActive 
+5504:                                   ? "--------" 
+5505:                                   : (() => {
+5506:                                       const syms = "XZYW?!$%&@#";
+5507:                                       let rez = "";
+5508:                                       for (let i = 0; i < scrollingGene.length; i++) {
+5509:                                         const idx = (scrollingGene.charCodeAt(i) + i) % syms.length;
+5510:                                         rez += syms[idx];
+5511:                                       }
+5512:                                       return rez;
+5513:                                     })())
+5514:                               : scrollingGene
+5515:                           }
+5516:                         </div>
+5517:                         
+5518:                         <div className={`w-full max-w-sm bg-neutral-900 h-2 border rounded-full overflow-hidden p-0.5 ${
+5519:                           isForcedLoopActive 
+5520:                             ? "border-red-950/80 shadow-[0_0_8px_rgba(239,68,68,0.2)]" 
+5521:                             : bioLabSubTab === 'anomaly'
+5522:                               ? anomalyEngineActive 
+5523:                                 ? "border-purple-955" 
+5524:                                 : "border-neutral-800"
+5525:                               : "border-green-950"
+5526:                         }`}>
+5527:                           <div 
+5528:                             className={isForcedLoopActive 
+5529:                               ? "bg-red-600 h-full rounded-sm animate-[pulse_2s_infinite]" 
+5530:                               : bioLabSubTab === 'anomaly'
+5531:                                 ? anomalyEngineActive
+5532:                                   ? "bg-gradient-to-r from-purple-600 to-pink-500 h-full rounded-sm transition-all duration-1000 ease-linear"
+5533:                                   : "bg-neutral-800/40 h-full rounded-sm"
+5534:                                 : "bg-gradient-to-r from-emerald-600 to-[#00FF41] h-full rounded-sm transition-all duration-1000 ease-linear"
+5535:                             }
+5536:                             style={{ 
+5537:                               width: isForcedLoopActive 
+5538:                                 ? "100%" 
+5539:                                 : (bioLabSubTab === 'anomaly' && !anomalyEngineActive)
+5540:                                   ? "0%"
+5541:                                   : `${(((boostSecondsLeft > 0 ? 8 : 16) - idleTime) / (boostSecondsLeft > 0 ? 8 : 16)) * 100}%` 
+5542:                             }}
+5543:                           />
+5544:                         </div>
+5545:                         
+5546:                         <div className="text-center font-mono text-[11px] tracking-wide space-y-1.5 flex flex-col items-center">
+5547:                           {isForcedLoopActive ? (
+5548:                             <div className="text-red-550 font-extrabold uppercase animate-pulse flex items-center gap-1.5 text-[9.5px] tracking-wider select-none bg-red-950/25 px-3 py-1 border border-red-500/30 rounded text-center max-w-[280px]">
+5549:                               ⚠️ REACTOR FROZEN: LOOPING FORCED CONSTRUCTION
+5550:                             </div>
+5551:                           ) : (
+5552:                             <div className={bioLabSubTab === 'anomaly' ? "text-purple-400 font-bold" : "text-green-500 font-bold"}>
+5553:                               {bioLabSubTab === 'anomaly' ? (
+5554:                                 anomalyEngineActive ? (
+5555:                                   <><FlickeringPurpleText text="Anomalous Consolidation in:" /> <span className="text-white font-bold">{idleTime}s</span></>
+5556:                                 ) : (
+5557:                                   <><FlickeringPurpleText text="Anomalous Consolidation:" /> <span className="text-neutral-500 font-bold">IDLE</span></>
+5558:                                 )
+5559:                               ) : (
+5560:                                 <>Gene Array Ready in: <span className="text-white font-bold">{idleTime}s</span></>
+5561:                               )}
+5562:                             </div>
+5563:                           )}
+5564:                           {boostSecondsLeft > 0 && !isForcedLoopActive && (
+5565:                             <div className={`text-[10px] font-bold px-2 py-0.5 border rounded animate-pulse font-mono flex items-center gap-1 ${
+5566:                               bioLabSubTab === 'anomaly'
+5567:                                 ? "text-purple-300 bg-purple-950/20 border-purple-500/40"
+5568:                                 : "text-[#00FF41] bg-[#00FF41]/15 border-[#00FF41]/40"
+5569:                             }`}>
+5570:                               <Zap className="w-3.5 h-3.5 text-amber-400" />
+5571:                               REACTOR BOOST ACTIVE: {Math.floor(boostSecondsLeft / 60)}:{(boostSecondsLeft % 60).toString().padStart(2, '0')} REMAINING
+5572:                             </div>
+5573:                           )}
+5574:                         </div>
+5575:                       </div>
+5576: 
+5577:                       <div className="space-y-2">
+5578:                         <button
+5579:                           type="button"
+5580:                           onClick={() => {
+5581:                             sound.playBeep(650, 0.05, "sine");
+5582:                             setIsCodonLogPopupOpen(true);
+5583:                           }}
+5584:                           className={`w-full py-2 border font-mono font-bold uppercase text-[10px] rounded-sm cursor-pointer transition-all flex items-center justify-center gap-1.5 active:scale-[0.99] ${
+5585:                             bioLabSubTab === 'anomaly'
+5586:                               ? "bg-purple-950/40 hover:bg-purple-900/60 border-purple-500/50 text-purple-300"
+5587:                               : "bg-blue-950/40 hover:bg-blue-900/60 border-blue-500/50 text-[#00E1FF]"
+5588:                           }`}
+5589:                         >
+5590:                           <Terminal className={`w-3.5 h-3.5 stroke-[2.5] ${bioLabSubTab === 'anomaly' ? "text-purple-300" : "text-[#00E1FF]"}`} />
+5591:                           <span>{bioLabSubTab === 'anomaly' ? "View Anomaly Discovery Log" : "View Gene Synthesis Log"}</span>
+5592:                         </button>
+5593: 
+5594:                         <button 
+5595:                           onClick={handleManualCombinatorClick}
+5596:                           className={`w-full py-2 border text-white font-bold uppercase text-xs transition-all cursor-pointer rounded-sm active:scale-[0.99] ${
+5597:                             bioLabSubTab === 'anomaly'
+5598:                               ? "bg-purple-900/40 border-purple-500/80 hover:bg-purple-900"
+5599:                               : "bg-green-900/40 border-green-500/80 hover:bg-green-900"
+5600:                           }`}
+5601:                         >
+5602:                           Manual Acceleration (-2s)
+5603:                         </button>
+5604:                       </div>
+5605:                     </div>
+5606: 
+5607:                     {/* Combinator Help Code & Sequence Ledger (Right) */}
+5608:                     <div className={`p-4 rounded flex flex-col justify-between relative overflow-y-auto custom-pox-scrollbar min-h-[300px] bg-neutral-900/20 border transition-all ${
+5609:                       bioLabSubTab === 'anomaly' ? "border-purple-900/45" : "border-green-900/40"
+5610:                     }`}>
+5611:                       <div>
+5612:                         <div className={`text-[10px] uppercase mb-1.5 font-mono ${
+5613:                           bioLabSubTab === 'anomaly' ? "text-purple-400" : "text-green-700"
+5614:                         }`}>
+5615:                           {bioLabSubTab === 'anomaly' ? (
+5616:                             <FlickeringPurpleText text="[ SPLICER STOCK GENE LEDGER ]" />
+5617:                           ) : (
+5618:                             "[ SPLICER STOCK GENE LEDGER ]"
+5619:                           )}
+5620:                         </div>
+5621:                         <h2 className="text-xs font-bold text-white tracking-wider mb-1.5 uppercase">Gene Inventory</h2>
+5622:                         <b className={`text-[10px] mb-3 block leading-tight font-mono ${
+5623:                           bioLabSubTab === 'anomaly' ? "text-purple-500/90" : "text-[#00c93c]"
+5624:                         }`}>
+5625:                           {bioLabSubTab === 'anomaly' ? (
+5626:                             <FlickeringPurpleText text="These 8-character DNA blocks act as raw units to construct the 64-character target genome." />
+5627:                           ) : (
+5628:                             "These 8-character DNA blocks act as raw units to construct the 64-character target genome."
+5629:                           )}
+5630:                         </b>
+5631:                       </div>
+5632: 
+5633:                       {/* Display Buttons and Stockpile Panels inside Default View */}
+5634:                       <div className="flex-1 flex flex-col justify-center min-h-[140px] min-h-0 space-y-3.5">
+5635:                         {/* pair-based array search button */}
+5636:                         {bioLabSubTab === 'pox' && (
+5637:                           <button 
+5638:                             onClick={() => { 
+5639:                               sound.playBeep(600,0.05,"sine"); 
+5640:                               setDiscoverySearchPrefix("");
+5641:                               setDiscoverySearchStep(0);
+5642:                               setIsCodonLedgerExpanded(true); 
+5643:                             }}
+5644:                             className="w-full py-3.5 px-4 bg-black/60 border border-green-955 hover:border-[#00FF41] hover:bg-green-955/20 text-[#00FF41] rounded flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group text-center shadow-[0_0_15px_rgba(0,255,65,0.05)]"
+5645:                           >
+5646:                             <span className="text-sm font-bold tracking-wider text-white font-mono uppercase group-hover:text-[#00FF41] transition-colors flex items-center justify-center gap-1.5">
+5647:                               <Search className="w-4 h-4 text-[#00FF41] animate-pulse" />
+5648:                               PAIR-BASED STEP-SEARCH
+5649:                             </span>
+5650:                             <span className="text-[8.5px] font-mono text-green-500 uppercase tracking-widest bg-green-950/30 px-2 py-0.5 border border-green-500/20 rounded">
+5651:                               [ Run Hierarchical Query ▼ ]
+5652:                             </span>
+5653:                           </button>
+5654:                         )}
+5655: 
+5656:                         {/* G.E.N. Gene Stockpile Panel for P.O.X. Reactor Sub-Tab as a beautiful matching info panel display */}
+5657:                         {bioLabSubTab === 'pox' && (() => {
+5658:                           const uniqueStandardCount = sequences.filter(s => !isAnomalousCodon(s.sequence)).length;
+5659:                           const totalStandardCopies = sequences.filter(s => !isAnomalousCodon(s.sequence)).reduce((sum, s) => sum + (s.count || 0), 0);
+5660: 
+5661:                           const requiredGenesList = [];
+5662:                           for (let i = 0; i < 8; i++) {
+5663:                             requiredGenesList.push(targetSequence.substring(i * 8, (i + 1) * 8));
+5664:                           }
+5665:                           const ownedRequired = requiredGenesList.filter(rg => 
+5666:                             sequences.some(s => s.sequence === rg && (s.count || 0) > 0)
+5667:                           ).length;
+5668: 
+5669:                           return (
+5670:                             <div className="border border-green-900/30 p-2.5 rounded-sm font-mono text-[9px] bg-black/35 transition-colors">
+5671:                               <div className="flex items-center justify-between mb-1.5 select-none">
+5672:                                 <span className="font-bold tracking-wider uppercase flex items-center gap-1.5 text-green-400">
+5673:                                   <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />
+5674:                                   Gene Stockpile Info
+5675:                                 </span>
+5676:                               </div>
+5677: 
+5678:                               <div className="space-y-1 bg-black/45 p-1.5 rounded-sm border border-neutral-900/60 text-[7.5px] leading-normal mb-2.5">
+5679:                                 {/* Stat 1: Total uniquely cataloged standard genes vs. ultimate possible permutations */}
+5680:                                 <div className="flex justify-between items-center">
+5681:                                   <span className="text-neutral-500 uppercase font-bold">Unique Standard Genes:</span>
+5682:                                   <span className="font-bold text-white">
+5683:                                     {uniqueStandardCount.toLocaleString()} / 65,536 Permutations
+5684:                                   </span>
+5685:                                 </div>
+5686: 
+5687:                                 {/* Stat 2: Total raw inventory copies */}
+5688:                                 <div className="flex justify-between items-center">
+5689:                                   <span className="text-neutral-500 uppercase font-bold">Total Gene Blocks Owned:</span>
+5690:                                   <span className="text-[#00FF41] font-black">
+5691:                                     {totalStandardCopies.toLocaleString()} Blocks
+5692:                                   </span>
+5693:                                 </div>
+5694: 
+5695:                                 {/* Stat 3: Target Sequence Alignment (the 8 required chunks) */}
+5696:                                 <div className="flex justify-between items-center">
+5697:                                   <span className="text-neutral-500 uppercase font-bold">Target Alignment:</span>
+5698:                                   <span className={`font-black ${
+5699:                                     ownedRequired === 8 
+5700:                                       ? "text-cyan-400 font-extrabold animate-pulse" 
+5701:                                       : "text-amber-500"
+5702:                                   }`}>
+5703:                                     {ownedRequired} / 8 Segment Blocks {ownedRequired === 8 ? "✓" : ""}
+5704:                                   </span>
+5705:                                 </div>
+5706:                               </div>
+5707: 
+5708:                               {/* Construction alignment index Dial Breakdown */}
+5709:                               <div className="p-2 border border-green-955 bg-[#041206] rounded-sm space-y-1 font-mono text-[7px]">
+5710:                                 <div className="text-[7.5px] font-bold text-green-400 tracking-wider uppercase border-b border-green-955/40 pb-0.5 flex justify-between">
+5711:                                   <span>Constructor Alignment Metrics</span>
+5712:                                   <span className="text-white font-black">{((ownedRequired / 8) * 100).toFixed(0)}% Ready</span>
+5713:                                 </div>
+5714: 
+5715:                                 <div className="text-neutral-450 leading-normal text-[6.5px]">
+5716:                                   Tracks raw 8-character DNA gene blocks required to compile the full 64-character target genome sequence. Harvest nodes via map scanner to secure missing blocks.
+5717:                                 </div>
+5718:                               </div>
+5719:                             </div>
+5720:                           );
+5721:                         })()}
+5722: 
+5723:                         {/* Anomalous Codons Ledger Button */}
+5724:                         {bioLabSubTab === 'anomaly' && (
+5725:                           <button 
+5726:                             onClick={() => { sound.playBeep(600,0.05,"sine"); setIsAnomalousLedgerExpanded(true); }}
+5727:                             className="w-full py-3.5 px-4 bg-black/60 border border-purple-500/80 hover:border-purple-400 hover:bg-purple-955/15 text-purple-300 rounded flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group text-center shadow-[0_0_15px_rgba(168,85,247,0.05)]"
+5728:                           >
+5729:                             <span className="text-sm font-bold tracking-wider text-white font-mono uppercase group-hover:text-purple-400 transition-colors flex items-center justify-center gap-1.5">
+5730:                               {sequences.filter(s => isAnomalousCodon(s.sequence)).length} Anomalous Genes Secured
+5731:                             </span>
+5732:                             <span className="text-[8.5px] font-mono text-purple-400 uppercase tracking-widest bg-purple-950/40 px-2 py-0.5 border border-purple-500/30 rounded shadow-[0_0_8px_rgba(168,85,247,0.3)]">
+5733:                               <FlickeringPurpleText text="[ DECRYPT ANOMALY VAULT ▼ ]" />
+5734:                             </span>
+5735:                           </button>
+5736:                         )}
+5737: 
+5738:                         {bioLabSubTab === 'anomaly' && (
+5739:                           <div className={`border p-2.5 rounded-sm font-mono text-[9px] transition-colors ${
+5740:                             anomalyEngineActive 
+5741:                               ? "border-purple-500/70 bg-[#0c0512]" 
+5742:                               : "border-purple-900/30 bg-black/35"
+5743:                           }`}>
+5744:                             <div className="flex items-center justify-between mb-1.5 select-none">
+5745:                               <span className={`font-bold tracking-wider uppercase flex items-center gap-1.5 ${
+5746:                                 anomalyEngineActive ? "text-purple-400" : "text-purple-500"
+5747:                               }`}>
+5748:                                 <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-ping" />
+5749:                                 <FlickeringPurpleText text="Anomaly Engine" />
+5750:                               </span>
+5751:                               <label className="relative inline-flex items-center cursor-pointer select-none">
+5752:                                 <input 
+5753:                                   type="checkbox" 
+5754:                                   checked={anomalyEngineActive} 
+5755:                                   onChange={(e) => handleToggleAnomalyEngine(e.target.checked)}
+5756:                                   className="sr-only peer"
+5757:                                 />
+5758:                                 <div className="w-7 h-4 bg-neutral-800 border border-neutral-700/60 rounded-full peer peer-focus:ring-0 peer-checked:bg-purple-600 after:content-[''] after:absolute after:top-[4px] after:left-[3px] after:bg-neutral-400 after:rounded-full after:h-2 after:w-2 after:transition-all peer-checked:after:translate-x-3.5 peer-checked:after:bg-purple-200" />
+5759:                               </label>
+5760:                             </div>
+5761: 
+5762:                             <div className="space-y-1 bg-black/45 p-1.5 rounded-sm border border-neutral-900/60 text-[7px] leading-normal mb-2.5">
+5763:                               {/* Requirement 1: Material stockpile key */}
+5764:                               <div className="flex justify-between items-center">
+5765:                                 <span className="text-neutral-500 uppercase">RESOURCE COUNT:</span>
+5766:                                 <span className={`font-semibold ${
+5767:                                   baseTallies.grandTotal >= 250000 
+5768:                                     ? "text-[#00FF41]" 
+5769:                                     : "text-red-400 animate-pulse"
+5770:                                 }`}>
+5771:                                   {baseTallies.grandTotal.toLocaleString()} / 250,000 NUCLEOTIDES  {baseTallies.grandTotal >= 250000 ? "✓" : "✗"}
+5772:                                 </span>
+5773:                               </div>
+5774: 
+5775:                               {/* Requirement 2: Energy Drain Warnings */}
+5776:                               <div className="flex justify-between items-center">
+5777:                                 <span className="text-neutral-500 uppercase">LOAD WARNING:</span>
+5778:                                 <span className="text-yellow-500/90 font-bold uppercase">RESETS STABILITY &amp; EMISSIONS TO 0</span>
+5779:                               </div>
+5780: 
+5781:                               {/* Cycle Cost */}
+5782:                               <div className="flex justify-between items-center">
+5783:                                 <span className="text-neutral-500 uppercase">CURRENT RATE:</span>
+5784:                                 <span className={anomalyEngineActive ? "text-purple-400 font-bold" : "text-neutral-450"}>
+5785:                                   -10,000 BASES / LOOP
+5786:                                 </span>
+5787:                               </div>
+5788:                             </div>
+5789: 
+5790:                             {/* Success Chance Live Dial Breakdown */}
+5791:                             {(() => {
+5792:                               const statsChance = getAnomalyEngineSuccessChance(baseTallies.grandTotal);
+5793:                               return (
+5794:                                 <div className="p-2 border border-purple-950/70 bg-[#0f0417] rounded-sm space-y-1 font-mono text-[7px]">
+5795:                                   <div className="text-[7.5px] font-bold text-purple-400 tracking-wider uppercase border-b border-purple-950/40 pb-0.5 flex justify-between">
+5796:                                     <span><FlickeringPurpleText text="ANOMALOUS DISCOVERY" /></span>
+5797:                                     <span className="text-white font-black">{statsChance.finalChance.toFixed(3)}%</span>
+5798:                                   </div>
+5799: 
+5800:                                   {statsChance.peakBoost > 0 && (
+5801:                                     <div className="flex justify-between text-pink-400 animate-pulse">
+5802:                                       <span>Resonance Peak Wave Spike:</span>
+5803:                                       <span>+{statsChance.peakBoost.toFixed(1)}%</span>
+5804:                                     </div>
+5805:                                   )}
+5806:                                   <div className="flex justify-between text-cyan-400">
+5807:                                     <span>Spectrum Dial Coupling Modifier:</span>
+5808:                                     <span>{statsChance.harmonicModifier >= 0 ? "+" : ""}{statsChance.harmonicModifier.toFixed(3)}%</span>
+5809:                                   </div>
+5810:                                 </div>
+5811:                               );
+5812:                             })()}
+5813:                           </div>
+5814:                         )}
+5815:                       </div>
+5816: 
+5817:                       {bioLabSubTab === 'pox' && (
+5818:                         <div className="text-[10px] text-green-700/80 leading-relaxed font-mono pt-3 border-t border-green-900/20 mt-3">
+5819:                           INFO: Gene blocks are used in the CONSTRUCTOR to build your target P.O.X. sequence.
+5820:                         </div>

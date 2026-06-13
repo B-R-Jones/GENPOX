@@ -121,7 +121,7 @@ export function getDailyWaveConfig(date: Date): WaveConfig {
 }
 
 /**
- * Custom weighted random codon generator influenced by the daily wave pair and its modifiers
+ * Custom weighted random gene generator influenced by the daily wave pair and its modifiers
  */
 export function generateWaveGeneBlock(wave: WaveConfig | null): string {
   const bases = ["A", "G", "T", "C"];

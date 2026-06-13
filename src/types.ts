@@ -25,7 +25,7 @@ export interface Creature {
   discoveredAt: number;
   origin: string; // "Created" or "Traded (from UID)"
   isAutoHacker?: boolean;
-  appendedCodons?: string[];
+  appendedGenes?: string[];
   isFavorite?: boolean;
   telomeres?: number; // Current telomere length out of 100
 }

@@ -65,8 +65,8 @@ export interface GenMail {
     creature: Creature;
     log: string[];
     isDefeated?: boolean;
-    codonsGained?: string[];
-    codonsLost?: string[];
+    genesGained?: string[];
+    genesLost?: string[];
   };
   tradeRequest?: {
     id: string;
@@ -123,9 +123,9 @@ function getCoherence(seq: string, target: string): 'full' | 'partial' | 'none' 
   
   let alignedMatches = 0;
   for (let i = 0; i < 8; i++) {
-    const seqCodon = seq64.substring(i * 8, (i + 1) * 8);
-    const tgtCodon = target64.substring(i * 8, (i + 1) * 8);
-    if (seqCodon && tgtCodon && seqCodon === tgtCodon) {
+    const seqGene = seq64.substring(i * 8, (i + 1) * 8);
+    const tgtGene = target64.substring(i * 8, (i + 1) * 8);
+    if (seqGene && tgtGene && seqGene === tgtGene) {
       alignedMatches++;
     }
   }
@@ -133,8 +133,8 @@ function getCoherence(seq: string, target: string): 'full' | 'partial' | 'none' 
   if (alignedMatches >= 1) return 'partial';
 
   for (let i = 0; i < 8; i++) {
-    const tgtCodon = target64.substring(i * 8, (i + 1) * 8);
-    if (tgtCodon && seq.includes(tgtCodon)) {
+    const tgtGene = target64.substring(i * 8, (i + 1) * 8);
+    if (tgtGene && seq.includes(tgtGene)) {
       return 'partial';
     }
   }
@@ -204,7 +204,7 @@ const encodeCreatureToBase64 = (creature: Creature): string => {
     weapon: creature.primaryWeapon,
     lore: creature.lore,
     ascii: creature.asciiArt,
-    appended: creature.appendedCodons || [],
+    appended: creature.appendedGenes || [],
     telomeres: creature.telomeres !== undefined ? creature.telomeres : 100
   };
   const jsonStr = JSON.stringify(compact);
@@ -231,7 +231,7 @@ const decodeCreatureFromBase64 = (base64String: string): Creature | null => {
       asciiArt: parsed.ascii || parsed.asciiArt || "o.x.o\n.###.\nx.o.x",
       discoveredAt: Date.now(),
       origin: "Traded via QR code",
-      appendedCodons: parsed.appended || [],
+      appendedGenes: parsed.appended || [],
       telomeres: parsed.telomeres !== undefined ? parsed.telomeres : 100
     };
   } catch (e) {
@@ -404,7 +404,7 @@ const NodeCrystalCanvas: React.FC<NodeCrystalCanvasProps> = ({ metrics, inventor
       const waveFrequency = 0.05 + totDepth * 0.08; // speed and spatial density of waves
       const ripplePhaseAngle = 0; // Perfectly static (no scrolling waves over time)
 
-      // Core anchor vertex positions (G top, T right, C bottom, A left)
+      // Unit anchor vertex positions (G top, T right, C bottom, A left)
       const ptG = { x: cx, y: cy - R * subWidthG };
       const ptT = { x: cx + R * subWidthT, y: cy };
       const ptC = { x: cx, y: cy + R * subWidthC };
@@ -514,7 +514,7 @@ const NodeCrystalCanvas: React.FC<NodeCrystalCanvasProps> = ({ metrics, inventor
         ctx.translate(cx + jitterX, cy + jitterY);
         ctx.rotate(rotationOffset);
 
-        // Core points adjusted for scale
+        // Unit points adjusted for scale
         const hG = { x: 0, y: -R * subWidthG * scale };
         const hT = { x: R * subWidthT * scale, y: 0 };
         const hC = { x: 0, y: R * subWidthC * scale };
@@ -647,7 +647,7 @@ const NodeCrystalCanvas: React.FC<NodeCrystalCanvasProps> = ({ metrics, inventor
       });
       ctx.restore();
 
-      // Core Anchor Point kept calm and static
+      // Unit Anchor Point kept calm and static
       ctx.beginPath();
       ctx.arc(cx + jitterX, cy + jitterY, 1.5, 0, 2 * Math.PI);
       ctx.fillStyle = "rgba(0, 255, 65, 0.55)";
@@ -866,11 +866,12 @@ export default function PoxConsole({
     ];
   });
 
-  // Node Crystal Core calculations
+  // Node Crystal Unit calculations
   const inventoryStrings = React.useMemo(() => {
     const list: string[] = [];
     sequences.forEach(item => {
-      const cnt = Math.max(0, item.count || 0);
+      // Unique-only calculation: treat count as 1 if it is > 0
+      const cnt = (item.count && item.count > 0) ? 1 : 0;
       for (let i = 0; i < cnt; i++) {
         if (item.sequence && item.sequence.length === 8) {
           list.push(item.sequence.toUpperCase());
@@ -964,18 +965,18 @@ export default function PoxConsole({
   const [scrollingGene, setScrollingGene] = useState<string>("--------");
   const [newestSequence, setNewestSequence] = useState<string>("");
   const [isFreshSequence, setIsFreshSequence] = useState<boolean>(false);
-  const [recentSplicedCodons, setRecentSplicedCodons] = useState<{ sequence: string; isNew: boolean }[]>([]);
+  const [recentSplicedGenes, setRecentSplicedGenes] = useState<{ sequence: string; isNew: boolean }[]>([]);
   
   const [discoveredPacketsLog, setDiscoveredPacketsLog] = useState<{
     id: string;
     timestamp: number;
-    codons: { sequence: string; isNew: boolean }[];
+    genes: { sequence: string; isNew: boolean }[];
   }[]>(() => {
     return [
       {
         id: "init-packet-1",
         timestamp: Date.now() - 60000,
-        codons: [
+        genes: [
           { sequence: "AGTCGTAC", isNew: false },
           { sequence: "CCCGGGAA", isNew: false },
           { sequence: "TTTAAACG", isNew: false },
@@ -988,35 +989,35 @@ export default function PoxConsole({
       }
     ];
   });
-  const [isCodonLogPopupOpen, setIsCodonLogPopupOpen] = useState<boolean>(false);
-  const [viewportCodonBalancePopupMailId, setViewportCodonBalancePopupMailId] = useState<string | null>(null);
+  const [isGeneLogPopupOpen, setIsGeneLogPopupOpen] = useState<boolean>(false);
+  const [viewportGeneBalancePopupMailId, setViewportGeneBalancePopupMailId] = useState<string | null>(null);
 
   // Gene Discovery Log Enhanced State
   const [discoveryLogTab, setDiscoveryLogTab] = useState<"register" | "search">("register");
   const [discoverySearchStep, setDiscoverySearchStep] = useState<number>(0);
   const [discoverySearchPrefix, setDiscoverySearchPrefix] = useState<string>("");
   const [discoverySearchText, setDiscoverySearchText] = useState<string>("");
-  const [discoverySelectedCodon, setDiscoverySelectedCodon] = useState<string | null>(null);
+  const [discoverySelectedGene, setDiscoverySelectedGene] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isCodonLogPopupOpen) {
+    if (!isGeneLogPopupOpen) {
       setDiscoveryLogTab("register");
       setDiscoverySearchStep(0);
       setDiscoverySearchPrefix("");
       setDiscoverySearchText("");
-      setDiscoverySelectedCodon(null);
+      setDiscoverySelectedGene(null);
     }
-  }, [isCodonLogPopupOpen]);
+  }, [isGeneLogPopupOpen]);
 
   const [isAnomalousLedgerExpanded, setIsAnomalousLedgerExpanded] = useState<boolean>(false);
   const [activeLedgerMailId, setActiveLedgerMailId] = useState<string | null>(null);
 
-  // Anomalous Codons Helper Functions:
-  const isAnomalousCodon = (seq: string): boolean => {
+  // Anomalous Genes Helper Functions:
+  const isAnomalousGene = (seq: string): boolean => {
     return seq.length === 8 && [...seq].some(char => "XZYW?!$%&@#".includes(char));
   };
 
-  const generateAnomalousCodon = (): string => {
+  const generateAnomalousGene = (): string => {
     const chars = "XZYW?!$%&@#";
     let result = "";
     for (let i = 0; i < 8; i++) {
@@ -1025,8 +1026,8 @@ export default function PoxConsole({
     return result;
   };
 
-  const getBenefitForAnomalousCodon = (codon: string) => {
-    const char = codon[0] || 'X';
+  const getBenefitForAnomalousGene = (gene: string) => {
+    const char = gene[0] || 'X';
     if (char === 'X' || char === 'Z') {
       return {
         id: "DOUBLE_STRIKE",
@@ -1044,8 +1045,8 @@ export default function PoxConsole({
     } else if (char === '?' || char === '!') {
       return {
         id: "HARVEST_BOOST",
-        name: "Quantum Extraction Core",
-        description: "Dramatically boosts codon harvesting rates (+1 extra codon on win).",
+        name: "Quantum Extraction Unit",
+        description: "Dramatically boosts gene harvesting rates (+1 extra gene on win).",
         effectType: "harvest_boost"
       };
     } else if (char === '$' || char === '%') {
@@ -1069,8 +1070,8 @@ export default function PoxConsole({
     const benefits: { id: string; name: string; description: string; effectType: string }[] = [];
     for (let i = 0; i < sequence.length; i += 8) {
       const chunk = sequence.slice(i, i + 8);
-      if (isAnomalousCodon(chunk)) {
-        const b = getBenefitForAnomalousCodon(chunk);
+      if (isAnomalousGene(chunk)) {
+        const b = getBenefitForAnomalousGene(chunk);
         if (!benefits.some(existing => existing.id === b.id)) {
           benefits.push(b);
         }
@@ -1160,11 +1161,11 @@ export default function PoxConsole({
             blocks.push(block);
           }
         }
-        // Appended codons
-        if (match.appendedCodons) {
-          match.appendedCodons.forEach(codon => {
-            if (codon.length === 8) {
-              blocks.push(codon);
+        // Appended genes
+        if (match.appendedGenes) {
+          match.appendedGenes.forEach(gene => {
+            if (gene.length === 8) {
+              blocks.push(gene);
             }
           });
         }
@@ -1389,7 +1390,7 @@ export default function PoxConsole({
   const [libFilterFaction, setLibFilterFaction] = useState<string>("ALL");
   const [libFilterType, setLibFilterType] = useState<string>("ALL");
   const [libFilterTag, setLibFilterTag] = useState<string>("ALL");
-  const [libFilterDispatchCodonOnly, setLibFilterDispatchCodonOnly] = useState<boolean>(false);
+  const [libFilterDispatchGeneOnly, setLibFilterDispatchGeneOnly] = useState<boolean>(false);
   const [libMinVitality, setLibMinVitality] = useState<number>(0);
   const [libMaxVitality, setLibMaxVitality] = useState<number>(250);
   const [libMinAttack, setLibMinAttack] = useState<number>(0);
@@ -1435,9 +1436,9 @@ export default function PoxConsole({
   const [tradeArchiveFaction, setTradeArchiveFaction] = useState<string>("ALL");
   const [tradeArchiveSort, setTradeArchiveSort] = useState<string>("name-asc");
 
-  const [selectedCodonIndex, setSelectedCodonIndex] = useState<number | null>(null);
+  const [selectedGeneIndex, setSelectedGeneIndex] = useState<number | null>(null);
   const [showTradeDiagnostics, setShowTradeDiagnostics] = useState<boolean>(false);
-  const [isCodonLedgerExpanded, setIsCodonLedgerExpanded] = useState<boolean>(false);
+  const [isGeneLedgerExpanded, setIsGeneLedgerExpanded] = useState<boolean>(false);
 
   // Hierarchical Base-Pair UI Step-Searching
   const [searchStep, setSearchStep] = useState<number>(0);
@@ -1450,12 +1451,12 @@ export default function PoxConsole({
   }, [activeSlotSelection]);
 
   useEffect(() => {
-    if (!isCodonLedgerExpanded) {
+    if (!isGeneLedgerExpanded) {
       setSearchStep(0);
       setCurrentSearchPrefix("");
       setShowIntermediateMatches(false);
     }
-  }, [isCodonLedgerExpanded]);
+  }, [isGeneLedgerExpanded]);
 
   // Target sequence for standard re-sequencing constructor
   const [targetSequence, setTargetSequence] = useState<string>(() => {
@@ -1782,26 +1783,26 @@ export default function PoxConsole({
         const quarterDuration = m.totalDuration / 4;
         const currentQuarters = Math.min(4, Math.floor(elapsedSeconds / quarterDuration));
         
-        let harvestedCodons = [...(m.harvestedCodons || [])];
+        let harvestedGenes = [...(m.harvestedGenes || [])];
         let quartersHarvested = m.quartersHarvested || 0;
         
         if (currentQuarters > quartersHarvested) {
           shouldUpdate = true;
           for (let q = quartersHarvested + 1; q <= currentQuarters; q++) {
-            // Pick acquired codon depending on accuracy
+            // Pick acquired gene depending on accuracy
             const anom = bioAnomalies.find(a => a.id === m.anomalyId);
-            const baseCodon = anom ? anom.codon : "AGTCGTAC";
+            const baseGene = anom ? anom.gene : "AGTCGTAC";
             const heatZoneRadius = (anom?.heatZoneDiameter || 20) / 2;
             
             // Proximity ratio: 0.0 is center, 1.0 is maximum boundary of the circle
             const ratio = Math.min(1, m.dispatchDistance / Math.max(1, heatZoneRadius));
             const perfectYieldChance = 1 - ratio; // 100% chance at center, 0% at boundary
             
-            let codonGot = baseCodon;
+            let geneGot = baseGene;
             if (Math.random() > perfectYieldChance) {
-              // Mutated codon (different/mutated sequence)
+              // Mutated gene (different/mutated sequence)
               const bases = ["A", "G", "T", "C"];
-              const chars = baseCodon.split("");
+              const chars = baseGene.split("");
               // Mutate depending on distance
               const numMutations = ratio > 0.6 ? 2 : 1;
               for (let mut = 0; mut < numMutations; mut++) {
@@ -1810,9 +1811,9 @@ export default function PoxConsole({
                 const choices = bases.filter(b => b !== oldBase);
                 chars[idx] = choices[Math.floor(Math.random() * choices.length)];
               }
-              codonGot = chars.join("");
+              geneGot = chars.join("");
             }
-            harvestedCodons.push(codonGot);
+            harvestedGenes.push(geneGot);
           }
           quartersHarvested = currentQuarters;
         }
@@ -1824,7 +1825,7 @@ export default function PoxConsole({
             ...m,
             elapsedSeconds,
             quartersHarvested,
-            harvestedCodons,
+            harvestedGenes,
             isCompleted
           };
         }
@@ -1876,7 +1877,7 @@ export default function PoxConsole({
       totalDuration,
       elapsedSeconds: 0,
       quartersHarvested: 0,
-      harvestedCodons: [],
+      harvestedGenes: [],
       isCompleted: false,
       isReturned: false
     };
@@ -1885,20 +1886,20 @@ export default function PoxConsole({
     sound.playBeep(440, 0.15, "square");
     setTimeout(() => sound.playBeep(880, 0.25, "sine"), 120);
     
-    triggerLog(`Dispatched "${creature.name}" on harvest mission. Base duration: ${Math.round(totalDuration / 60)}m. Core distance: ${dist.toFixed(1)}ft.`, "success");
+    triggerLog(`Dispatched "${creature.name}" on harvest mission. Base duration: ${Math.round(totalDuration / 60)}m. Unit distance: ${dist.toFixed(1)}ft.`, "success");
     addScannerLog(`DISPATCH: "${creature.name}" targeted Anomaly ${anom.id} (Distance: ${dist.toFixed(1)}ft)`);
     setCustomTapCoords(null);
   };
 
-  const handleRetrieveHarvestedCodons = (missionId: string) => {
+  const handleRetrieveHarvestedGenes = (missionId: string) => {
     const mission = harvestingMissions.find(m => m.id === missionId);
     if (!mission) return;
 
     // Set as returned so it goes off the map and is freed up
     setHarvestingMissions(prev => prev.map(m => m.id === missionId ? { ...m, isReturned: true } : m));
 
-    // Grant collected codons to sequences currency state!
-    const newlyAcquired = mission.harvestedCodons || [];
+    // Grant collected genes to sequences currency state!
+    const newlyAcquired = mission.harvestedGenes || [];
     if (newlyAcquired.length > 0) {
       setSequences(prev => {
         let updated = [...prev];
@@ -1918,11 +1919,11 @@ export default function PoxConsole({
       });
 
       sound.playSynthesisSuccess();
-      triggerLog(`Retrieved "${mission.creatureName}" to terminal. Transferred ${newlyAcquired.length} codons to stockpile: ${newlyAcquired.join(", ")}`, "success");
-      addScannerLog(`RECALL: "${mission.creatureName}" returned. Acquired codons: ${newlyAcquired.join(", ")}`);
+      triggerLog(`Retrieved "${mission.creatureName}" to terminal. Transferred ${newlyAcquired.length} genes to stockpile: ${newlyAcquired.join(", ")}`, "success");
+      addScannerLog(`RECALL: "${mission.creatureName}" returned. Acquired genes: ${newlyAcquired.join(", ")}`);
     } else {
       sound.playBeep(330, 0.2, "sawtooth");
-      triggerLog(`Retrieved "${mission.creatureName}" but zero codon sequences collected. Location scan was blank.`, "warn");
+      triggerLog(`Retrieved "${mission.creatureName}" but zero gene sequences collected. Location scan was blank.`, "warn");
       addScannerLog(`RECALL: "${mission.creatureName}" returned empty.`);
     }
   };
@@ -1943,7 +1944,7 @@ export default function PoxConsole({
     sound.playBeep(520, 0.08, "sine");
     setSelectedAnomalyId(anomalyId);
     setCustomTapCoords({ lat, lng, distance: distanceInFeet });
-    triggerLog(`Harvest coordinate locked: ${distanceInFeet.toFixed(1)} ft from core.`, "info");
+    triggerLog(`Harvest coordinate locked: ${distanceInFeet.toFixed(1)} ft from node.`, "info");
   };
 
   // Catch Maps authentication / activation issues globally
@@ -1978,7 +1979,7 @@ export default function PoxConsole({
       "CHITIN-Swarm Larva",
       "HYBRID Genome Signature"
     ];
-    const codons = [
+    const genes = [
       "AGTCGTAC",
       "CCCGGGAA",
       "TTTAAACG",
@@ -2009,7 +2010,7 @@ export default function PoxConsole({
         lng: userCoords.lng + dLng,
         dx,
         dy,
-        codon: codons[idx],
+        gene: genes[idx],
         faction: factions[idx % factions.length],
         signalStrength: Math.floor(98 - distance * 0.7),
         mutantLoad: Math.floor(45 + (idx * 9) + (Math.cos(idx * 3) * 5)),
@@ -2049,7 +2050,7 @@ export default function PoxConsole({
     );
   };
 
-  const handleHarvestAnomalyCodon = (anomalyId: string) => {
+  const handleHarvestAnomalyGene = (anomalyId: string) => {
     if (!isPowered) {
       triggerLog("SYS POWER OFFLINE. CANNOT ACCESS ELECTRON-COUPLING EXTRACTOR.", "warn");
       sound.playReject();
@@ -2058,12 +2059,12 @@ export default function PoxConsole({
     const anomaly = bioAnomalies.find(a => a.id === anomalyId);
     if (!anomaly) return;
     if (anomaly.harvested) {
-      triggerLog(`CODON CANNOT BE HARVESTED. Molecular trace is depleted.`, "warn");
+      triggerLog(`GENE CANNOT BE HARVESTED. Molecular trace is depleted.`, "warn");
       sound.playReject();
       return;
     }
     if (anomaly.distance > scanRadius) {
-      triggerLog(`CODON OUT OF SYNC RANGE. Expand player Sync-Net boundary.`, "warn");
+      triggerLog(`GENE OUT OF SYNC RANGE. Expand player Sync-Net boundary.`, "warn");
       sound.playReject();
       return;
     }
@@ -2077,19 +2078,19 @@ export default function PoxConsole({
 
     // Update sequences
     setSequences(prev => {
-      const existing = prev.find(s => s.sequence === anomaly.codon);
+      const existing = prev.find(s => s.sequence === anomaly.gene);
       if (existing) {
-        return prev.map(s => s.sequence === anomaly.codon ? { ...s, count: s.count + 1 } : s);
+        return prev.map(s => s.sequence === anomaly.gene ? { ...s, count: s.count + 1 } : s);
       } else {
-        return [...prev, { sequence: anomaly.codon, count: 1, discoveredAt: Date.now() }];
+        return [...prev, { sequence: anomaly.gene, count: 1, discoveredAt: Date.now() }];
       }
     });
 
-    triggerLog(`[SYNC-NET RECOVERY] Extracted codon Block "${anomaly.codon}" into biological inventory.`, "success");
+    triggerLog(`[SYNC-NET RECOVERY] Extracted gene Block "${anomaly.gene}" into biological inventory.`, "success");
     sound.playTradeSuccess();
     setStats((prev) => ({
       ...prev,
-      totalCodonsAcquired: prev.totalCodonsAcquired + 1
+      totalGenesAcquired: prev.totalGenesAcquired + 1
     }));
   };
 
@@ -2170,8 +2171,8 @@ export default function PoxConsole({
     winnerUid: string | null;
     isTradeInterceptor?: boolean;
     usedSpecialMoves?: string[];
-    harvestedCodon?: string;
-    harvestedExtraCodons?: string[];
+    harvestedGene?: string;
+    harvestedExtraGenes?: string[];
   } | null>(null);
 
   // Auto scroll combat log to the bottom
@@ -2217,7 +2218,7 @@ export default function PoxConsole({
       {
         id: "MAIL-9919DX",
         date: "2026-06-06",
-        tagline: "P.O.X. Transceiver Sync Core: Urgent Bio-Defense Harvest Request",
+        tagline: "P.O.X. Transceiver Sync Unit: Urgent Bio-Defense Harvest Request",
         isRead: true,
         sequences: generateDailyBountySequences("2026-06-06"),
         type: "dispatch"
@@ -2235,29 +2236,29 @@ export default function PoxConsole({
     localStorage.setItem("pox_gen_network_mails", JSON.stringify(genMails));
   }, [genMails]);
 
-  // Memoized daily G.E.N. Network dispatch codons
-  const dispatchCodons = React.useMemo(() => {
-    const codons = new Set<string>();
+  // Memoized daily G.E.N. Network dispatch genes
+  const dispatchGenes = React.useMemo(() => {
+    const genes = new Set<string>();
     const todayMail = genMails.find((m) => m.type === 'dispatch' || (!m.type && m.sequences && m.sequences.length > 0));
     const todayTargets = todayMail ? todayMail.sequences : [];
     todayTargets.forEach((seq) => {
       for (let i = 0; i < seq.length; i += 8) {
-        codons.add(seq.slice(i, i + 8));
+        genes.add(seq.slice(i, i + 8));
       }
     });
-    return codons;
+    return genes;
   }, [genMails]);
 
-  const checkCreatureHasDispatchCodon = React.useCallback((seq: string) => {
+  const checkCreatureHasDispatchGene = React.useCallback((seq: string) => {
     for (let i = 0; i < seq.length; i += 8) {
-      if (dispatchCodons.has(seq.slice(i, i + 8))) return true;
+      if (dispatchGenes.has(seq.slice(i, i + 8))) return true;
     }
     return false;
-  }, [dispatchCodons]);
+  }, [dispatchGenes]);
 
   interface PlayerStatsData {
     totalSpliced: number;
-    totalCodonsAcquired: number;
+    totalGenesAcquired: number;
     totalManualAccelerations: number;
     totalTradesCompleted: number;
     totalCreaturesSpliceHarvested: number;
@@ -2281,7 +2282,7 @@ export default function PoxConsole({
     }
     return {
       totalSpliced: 1,
-      totalCodonsAcquired: 4,
+      totalGenesAcquired: 4,
       totalManualAccelerations: 0,
       totalTradesCompleted: 0,
       totalCreaturesSpliceHarvested: 0,
@@ -2304,7 +2305,7 @@ export default function PoxConsole({
   }, [stats]);
 
   useEffect(() => {
-    setSelectedCodonIndex(null);
+    setSelectedGeneIndex(null);
   }, [inspectedCreatureId]);
 
   // Live Terminal Log Stream state (for footer and diagnostic metrics)
@@ -2334,7 +2335,7 @@ export default function PoxConsole({
     sound.isMuted = isMuted;
   }, [isMuted]);
 
-  // Aggregate stats: calculate count of A, G, T, C across sequence codon assets
+  // Aggregate stats: calculate count of A, G, T, C across sequence gene assets
   const getAggregateNucleotides = () => {
     let A = 0, G = 0, T = 0, C = 0;
     sequences.forEach(s => {
@@ -2404,11 +2405,11 @@ export default function PoxConsole({
       if (nextVal <= 0) {
         if (devForceAnomalyRef.current) {
           // Dev force toggle active: Bypass fuel consumption & guarantee success
-          const anomalousCodon = generateAnomalousCodon();
+          const anomalousGene = generateAnomalousGene();
           sound.playSynthesisSuccess();
-          triggerAddGeneSequence(anomalousCodon);
-          triggerLog(`[DEV MODE FUSION] Force-triggered successfully (Zero resources consumed). Codon block: ${anomalousCodon}`, "success");
-          addScannerLog(`[DEV INJECTED CORE] Forced anomalous creation of: ${anomalousCodon}`);
+          triggerAddGeneSequence(anomalousGene);
+          triggerLog(`[DEV MODE FUSION] Force-triggered successfully (Zero resources consumed). Gene block: ${anomalousGene}`, "success");
+          addScannerLog(`[DEV INJECTED UNIT] Forced anomalous creation of: ${anomalousGene}`);
         } else if (anomalyEngineActiveRef.current && baseTalliesRef.current.grandTotal >= 250000) {
           // Calculate active scaling chance based on current grand total nucleotide stockpile
           const currentTotal = baseTalliesRef.current.grandTotal;
@@ -2419,22 +2420,22 @@ export default function PoxConsole({
           consumeNucleotides(10000);
 
           if (roll <= chanceMetrics.finalChance) {
-            const anomalousCodon = generateAnomalousCodon();
+            const anomalousGene = generateAnomalousGene();
             sound.playSynthesisSuccess();
-            triggerAddGeneSequence(anomalousCodon);
-            triggerLog(`[ANOMALY ENGINE] Fusion successful! Probability was ${chanceMetrics.finalChance.toFixed(3)}% (Rolled: ${roll.toFixed(3)}%). Generated anomalous block ${anomalousCodon}.`, "success");
-            addScannerLog(`[ANOMALY GENERATOR SUCCESS] Synthesized codon block ${anomalousCodon} under unstable fusion conditions.`);
+            triggerAddGeneSequence(anomalousGene);
+            triggerLog(`[ANOMALY ENGINE] Fusion successful! Probability was ${chanceMetrics.finalChance.toFixed(3)}% (Rolled: ${roll.toFixed(3)}%). Generated anomalous block ${anomalousGene}.`, "success");
+            addScannerLog(`[ANOMALY GENERATOR SUCCESS] Synthesized gene block ${anomalousGene} under unstable fusion conditions.`);
           } else {
             sound.playBeep(220, 0.35, "sawtooth");
             triggerLog(`[ANOMALY ENGINE] Decoupling failure. Fusion chanced: ${chanceMetrics.finalChance.toFixed(3)}% (Rolled: ${roll.toFixed(3)}%). 10,000 nucleotides decomposed in magnetic buffer.`, "warn");
-            addScannerLog("[ANOMALY FAILED] Fusion was unsuccessful. Energy discharged without codon yield.");
+            addScannerLog("[ANOMALY FAILED] Fusion was unsuccessful. Energy discharged without gene yield.");
           }
         } else {
           if (anomalyEngineActiveRef.current) {
             setAnomalyEngineActive(false);
             triggerLog("ANOMALY ENGINE SHUT DOWN: Nucleotide reserves fell below minimum 250k threshold.", "warn");
           }
-          // Trigger standard codon splicing 8-codon packet
+          // Trigger standard gene splicing 8-gene packet
           const batch: string[] = [];
           for (let i = 0; i < 8; i++) {
             batch.push(generateWaveGeneBlock(todayWave));
@@ -2466,8 +2467,8 @@ export default function PoxConsole({
       let remaining = totalSequencesToConsume;
       const updated = prev
         .map((s) => {
-          if (isAnomalousCodon(s.sequence)) {
-            return s; // leave anomalous codons completely alone
+          if (isAnomalousGene(s.sequence)) {
+            return s; // leave anomalous genes completely alone
           }
           if (remaining <= 0) {
             return s;
@@ -2491,16 +2492,16 @@ export default function PoxConsole({
       setNodeStability(0);
       setNodeEmissivity(0);
       triggerLog("ANOMALY ENGINE ENGAGED! High voltage strain resets Node Stability & Emissions to 0.", "warn");
-      addScannerLog("[ANOMALY ENGINE INITIATION] All telemetry channels reset index to 0. Cosmic codon hunting activated!");
+      addScannerLog("[ANOMALY ENGINE INITIATION] All telemetry channels reset index to 0. Cosmic gene hunting activated!");
       sound.playBeep(120, 0.6, "sawtooth");
     } else {
       setAnomalyEngineActive(false);
-      triggerLog("Anomaly Engine disengaged. Core power normalized. Standard Bio-Lab Reactor active.", "info");
+      triggerLog("Anomaly Engine disengaged. Reactor power normalized. Standard Bio-Lab Reactor active.", "info");
       sound.playBeep(350, 0.15, "sine");
     }
   };
 
-  // Add synthesized codon
+  // Add synthesized gene
   const triggerAddGeneSequence = (gene: string) => {
     setNewestSequence(gene);
     const alreadyDiscovered = sequences.some((s) => s.sequence === gene);
@@ -2518,17 +2519,17 @@ export default function PoxConsole({
 
     if (alreadyDiscovered) {
       setIsFreshSequence(false);
-      setRecentSplicedCodons([{ sequence: gene, isNew: false }]);
+      setRecentSplicedGenes([{ sequence: gene, isNew: false }]);
       triggerLog(`CONSOLIDATED NUCLEOTIDE PATTERN: ${gene} (+1 owned)`, "info");
     } else {
       setIsFreshSequence(true);
-      setRecentSplicedCodons([{ sequence: gene, isNew: true }]);
-      triggerLog(`NEW RECOGNIZED CODON DISCOVERED: ${gene}`, "success");
+      setRecentSplicedGenes([{ sequence: gene, isNew: true }]);
+      triggerLog(`NEW RECOGNIZED GENE DISCOVERED: ${gene}`, "success");
     }
 
     setStats((prev) => ({
       ...prev,
-      totalCodonsAcquired: prev.totalCodonsAcquired + 1
+      totalGenesAcquired: prev.totalGenesAcquired + 1
     }));
   };
 
@@ -2569,19 +2570,19 @@ export default function PoxConsole({
       return updated;
     });
 
-    setRecentSplicedCodons(newlySplicedList);
+    setRecentSplicedGenes(newlySplicedList);
     setDiscoveredPacketsLog((prev) => {
       const newEntry = {
         id: Math.random().toString(36).substring(2, 9) + '-' + Date.now(),
         timestamp: Date.now(),
-        codons: newlySplicedList
+        genes: newlySplicedList
       };
       return [newEntry, ...prev].slice(0, 8);
     });
 
     setStats((prev) => ({
       ...prev,
-      totalCodonsAcquired: prev.totalCodonsAcquired + genes.length
+      totalGenesAcquired: prev.totalGenesAcquired + genes.length
     }));
 
     const newlyDiscoveredCount = newlySplicedList.filter(g => g.isNew).length;
@@ -2607,7 +2608,7 @@ export default function PoxConsole({
 
     let nextTime = prevTime > 2 ? prevTime - 2 : resetVal;
 
-    // Trigger instant codon packet synthesis if accelerated to boundary reset
+    // Trigger instant gene packet synthesis if accelerated to boundary reset
     if (prevTime <= 2) {
       const batch: string[] = [];
       for (let i = 0; i < 8; i++) {
@@ -2631,17 +2632,17 @@ export default function PoxConsole({
 
     for (let i = 0; i < 8; i++) {
       if (updatedSlots[i] === null) {
-        // Target required codon segment at slot i
-        const requiredCodon = targetSequence.substring(i * 8, (i + 1) * 8);
+        // Target required gene segment at slot i
+        const requiredGene = targetSequence.substring(i * 8, (i + 1) * 8);
 
         // Find if this exact matching sequence is available in stock
-        const stockIndex = stockSequences.findIndex(s => s.sequence === requiredCodon && s.count > 0);
+        const stockIndex = stockSequences.findIndex(s => s.sequence === requiredGene && s.count > 0);
         if (stockIndex >= 0) {
           stockSequences[stockIndex] = {
             ...stockSequences[stockIndex],
             count: stockSequences[stockIndex].count - 1
           };
-          updatedSlots[i] = requiredCodon;
+          updatedSlots[i] = requiredGene;
           didChanges = true;
           autoFilledCount++;
         }
@@ -2651,9 +2652,9 @@ export default function PoxConsole({
     if (didChanges) {
       setSequences(stockSequences.filter(s => s.count > 0 || sequences.find(p => p.sequence === s.sequence)?.count === 0));
       setSplicerSlots(updatedSlots);
-      triggerLog(`AUTO CODON: Filled ${autoFilledCount} matching slots with verified stock segments.`, "success");
+      triggerLog(`AUTO GENE: Filled ${autoFilledCount} matching slots with verified stock segments.`, "success");
     } else {
-      triggerLog("AUTO CODON: No matching segments found in stock for any unfilled slots.", "warn");
+      triggerLog("AUTO GENE: No matching segments found in stock for any unfilled slots.", "warn");
     }
   };
 
@@ -2668,9 +2669,9 @@ export default function PoxConsole({
     if (activeSlotSelection === null) return;
     
     // Check if selected sequence matches the expected sequence for this slot location
-    const expectedCodon = targetSequence.substring(activeSlotSelection * 8, (activeSlotSelection + 1) * 8);
-    if (seq !== expectedCodon) {
-      triggerLog(`GENOME MISMATCH: Codon does not match required slot sequence ${expectedCodon}`, "warn");
+    const expectedGene = targetSequence.substring(activeSlotSelection * 8, (activeSlotSelection + 1) * 8);
+    if (seq !== expectedGene) {
+      triggerLog(`GENOME MISMATCH: Gene does not match required slot sequence ${expectedGene}`, "warn");
       sound.playBeep(220, 0.2, "sawtooth");
       return;
     }
@@ -2706,7 +2707,7 @@ export default function PoxConsole({
     setSplicerSlots(updatedSlots);
     setActiveSlotSelection(null);
     sound.playBeep(440, 0.1, "triangle");
-    triggerLog(`Assigned matching codon block to slot #${activeSlotSelection + 1}`, "success");
+    triggerLog(`Assigned matching gene block to slot #${activeSlotSelection + 1}`, "success");
   };
 
   const handleEjectSlot = (slotIdx: number, e: React.MouseEvent) => {
@@ -2731,7 +2732,7 @@ export default function PoxConsole({
     const updated = [...splicerSlots];
     updated[slotIdx] = null;
     setSplicerSlots(updated);
-    triggerLog(`Returned codon segment #${slotIdx + 1} to archive stock`, "info");
+    triggerLog(`Returned gene segment #${slotIdx + 1} to archive stock`, "info");
   };
 
   // G.E.N. Network specific splicing helpers
@@ -2744,9 +2745,9 @@ export default function PoxConsole({
   const handleSelectSequenceForNetSlot = (seq: string) => {
     if (activeNetSlotSelection === null || !selectedDispatchSequence) return;
     
-    const expectedCodon = selectedDispatchSequence.substring(activeNetSlotSelection * 8, (activeNetSlotSelection + 1) * 8);
-    if (seq !== expectedCodon) {
-      triggerLog(`GENOME MISMATCH: Codon does not match required slot sequence ${expectedCodon}`, "warn");
+    const expectedGene = selectedDispatchSequence.substring(activeNetSlotSelection * 8, (activeNetSlotSelection + 1) * 8);
+    if (seq !== expectedGene) {
+      triggerLog(`GENOME MISMATCH: Gene does not match required slot sequence ${expectedGene}`, "warn");
       sound.playBeep(220, 0.2, "sawtooth");
       return;
     }
@@ -2782,7 +2783,7 @@ export default function PoxConsole({
     setNetSplicerSlots(updatedSlots);
     setActiveNetSlotSelection(null);
     sound.playBeep(440, 0.1, "triangle");
-    triggerLog(`Assigned matching G.E.N. codon block to slot #${activeNetSlotSelection + 1}`, "success");
+    triggerLog(`Assigned matching G.E.N. gene block to slot #${activeNetSlotSelection + 1}`, "success");
   };
 
   const handleEjectNetSlot = (slotIdx: number, e: React.MouseEvent) => {
@@ -2807,7 +2808,7 @@ export default function PoxConsole({
     const updated = [...netSplicerSlots];
     updated[slotIdx] = null;
     setNetSplicerSlots(updated);
-    triggerLog(`Returned G.E.N. codon segment #${slotIdx + 1} to archive stock`, "info");
+    triggerLog(`Returned G.E.N. gene segment #${slotIdx + 1} to archive stock`, "info");
   };
 
   const handleAutofillNetSplicer = () => {
@@ -2821,15 +2822,15 @@ export default function PoxConsole({
 
     for (let i = 0; i < 8; i++) {
       if (updatedSlots[i] === null) {
-        const requiredCodon = selectedDispatchSequence.substring(i * 8, (i + 1) * 8);
+        const requiredGene = selectedDispatchSequence.substring(i * 8, (i + 1) * 8);
 
-        const stockIndex = stockSequences.findIndex(s => s.sequence === requiredCodon && s.count > 0);
+        const stockIndex = stockSequences.findIndex(s => s.sequence === requiredGene && s.count > 0);
         if (stockIndex >= 0) {
           stockSequences[stockIndex] = {
             ...stockSequences[stockIndex],
             count: stockSequences[stockIndex].count - 1
           };
-          updatedSlots[i] = requiredCodon;
+          updatedSlots[i] = requiredGene;
           didChanges = true;
           autoFilledCount++;
         }
@@ -2839,9 +2840,9 @@ export default function PoxConsole({
     if (didChanges) {
       setSequences(stockSequences.filter(s => s.count > 0 || sequences.find(p => p.sequence === s.sequence)?.count === 0));
       setNetSplicerSlots(updatedSlots);
-      triggerLog(`G.E.N. AUTO CODON: Filled ${autoFilledCount} matching slots.`, "success");
+      triggerLog(`G.E.N. AUTO GENE: Filled ${autoFilledCount} matching slots.`, "success");
     } else {
-      triggerLog("G.E.N. AUTO CODON: No matching segments found in stock.", "warn");
+      triggerLog("G.E.N. AUTO GENE: No matching segments found in stock.", "warn");
     }
   };
 
@@ -2997,7 +2998,7 @@ export default function PoxConsole({
             lore: data.creature.lore || "A fast splicing mutant warrior.",
             asciiArt: data.creature.asciiArt || "o.x.o\n.###.\nx.o.x",
             discoveredAt: Date.now(),
-            origin: "Spliced Core"
+            origin: "Spliced Gene"
           };
           setCreatures((prev) => [spawned, ...prev]);
           setCreatureCardOpenedFrom('Constructor');
@@ -3032,7 +3033,7 @@ export default function PoxConsole({
     }, 2200);
   };
 
-  // Forces a 64-character genome construction bypassing standard codon availability constraints
+  // Forces a 64-character genome construction bypassing standard gene availability constraints
   const handleForceConstruction = (customSequence?: string | any) => {
     if (isSplicing || isForcedConstructionActive) return;
 
@@ -3072,10 +3073,10 @@ export default function PoxConsole({
     const isLooping = isForcedLoopActiveRef.current;
 
     const logs: string[] = [
-      `[INIT] >> ENGAGING EMERGENCY CODON OVERRIDE SEQUENCE...`,
+      `[INIT] >> ENGAGING EMERGENCY GENE OVERRIDE SEQUENCE...`,
       ...(isLooping ? [
         `[STATUS: FREEZE MAINTAINED] >> Reactor thermal coils frozen for active construction loop.`,
-        `[REASON] >> CORES RUNNING UNDER CRITICAL LOOP VOLTAGE.`
+        `[REASON] >> SYSTEMS RUNNING UNDER CRITICAL LOOP VOLTAGE.`
       ] : [
         `[WARNING] >> REACTOR OVERHEATING RISK: STABILIZING COILS FORCED TO FREEZE FOR 8.0 SECONDS.`
       ]),
@@ -3086,7 +3087,7 @@ export default function PoxConsole({
 
     let currentStock = [...sequences];
 
-    // Helper to deduct a codon from stock
+    // Helper to deduct a gene from stock
     const deductFromStock = (seq: string): boolean => {
       const idx = currentStock.findIndex(s => s.sequence === seq && s.count > 0);
       if (idx >= 0) {
@@ -3102,8 +3103,8 @@ export default function PoxConsole({
       return false;
     };
 
-    // Helper to find a codon possessing expectedChar at index position j
-    const findAndSacrificeCodon = (expectedChar: string, j: number): string | null => {
+    // Helper to find a gene possessing expectedChar at index position j
+    const findAndSacrificeGene = (expectedChar: string, j: number): string | null => {
       const idx = currentStock.findIndex(s => s.sequence[j] === expectedChar && s.count > 0);
       if (idx >= 0) {
         const matchingSeq = currentStock[idx].sequence;
@@ -3122,28 +3123,28 @@ export default function PoxConsole({
 
     // Analyze base by base
     for (let i = 0; i < 8; i++) {
-      const expectedCodon = fullDNASeq.substring(i * 8, (i + 1) * 8);
+      const expectedGene = fullDNASeq.substring(i * 8, (i + 1) * 8);
       let scaffoldStr = "";
       let scaffoldType = "";
 
-      if (!isCustom && splicerSlots[i] === expectedCodon) {
-        scaffoldStr = expectedCodon;
-        scaffoldType = "PRE-ALIGNED MANUAL CODON";
+      if (!isCustom && splicerSlots[i] === expectedGene) {
+        scaffoldStr = expectedGene;
+        scaffoldType = "PRE-ALIGNED MANUAL GENE";
       } else {
-        // Look for exact matching codon first
-        const hasMatch = currentStock.some(s => s.sequence === expectedCodon && s.count > 0);
+        // Look for exact matching gene first
+        const hasMatch = currentStock.some(s => s.sequence === expectedGene && s.count > 0);
         if (hasMatch) {
-          deductFromStock(expectedCodon);
-          scaffoldStr = expectedCodon;
+          deductFromStock(expectedGene);
+          scaffoldStr = expectedGene;
           scaffoldType = "MATCH STOCK RECRUITED";
           totalPrimaryConsumed++;
         } else {
-          // Consume any random available codon
-          const anyCodon = currentStock.find(s => s.count > 0);
-          if (anyCodon) {
-            deductFromStock(anyCodon.sequence);
-            scaffoldStr = anyCodon.sequence;
-            scaffoldType = `ANY CODON UNSTABLE BASE [${anyCodon.sequence.slice(0, 4)}...]`;
+          // Consume any random available gene
+          const anyGene = currentStock.find(s => s.count > 0);
+          if (anyGene) {
+            deductFromStock(anyGene.sequence);
+            scaffoldStr = anyGene.sequence;
+            scaffoldType = `ANY GENE UNSTABLE BASE [${anyGene.sequence.slice(0, 4)}...]`;
             totalPrimaryConsumed++;
           } else {
             scaffoldStr = "--------";
@@ -3157,9 +3158,9 @@ export default function PoxConsole({
         text: `Slot #${i + 1} processing using scaffold: ${scaffoldType}`
       });
 
-      // Evaluate 8 bases in this codon
+      // Evaluate 8 bases in this gene
       for (let j = 0; j < 8; j++) {
-        const expectedChar = expectedCodon[j];
+        const expectedChar = expectedGene[j];
         const scaffoldChar = scaffoldStr[j];
         
         // Match evaluation with success roll
@@ -3169,24 +3170,24 @@ export default function PoxConsole({
           // Perfectly appended! No sacrifice
         } else {
           // Appending failed (either due to character mismatch or random chance rule)
-          // Find and sacrifice a codon having expectedChar at position j
-          const sacrificedSeq = findAndSacrificeCodon(expectedChar, j);
+          // Find and sacrifice a gene having expectedChar at position j
+          const sacrificedSeq = findAndSacrificeGene(expectedChar, j);
           
           if (sacrificedSeq) {
             totalSacrificed++;
             stepLogs.push({
               second: Math.min(7, i + 1),
-              text: ` ➔ FAILED APPEND (pos ${j + 1}). Sacrificed codon ${sacrificedSeq} (depleting pool)`
+              text: ` ➔ FAILED APPEND (pos ${j + 1}). Sacrificed gene ${sacrificedSeq} (depleting pool)`
             });
           } else {
-            // If no codon fits, consume any available codon from stock
+            // If no gene fits, consume any available gene from stock
             const backupSacrifice = currentStock.find(s => s.count > 0);
             if (backupSacrifice) {
               deductFromStock(backupSacrifice.sequence);
               totalSacrificed++;
               stepLogs.push({
                 second: Math.min(7, i + 1),
-                text: ` ➔ FAILED APPEND (pos ${j + 1}). Sacrificed backup codon ${backupSacrifice.sequence} to guarantee placement`
+                text: ` ➔ FAILED APPEND (pos ${j + 1}). Sacrificed backup gene ${backupSacrifice.sequence} to guarantee placement`
               });
             } else {
               stepLogs.push({
@@ -3440,7 +3441,7 @@ export default function PoxConsole({
       setAutoHackerNonDetectionTimes(prev => ({ ...prev, [hacker.id]: 0 }));
 
       const randomPeer = nearbyUsers[Math.floor(Math.random() * nearbyUsers.length)];
-      const targetDefender = randomPeer.creaturesAvailable?.[0] || constructProceduralCreature("TTTAAACGTTTAAACGAGTCGTACCCCGGMAATTTAAACGTTTAAACGAGTCGTACCCCGGMAAT", "Peer Node Shield Core");
+      const targetDefender = randomPeer.creaturesAvailable?.[0] || constructProceduralCreature("TTTAAACGTTTAAACGAGTCGTACCCCGGMAATTTAAACGTTTAAACGAGTCGTACCCCGGMAAT", "Peer Node Shield Unit");
 
       // Get effective stats degraded by remaining telomeres
       const effHacker = getEffectiveStats(hacker);
@@ -3552,31 +3553,31 @@ export default function PoxConsole({
 
       let battleOutcomeLine = "";
       let isDefeated = false;
-      const snatchedCodonsList: string[] = [];
+      const snatchedGenesList: string[] = [];
 
       if (playerWon) {
         battleOutcomeLine = `[${timestamp}] >>> SUCCESS: Host cybernetic sector breached! Snatched raw data genes from local target.`;
         const randIndex = Math.floor(Math.random() * 8);
-        const autoSnatchedCodon = targetDefender.sequence.slice(randIndex * 8, (randIndex + 1) * 8);
-        snatchedCodonsList.push(autoSnatchedCodon);
+        const autoSnatchedGene = targetDefender.sequence.slice(randIndex * 8, (randIndex + 1) * 8);
+        snatchedGenesList.push(autoSnatchedGene);
 
-        // EXTRA HARVEST BOOST codon
+        // EXTRA HARVEST BOOST gene
         const hasHarvestBoost = attackerBenefits.some(b => b.id === 'HARVEST_BOOST');
         if (hasHarvestBoost) {
           const randIndexEx = Math.floor(Math.random() * 8);
-          const extraSnatchedCodon = targetDefender.sequence.slice(randIndexEx * 8, (randIndexEx + 1) * 8);
-          snatchedCodonsList.push(extraSnatchedCodon);
-          combatLogs.push(`🌌 ANOMALOUS QUANTUM EXTRACT [Quantum Extraction Core] activated! Snatched extra codon segment: ${extraSnatchedCodon}`);
+          const extraSnatchedGene = targetDefender.sequence.slice(randIndexEx * 8, (randIndexEx + 1) * 8);
+          snatchedGenesList.push(extraSnatchedGene);
+          combatLogs.push(`🌌 ANOMALOUS QUANTUM EXTRACT [Quantum Extraction Unit] activated! Snatched extra gene segment: ${extraSnatchedGene}`);
         }
 
         setSequences(sPrev => {
           let updated = [...sPrev];
-          snatchedCodonsList.forEach(codon => {
-            const matched = updated.findIndex(sq => sq.sequence === codon);
+          snatchedGenesList.forEach(gene => {
+            const matched = updated.findIndex(sq => sq.sequence === gene);
             if (matched >= 0) {
               updated[matched] = { ...updated[matched], count: updated[matched].count + 1 };
             } else {
-              updated.push({ sequence: codon, count: 1, discoveredAt: Date.now() });
+              updated.push({ sequence: gene, count: 1, discoveredAt: Date.now() });
             }
           });
           return updated;
@@ -3585,7 +3586,7 @@ export default function PoxConsole({
         setStats(sPrev => ({
           ...sPrev,
           totalHacksWon: (sPrev.totalHacksWon || 0) + 1,
-          totalCodonsAcquired: (sPrev.totalCodonsAcquired || 0) + snatchedCodonsList.length
+          totalGenesAcquired: (sPrev.totalGenesAcquired || 0) + snatchedGenesList.length
         }));
         setNodeEmissivity(prev => Math.min(100, prev + (hacker.attack / 10)));
       } else if (attackerHp <= 0 && defenderHp <= 0) {
@@ -3629,7 +3630,7 @@ export default function PoxConsole({
               ...updatedMail.autoHackLog,
               log: trimInnerBattleLogs([...updatedMail.autoHackLog.log, ...appendedLines]),
               isDefeated: isDefeated,
-              codonsGained: [...(updatedMail.autoHackLog.codonsGained || []), ...snatchedCodonsList]
+              genesGained: [...(updatedMail.autoHackLog.genesGained || []), ...snatchedGenesList]
             };
           }
           const updatedMails = [...mPrev];
@@ -3654,7 +3655,7 @@ export default function PoxConsole({
                 ...appendedLines
               ]),
               isDefeated: isDefeated,
-              codonsGained: snatchedCodonsList
+              genesGained: snatchedGenesList
             }
           } as GenMail, ...mPrev];
         }
@@ -3693,7 +3694,7 @@ export default function PoxConsole({
       "HOSTILE-PHAGE-NANO",
       "BREACH-MALVECTOR-X",
       "CYBER-STALKER-7",
-      "CODON-EXTRACTOR-A9"
+      "GENE-EXTRACTOR-A9"
     ];
     // Get defender's effective stats degraded by remaining telomeres
     const effDefender = getEffectiveStats(defender);
@@ -3800,7 +3801,7 @@ export default function PoxConsole({
     if (!defenderWon && defenderHp <= 0 && hasSelfDestructDef && attackerHp > 0) {
       combatLogs.push(`💥 ANOMALOUS OVERDRIVE [Supernova Reverb] triggered! Your defender self-destructed and vaporized intruder ${attacker.name}!`);
       attackerHp = 0;
-      defenderWon = true; // Win on self-destruct tie defense to protect core!
+      defenderWon = true; // Win on self-destruct tie defense to protect unit!
     } else if (defenderWon && attackerHp <= 0 && hasSelfDestructAtk && defenderHp > 0) {
       combatLogs.push(`💥 Intruder anomaly triggered [Supernova Reverb]! Self-destructed and crushed your defender ${defender.name}!`);
       defenderHp = 0;
@@ -3808,7 +3809,7 @@ export default function PoxConsole({
     }
 
     let outcomeText = "";
-    let lostCodon = "";
+    let lostGene = "";
     if (defenderWon) {
       outcomeText = `[${timestamp}] >>> BREACH DEFLECTED: Defender "${defender.name}" successfully neutralized the intruder vector!`;
       setNodeStability(prev => Math.min(100, prev + defender.defense / 10));
@@ -3819,22 +3820,22 @@ export default function PoxConsole({
       const ownedOnes = sequences.filter(s => s.count > 0);
       if (ownedOnes.length > 0) {
         const selection = ownedOnes[Math.floor(Math.random() * ownedOnes.length)];
-        lostCodon = selection.sequence;
+        lostGene = selection.sequence;
         
         setSequences(sPrev => {
           return sPrev.map(s => {
-            if (s.sequence === lostCodon) {
+            if (s.sequence === lostGene) {
               return { ...s, count: Math.max(0, s.count - 1) };
             }
             return s;
           }).filter(s => s.count > 0 || ['AGTCGTAC', 'CCCGGGAA', 'TTTAAACG', 'AACCGGTT'].includes(s.sequence));
         });
         
-        combatLogs.push(`WARNING: Node breached! Intruders successfully extracted gene block ${lostCodon}.`);
+        combatLogs.push(`WARNING: Node breached! Intruders successfully extracted gene block ${lostGene}.`);
       }
     }
 
-    const lostCodonArray = lostCodon ? [lostCodon] : [];
+    const lostGeneArray = lostGene ? [lostGene] : [];
 
     setGenMails(mPrev => {
       const mailId = 'MAIL-DEFENSE-LOG';
@@ -3861,7 +3862,7 @@ export default function PoxConsole({
             ...updatedMail.autoHackLog,
             creature: defender, // refresh defender representation if changed
             log: trimInnerBattleLogs([...updatedMail.autoHackLog.log, ...appends]),
-            codonsLost: [...(updatedMail.autoHackLog.codonsLost || []), ...lostCodonArray]
+            genesLost: [...(updatedMail.autoHackLog.genesLost || []), ...lostGeneArray]
           };
         }
         const updatedMails = [...mPrev];
@@ -3885,7 +3886,7 @@ export default function PoxConsole({
               `[G.E.N. DEFENDER INTEGRITY RECORDER] System defense tracking logs. Recording active shield countermeasure outcomes.`,
               ...appends
             ]),
-            codonsLost: lostCodonArray
+            genesLost: lostGeneArray
           }
         };
         return [newMail, ...mPrev];
@@ -4175,25 +4176,25 @@ export default function PoxConsole({
       let nextAtkHp = prev.attackerCurrentHp;
       if (hasSiphonAtk) {
         nextAtkHp = Math.min(effAttacker.vitality, nextAtkHp + 15);
-        newLogs.push(`[${timestamp}] 🧬 ANOMALOUS BIO-REGEN [Bio-Organic Siphon] siphoned +15 HP from defender core.`);
+        newLogs.push(`[${timestamp}] 🧬 ANOMALOUS BIO-REGEN [Bio-Organic Siphon] siphoned +15 HP from defender.`);
       }
 
       let nextDefHp = prev.defenderCurrentHp;
       if (hasSiphonDef) {
         nextDefHp = Math.min(effDefender.vitality, nextDefHp + 15);
-        newLogs.push(`[${timestamp}] 🧬 TARGET REGEN PROTOCOL [Bio-Organic Siphon] siphoned +15 HP from your core.`);
+        newLogs.push(`[${timestamp}] 🧬 TARGET REGEN PROTOCOL [Bio-Organic Siphon] siphoned +15 HP from your unit.`);
       }
       let nextStatus = prev.status;
       let winnerUid = prev.winnerUid;
       const usedMoves = prev.usedSpecialMoves ? [...prev.usedSpecialMoves] : [];
 
-      let localSnatchedCodon = prev.harvestedCodon;
-      let localExtraCodons = prev.harvestedExtraCodons ? [...prev.harvestedExtraCodons] : [];
+      let localSnatchedGene = prev.harvestedGene;
+      let localExtraGenes = prev.harvestedExtraGenes ? [...prev.harvestedExtraGenes] : [];
 
       if (specialMove) {
         usedMoves.push(specialMove.name);
         if (specialMove.type === 'healing') {
-          newLogs.push(`[${timestamp}] >> TRG: [${specialMove.name}]! Siphoned 35 HP from defender and mended attacker core.`);
+          newLogs.push(`[${timestamp}] >> TRG: [${specialMove.name}]! Siphoned 35 HP from defender and mended attacker.`);
         } else if (specialMove.type === 'evasive') {
           newLogs.push(`[${timestamp}] >> TRG: [${specialMove.name}]! Escape deviation shift. Defender strike NEGATED.`);
         }
@@ -4233,33 +4234,33 @@ export default function PoxConsole({
             nextStatus = 'completed';
             winnerUid = 'PLAYER';
             
-            // Winning standard codon
-            const randomCodonIndex = Math.floor(Math.random() * 8);
-            const snatchedCodon = defender.sequence.slice(randomCodonIndex * 8, (randomCodonIndex + 1) * 8);
-            localSnatchedCodon = snatchedCodon;
+            // Winning standard gene
+            const randomGeneIndex = Math.floor(Math.random() * 8);
+            const snatchedGene = defender.sequence.slice(randomGeneIndex * 8, (randomGeneIndex + 1) * 8);
+            localSnatchedGene = snatchedGene;
             
-            // Appended codons autowin!
-            const extraCodons: string[] = [];
+            // Appended genes autowin!
+            const extraGenes: string[] = [];
             if (defender.sequence.length > 64) {
               const extraSec = defender.sequence.slice(64);
               for (let idx = 0; idx < extraSec.length; idx += 8) {
-                extraCodons.push(extraSec.slice(idx, idx + 8));
+                extraGenes.push(extraSec.slice(idx, idx + 8));
               }
             }
-            localExtraCodons = extraCodons;
+            localExtraGenes = extraGenes;
 
             setSequences(sPrev => {
               let updated = [...sPrev];
               // Add standard snatched
-              const matching = updated.findIndex(s => s.sequence === snatchedCodon);
+              const matching = updated.findIndex(s => s.sequence === snatchedGene);
               if (matching >= 0) {
                 updated[matching] = { ...updated[matching], count: updated[matching].count + 1 };
               } else {
-                updated.push({ sequence: snatchedCodon, count: 1, discoveredAt: Date.now() });
+                updated.push({ sequence: snatchedGene, count: 1, discoveredAt: Date.now() });
               }
 
-              // Add extra codons
-              extraCodons.forEach(ec => {
+              // Add extra genes
+              extraGenes.forEach(ec => {
                 const ecIdx = updated.findIndex(s => s.sequence === ec);
                 if (ecIdx >= 0) {
                   updated[ecIdx] = { ...updated[ecIdx], count: updated[ecIdx].count + 1 };
@@ -4272,20 +4273,20 @@ export default function PoxConsole({
             });
 
             newLogs.push(`[${timestamp}] >>> HIGH-LEVEL SECURITY BREACH COMPLETE!`);
-            newLogs.push(`[${timestamp}] >>> Snatched defensive codon "${snatchedCodon}" into system vault!`);
-            if (extraCodons.length > 0) {
-              newLogs.push(`[${timestamp}] >>> AUTOMATIC APPRENTICE WIN: Snatched ${extraCodons.length} appended codons: [${extraCodons.join(", ")}]!`);
+            newLogs.push(`[${timestamp}] >>> Snatched defensive gene "${snatchedGene}" into system vault!`);
+            if (extraGenes.length > 0) {
+              newLogs.push(`[${timestamp}] >>> AUTOMATIC APPRENTICE WIN: Snatched ${extraGenes.length} appended genes: [${extraGenes.join(", ")}]!`);
             }
 
             setStats(sPrev => ({
               ...sPrev,
               interceptorHacksWon: (sPrev.interceptorHacksWon || 0) + 1,
               totalHacksWon: (sPrev.totalHacksWon || 0) + 1,
-              totalCodonsAcquired: sPrev.totalCodonsAcquired + 1 + extraCodons.length
+              totalGenesAcquired: sPrev.totalGenesAcquired + 1 + extraGenes.length
             }));
             setNodeStability(prev => Math.min(100, prev + attacker.defense / 10));
             sound.playSynthesisSuccess();
-            triggerLog(`INTERCEPT WIN: Snatched codons from peer.`, "success");
+            triggerLog(`INTERCEPT WIN: Snatched genes from peer.`, "success");
           }
         }
       } else {
@@ -4307,29 +4308,29 @@ export default function PoxConsole({
         if (nextDefHp <= 0 && nextAtkHp > 0) {
           nextStatus = 'completed';
           winnerUid = 'PLAYER';
-          const randomCodonIndex = Math.floor(Math.random() * 8);
-          const snatchedCodon = defender.sequence.slice(randomCodonIndex * 8, (randomCodonIndex + 1) * 8);
-          localSnatchedCodon = snatchedCodon;
+          const randomGeneIndex = Math.floor(Math.random() * 8);
+          const snatchedGene = defender.sequence.slice(randomGeneIndex * 8, (randomGeneIndex + 1) * 8);
+          localSnatchedGene = snatchedGene;
           
-          const extraCodons: string[] = [];
+          const extraGenes: string[] = [];
           if (defender.sequence.length > 64) {
             const extraSec = defender.sequence.slice(64);
             for (let idx = 0; idx < extraSec.length; idx += 8) {
-              extraCodons.push(extraSec.slice(idx, idx + 8));
+              extraGenes.push(extraSec.slice(idx, idx + 8));
             }
           }
-          localExtraCodons = extraCodons;
+          localExtraGenes = extraGenes;
 
           setSequences(sPrev => {
             let updated = [...sPrev];
-            const matching = updated.findIndex(s => s.sequence === snatchedCodon);
+            const matching = updated.findIndex(s => s.sequence === snatchedGene);
             if (matching >= 0) {
               updated[matching] = { ...updated[matching], count: updated[matching].count + 1 };
             } else {
-              updated.push({ sequence: snatchedCodon, count: 1, discoveredAt: Date.now() });
+              updated.push({ sequence: snatchedGene, count: 1, discoveredAt: Date.now() });
             }
 
-            extraCodons.forEach(ec => {
+            extraGenes.forEach(ec => {
               const ecIdx = updated.findIndex(s => s.sequence === ec);
               if (ecIdx >= 0) {
                 updated[ecIdx] = { ...updated[ecIdx], count: updated[ecIdx].count + 1 };
@@ -4342,15 +4343,15 @@ export default function PoxConsole({
           });
 
           newLogs.push(`[${timestamp}] >>> HIGH-LEVEL SECURITY BREACH COMPLETE!`);
-          newLogs.push(`[${timestamp}] >>> Host computer compromised. Harvested codon "${snatchedCodon}" into data bank!`);
-          if (extraCodons.length > 0) {
-            newLogs.push(`[${timestamp}] >>> AUTOMATIC APPRENTICE WIN: Recovered ${extraCodons.length} appended codons: [${extraCodons.join(", ")}]!`);
+          newLogs.push(`[${timestamp}] >>> Host computer compromised. Harvested gene "${snatchedGene}" into data bank!`);
+          if (extraGenes.length > 0) {
+            newLogs.push(`[${timestamp}] >>> AUTOMATIC APPRENTICE WIN: Recovered ${extraGenes.length} appended genes: [${extraGenes.join(", ")}]!`);
           }
 
           setStats(sPrev => ({
             ...sPrev,
             totalHacksWon: (sPrev.totalHacksWon || 0) + 1,
-            totalCodonsAcquired: sPrev.totalCodonsAcquired + 1 + extraCodons.length
+            totalGenesAcquired: sPrev.totalGenesAcquired + 1 + extraGenes.length
           }));
           setNodeEmissivity(prev => Math.min(100, prev + (attacker.attack / 10)));
           sound.playSynthesisSuccess();
@@ -4390,8 +4391,8 @@ export default function PoxConsole({
         status: nextStatus,
         winnerUid,
         usedSpecialMoves: usedMoves,
-        harvestedCodon: localSnatchedCodon,
-        harvestedExtraCodons: localExtraCodons
+        harvestedGene: localSnatchedGene,
+        harvestedExtraGenes: localExtraGenes
       };
     });
   };
@@ -4572,19 +4573,19 @@ export default function PoxConsole({
     triggerLog(isCurrentlyFav ? `REMOVED "${bot.name}" FROM FAVORITES` : `ADDED "${bot.name}" TO FAVORITES`, "success");
   };
 
-  const handleSpliceExtract = (creatureId: string, extractedCodon: string) => {
+  const handleSpliceExtract = (creatureId: string, extractedGene: string) => {
     sound.playBeep(200, 0.4, "sawtooth");
     sound.playSynthesisSuccess();
 
-    // Add extracted Codon to sequences inventory
+    // Add extracted Gene to sequences inventory
     setSequences((prev) => {
-      const matchIdx = prev.findIndex((s) => s.sequence === extractedCodon);
+      const matchIdx = prev.findIndex((s) => s.sequence === extractedGene);
       if (matchIdx >= 0) {
         const updated = [...prev];
         updated[matchIdx].count += 1;
         return updated;
       } else {
-        return [...prev, { sequence: extractedCodon, count: 1, discoveredAt: Date.now() }];
+        return [...prev, { sequence: extractedGene, count: 1, discoveredAt: Date.now() }];
       }
     });
 
@@ -4599,14 +4600,14 @@ export default function PoxConsole({
     setStats((prev) => ({
       ...prev,
       totalCreaturesSpliceHarvested: prev.totalCreaturesSpliceHarvested + 1,
-      totalCodonsAcquired: prev.totalCodonsAcquired + 1
+      totalGenesAcquired: prev.totalGenesAcquired + 1
     }));
 
     // Reset detail inspector to null
     setInspectedCreatureId(null);
-    setSelectedCodonIndex(null);
+    setSelectedGeneIndex(null);
 
-    triggerLog(`MUTATION COMPRESSION SUCCESS: Extracted codon ${extractedCodon}. Specimen incinerated securely.`, 'success');
+    triggerLog(`MUTATION COMPRESSION SUCCESS: Extracted gene ${extractedGene}. Specimen incinerated securely.`, 'success');
   };
 
   // Render sequence with base-by-base colors
@@ -4638,7 +4639,7 @@ export default function PoxConsole({
       <span className="font-mono text-[9px] leading-tight break-all font-bold tracking-widest flex flex-wrap gap-1 select-all">
         {Array.from({ length: Math.ceil(seq.length / 8) }).map((_, i) => {
           const cSeq = seq.slice(i * 8, (i + 1) * 8);
-          const isAnom = isAnomalousCodon(cSeq);
+          const isAnom = isAnomalousGene(cSeq);
           return (
             <span 
               key={i} 
@@ -4649,7 +4650,7 @@ export default function PoxConsole({
                     i % 4 === 1 ? 'text-amber-400' :
                     i % 4 === 2 ? 'text-blue-400' : 'text-purple-400'
               }`}
-              title={isAnom ? `Anomalous Codon Chunk ${i+1}` : `Codon ${i+1}`}
+              title={isAnom ? `Anomalous Gene Chunk ${i+1}` : `Gene ${i+1}`}
             >
               {cSeq}
             </span>
@@ -4692,14 +4693,14 @@ export default function PoxConsole({
     // Calculate matching sequences for "This Node"
     let thisNodeMatches = 0;
     const thisNodeTarget = isIncoming ? targetSeq : receiverTargetSeq;
-    const thisNodeCodons: string[] = [];
+    const thisNodeGenes: string[] = [];
     for (let i = 0; i < 8; i++) {
       const chunk = thisNodeTarget.slice(i * 8, (i + 1) * 8);
       if (chunk.length === 8) {
-        thisNodeCodons.push(chunk);
+        thisNodeGenes.push(chunk);
       }
     }
-    thisNodeCodons.forEach(tc => {
+    thisNodeGenes.forEach(tc => {
       const found = sequences.find(item => item.sequence === tc);
       if (found) {
         thisNodeMatches += found.count;
@@ -4709,24 +4710,24 @@ export default function PoxConsole({
     // Calculate matching sequences for "Peer Node"
     let peerMatches = 0;
     const peerTarget = isIncoming ? receiverTargetSeq : targetSeq;
-    const peerCodons: string[] = [];
+    const peerGenes: string[] = [];
     for (let i = 0; i < 8; i++) {
       const chunk = peerTarget.slice(i * 8, (i + 1) * 8);
       if (chunk.length === 8) {
-        peerCodons.push(chunk);
+        peerGenes.push(chunk);
       }
     }
-    const partnerCodons: string[] = [];
+    const partnerGenes: string[] = [];
     activeTrade.partner.creaturesAvailable.forEach(creature => {
       for (let i = 0; i < 8; i++) {
-        const codon = creature.sequence.slice(i * 8, (i + 1) * 8);
-        if (codon.length === 8) {
-          partnerCodons.push(codon);
+        const gene = creature.sequence.slice(i * 8, (i + 1) * 8);
+        if (gene.length === 8) {
+          partnerGenes.push(gene);
         }
       }
     });
-    peerCodons.forEach(tc => {
-      const matches = partnerCodons.filter(c => c === tc);
+    peerGenes.forEach(tc => {
+      const matches = partnerGenes.filter(c => c === tc);
       peerMatches += matches.length;
     });
 
@@ -4895,7 +4896,7 @@ export default function PoxConsole({
               onClick={() => { 
                 sound.playSynthesisSuccess(); 
                 setIsPowered(!isPowered); 
-                triggerLog(isPowered ? "Reactor system offline. Core components frozen." : "Reactor systems online. Core power initiated.", isPowered ? "warn" : "success");
+                triggerLog(isPowered ? "Reactor system offline. System components frozen." : "Reactor systems online. Reactor power initiated.", isPowered ? "warn" : "success");
               }}
               className={`py-1 px-1.5 rounded border text-[8px] font-bold uppercase cursor-pointer flex-grow ${
                 isPowered 
@@ -5017,9 +5018,9 @@ export default function PoxConsole({
           {!isPowered ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8 border border-neutral-800 bg-neutral-950/20 max-w-lg mx-auto rounded">
               <Dna className="w-14 h-14 text-green-900/60 animate-spin" style={{ animationDuration: '30s' }} />
-              <h2 className="text-base font-bold text-green-700 tracking-widest uppercase mt-4">System Core Down</h2>
+              <h2 className="text-base font-bold text-green-700 tracking-widest uppercase mt-4">System Offline</h2>
               <p className="text-xs text-green-900/80 mt-2 max-w-sm leading-relaxed">
-                Terminal power is currently on reserve bypass standby. Toggle power [SYS] in sidebar to initiate core genetic processes.
+                Terminal power is currently on reserve bypass standby. Toggle power [SYS] in sidebar to initiate genetic processes.
               </p>
               <button 
                 onClick={() => { sound.playSynthesisSuccess(); setIsPowered(true); }}
@@ -5083,9 +5084,9 @@ export default function PoxConsole({
                       <div className={`bg-neutral-900/20 p-4 rounded flex flex-col justify-between relative overflow-y-auto custom-pox-scrollbar min-h-[300px] border transition-all ${
                         bioLabSubTab === 'anomaly' ? "border-purple-900/40" : "border-green-900/40"
                       }`}>
-                      {isCodonLogPopupOpen && (
+                      {isGeneLogPopupOpen && (
                         <motion.div
-                          key="codon-log-popup"
+                          key="gene-log-popup"
                           initial={{ opacity: 0, scale: 0.98 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.98 }}
@@ -5103,7 +5104,7 @@ export default function PoxConsole({
                                 onClick={() => {
                                   sound.playBeep(440, 0.05, "sine");
                                   setDiscoveredPacketsLog([]);
-                                  setDiscoverySelectedCodon(null);
+                                  setDiscoverySelectedGene(null);
                                   triggerLog("GENE ARCHIVE: Cleared all packet records.", "info");
                                 }}
                                 className="px-2 py-0.5 bg-red-950/20 hover:bg-red-900 border border-red-900/60 text-red-400 hover:text-white rounded text-[8px] cursor-pointer font-bold select-none transition-colors"
@@ -5114,7 +5115,7 @@ export default function PoxConsole({
                                 type="button"
                                 onClick={() => {
                                   sound.playBeep(440, 0.05, "sine");
-                                  setIsCodonLogPopupOpen(false);
+                                  setIsGeneLogPopupOpen(false);
                                 }}
                                 className="px-2 py-0.5 bg-green-950/80 hover:bg-green-900 border border-green-800 text-[#00FF41] hover:text-white rounded text-[8.5px] cursor-pointer font-bold tracking-wider"
                               >
@@ -5125,7 +5126,7 @@ export default function PoxConsole({
 
                           {/* Conditionally Rendered Single Pane Layout */}
                           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                            {!discoverySelectedCodon ? (
+                            {!discoverySelectedGene ? (
                               /* Spliced Packets Register / Log List */
                               <div className="flex-1 flex flex-col min-h-0 overflow-hidden space-y-2">
                                 {/* Top Flavor Text Bar replacing filter entry box as requested */}
@@ -5138,7 +5139,7 @@ export default function PoxConsole({
                                   {(() => {
                                     const filtered = discoveredPacketsLog.filter(packet => {
                                       if (!discoverySearchText) return true;
-                                      return packet.codons.some(c => c.sequence.toUpperCase().includes(discoverySearchText));
+                                      return packet.genes.some(c => c.sequence.toUpperCase().includes(discoverySearchText));
                                     });
 
                                     if (filtered.length === 0) {
@@ -5150,7 +5151,7 @@ export default function PoxConsole({
                                     }
 
                                     return filtered.map((packet, pIdx) => {
-                                      const uniqueCount = packet.codons.filter(c => c.isNew).length;
+                                      const uniqueCount = packet.genes.filter(c => c.isNew).length;
                                       const timeStr = new Date(packet.timestamp).toLocaleTimeString();
                                       return (
                                         <div key={packet.id || pIdx} className="border border-green-950/60 bg-black/40 p-2 rounded-sm space-y-1.5 hover:border-green-800/40 transition-colors">
@@ -5159,27 +5160,27 @@ export default function PoxConsole({
                                               <span className="text-neutral-600">#{discoveredPacketsLog.length - pIdx}</span> PACKET SPLICED
                                             </span>
                                             <span className="font-mono flex items-center gap-2">
-                                              <span className="text-cyan-500 font-bold">{uniqueCount} NEW CORES</span>
+                                              <span className="text-cyan-500 font-bold">{uniqueCount} NEW GENES</span>
                                               <span className="text-neutral-500">{timeStr}</span>
                                             </span>
                                           </div>
                                           <div className="grid grid-cols-4 gap-1">
-                                            {packet.codons.map((codon, cIdx) => {
-                                              const isAnom = isAnomalousCodon(codon.sequence);
-                                              const isSelected = discoverySelectedCodon === codon.sequence;
+                                            {packet.genes.map((gene, cIdx) => {
+                                              const isAnom = isAnomalousGene(gene.sequence);
+                                              const isSelected = discoverySelectedGene === gene.sequence;
                                               return (
                                                 <button
                                                   key={cIdx}
                                                   onClick={() => {
                                                     sound.playBeep(450, 0.05, "sine");
-                                                    setDiscoverySelectedCodon(codon.sequence);
+                                                    setDiscoverySelectedGene(gene.sequence);
                                                   }}
                                                   className={`px-1 py-1 border text-center font-mono rounded-sm select-none transition-all text-[8.5px] font-bold cursor-pointer hover:scale-[1.02] ${
                                                     isSelected
                                                       ? isAnom
                                                         ? "border-purple-400 bg-purple-950/50 text-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.3)] font-extrabold"
                                                         : "border-[#00FF41] bg-green-900/30 text-[#00FF41] shadow-[0_0_8px_rgba(0,255,65,0.2)]"
-                                                      : codon.isNew
+                                                      : gene.isNew
                                                         ? isAnom
                                                           ? "border-purple-650 bg-purple-950/20 text-purple-400 animate-pulse"
                                                           : "border-green-500/50 bg-green-950/10 text-[#00FF41] animate-pulse"
@@ -5188,7 +5189,7 @@ export default function PoxConsole({
                                                           : "border-sky-950/50 bg-sky-950/10 text-sky-400/80"
                                                   }`}
                                                 >
-                                                  {codon.sequence}
+                                                  {gene.sequence}
                                                 </button>
                                               );
                                             })}
@@ -5202,8 +5203,8 @@ export default function PoxConsole({
                             ) :
                               /* 2. Detailed Gene analysis view occupied over the log list */
                               (() => {
-                                const seq = discoverySelectedCodon;
-                                const isAnom = isAnomalousCodon(seq);
+                                const seq = discoverySelectedGene;
+                                const isAnom = isAnomalousGene(seq);
                                 
                                 // Count composition
                                 let a = 0, t = 0, c = 0, g = 0, q = 0;
@@ -5234,7 +5235,7 @@ export default function PoxConsole({
                                         <button
                                           onClick={() => {
                                             sound.playBeep(440, 0.05, "sine");
-                                            setDiscoverySelectedCodon(null);
+                                            setDiscoverySelectedGene(null);
                                           }}
                                           className="px-2 py-1 bg-green-950/65 hover:bg-green-900/85 border border-green-800 text-[#00FF41] font-bold text-[8px] rounded-sm cursor-pointer transition-colors flex items-center justify-center gap-1 shadow-sm select-none animate-pulse"
                                         >
@@ -5347,7 +5348,7 @@ export default function PoxConsole({
                                         onClick={() => {
                                           navigator.clipboard.writeText(seq);
                                           sound.playBeep(880, 0.08, "sine");
-                                          triggerLog(`DUPLICATED CODON: ${seq}`, "success");
+                                          triggerLog(`DUPLICATED GENE: ${seq}`, "success");
                                         }}
                                         className="w-full py-1.5 text-[8px] font-bold text-green-400 hover:text-white bg-green-950/25 hover:bg-[#00FF41]/20 border border-green-800/40 hover:border-green-400 rounded-sm cursor-pointer transition-all flex items-center justify-center gap-1.5 uppercase select-none active:scale-[0.98]"
                                       >
@@ -5475,7 +5476,7 @@ export default function PoxConsole({
                             >
                               <span className="block text-[8.5px] text-purple-400 uppercase tracking-widest leading-none group-hover:text-purple-300">Anomalous Gene IDs</span>
                               <div className="text-lg font-bold text-white leading-none mt-1 flex items-center justify-between">
-                                <span><span className="text-purple-400">⬢</span> {sequences.filter(s => isAnomalousCodon(s.sequence)).length}</span>
+                                <span><span className="text-purple-400">⬢</span> {sequences.filter(s => isAnomalousGene(s.sequence)).length}</span>
                                 <span className="text-[6.5px] text-purple-400 bg-purple-950/60 border border-purple-500/20 px-1 py-0.5 rounded opacity-70 group-hover:opacity-100 transition-opacity">OPEN ➔</span>
                               </div>
                             </div>
@@ -5579,7 +5580,7 @@ export default function PoxConsole({
                           type="button"
                           onClick={() => {
                             sound.playBeep(650, 0.05, "sine");
-                            setIsCodonLogPopupOpen(true);
+                            setIsGeneLogPopupOpen(true);
                           }}
                           className={`w-full py-2 border font-mono font-bold uppercase text-[10px] rounded-sm cursor-pointer transition-all flex items-center justify-center gap-1.5 active:scale-[0.99] ${
                             bioLabSubTab === 'anomaly'
@@ -5639,7 +5640,7 @@ export default function PoxConsole({
                               sound.playBeep(600,0.05,"sine"); 
                               setDiscoverySearchPrefix("");
                               setDiscoverySearchStep(0);
-                              setIsCodonLedgerExpanded(true); 
+                              setIsGeneLedgerExpanded(true); 
                             }}
                             className="w-full py-3.5 px-4 bg-black/60 border border-green-955 hover:border-[#00FF41] hover:bg-green-955/20 text-[#00FF41] rounded flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group text-center shadow-[0_0_15px_rgba(0,255,65,0.05)]"
                           >
@@ -5655,8 +5656,8 @@ export default function PoxConsole({
 
                         {/* G.E.N. Gene Stockpile Panel for P.O.X. Reactor Sub-Tab as a beautiful matching info panel display */}
                         {bioLabSubTab === 'pox' && (() => {
-                          const uniqueStandardCount = sequences.filter(s => !isAnomalousCodon(s.sequence)).length;
-                          const totalStandardCopies = sequences.filter(s => !isAnomalousCodon(s.sequence)).reduce((sum, s) => sum + (s.count || 0), 0);
+                          const uniqueStandardCount = sequences.filter(s => !isAnomalousGene(s.sequence)).length;
+                          const totalStandardCopies = sequences.filter(s => !isAnomalousGene(s.sequence)).reduce((sum, s) => sum + (s.count || 0), 0);
 
                           const requiredGenesList = [];
                           for (let i = 0; i < 8; i++) {
@@ -5720,14 +5721,14 @@ export default function PoxConsole({
                           );
                         })()}
 
-                        {/* Anomalous Codons Ledger Button */}
+                        {/* Anomalous Genes Ledger Button */}
                         {bioLabSubTab === 'anomaly' && (
                           <button 
                             onClick={() => { sound.playBeep(600,0.05,"sine"); setIsAnomalousLedgerExpanded(true); }}
                             className="w-full py-3.5 px-4 bg-black/60 border border-purple-500/80 hover:border-purple-400 hover:bg-purple-955/15 text-purple-300 rounded flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group text-center shadow-[0_0_15px_rgba(168,85,247,0.05)]"
                           >
                             <span className="text-sm font-bold tracking-wider text-white font-mono uppercase group-hover:text-purple-400 transition-colors flex items-center justify-center gap-1.5">
-                              {sequences.filter(s => isAnomalousCodon(s.sequence)).length} Anomalous Genes Secured
+                              {sequences.filter(s => isAnomalousGene(s.sequence)).length} Anomalous Genes Secured
                             </span>
                             <span className="text-[8.5px] font-mono text-purple-400 uppercase tracking-widest bg-purple-950/40 px-2 py-0.5 border border-purple-500/30 rounded shadow-[0_0_8px_rgba(168,85,247,0.3)]">
                               <FlickeringPurpleText text="[ DECRYPT ANOMALY VAULT ▼ ]" />
@@ -5820,9 +5821,9 @@ export default function PoxConsole({
                         </div>
                       )}
 
-                      {/* Display the Unique Patterns and Anomalous Codons windows as Absolute Overlays covering only this right pane */}
+                      {/* Display the Unique Patterns and Anomalous Genes windows as Absolute Overlays covering only this right pane */}
                       <AnimatePresence>
-                        {isCodonLedgerExpanded && (
+                        {isGeneLedgerExpanded && (
                           <motion.div
                             key="pair-base-search-popup"
                             initial={{ opacity: 0, scale: 0.98 }}
@@ -5840,7 +5841,7 @@ export default function PoxConsole({
                                 type="button"
                                 onClick={() => {
                                   sound.playBeep(440, 0.05, "sine");
-                                  setIsCodonLedgerExpanded(false);
+                                  setIsGeneLedgerExpanded(false);
                                 }}
                                 className="px-2 py-0.5 bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-500 hover:text-white rounded text-[8px] cursor-pointer font-bold tracking-wider"
                               >
@@ -5945,7 +5946,7 @@ export default function PoxConsole({
                                         "TA", "TC", "TG", "TT"
                                       ];
                                       const loggedUniqueGenes = Array.from(new Set([
-                                        ...discoveredPacketsLog.flatMap(p => p.codons.map(c => c.sequence)),
+                                        ...discoveredPacketsLog.flatMap(p => p.genes.map(c => c.sequence)),
                                         ...sequences.map(s => s.sequence)
                                       ]));
 
@@ -5964,7 +5965,7 @@ export default function PoxConsole({
                                               setDiscoverySearchPrefix(tentative);
                                               setDiscoverySearchStep(prev => prev + 1);
                                               if (matches.length > 0) {
-                                                setDiscoverySelectedCodon(matches[0]);
+                                                setDiscoverySelectedGene(matches[0]);
                                               }
                                             }}
                                             className={`py-1.5 border rounded-sm font-mono text-center select-none transition-all ${
@@ -6006,7 +6007,7 @@ export default function PoxConsole({
                                   <div className="grid grid-cols-1 gap-1">
                                     {(() => {
                                       const loggedUniqueGenes = Array.from(new Set([
-                                        ...discoveredPacketsLog.flatMap(p => p.codons.map(c => c.sequence)),
+                                        ...discoveredPacketsLog.flatMap(p => p.genes.map(c => c.sequence)),
                                         ...sequences.map(s => s.sequence)
                                       ]));
                                       const matches = loggedUniqueGenes.filter(seq => seq.toUpperCase().startsWith(discoverySearchPrefix));
@@ -6014,20 +6015,20 @@ export default function PoxConsole({
                                       if (matches.length === 0) {
                                         return (
                                           <div className="text-center py-4 text-[8px] text-green-700 italic">
-                                            No matching standard or anomalous codon cores found.
+                                            No matching standard or anomalous genes found.
                                           </div>
                                         );
                                       }
 
                                       return matches.map((seq, idx) => {
-                                        const isAnom = isAnomalousCodon(seq);
-                                        const isSel = discoverySelectedCodon === seq;
+                                        const isAnom = isAnomalousGene(seq);
+                                        const isSel = discoverySelectedGene === seq;
                                         return (
                                           <div
                                             key={idx}
                                             onClick={() => {
                                               sound.playBeep(450, 0.05, "sine");
-                                              setDiscoverySelectedCodon(seq);
+                                              setDiscoverySelectedGene(seq);
                                             }}
                                             className={`py-1 px-1.5 flex justify-between items-center rounded border cursor-pointer select-none transition-all ${
                                               isSel
@@ -6064,7 +6065,7 @@ export default function PoxConsole({
 
                         {isAnomalousLedgerExpanded && (
                           <motion.div
-                            key="anomalous-codons-popup"
+                            key="anomalous-genes-popup"
                             initial={{ opacity: 0, scale: 0.98 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.98 }}
@@ -6090,13 +6091,13 @@ export default function PoxConsole({
 
                             <div className="text-[8px] text-purple-500 uppercase tracking-widest mb-2 border-b border-purple-955 pb-1 flex justify-between select-none font-mono font-bold">
                               <span><FlickeringPurpleText text="ANOMALOUS GENES LISTED BELOW" /></span>
-                              <span>{sequences.filter(s => isAnomalousCodon(s.sequence)).length} ANOMALOUS GENES SECURED</span>
+                              <span>{sequences.filter(s => isAnomalousGene(s.sequence)).length} ANOMALOUS GENES SECURED</span>
                             </div>
 
-                            {/* Scrollable list of Anomalous Codons */}
+                            {/* Scrollable list of Anomalous Genes */}
                             <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5 custom-pox-scrollbar font-mono">
-                              {sequences.filter(s => isAnomalousCodon(s.sequence)).sort((a, b) => b.count - a.count).map((item, idx) => {
-                                const benefits = getBenefitForAnomalousCodon(item.sequence);
+                              {sequences.filter(s => isAnomalousGene(s.sequence)).sort((a, b) => b.count - a.count).map((item, idx) => {
+                                const benefits = getBenefitForAnomalousGene(item.sequence);
                                 return (
                                   <div 
                                     key={idx}
@@ -6120,8 +6121,8 @@ export default function PoxConsole({
                                   </div>
                                 );
                               })}
-                              {sequences.filter(s => isAnomalousCodon(s.sequence)).length === 0 && (
-                                <p className="text-center py-6 text-xs text-purple-400 font-mono italic">No anomalous codons resolved. Harvest deep thermal heat spots via the map scanner.</p>
+                              {sequences.filter(s => isAnomalousGene(s.sequence)).length === 0 && (
+                                <p className="text-center py-6 text-xs text-purple-400 font-mono italic">No anomalous genes resolved. Harvest deep thermal heat spots via the map scanner.</p>
                               )}
                             </div>
 
@@ -6156,7 +6157,7 @@ export default function PoxConsole({
                               <span>[ EMERGENCY FORCED COMPILATION ]</span>
                               <span>REACTOR STATUS: FROZEN ({reactorFreezeTimeLeft}s)</span>
                             </div>
-                            <h3 className="text-xs font-black text-white uppercase tracking-wider mb-2">BYPASSING CODON COMPILATION LOCKS</h3>
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider mb-2">BYPASSING GENE COMPILATION LOCKS</h3>
                           </div>
 
                           {/* Scrolling Terminal Output logs */}
@@ -6175,7 +6176,7 @@ export default function PoxConsole({
                             <div className="flex items-center gap-1.5 justify-center py-2 bg-red-950/30 border border-red-900/50 rounded">
                               <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
                               <span className="text-[9px] text-red-400 font-extrabold uppercase tracking-widest text-center px-1">
-                                {isForcedLoopActive ? "LOOP CASCADE ACTIVE: REACTOR COILS FROZEN" : `FREEZING REACTOR CODON CYCLE: ${reactorFreezeTimeLeft}s REMAINING`}
+                                {isForcedLoopActive ? "LOOP CASCADE ACTIVE: REACTOR COILS FROZEN" : `FREEZING REACTOR GENE CYCLE: ${reactorFreezeTimeLeft}s REMAINING`}
                               </span>
                             </div>
 
@@ -6202,7 +6203,7 @@ export default function PoxConsole({
                           >
                             <Dna className="w-14 h-14" />
                           </motion.div>
-                          <h3 className="text-sm font-bold text-[#00FF41] tracking-widest uppercase animate-pulse">AUTOTRONIC MORPHOGENESIS CORE ENGAGED</h3>
+                          <h3 className="text-sm font-bold text-[#00FF41] tracking-widest uppercase animate-pulse">AUTOTRONIC MORPHOGENESIS ENGINE ENGAGED</h3>
                           <p className="text-[10px] text-green-600 max-w-xs mt-2 leading-relaxed">Processing 64-character sequencing algorithm using premium cyber insect DNA matrices...</p>
                           <div className="w-48 bg-neutral-900 border border-green-950 rounded-full h-3 mt-4 p-0.5 overflow-hidden">
                             <div className="bg-[#00FF41] h-full rounded-sm shadow-[0_0_8px_#00FF41]" style={{ width: `${splicingProgress}%` }} />
@@ -6222,7 +6223,7 @@ export default function PoxConsole({
                             {/* Dash grid representations of 8 slots */}
                             <div className="grid grid-cols-4 gap-1.5 bg-black p-2 rounded border border-green-900/40 mb-3">
                               {splicerSlots.map((slot, idx) => {
-                                const isAnom = slot ? isAnomalousCodon(slot) : false;
+                                const isAnom = slot ? isAnomalousGene(slot) : false;
                                 return (
                                   <div 
                                     key={idx}
@@ -6247,7 +6248,7 @@ export default function PoxConsole({
                                         <button 
                                           onClick={(e) => handleEjectSlot(idx, e)}
                                           className="absolute -top-1 -right-1 bg-red-950 text-red-500 hover:bg-red-900 border border-red-900 rounded-full w-3.5 h-3.5 flex items-center justify-center text-[7px]"
-                                          title="Eject codon block"
+                                          title="Eject gene block"
                                         >
                                           ×
                                         </button>
@@ -6271,7 +6272,7 @@ export default function PoxConsole({
                               <div className="break-all text-[11px] leading-relaxed font-mono select-all font-extrabold tracking-widest flex flex-wrap gap-x-2 gap-y-1">
                                 {Array.from({ length: 8 }).map((_, i) => {
                                   const segment = targetSequence.slice(i * 8, (i + 1) * 8);
-                                  const isAnom = isAnomalousCodon(segment);
+                                  const isAnom = isAnomalousGene(segment);
                                   return (
                                     <span
                                       key={i}
@@ -6356,7 +6357,7 @@ export default function PoxConsole({
                       )}
                     </div>
 
-                    {/* Splicer select codon inventory (Right) */}
+                    {/* Splicer select gene inventory (Right) */}
                     <div className="bg-neutral-900/20 border border-green-900/40 p-5 rounded flex flex-col justify-between">
                       {activeSlotSelection !== null ? (
                         <div className="flex flex-col justify-between h-full">
@@ -6365,10 +6366,10 @@ export default function PoxConsole({
                               <span>ASSIGN SLOT PROTOCOL #{activeSlotSelection + 1}</span>
                               <button onClick={() => { sound.playBeep(450,0.05,"sine"); setActiveSlotSelection(null); }} className="text-red-500 hover:text-white font-bold cursor-pointer">[ CANCEL ]</button>
                             </div>
-                            <h2 className="text-xs font-bold text-white tracking-wider mb-1">CHOOSE CODON SEGMENT</h2>
-                            <p className="text-[10px] text-green-700 font-mono mb-2 leading-tight">Selecting one codon stock decants it directly into the assembly matrix.</p>
+                            <h2 className="text-xs font-bold text-white tracking-wider mb-1">CHOOSE GENE SEGMENT</h2>
+                            <p className="text-[10px] text-green-700 font-mono mb-2 leading-tight">Selecting one gene stock decants it directly into the assembly matrix.</p>
                             
-                            {/* Expected codon info block */}
+                            {/* Expected gene info block */}
                             <div className="bg-green-950/20 border border-green-500/30 p-2 rounded mb-3 text-left animate-fade-in">
                               <div className="text-[8.5px] text-[#00FF41] font-bold tracking-wider uppercase">[ REQUIRED SEGMENT FOR SLOT #{activeSlotSelection + 1} ]</div>
                               <div className="font-mono text-cyan-400 font-extrabold text-sm tracking-widest mt-0.5">
@@ -6476,7 +6477,7 @@ export default function PoxConsole({
                                           name: bot.name,
                                           seq: bot.sequence,
                                           stats: { hp: bot.vitality, atk: bot.attack, def: bot.defense, spd: bot.speed },
-                                          appended: bot.appendedCodons || [],
+                                          appended: bot.appendedGenes || [],
                                           moves: getUnlockedMoves(bot.sequence).map(m => m.name),
                                           visual: { faction: bot.faction, type: bot.type, ascii: bot.asciiArt },
                                           sound: getEmotSoundDetails(bot.sequence)
@@ -6513,7 +6514,7 @@ export default function PoxConsole({
                                       <div className="font-mono text-[9.5px] leading-tight break-all font-bold tracking-widest dark:text-white flex flex-wrap">
                                         {Array.from({ length: 8 }).map((_, i) => {
                                           const cSeq = bot.sequence.slice(i * 8, (i + 1) * 8);
-                                          const isAnom = isAnomalousCodon(cSeq);
+                                          const isAnom = isAnomalousGene(cSeq);
                                           return (
                                           <span 
                                             key={i} 
@@ -6524,7 +6525,7 @@ export default function PoxConsole({
                                                   i % 4 === 1 ? 'text-amber-400' :
                                                   i % 4 === 2 ? 'text-blue-400' : 'text-purple-400'
                                             }`}
-                                            title={isAnom ? `Anomalous Codon Chunk ${i+1}` : `Codon ${i+1}`}
+                                            title={isAnom ? `Anomalous Gene Chunk ${i+1}` : `Gene ${i+1}`}
                                           >
                                             {cSeq}
                                           </span>
@@ -6644,21 +6645,21 @@ export default function PoxConsole({
                             <div className="mt-4 p-3 bg-black/60 border border-red-900/40 rounded-lg space-y-3 font-sans">
                               <div className="flex justify-between items-center pb-1.5 border-b border-red-950">
                                 <span className="text-[10px] text-red-400 font-bold tracking-wider uppercase flex items-center gap-1">
-                                  <AlertTriangle className="w-3.5 h-3.5" /> CODON DESTRUCT-HARVEST MATRIX
+                                  <AlertTriangle className="w-3.5 h-3.5" /> GENE DESTRUCT-HARVEST MATRIX
                                 </span>
                                 <span className="text-[8px] text-neutral-500 font-mono">1 EXTRACTABLE NODE LIMIT</span>
                               </div>
                               
                               <p className="text-[10px] text-neutral-400 leading-normal">
-                                Select exactly <strong className="text-[#00FF41]">one (1) CODON node</strong> below to harvest back into your Bio-Lab codon inventory. Doing so will permanently <strong className="text-red-500">incinerate this creature</strong> and delete the remaining genes.
+                                Select exactly <strong className="text-[#00FF41]">one (1) GENE node</strong> below to harvest back into your Bio-Lab gene inventory. Doing so will permanently <strong className="text-red-500">incinerate this creature</strong> and delete the remaining genes.
                               </p>
 
                               <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 font-mono">
                                 {Array.from({ length: bot.sequence.length / 8 }).map((_, i) => {
-                                  const codon = bot.sequence.slice(i * 8, (i + 1) * 8);
-                                  const isSelected = selectedCodonIndex === i;
-                                  const isAnom = isAnomalousCodon(codon);
-                                  const ownedCount = sequences.find(s => s.sequence === codon)?.count || 0;
+                                  const gene = bot.sequence.slice(i * 8, (i + 1) * 8);
+                                  const isSelected = selectedGeneIndex === i;
+                                  const isAnom = isAnomalousGene(gene);
+                                  const ownedCount = sequences.find(s => s.sequence === gene)?.count || 0;
                                   const doesNotExistInInventory = ownedCount === 0;
                                   return (
                                     <button
@@ -6666,7 +6667,7 @@ export default function PoxConsole({
                                       type="button"
                                       onClick={() => {
                                         sound.playBeep(600 + i * 50, 0.05, "sine");
-                                        setSelectedCodonIndex(i);
+                                        setSelectedGeneIndex(i);
                                       }}
                                       className={`relative py-3 px-1 rounded border flex flex-col items-center justify-center transition-all cursor-pointer ${
                                         isSelected
@@ -6686,22 +6687,22 @@ export default function PoxConsole({
                                           NEW
                                         </span>
                                       )}
-                                      <span className="text-[10px] font-mono tracking-widest mt-1.5">{codon}</span>
+                                      <span className="text-[10px] font-mono tracking-widest mt-1.5">{gene}</span>
                                     </button>
                                   );
                                 })}
                               </div>
 
-                              {selectedCodonIndex !== null && (
+                              {selectedGeneIndex !== null && (
                                 <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-red-950 mt-1">
                                   <span className="text-[9.5px] text-red-400 flex-grow leading-snug">
-                                    CONVERT CODON <strong className="text-white bg-red-900/60 px-1 py-0.5 rounded tracking-widest font-mono">"{bot.sequence.slice(selectedCodonIndex * 8, (selectedCodonIndex + 1) * 8)}"</strong> INTO ARCHIVE STOCK. THIS CREATURE WILL BE PURGED.
+                                    CONVERT GENE <strong className="text-white bg-red-900/60 px-1 py-0.5 rounded tracking-widest font-mono">"{bot.sequence.slice(selectedGeneIndex * 8, (selectedGeneIndex + 1) * 8)}"</strong> INTO ARCHIVE STOCK. THIS CREATURE WILL BE PURGED.
                                   </span>
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const pickedCodon = bot.sequence.slice(selectedCodonIndex * 8, (selectedCodonIndex + 1) * 8);
-                                      handleSpliceExtract(bot.id, pickedCodon);
+                                      const pickedGene = bot.sequence.slice(selectedGeneIndex * 8, (selectedGeneIndex + 1) * 8);
+                                      handleSpliceExtract(bot.id, pickedGene);
                                     }}
                                     className="w-full sm:w-auto px-4 py-2 bg-red-800 hover:bg-red-700 text-white font-bold rounded-sm uppercase text-xs cursor-pointer tracking-wider shrink-0 shadow-[0_0_12px_rgba(239,68,68,0.3)] transition-all active:scale-95"
                                   >
@@ -6711,11 +6712,11 @@ export default function PoxConsole({
                               )}
                             </div>
 
-                            {/* Codon Sequence Extension Lab */}
+                            {/* Gene Sequence Extension Lab */}
                             <div className="mt-4 p-3 bg-black/60 border border-amber-900/40 rounded-lg space-y-3 font-sans">
                               <div className="flex justify-between items-center pb-1.5 border-b border-amber-950">
                                 <span className="text-[10px] text-amber-400 font-bold tracking-wider uppercase flex items-center gap-1 font-sans">
-                                  <Sparkles className="w-3.5 h-3.5 text-amber-500" /> CODON SEQUENCE EXTENSION LAB
+                                  <Sparkles className="w-3.5 h-3.5 text-amber-500" /> GENE SEQUENCE EXTENSION LAB
                                 </span>
                                 <span className="text-[8px] text-neutral-500 font-mono">
                                   EXTENSIONS: {Math.max(0, (bot.sequence.length - 64) / 8)} / 2 MAXIMUM
@@ -6723,7 +6724,7 @@ export default function PoxConsole({
                               </div>
 
                               <p className="text-[10px] text-neutral-400 leading-normal">
-                                Combine custom 8-letter codon sequences from your Bio-Lab codon inventory onto this specimen to trigger stat recalibration and unlock dynamic combat maneuvers. Limit 2 additional extensions.
+                                Combine custom 8-letter gene sequences from your Bio-Lab gene inventory onto this specimen to trigger stat recalibration and unlock dynamic combat maneuvers. Limit 2 additional extensions.
                               </p>
 
                               {bot.sequence.length < 80 ? (
@@ -6731,22 +6732,22 @@ export default function PoxConsole({
                                   {(() => {
                                     const lastFour = bot.sequence.slice(-4);
                                     const prefixToMatch = lastFour.split("").reverse().join("");
-                                    const matchingCodons = sequences.filter(s => s.count > 0 && s.sequence.substring(0, 4) === prefixToMatch);
+                                    const matchingGenes = sequences.filter(s => s.count > 0 && s.sequence.substring(0, 4) === prefixToMatch);
                                     
                                     return (
                                       <>
                                         <div className="bg-amber-950/20 border border-amber-900/35 p-2 rounded text-[9.5px] text-amber-500 font-mono leading-relaxed">
-                                          <span className="font-extrabold uppercase text-amber-400 block mb-0.5">🧬 CODON ALIGNMENT RULE:</span>
-                                          The next codon's first 4 letters must mirror/reverse the active target's suffix <span className="text-white underline font-bold px-0.5 bg-zinc-900 rounded font-mono">"{lastFour}"</span> &rarr; <span className="text-amber-300 font-bold bg-amber-950/60 px-1 py-0.5 rounded border border-amber-800/40 font-mono">Must start with "{prefixToMatch}"</span>.
+                                          <span className="font-extrabold uppercase text-amber-400 block mb-0.5">🧬 GENE ALIGNMENT RULE:</span>
+                                          The next gene's first 4 letters must mirror/reverse the active target's suffix <span className="text-white underline font-bold px-0.5 bg-zinc-900 rounded font-mono">"{lastFour}"</span> &rarr; <span className="text-amber-300 font-bold bg-amber-950/60 px-1 py-0.5 rounded border border-amber-800/40 font-mono">Must start with "{prefixToMatch}"</span>.
                                         </div>
 
                                         <div className="text-[9.5px] uppercase font-bold text-amber-500 select-none font-mono">
-                                          AVAILABLE CODON STOCKPILES IN INVENTORY:
+                                          AVAILABLE GENE STOCKPILES IN INVENTORY:
                                         </div>
 
-                                        {matchingCodons.length > 0 ? (
+                                        {matchingGenes.length > 0 ? (
                                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 max-h-36 overflow-y-auto custom-pox-scrollbar pr-1 font-mono">
-                                            {matchingCodons.map((seqObj) => {
+                                            {matchingGenes.map((seqObj) => {
                                               const isChosen = selectedExtensionSequence === seqObj.sequence;
                                               return (
                                                 <button
@@ -6770,7 +6771,7 @@ export default function PoxConsole({
                                           </div>
                                         ) : (
                                           <div className="p-2.5 bg-neutral-950 border border-neutral-800 rounded font-mono text-[9px] text-amber-600 leading-normal">
-                                            ✕ No matching codon blocks in stock that start with <strong className="text-white select-all bg-amber-950/40 px-1 rounded">"{prefixToMatch}"</strong>.
+                                            ✕ No matching gene blocks in stock that start with <strong className="text-white select-all bg-amber-950/40 px-1 rounded">"{prefixToMatch}"</strong>.
                                             <br />
                                             Please visit the <strong className="text-white bg-slate-900 border border-zinc-700 px-1 py-0.5 rounded font-mono">DNA COMBINATOR</strong> tab to synthesize patterns starting with this prefix.
                                           </div>
@@ -6782,7 +6783,7 @@ export default function PoxConsole({
                                   {selectedExtensionSequence && (
                                     <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-amber-950/30 mt-1">
                                       <span className="text-[9px] text-amber-500 flex-grow leading-normal">
-                                        APPEND CODON <strong className="text-white bg-amber-950/60 px-1 py-0.5 rounded tracking-widest font-mono">"{selectedExtensionSequence}"</strong> TO INSTANCE RECTIFIER BLOCK. RECALCULATING STATISTICS POTENCY...
+                                        APPEND GENE <strong className="text-white bg-amber-950/60 px-1 py-0.5 rounded tracking-widest font-mono">"{selectedExtensionSequence}"</strong> TO INSTANCE RECTIFIER BLOCK. RECALCULATING STATISTICS POTENCY...
                                       </span>
                                       <button
                                         type="button"
@@ -6808,11 +6809,11 @@ export default function PoxConsole({
                                           setCreatures((prev) => {
                                             return prev.map(c => {
                                               if (c.id === bot.id) {
-                                                const currentAppended = c.appendedCodons || [];
+                                                const currentAppended = c.appendedGenes || [];
                                                 return {
                                                   ...c,
                                                   sequence: nextSeq,
-                                                  appendedCodons: [...currentAppended, selectedExtensionSequence],
+                                                  appendedGenes: [...currentAppended, selectedExtensionSequence],
                                                   vitality: proc.vitality,
                                                   attack: proc.attack,
                                                   defense: proc.defense,
@@ -6827,7 +6828,7 @@ export default function PoxConsole({
                                             });
                                           });
 
-                                          triggerLog(`MUTATION MERGER SUCCESS: Appended codon "${selectedExtensionSequence}" onto specimen "${bot.name}". Stats re-optimized!`, "success");
+                                          triggerLog(`MUTATION MERGER SUCCESS: Appended gene "${selectedExtensionSequence}" onto specimen "${bot.name}". Stats re-optimized!`, "success");
                                           setSelectedExtensionSequence(null);
                                         }}
                                         className="w-full sm:w-auto px-4 py-2 bg-amber-800 hover:bg-amber-700 text-black font-bold rounded-sm uppercase text-xs cursor-pointer tracking-wider shrink-0 transition-all shadow-[0_0_10px_rgba(245,158,11,0.2)] active:scale-95"
@@ -6841,7 +6842,7 @@ export default function PoxConsole({
                                 <div className="p-2.5 bg-green-950/15 border border-green-900/45 rounded text-center">
                                   <span className="text-[10px] text-[#00FF41] font-bold block uppercase tracking-wider">▲ STABILIZATION INTEGRITY UNLOCKED</span>
                                   <p className="text-[9.5px] text-green-700 font-mono mt-0.5 leading-relaxed">
-                                    Specimen sequence has been appended with exactly 2 maximum additional codons. Signal capacity stabilized.
+                                    Specimen sequence has been appended with exactly 2 maximum additional genes. Signal capacity stabilized.
                                   </p>
                                 </div>
                               )}
@@ -7004,7 +7005,7 @@ export default function PoxConsole({
                             tags.push("ALPHA GENE");
                           }
                           
-                          if (item.appendedCodons && item.appendedCodons.length > 0) {
+                          if (item.appendedGenes && item.appendedGenes.length > 0) {
                             tags.push("MODIFIED");
                           }
                           
@@ -7033,7 +7034,7 @@ export default function PoxConsole({
                           (libFilterFaction !== "ALL" ? 1 : 0) +
                           (libFilterType !== "ALL" ? 1 : 0) +
                           (libFilterTag !== "ALL" ? 1 : 0) +
-                          (libFilterDispatchCodonOnly ? 1 : 0) +
+                          (libFilterDispatchGeneOnly ? 1 : 0) +
                           (libMinVitality > 0 ? 1 : 0) +
                           (libMaxVitality < computedMaxVitality ? 1 : 0) +
                           (libMinAttack > 0 ? 1 : 0) +
@@ -7059,8 +7060,8 @@ export default function PoxConsole({
                             const itemTags = getCreatureTags(item);
                             if (libFilterTag !== "ALL" && !itemTags.includes(libFilterTag)) return false;
 
-                            // G.E.N. Dispatch Codon Match filter
-                            if (libFilterDispatchCodonOnly && !checkCreatureHasDispatchCodon(item.sequence)) return false;
+                            // G.E.N. Dispatch Gene Match filter
+                            if (libFilterDispatchGeneOnly && !checkCreatureHasDispatchGene(item.sequence)) return false;
                             
                             // Stats boundaries
                             if (item.vitality < libMinVitality || item.vitality > libMaxVitality) return false;
@@ -7103,7 +7104,7 @@ export default function PoxConsole({
                           setLibFilterFaction("ALL");
                           setLibFilterType("ALL");
                           setLibFilterTag("ALL");
-                          setLibFilterDispatchCodonOnly(false);
+                          setLibFilterDispatchGeneOnly(false);
                           setLibMinVitality(0);
                           setLibMaxVitality(computedMaxVitality);
                           setLibMinAttack(0);
@@ -7339,15 +7340,15 @@ export default function PoxConsole({
                                       </div>
                                     </div>
 
-                                    {/* G.E.N. Dispatch Codon Match filter options & Repositioned Clear Filters */}
+                                    {/* G.E.N. Dispatch Gene Match filter options & Repositioned Clear Filters */}
                                     <div className="border-t border-green-950/80 pt-2 flex items-center justify-between gap-3 flex-wrap">
                                       <label className="flex items-center gap-2 text-neutral-400 font-bold cursor-pointer select-none">
                                         <input
                                           type="checkbox"
-                                          checked={libFilterDispatchCodonOnly}
+                                          checked={libFilterDispatchGeneOnly}
                                           onChange={(e) => {
                                             sound.playBeep(440, 0.05, "sine");
-                                            setLibFilterDispatchCodonOnly(e.target.checked);
+                                            setLibFilterDispatchGeneOnly(e.target.checked);
                                           }}
                                           className="w-3 h-3 accent-[#00FF41] rounded border-green-900 bg-neutral-950 cursor-pointer"
                                         />
@@ -7522,8 +7523,8 @@ export default function PoxConsole({
                                             <Trash2 className="w-3.5 h-3.5" />
                                           </button>
                                         </div>
-                                        {checkCreatureHasDispatchCodon(item.sequence) && (
-                                          <div className="absolute bottom-1 right-7 pointer-events-none select-none text-[6.5px] uppercase font-bold text-amber-400 font-mono tracking-wider bg-amber-950/75 px-1 py-[0.5px] border border-amber-600/40 rounded shadow-[0_0_6px_rgba(251,191,36,0.15)] animate-pulse" title="SPECIMEN CONTAINS ACTIVE DISPATCH CODON">
+                                        {checkCreatureHasDispatchGene(item.sequence) && (
+                                          <div className="absolute bottom-1 right-7 pointer-events-none select-none text-[6.5px] uppercase font-bold text-amber-400 font-mono tracking-wider bg-amber-950/75 px-1 py-[0.5px] border border-amber-600/40 rounded shadow-[0_0_6px_rgba(251,191,36,0.15)] animate-pulse" title="SPECIMEN CONTAINS ACTIVE DISPATCH GENE">
                                             🧬 G.E.N. MATCH
                                           </div>
                                         )}
@@ -7783,15 +7784,15 @@ export default function PoxConsole({
                             <div className="flex flex-col items-center justify-center text-center space-y-4 py-8 h-full">
                               {activeHack.winnerUid === 'PLAYER' ? (
                                 (() => {
-                                  const snatched = activeHack.harvestedCodon || "";
-                                  const extraSnatched = activeHack.harvestedExtraCodons || [];
+                                  const snatched = activeHack.harvestedGene || "";
+                                  const extraSnatched = activeHack.harvestedExtraGenes || [];
                                   
-                                  // 1. Matches a codon in the daily target (targetSequence)
-                                  const dailyTargetCodons: string[] = [];
+                                  // 1. Matches a gene in the daily target (targetSequence)
+                                  const dailyTargetGenes: string[] = [];
                                   for (let i = 0; i < 64; i += 8) {
-                                    dailyTargetCodons.push(targetSequence.slice(i, i + 8));
+                                    dailyTargetGenes.push(targetSequence.slice(i, i + 8));
                                   }
-                                  const matchesDaily = snatched && dailyTargetCodons.includes(snatched);
+                                  const matchesDaily = snatched && dailyTargetGenes.includes(snatched);
                                   
                                   // 2. Matches one from the G.E.N. Network target list
                                   const matchesGenNetwork = snatched && genMails.some(mail => 
@@ -7835,7 +7836,7 @@ export default function PoxConsole({
 
                                         {extraSnatched.length > 0 && (
                                           <div className="pt-0.5">
-                                            <div className="text-[6.5px] text-neutral-500 uppercase font-black tracking-wider leading-none mb-1">Recovered Appended Codons:</div>
+                                            <div className="text-[6.5px] text-neutral-500 uppercase font-black tracking-wider leading-none mb-1">Recovered Appended Genes:</div>
                                             <div className="flex flex-wrap gap-1">
                                               {extraSnatched.map((ec, idx) => (
                                                 <span key={idx} className="text-[8px] font-mono font-bold text-cyan-400 bg-cyan-950/45 border border-cyan-800/40 px-1 py-0.5 rounded select-all">
@@ -7869,7 +7870,7 @@ export default function PoxConsole({
                                               : 'bg-black/40 border-neutral-900 text-neutral-500'
                                           }`}>
                                             <span>📡 G.E.N. NETWORK TARGET LIST:</span>
-                                            <span>{matchesGenNetwork ? "● MATCHED BROADCAST" : "⬡ UNLISTED CODON"}</span>
+                                            <span>{matchesGenNetwork ? "● MATCHED BROADCAST" : "⬡ UNLISTED GENE"}</span>
                                           </div>
 
                                           {/* Pear request matching */}
@@ -7946,7 +7947,7 @@ export default function PoxConsole({
 
                           <div className="p-2.5 bg-red-950/20 border border-red-900/40 rounded text-[8.5px] leading-normal mt-3 text-red-405 font-mono font-bold">
                             <span className="font-bold text-red-400 uppercase block mb-0.5">WARNING SYSTEM OVERRIDE:</span>
-                            Breach hacks snatch genuine codons from target genetic arrays, but a loss reports leakages.
+                            Breach hacks snatch genuine genes from target genetic arrays, but a loss reports leakages.
                           </div>
                         </div>
                       </>
@@ -8604,10 +8605,10 @@ export default function PoxConsole({
                                             <span><FlickeringPurpleText text="Detected Anomalous Gene" /></span>
                                           </div>
                                           <div className="text-white bg-neutral-950 border border-purple-900/20 py-1 px-1.5 rounded text-center text-[10px] select-all font-mono tracking-wider font-extrabold shadow-[2px_2px_0px_rgba(168,85,247,0.03)] border-dashed">
-                                            {anom.codon}
+                                            {anom.gene}
                                           </div>
                                           <div className="text-purple-500 text-[7.5px] leading-tight pt-1">
-                                            STOCK COUNT: <strong className="text-white">{(sequences.find(s => s.sequence === anom.codon)?.count) || 0}</strong> SAVED
+                                            STOCK COUNT: <strong className="text-white">{(sequences.find(s => s.sequence === anom.gene)?.count) || 0}</strong> SAVED
                                           </div>
                                         </div>
 
@@ -8661,10 +8662,10 @@ export default function PoxConsole({
                                                   </div>
 
                                                   <div className="bg-black/85 p-1 px-1.5 rounded border border-purple-955/50 text-[7.5px] text-purple-500">
-                                                    <b>ACQUIRED BASES ({activeMission.harvestedCodons.length}/4):</b>{" "}
+                                                    <b>ACQUIRED BASES ({activeMission.harvestedGenes.length}/4):</b>{" "}
                                                     <span className="text-white font-bold">
-                                                      {activeMission.harvestedCodons.length > 0 
-                                                        ? activeMission.harvestedCodons.join(", ") 
+                                                      {activeMission.harvestedGenes.length > 0 
+                                                        ? activeMission.harvestedGenes.join(", ") 
                                                         : "SCANNING ORBITAL RADIATIVES..."}
                                                     </span>
                                                   </div>
@@ -8672,7 +8673,7 @@ export default function PoxConsole({
                                                   {activeMission.isCompleted ? (
                                                     <button
                                                       type="button"
-                                                      onClick={() => handleRetrieveHarvestedCodons(activeMission.id)}
+                                                      onClick={() => handleRetrieveHarvestedGenes(activeMission.id)}
                                                       className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-black text-[9px] uppercase rounded border border-purple-400 cursor-pointer shadow-[0_0_8px_#a855f7] transition-all hover:scale-102 flex items-center justify-center gap-1 animate-pulse"
                                                     >
                                                       <Check className="w-3.5 h-3.5 mr-1" />
@@ -8680,7 +8681,7 @@ export default function PoxConsole({
                                                     </button>
                                                   ) : (
                                                     <div className="text-[7px] text-zinc-500 italic text-center leading-tight">
-                                                      Retrieval available upon mission completion. Codons are banked on safe return.
+                                                      Retrieval available upon mission completion. Genes are banked on safe return.
                                                     </div>
                                                   )}
                                                 </div>
@@ -8698,7 +8699,7 @@ export default function PoxConsole({
                                             if (!isHarvestable) {
                                               return (
                                                 <div className="border border-red-955 bg-red-955/15 p-2 rounded text-[8.5px] text-red-400 text-center font-bold">
-                                                  <p className="uppercase font-mono text-[9px] text-red-500 mb-0.5">✕ CODON OUT OF RANGE</p>
+                                                  <p className="uppercase font-mono text-[9px] text-red-500 mb-0.5">✕ GENE OUT OF RANGE</p>
                                                   <span className="text-[7.5px] leading-normal tracking-wide block">
                                                     ANOMALY DISTANCE ({anom.distance.toFixed(0)} FT) EXCEEDS TERMINAL RADIO RANGE ({scanRadius.toFixed(0)} FT).
                                                   </span>
@@ -8727,7 +8728,7 @@ export default function PoxConsole({
                                                   </div>
                                                   <div className="flex justify-between text-purple-400 font-bold border-t border-purple-955/40 pt-1">
                                                     <span>DISTANCE PINPOINT:</span>
-                                                    <span>{customTapCoords ? `${lockDist.toFixed(1)} FT FROM CORE` : "CENTER CORE (0.0 FT)"}</span>
+                                                    <span>{customTapCoords ? `${lockDist.toFixed(1)} FT FROM NODE` : "CENTER NODE (0.0 FT)"}</span>
                                                   </div>
                                                   <div className="flex justify-between text-white">
                                                     <span>STATION ACCURACY:</span>
@@ -8936,10 +8937,10 @@ export default function PoxConsole({
                                               </div>
 
                                               <div className="bg-black/95 p-1 px-1.5 rounded border border-purple-955 text-[8px] text-purple-400 flex justify-between items-center">
-                                                <span><b>CODON PACKETS ({m.harvestedCodons.length}/4):</b></span>
+                                                <span><b>GENE PACKETS ({m.harvestedGenes.length}/4):</b></span>
                                                 <span className="text-white font-mono font-bold">
-                                                  {m.harvestedCodons.length > 0 
-                                                    ? m.harvestedCodons.join(", ") 
+                                                  {m.harvestedGenes.length > 0 
+                                                    ? m.harvestedGenes.join(", ") 
                                                     : "INTEGRATION LINKING..."}
                                                 </span>
                                               </div>
@@ -8947,7 +8948,7 @@ export default function PoxConsole({
                                               {m.isCompleted && (
                                                 <button
                                                   type="button"
-                                                  onClick={() => handleRetrieveHarvestedCodons(m.id)}
+                                                  onClick={() => handleRetrieveHarvestedGenes(m.id)}
                                                   className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-black text-[9px] uppercase rounded border border-purple-400 cursor-pointer shadow-[0_0_10px_#a855f7] transition-all flex items-center justify-center gap-1 animate-pulse"
                                                 >
                                                   <Check className="w-4 h-4 mr-1" />
@@ -9496,7 +9497,7 @@ export default function PoxConsole({
                               <span>⌬</span> BIOPOLYMER SUB-NODES FREQUENCY SPECTRUM
                             </h3>
                             <p className="text-neutral-500 text-[8px] mb-3 leading-normal">
-                              Computed values representing raw biochemical sequencing of synthesized codon elements. Sub-nodes correspond to biological attributes.
+                              Computed values representing raw biochemical sequencing of synthesized gene elements. Sub-nodes correspond to biological attributes.
                             </p>
 
                             <div className="grid grid-cols-2 gap-2 mt-2">
@@ -9667,7 +9668,7 @@ export default function PoxConsole({
                         <div className="flex justify-between items-center bg-green-950/60 border border-green-500/30 px-3 py-2 rounded mb-3 flex-shrink-0">
                           <span className="text-[9px] text-[#00FF41] font-bold tracking-widest uppercase flex items-center gap-2">
                             <span className="w-1.5 h-1.5 bg-[#00FF41] rounded-full animate-ping" />
-                            [ SYNC-NET CORE SECTOR TELEMETRY STATS ]
+                            [ SYNC-NET SECTOR TELEMETRY STATS ]
                           </span>
                           <button
                             type="button"
@@ -9688,13 +9689,13 @@ export default function PoxConsole({
                               <span>⌬</span> RECORDED SECTOR METRICS & METADATA
                             </h3>
                             <p className="text-neutral-500 text-[8px] mb-3 leading-normal">
-                              Historical record of player network transfers, biological reactor accelerations, hacker campaigns, and codon data acquisitions.
+                              Historical record of player network transfers, biological reactor accelerations, hacker campaigns, and gene data acquisitions.
                             </p>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                               <div className="bg-neutral-900/40 p-2 rounded border border-green-950/50 flex justify-between items-center">
-                                <span className="text-neutral-500 uppercase text-[7.5px]">TOTAL CODONS ACQUIRED:</span>
-                                <span className="text-[#00FF41] font-extrabold text-[10px]">{stats.totalCodonsAcquired}</span>
+                                <span className="text-neutral-500 uppercase text-[7.5px]">TOTAL GENES ACQUIRED:</span>
+                                <span className="text-[#00FF41] font-extrabold text-[10px]">{stats.totalGenesAcquired}</span>
                               </div>
                               <div className="bg-neutral-900/40 p-2 rounded border border-green-950/50 flex justify-between items-center">
                                 <span className="text-neutral-500 uppercase text-[7.5px]">REACTOR ACCELERATIONS:</span>
@@ -9705,7 +9706,7 @@ export default function PoxConsole({
                                 <span className="text-[#00FF41] font-bold text-[10px]">{stats.totalSpliced}</span>
                               </div>
                               <div className="bg-neutral-900/40 p-2 rounded border border-green-950/30 flex justify-between items-center">
-                                <span className="text-neutral-500 uppercase text-[7.5px]">SPLICED CODONS FROM SPECIMENS:</span>
+                                <span className="text-neutral-500 uppercase text-[7.5px]">SPLICED GENES FROM SPECIMENS:</span>
                                 <span className="text-red-400 font-bold text-[10px]">{stats.totalCreaturesSpliceHarvested}</span>
                               </div>
                               <div className="bg-neutral-900/40 p-2 rounded border border-green-950/30 flex justify-between items-center">
@@ -9937,7 +9938,7 @@ export default function PoxConsole({
                       </div>
                       
                       <div className="pt-3 mt-4 border-t border-green-900/20 text-[9px] text-green-700 font-mono text-center uppercase tracking-widest select-none">
-                        DECRYPTION CORE: ACTIVE 256-BIT QUANTUM COMS PROTECTION
+                        DECRYPTION ENGINE: ACTIVE 256-BIT QUANTUM COMS PROTECTION
                       </div>
                     </div>
 
@@ -9952,7 +9953,7 @@ export default function PoxConsole({
                               sound.playBeep(440, 0.05, "sine");
                               setSelectedMailId(null);
                               setSelectedDispatchSequence(null);
-                              setViewportCodonBalancePopupMailId(null);
+                              setViewportGeneBalancePopupMailId(null);
                             }}
                             className="px-3.5 py-1.5 bg-red-950 hover:bg-red-900 hover:text-white border border-red-500 text-red-100 font-bold uppercase text-[9px] cursor-pointer tracking-wider flex items-center gap-1 transition-all"
                           >
@@ -10045,7 +10046,7 @@ export default function PoxConsole({
                                                   <button
                                                     onClick={(e) => handleEjectNetSlot(idx, e)}
                                                     className="absolute -top-1 -right-1 bg-red-950 text-red-500 hover:bg-red-900 border border-red-900/40 rounded-full w-3.5 h-3.5 flex items-center justify-center text-[7px]"
-                                                    title="Eject codon block"
+                                                    title="Eject gene block"
                                                   >
                                                     ×
                                                   </button>
@@ -10099,7 +10100,7 @@ export default function PoxConsole({
                                     </div>
                                   </div>
 
-                                  {/* Right sub-column: available matching codon block picker [md:col-span-2] */}
+                                  {/* Right sub-column: available matching gene block picker [md:col-span-2] */}
                                   <div className="md:col-span-2 bg-neutral-950/40 border border-green-950 rounded p-2.5 flex flex-col justify-between">
                                     {activeNetSlotSelection !== null ? (
                                       <div className="flex flex-col justify-between h-full space-y-2">
@@ -10151,7 +10152,7 @@ export default function PoxConsole({
                                             );
                                           })}
                                           {sequences.filter(s => s.count > 0).length === 0 && (
-                                            <div className="text-center text-green-950 text-[9px] py-6 select-none font-mono">No stock codons available.</div>
+                                            <div className="text-center text-green-950 text-[9px] py-6 select-none font-mono">No stock genes available.</div>
                                           )}
                                         </div>
                                       </div>
@@ -10246,9 +10247,9 @@ export default function PoxConsole({
                                     <div className="text-[8.5px] text-blue-500 uppercase tracking-wider font-bold mb-1.5 flex justify-between items-center font-mono">
                                       <span>NODE DEFENDER LOG:</span>
                                       <button 
-                                        onClick={() => { sound.playBeep(650, 0.05, "sine"); setViewportCodonBalancePopupMailId(mail.id); }}
+                                        onClick={() => { sound.playBeep(650, 0.05, "sine"); setViewportGeneBalancePopupMailId(mail.id); }}
                                         className="text-[8px] bg-[#00FF41]/15 text-[#00FF41] hover:bg-[#00FF41]/25 border border-[#00FF41]/35 px-2 py-0.5 rounded font-mono font-bold tracking-tight cursor-pointer shadow-[0_0_8px_rgba(0,255,65,0.15)] animate-pulse"
-                                        title="View list of codons gained/lost for entirety of this battle log"
+                                        title="View list of genes gained/lost for entirety of this battle log"
                                       >
                                         [ TRANSFERS AUDIT ]
                                       </button>
@@ -10281,9 +10282,9 @@ export default function PoxConsole({
 
                                     {/* TRANSFERS AUDIT OVERLAY INLINE */}
                                     <AnimatePresence>
-                                      {viewportCodonBalancePopupMailId === mail.id && (() => {
-                                        const gained = mail.autoHackLog.codonsGained || [];
-                                        const lost = mail.autoHackLog.codonsLost || [];
+                                      {viewportGeneBalancePopupMailId === mail.id && (() => {
+                                        const gained = mail.autoHackLog.genesGained || [];
+                                        const lost = mail.autoHackLog.genesLost || [];
                                         return (
                                           <motion.div
                                             key="transfers-audit-popup"
@@ -10294,13 +10295,13 @@ export default function PoxConsole({
                                           >
                                             <div className="flex justify-between items-center border-b border-red-955 pb-1.5 mb-2 select-none">
                                               <span className="text-[10px] text-red-400 font-bold tracking-widest uppercase flex items-center gap-1.5 font-mono">
-                                                🚨 DEFENSE CODON AUDIT
+                                                🚨 DEFENSE GENE AUDIT
                                               </span>
                                               <button
                                                 type="button"
                                                 onClick={() => {
                                                   sound.playBeep(440, 0.05, "sine");
-                                                  setViewportCodonBalancePopupMailId(null);
+                                                  setViewportGeneBalancePopupMailId(null);
                                                 }}
                                                 className="px-2 py-0.5 rounded text-[8.5px] cursor-pointer font-bold tracking-wider border bg-red-950/80 hover:bg-red-900 border-red-800 text-red-500 hover:text-white"
                                               >
@@ -10315,11 +10316,11 @@ export default function PoxConsole({
                                             <div className="flex-1 overflow-y-auto space-y-2 pr-0.5 custom-pox-scrollbar font-mono">
                                               <div>
                                                 <div className="text-[9px] text-red-400 font-bold tracking-wider uppercase mb-1.5 font-mono">
-                                                  SURRENDERED CODONS ({lost.length})
+                                                  SURRENDERED GENES ({lost.length})
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-1.5">
                                                   {lost.map((seq, sIdx) => {
-                                                    const isAnom = isAnomalousCodon(seq);
+                                                    const isAnom = isAnomalousGene(seq);
                                                     return (
                                                       <div 
                                                         key={sIdx}
@@ -10430,9 +10431,9 @@ export default function PoxConsole({
                                     <div className="text-[8.5px] text-green-500 uppercase tracking-wider font-bold mb-1.5 flex justify-between items-center">
                                       <span>🖥️ LOG STREAM INTERCEPT:</span>
                                       <button 
-                                        onClick={() => { sound.playBeep(650, 0.05, "sine"); setViewportCodonBalancePopupMailId(mail.id); }}
+                                        onClick={() => { sound.playBeep(650, 0.05, "sine"); setViewportGeneBalancePopupMailId(mail.id); }}
                                         className="text-[8px] bg-[#00FF41]/15 text-[#00FF41] hover:bg-[#00FF41]/25 border border-[#00FF41]/35 px-2 py-0.5 rounded font-mono font-bold tracking-tight cursor-pointer shadow-[0_0_8px_rgba(0,255,65,0.15)] animate-pulse"
-                                        title="View list of codons gained/lost for entirety of this battle log"
+                                        title="View list of genes gained/lost for entirety of this battle log"
                                       >
                                         [ TRANSFERS AUDIT ]
                                       </button>
@@ -10466,9 +10467,9 @@ export default function PoxConsole({
 
                                     {/* TRANSFERS AUDIT OVERLAY INLINE */}
                                     <AnimatePresence>
-                                      {viewportCodonBalancePopupMailId === mail.id && (() => {
-                                        const gained = mail.autoHackLog.codonsGained || [];
-                                        const lost = mail.autoHackLog.codonsLost || [];
+                                      {viewportGeneBalancePopupMailId === mail.id && (() => {
+                                        const gained = mail.autoHackLog.genesGained || [];
+                                        const lost = mail.autoHackLog.genesLost || [];
                                         return (
                                           <motion.div
                                             key="transfers-audit-popup"
@@ -10485,7 +10486,7 @@ export default function PoxConsole({
                                                 type="button"
                                                 onClick={() => {
                                                   sound.playBeep(440, 0.05, "sine");
-                                                  setViewportCodonBalancePopupMailId(null);
+                                                  setViewportGeneBalancePopupMailId(null);
                                                 }}
                                                 className="px-2 py-0.5 rounded text-[8.5px] cursor-pointer font-bold tracking-wider border bg-green-950/80 hover:bg-green-900 border-green-850 text-green-500 hover:text-white"
                                               >
@@ -10494,17 +10495,17 @@ export default function PoxConsole({
                                             </div>
 
                                             <p className="text-[8.5px] text-neutral-405 mb-2 leading-snug font-mono select-none text-neutral-400 font-mono">
-                                              Snatched target codon stream records.
+                                              Snatched target gene stream records.
                                             </p>
 
                                             <div className="flex-1 overflow-y-auto space-y-2 pr-0.5 custom-pox-scrollbar font-mono">
                                               <div>
                                                 <div className="text-[9px] text-[#00FF41] font-bold tracking-wider uppercase mb-1.5 font-mono">
-                                                  🛡️ SNATCHED CODON INFLOW ({gained.length})
+                                                  🛡️ SNATCHED GENE INFLOW ({gained.length})
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-1.5">
                                                   {gained.map((seq, sIdx) => {
-                                                    const isAnom = isAnomalousCodon(seq);
+                                                    const isAnom = isAnomalousGene(seq);
                                                     return (
                                                       <div 
                                                         key={sIdx}
@@ -10519,7 +10520,7 @@ export default function PoxConsole({
                                                     );
                                                   })}
                                                   {gained.length === 0 && (
-                                                    <p className="col-span-2 text-center text-[9px] text-neutral-500 py-4 italic font-mono">No codons gained.</p>
+                                                    <p className="col-span-2 text-center text-[9px] text-neutral-500 py-4 italic font-mono">No genes gained.</p>
                                                   )}
                                                 </div>
                                               </div>
@@ -10608,7 +10609,7 @@ export default function PoxConsole({
                                       </div>
                                       {tr.partner.targetSequence && (
                                         <div className="p-1.5 bg-cyan-950/15 border border-cyan-900/40 rounded text-[9px] mt-1.5 text-cyan-400 font-mono leading-normal relative overflow-hidden">
-                                          Node Desires Target codon DNA: 
+                                          Node Desires Target gene DNA: 
                                           <div className="font-bold text-white tracking-widest mt-0.5 break-all select-all text-[8px]">{renderColorCodedSequence(tr.partner.targetSequence)}</div>
                                           {partnerDesireMatchesDispatch && (
                                             <div className="mt-1 text-[7.5px] text-purple-400 font-mono font-bold flex items-center gap-1">
@@ -10626,7 +10627,7 @@ export default function PoxConsole({
                                     </div>
                                   </div>
 
-                                  {/* Right Panel: Player Response Core */}
+                                  {/* Right Panel: Player Response */}
                                   <div className="md:col-span-3 bg-neutral-950/80 border border-green-950 p-3.5 rounded flex flex-col justify-between min-h-[310px]">
                                     <div className="text-[8.5px] text-green-500 uppercase tracking-wider font-bold mb-1.5 flex justify-between items-center select-none font-mono">
                                       <span>📥 TRANSACTION SYNC cockpit:</span>
@@ -11139,10 +11140,10 @@ export default function PoxConsole({
                                       <span>Detected Anomalous Gene</span>
                                     </div>
                                     <div className="text-white bg-neutral-950 border border-green-900/20 py-1 px-1.5 rounded text-center text-[10px] select-all font-mono tracking-wider font-extrabold shadow-[2px_2px_0px_rgba(0,255,65,0.03)] border-dashed">
-                                      {anom.codon}
+                                      {anom.gene}
                                     </div>
                                     <div className="text-green-700 text-[7.5px] leading-tight pt-1">
-                                      STOCK COUNT: <strong className="text-white">{(sequences.find(s => s.sequence === anom.codon)?.count) || 0}</strong> SAVED
+                                      STOCK COUNT: <strong className="text-white">{(sequences.find(s => s.sequence === anom.gene)?.count) || 0}</strong> SAVED
                                     </div>
                                   </div>
 
@@ -11200,10 +11201,10 @@ export default function PoxConsole({
                                             </div>
 
                                             <div className="bg-black/85 p-1 px-1.5 rounded border border-green-950/50 text-[7.5px] text-green-500">
-                                              <b>ACQUIRED BASES ({activeMission.harvestedCodons.length}/4):</b>{" "}
+                                              <b>ACQUIRED BASES ({activeMission.harvestedGenes.length}/4):</b>{" "}
                                               <span className="text-white font-bold">
-                                                {activeMission.harvestedCodons.length > 0 
-                                                  ? activeMission.harvestedCodons.join(", ") 
+                                                {activeMission.harvestedGenes.length > 0 
+                                                  ? activeMission.harvestedGenes.join(", ") 
                                                   : "SCANNING ORBITAL RADIATIVES..."}
                                               </span>
                                             </div>
@@ -11211,7 +11212,7 @@ export default function PoxConsole({
                                             {activeMission.isCompleted ? (
                                               <button
                                                 type="button"
-                                                onClick={() => handleRetrieveHarvestedCodons(activeMission.id)}
+                                                onClick={() => handleRetrieveHarvestedGenes(activeMission.id)}
                                                 className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[9px] uppercase rounded border border-emerald-400 cursor-pointer shadow-[0_0_8px_#10b981] transition-all hover:scale-102 flex items-center justify-center gap-1 animate-pulse"
                                               >
                                                 <Check className="w-3.5 h-3.5 mr-1" />
@@ -11219,7 +11220,7 @@ export default function PoxConsole({
                                               </button>
                                             ) : (
                                               <div className="text-[7px] text-zinc-500 italic text-center leading-tight">
-                                                Retrieval available upon mission completion. Codons are banked on safe return.
+                                                Retrieval available upon mission completion. Genes are banked on safe return.
                                               </div>
                                             )}
                                           </div>
@@ -11237,7 +11238,7 @@ export default function PoxConsole({
                                       if (!isHarvestable) {
                                         return (
                                           <div className="border border-red-950 bg-red-950/15 p-2 rounded text-[8.5px] text-red-400 text-center font-bold">
-                                            <p className="uppercase font-mono text-[9px] text-red-500 mb-0.5">✕ CODON OUT OF RANGE</p>
+                                            <p className="uppercase font-mono text-[9px] text-red-500 mb-0.5">✕ GENE OUT OF RANGE</p>
                                             <span className="text-[7.5px] leading-normal tracking-wide block">
                                               ANOMALY DISTANCE ({anom.distance.toFixed(0)} FT) EXCEEDS TERMINAL RADIO RANGE ({scanRadius.toFixed(0)} FT).
                                             </span>
@@ -11266,7 +11267,7 @@ export default function PoxConsole({
                                             </div>
                                             <div className="flex justify-between text-[#00FF41] font-bold border-t border-emerald-950/40 pt-1">
                                               <span>DISTANCE PINPOINT:</span>
-                                              <span>{customTapCoords ? `${lockDist.toFixed(1)} FT FROM CORE` : "CENTER CORE (0.0 FT)"}</span>
+                                              <span>{customTapCoords ? `${lockDist.toFixed(1)} FT FROM NODE` : "CENTER NODE (0.0 FT)"}</span>
                                             </div>
                                             <div className="flex justify-between text-white">
                                               <span>STATION ACCURACY:</span>
@@ -11310,7 +11311,7 @@ export default function PoxConsole({
                                           ) : (
                                             <div className="border border-neutral-900 bg-neutral-950 p-2 text-center rounded text-[7.5px] text-neutral-500 italic leading-snug">
                                               [!] NO AVAILABLE CYBORGS FOR DISPATCH.<br/>
-                                              CONSTRUCT NEW SEC DEFENDERS TO HARVEST CODON ANOMALIES.
+                                              CONSTRUCT NEW SEC DEFENDERS TO HARVEST GENE ANOMALIES.
                                             </div>
                                           )}
                                         </div>
@@ -11479,10 +11480,10 @@ export default function PoxConsole({
                                         </div>
 
                                         <div className="bg-black/95 p-1 px-1.5 rounded border border-green-950 text-[8px] text-green-400 flex justify-between items-center">
-                                          <span><b>CODON PACKETS ({m.harvestedCodons.length}/4):</b></span>
+                                          <span><b>GENE PACKETS ({m.harvestedGenes.length}/4):</b></span>
                                           <span className="text-white font-mono font-bold">
-                                            {m.harvestedCodons.length > 0 
-                                              ? m.harvestedCodons.join(", ") 
+                                            {m.harvestedGenes.length > 0 
+                                              ? m.harvestedGenes.join(", ") 
                                               : "INTEGRATION LINKING..."}
                                           </span>
                                         </div>
@@ -11490,7 +11491,7 @@ export default function PoxConsole({
                                         {m.isCompleted && (
                                           <button
                                             type="button"
-                                            onClick={() => handleRetrieveHarvestedCodons(m.id)}
+                                            onClick={() => handleRetrieveHarvestedGenes(m.id)}
                                             className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[9px] uppercase rounded border border-emerald-400 cursor-pointer shadow-[0_0_10px_#10b981] transition-all flex items-center justify-center gap-1 animate-pulse"
                                           >
                                             <Check className="w-4 h-4 mr-1" />
@@ -12131,7 +12132,7 @@ export default function PoxConsole({
                                     type="button"
                                     onClick={() => {
                                       sound.playBeep(420, 0.05, "sine");
-                                      const radNames = ["GAMMA_CORE", "TRINITY_BRIDGE", "SPECTRE_NODE_06", "ZEPHYR_REACTION", "NEXUS_MATRIX"];
+                                      const radNames = ["GAMMA_UNIT", "TRINITY_BRIDGE", "SPECTRE_NODE_06", "ZEPHYR_REACTION", "NEXUS_MATRIX"];
                                       const rName = radNames[Math.floor(Math.random() * radNames.length)] + "_" + Math.floor(Math.random() * 100);
                                       const rId = "NODE-" + Math.random().toString(36).substring(2, 6).toUpperCase() + "-" + Math.random().toString(36).substring(2, 6).toUpperCase() + "-" + Math.random().toString(36).substring(2, 6).toUpperCase();
                                       setNewNodeName(rName);
@@ -12614,7 +12615,7 @@ export default function PoxConsole({
               def: bot.defense,
               spd: bot.speed
             },
-            appended: bot.appendedCodons || [],
+            appended: bot.appendedGenes || [],
             moves: getUnlockedMoves(bot.sequence).map(m => m.name),
             visual: {
               faction: bot.faction,
@@ -12825,7 +12826,7 @@ export default function PoxConsole({
               }}
               className="mt-3.5 py-2.5 bg-blue-950 border border-blue-600 hover:bg-blue-900 text-blue-300 hover:text-white rounded text-[9px] font-bold uppercase tracking-widest cursor-pointer transition-all active:scale-98 text-center"
             >
-              INTEGRATE CODON SEQUENCE INTO DATABASE
+              INTEGRATE GENE SEQUENCE INTO DATABASE
             </button>
           </motion.div>
         )}

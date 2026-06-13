@@ -50,7 +50,7 @@ export function constructProceduralCreature(sequence: string, origin: string = "
 
   // Name Generator parts
   const prefixes = ["Chitin", "Toxi", "Solder", "Tetan", "Glitch", "Phage", "Bio", "Xeno", "Vex", "Cyber"];
-  const matrix = ["Weaver", "Swarm", "Core", "Dredge", "Claw", "Suture", "Stinger", "Shell", "Latch", "Pincer"];
+  const matrix = ["Weaver", "Swarm", "Shell", "Dredge", "Claw", "Suture", "Stinger", "Shell", "Latch", "Pincer"];
   const suffixes = ["v1", "Mk-III", "Pro", "404", "Omega", "B-9", "Delta", "X", "Prime", "Zeta"];
 
   const hash1 = (countA * 3 + countG * 7 + countT * 11 + countC * 13) % prefixes.length;
@@ -83,7 +83,7 @@ export function constructProceduralCreature(sequence: string, origin: string = "
   // Lore text
   const lore = `Synthesized from custom sub-gene segments. Displays aggressive ${faction.toLowerCase()}-sector behavior with optimized ${primaryWeapon} payloads. Integrated weapon clusters operate at ${attack}-rating.`;
 
-  // Abstract ASCII visual matrix (5x5 grid representing core)
+  // Abstract ASCII visual matrix (5x5 grid representing node)
   const gridChars = [".", "o", "x", "#", "O"];
   let asciiArt = "";
   for (let r = 0; r < 5; r++) {
@@ -119,12 +119,12 @@ export function getUnlockedMoves(sequence: string) {
   const moves: { type: 'healing' | 'evasive'; name: string; description: string }[] = [];
   if (!sequence || sequence.length <= 64) return moves;
 
-  // Codon 1: Characters 64 to 72
+  // Gene 1: Characters 64 to 72
   if (sequence.length >= 72) {
-    const codon1 = sequence.slice(64, 72);
+    const gene1 = sequence.slice(64, 72);
     let ga = 0;
     let tc = 0;
-    for (const char of codon1) {
+    for (const char of gene1) {
       if (char === 'A' || char === 'G') ga++;
       else if (char === 'T' || char === 'C') tc++;
     }
@@ -143,9 +143,9 @@ export function getUnlockedMoves(sequence: string) {
     }
   }
 
-  // Codon 2: Characters 72 to 80
+  // Gene 2: Characters 72 to 80
   if (sequence.length >= 80) {
-    const codon2 = sequence.slice(72, 80);
+    const gene2 = sequence.slice(72, 80);
     const firstType = moves[0]?.type;
     if (firstType === 'healing') {
       moves.push({
@@ -174,7 +174,7 @@ export const simulatedUids = [
   "CONTAIN_UNIT_3",
   "X_VIRUS_MKT",
   "SLICER_GRID",
-  "INFECTED_CORE",
+  "INFECTED_UNIT",
   "TRANSCEIVER_13",
   "POX_BOT_99",
 ];

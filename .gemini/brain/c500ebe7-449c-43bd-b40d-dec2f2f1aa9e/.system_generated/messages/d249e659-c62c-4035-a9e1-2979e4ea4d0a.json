@@ -1,0 +1,1 @@
+{"id":"d249e659-c62c-4035-a9e1-2979e4ea4d0a","recipient":"c500ebe7-449c-43bd-b40d-dec2f2f1aa9e","sender":"c500ebe7-449c-43bd-b40d-dec2f2f1aa9e/task-1602","priority":"MESSAGE_PRIORITY_LOW","timestamp":"2026-06-13T17:29:42.132585200Z","renderDetails":{"messageTitle":"Wait timer: Timer Cancelled"},"content":"Your scheduled timer was cancelled because you received another message."}

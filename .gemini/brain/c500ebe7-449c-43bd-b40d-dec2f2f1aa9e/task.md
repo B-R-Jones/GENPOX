@@ -1,0 +1,66 @@
+# GENPOX Native Android Rewrite Tasks
+
+- `[x]` **Phase 1: Scaffolding and Environment Setup**
+    - `[x]` Install and verify the `android` CLI tool on Windows
+    - `[x]` Initialize a new Jetpack Compose Android app under `c:\Users\Brent\Antigravity\GENPOX-android`
+    - `[x]` Configure standard dependencies (Compose, Navigation, Room, Google AI SDK, Google Maps, CameraX, ML Kit)
+    - `[x]` Set up permissions in AndroidManifest.xml (Camera, Geolocation, Internet) and lock to Portrait
+- `[x]` **Phase 2: Core State and Database Layer**
+    - `[x]` Define domain data models (`Creature`, `GeneSequence`, `NearbyUser`, `HarvestMission`)
+    - `[x]` Set up Room Database for creature/gene storage
+    - `[x]` Implement Preference DataStore for storing the Gemini API key securely
+    - `[x]` Build repositories and core view models
+- `[x]` **Phase 3: Synthesizer & Compose Canvas Visualizer**
+    - `[x]` Create `PoxSynthManager` in Kotlin (PCM sound buffer generation + `AudioTrack`)
+    - `[x]` Implement `NodeCrystalCanvas` in Compose `Canvas` with lunar phase/chaos math
+- `[x]` **Phase 4: Retro Console Views**
+    - `[x]` Build shell navigation and global retro CRT layout
+    - `[x]` Implement Settings UI for Gemini API Key configuration
+    - `[x]` Implement Combinator compiler view (integrating Google AI SDK)
+    - `[x]` Implement Splicer and Forecast Calendar screens
+    - `[x]` Implement Vault (Library) and Inventory screens
+- `[x]` **Phase 5: Map Scanner & Scanner Camera**
+    - `[x]` Add styled Google Map for Scanner view
+    - `[x]` Implement CameraX + ML Kit analyzer for Transceiver barcode scans
+    - `[x]` Hook up native geolocations
+- `[x]` **Phase 6: Integration Testing & APK Verification**
+    - `[x]` Perform test compile and resolve any build errors (Build completed successfully)
+    - `[x]` Run unit tests (All tests passed)
+    - `[-]` Deploy debug APK to Android Emulator (Emulator remains offline/stuck due to host system BIOS virtualization disabled)
+- `[x]` **Phase 7: Resolve Runtime Crash & Native Annotation Processing (KSP)**
+    - `[x]` Migrate compilation pipeline from Kapt to KSP to work with built-in Kotlin in AGP 9.0
+    - `[x]` Upgrade Room library from 2.6.1 to 2.8.4 to resolve the KSP2 `unexpected jvm signature V` exception
+    - `[x]` Deploy the updated debug APK to the physical Pixel 10 Pro Fold via ADB USB
+    - `[x]` Verify that the app launches successfully and runs stable without crashes
+- `[ ]` **Phase 8: Bio-Lab Dual-Reactor & Lunar-Modulated Synthesizer**
+    - `[x]` Create `WaveMath.kt` with synodic lunar calculations, weighted random gene generator, Anomaly logarithmic success scaling, Gaussian peaks, and anomalous gene benefits
+    - `[x]` Update `MainViewModel.kt` to include reactor states, discovered packets history, dynamic nucleotide tallies, standard gene consumption, and the 1-second interval coroutine tick engine
+    - `[x]` Refactor `PoxScreens.kt` (`CombinatorView`) to render the dual-reactor tabs, manual booster controls, Step-Search grid overlays, and Packet Log search & diagnostic overlays
+    - `[x]` Build, deploy to Pixel 10 Pro Fold, and verify execution and gameplay flow
+- `[x]` **Phase 8.1: Layout Refinement & Terminology Alignment**
+    - `[x]` Remove the node crystal visualization from the CombinatorView
+    - `[x]` Align P.O.X. Reactor subtab layout, headers, labels, and text with the web prototype
+    - `[x]` Implement tomorrow's and day after tomorrow's forecast waves calculation in PoxScreens
+    - `[x]` Compile and run unit tests
+    - `[x]` Deploy to Pixel 10 Pro Fold and manually verify layout alignment
+- `[x]` **Phase 9: Web App Terminology Alignment**
+    - `[x]` Write and run the refactoring script (`rename_codons.py`)
+    - `[x]` Verify TypeScript compilation and lack of `codon` matches
+    - `[x]` Test local compilation / build of the web app
+- `[x]` **Phase 10: Core/Cores Terminology Clean-Up**
+    - `[x]` Write and run refactoring script (`rename_cores.py`)
+    - `[x]` Run Android unit tests to verify compile/runtime safety
+    - `[x]` Verify that no "core" references (outside android framework packages) remain
+- `[x]` **Phase 11: Anomaly Engine Layout Fixes**
+    - `[x]` Deactivate progress loading bar on Anomaly subtab when engine is toggled OFF
+    - `[x]` Implement Anomaly Engine switch toggle on Anomaly subtab
+    - `[x]` Build Resource & Rate Info Panel box (Resource Count with check/cross checks, Load Warning, and Rate)
+    - `[x]` Build Anomalous Discovery & Coupling modifier card details box
+    - `[x]` Run Android unit tests and verify compile packaging
+    - `[x]` Deploy and launch APK to verify layout on Pixel 10 Pro Fold
+- **Phase 12: Bio-Lab Reactor Layout Refinement (Layout Swap)**
+    - `[x]` Swap vertical layout positions of action buttons and overlay buttons in `PoxScreens.kt`
+    - `[x]` Move Action buttons (View Log, Manual Acceleration) outside the tab-switched Card Box to the bottom
+    - `[x]` Move Overlay trigger buttons (Step-Search, Packet Log, Decrypted Vault) inside the Card Box container
+    - `[x]` Compile and run local JVM unit tests
+    - `[x]` Assemble debug APK, install, and run on physical Pixel 10 Pro Fold

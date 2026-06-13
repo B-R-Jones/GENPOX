@@ -434,14 +434,14 @@ export default function ForecastCalendar({ onPlayBeep, targetSequence, gameTime 
                   {activeWaveConfig.isNewMoon && (
                     <div className="border-t border-red-950 pt-2 text-[8.5px] font-sans text-red-300/80 leading-normal">
                       <strong className="text-red-500 uppercase font-mono text-[9px] block mb-0.5">⚠️ DISRUPTIVE LUNAR DEBUFF ACTIVATED</strong>
-                      Gravitational nodes are aligned inversely, applying a <strong className="text-white font-mono">-0.0125</strong> debuff to core base pair spawn frequencies in the Bio-Lab Reactor.
+                      Gravitational nodes are aligned inversely, applying a <strong className="text-white font-mono">-0.0125</strong> debuff to base-pair spawn frequencies in the Bio-Lab Reactor.
                     </div>
                   )}
 
                   {activeWaveConfig.isFullMoon && (
                     <div className="border-t border-cyan-950 pt-2 text-[8.5px] font-sans text-cyan-300/80 leading-normal">
                       <strong className="text-cyan-400 uppercase font-mono text-[9px] block mb-0.5">🌟 RESONATING LUNAR BUFF ENGAGED</strong>
-                      G.E.N. orbit satellites are illuminated completely, providing a <strong className="text-white font-mono">+0.0125</strong> buff to core biological combination sequence rates.
+                      G.E.N. orbit satellites are illuminated completely, providing a <strong className="text-white font-mono">+0.0125</strong> buff to biological combination sequence rates.
                     </div>
                   )}
 
@@ -492,7 +492,7 @@ export default function ForecastCalendar({ onPlayBeep, targetSequence, gameTime 
                         </div>
 
                         <div className="flex justify-between items-center pt-1.5 pb-0.5">
-                          <span>NEXT TARGET CHAIN-CODON:</span>
+                          <span>NEXT TARGET CHAIN-GENE:</span>
                           <strong className="text-white text-[10px] tracking-widest font-mono">"{activeWaveConfig.secondary}"</strong>
                         </div>
 
@@ -505,7 +505,7 @@ export default function ForecastCalendar({ onPlayBeep, targetSequence, gameTime 
                       </div>
 
                       <p className="text-[8.5px] leading-relaxed text-neutral-400 font-sans">
-                        Tactical Tip: Align your high-density codon harvests during <strong className="text-cyan-400">Full Moon</strong> phases to receive enhanced spawn rates for target sequences!
+                        Tactical Tip: Align your high-density gene harvests during <strong className="text-cyan-400">Full Moon</strong> phases to receive enhanced spawn rates for target sequences!
                       </p>
                     </div>
                   )}

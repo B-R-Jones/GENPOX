@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary": "This plan details how we will recursively find and replace all gameplay, structural, and flavor references to 'core' or 'cores' in the Kotlin (pox-android/) and TypeScript (src/) codebases, as well as markdown documentation. It excludes Android framework package imports (e.g. androidx.compose.animation.core) to prevent compilation failure.",
+  "updatedAt": "2026-06-13T16:37:48.988246300Z",
+  "requestFeedback": true
+}

@@ -105,7 +105,7 @@ app.post("/api/creatures/generate-desc", async (req, res) => {
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            name: { type: Type.STRING, description: "A cool retro cybernetic/biological battle creature name, e.g. CyberVex-9, Toxipod, Chitin-Core" },
+            name: { type: Type.STRING, description: "A cool retro cybernetic/biological battle creature name, e.g. CyberVex-9, Toxipod, Chitin-Shell" },
             faction: { type: Type.STRING, description: "One of the four P.O.X. battle sectors: 'Infection', 'Mech', 'Parasite', 'Containment'" },
             type: { type: Type.STRING, description: "Bio-mechanical classification, e.g., Virus Swarm, Neural Parasite, Heavy Metal Shell" },
             vitality: { type: Type.NUMBER, description: "HP / Combat Life from 100 to 250" },
@@ -114,7 +114,7 @@ app.post("/api/creatures/generate-desc", async (req, res) => {
             speed: { type: Type.NUMBER, description: "Agility velocity stat from 10 to 99" },
             primaryWeapon: { type: Type.STRING, description: "Cool mechanical insect or virus bio-weapon name attached to its body, e.g. Acid Spurt-Needle" },
             lore: { type: Type.STRING, description: "A brief, highly flavorful 2-sentence description detailing its bio-tech evolution and operational designation." },
-            asciiArt: { type: Type.STRING, description: "An abstract 5x5 Grid representation using only characters '.', 'o', 'x', '#', 'O', '#' to visually represent the core of this bug/creature" }
+            asciiArt: { type: Type.STRING, description: "An abstract 5x5 Grid representation using only characters '.', 'o', 'x', '#', 'O', '#' to visually represent the unit of this bug/creature" }
           },
           required: ["name", "faction", "type", "vitality", "attack", "defense", "speed", "primaryWeapon", "lore", "asciiArt"]
         }

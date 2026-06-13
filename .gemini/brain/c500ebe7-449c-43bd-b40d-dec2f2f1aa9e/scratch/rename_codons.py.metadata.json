@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Comprehensive refactoring script to replace all occurrences of 'codon' with 'gene' in ts, tsx, txt, html, and json files in the root and src/ directories, excluding large search data dumps.",
+  "updatedAt": "2026-06-13T16:09:57.911834800Z"
+}
