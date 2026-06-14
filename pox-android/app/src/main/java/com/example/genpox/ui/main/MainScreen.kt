@@ -21,9 +21,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import com.example.genpox.PoxApplication
+import com.example.genpox.data.WaveMath
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.PoxCameraScanner
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun MainScreen(
@@ -39,6 +43,28 @@ fun MainScreen(
     val selectedTab by viewModel.selectedTab.collectAsState()
     val logs by viewModel.terminalLogs.collectAsState()
     val showScanner by viewModel.showScanner.collectAsState()
+    val geneSequences by viewModel.geneSequences.collectAsState()
+
+    val countA = remember(geneSequences) {
+        geneSequences.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
+            gene.sequence.count { it == 'A' || it == 'a' } * gene.count
+        }
+    }
+    val countG = remember(geneSequences) {
+        geneSequences.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
+            gene.sequence.count { it == 'G' || it == 'g' } * gene.count
+        }
+    }
+    val countT = remember(geneSequences) {
+        geneSequences.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
+            gene.sequence.count { it == 'T' || it == 't' } * gene.count
+        }
+    }
+    val countC = remember(geneSequences) {
+        geneSequences.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
+            gene.sequence.count { it == 'C' || it == 'c' } * gene.count
+        }
+    }
 
     val logListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -52,14 +78,17 @@ fun MainScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(CyberBackgroundDark)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(CyberBackgroundDark)
-                .safeContentPadding()
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .safeDrawingPadding()
+                .padding(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             // 1. CRT CONSOLE HEADER SYSTEM
             Row(
@@ -125,6 +154,41 @@ fun MainScreen(
                 }
             }
 
+            // 1b. Simplified global Nucleotide stockpile counter
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf(
+                    Pair("A", countA),
+                    Pair("G", countG),
+                    Pair("T", countT),
+                    Pair("C", countC)
+                ).forEach { (nucleotide, count) ->
+                    Text(
+                        text = "[ $nucleotide: $count ]",
+                        color = CyberGreen,
+                        style = Typography.labelSmall,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
+                }
+                Text(
+                    text = "• GEN ACTIVE",
+                    color = CyberGreenDim,
+                    style = Typography.labelSmall,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+
             // 2. MAIN HUD ACTIVE DISPLAY SCREEN
             Box(
                 modifier = Modifier
@@ -145,30 +209,35 @@ fun MainScreen(
                 }
             }
 
-            // 3. RETRO TERMINAL PRINT LOGS SCREEN
+            // 3. RETRO TERMINAL PRINT LOGS SCREEN (Global Footer Ticker)
+            val discoveredPacketsLog by viewModel.discoveredPacketsLog.collectAsState()
+            val bottomLogText = remember(discoveredPacketsLog) {
+                if (discoveredPacketsLog.isNotEmpty()) {
+                    val packet = discoveredPacketsLog.last()
+                    val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(packet.timestamp))
+                    val count = packet.genes.size
+                    val packetTypeStr = if (packet.isAnomalous) "ANOMALOUS FUSION" else "GENE SYNTHESIS"
+                    val packetDetailStr = if (packet.isAnomalous) "ANOMALOUS GENE DETECTED" else "$count NEW GENES"
+                    "[$timeStr] ${packetTypeStr.uppercase()} COMPLETE: PACKET READY ($packetDetailStr)"
+                } else {
+                    "[18:55:21] GENE SYNTHESIS COMPLETE: PACKET READY (5 NEW GENES)"
+                }
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(65.dp)
                     .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                     .background(Color.Black)
-                    .padding(6.dp)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
             ) {
-                LazyColumn(
-                    state = logListState,
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    items(logs) { log ->
-                        Text(
-                            text = log,
-                            style = Typography.labelSmall,
-                            fontSize = 8.sp,
-                            lineHeight = 10.sp,
-                            color = if (log.contains("ERR")) Color.Red else if (log.contains("OK")) CyberGreen else CyberGreenDim
-                        )
-                    }
-                }
+                Text(
+                    text = bottomLogText,
+                    color = CyberGreen,
+                    style = Typography.labelSmall,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
             }
 
             // 4. BOTTOM TACTILE RUBBER NAVIGATION DECK KEYS

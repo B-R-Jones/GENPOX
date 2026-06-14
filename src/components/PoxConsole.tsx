@@ -6328,7 +6328,7 @@ export default function PoxConsole({
                                     handleForceConstruction();
                                   }}
                                   disabled={isSplicing || isForcedConstructionActive}
-                                  className="flex-1 py-1.5 bg-red-950/20 hover:bg-neutral-900 border border-red-950 text-red-500 hover:text-red-400 text-[10px] font-mono hover:border-red-500 rounded cursor-pointer font-bold tracking-wider active:scale-[0.98] transition-all flex items-center justify-center gap-1"
+                                  className="flex-1 py-3 bg-red-950/20 hover:bg-neutral-900 border border-red-950 hover:border-red-500 text-red-500 hover:text-red-400 text-xs font-mono rounded cursor-pointer font-bold tracking-wider active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
                                 >
                                   <Zap className="w-3.5 h-3.5 text-red-500 animate-pulse" />
                                   FORCE SINGLE
@@ -6340,12 +6340,10 @@ export default function PoxConsole({
                                     handleForceConstruction();
                                   }}
                                   disabled={isSplicing || isForcedConstructionActive}
-                                  className="flex-1 py-1.5 bg-red-950/25 hover:bg-red-950/60 leading-tight border border-red-500 rounded text-red-400 text-[10px] font-mono hover:shadow-[0_0_10px_rgba(239,68,68,0.2)] flex flex-col items-center justify-center cursor-pointer font-bold tracking-wider active:scale-[0.98] transition-all"
+                                  className="flex-1 py-3 bg-red-950/25 hover:bg-red-950/60 border border-red-500 hover:border-red-400 hover:shadow-[0_0_10px_rgba(239,68,68,0.2)] text-red-400 hover:text-red-300 text-xs font-mono rounded cursor-pointer font-bold tracking-wider active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
                                 >
-                                  <span className="flex items-center gap-1 text-red-500 uppercase font-extrabold text-[10px]">
-                                    <ShieldAlert className="w-3.5 h-3.5 text-red-500 animate-pulse" />
-                                    FORCE AUTO-LOOP
-                                  </span>
+                                  <ShieldAlert className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                                  FORCE AUTO-LOOP
                                 </button>
                               </div>
                               <span className="text-[7.5px] text-red-400/80 leading-tight block uppercase font-semibold text-center select-all font-mono">

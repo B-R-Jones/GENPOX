@@ -39,6 +39,7 @@ class MainScreenViewModelTest {
         val apiKeyFlow = MutableStateFlow("")
         val muteFlow = MutableStateFlow(false)
         val radiusFlow = MutableStateFlow(55f)
+        val targetSequenceFlow = MutableStateFlow("")
 
         override val allCreatures: Flow<List<Creature>> = flowOf(creaturesList)
         override suspend fun getCreatureById(id: String): Creature? = creaturesList.find { it.id == id }
@@ -78,6 +79,7 @@ class MainScreenViewModelTest {
         override val geminiApiKey: Flow<String> = apiKeyFlow
         override val muteSound: Flow<Boolean> = muteFlow
         override val scanRadius: Flow<Float> = radiusFlow
+        override val targetSequence: Flow<String> = targetSequenceFlow
 
         override suspend fun saveGeminiApiKey(apiKey: String) {
             apiKeyFlow.value = apiKey
@@ -88,6 +90,10 @@ class MainScreenViewModelTest {
         override suspend fun setScanRadius(radius: Float) {
             radiusFlow.value = radius
         }
+        override suspend fun saveTargetSequence(seq: String) {
+            targetSequenceFlow.value = seq
+        }
+
     }
 
     @Test

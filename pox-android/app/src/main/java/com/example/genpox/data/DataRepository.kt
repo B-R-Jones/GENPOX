@@ -26,9 +26,11 @@ interface DataRepository {
     val geminiApiKey: Flow<String>
     val muteSound: Flow<Boolean>
     val scanRadius: Flow<Float>
+    val targetSequence: Flow<String>
     suspend fun saveGeminiApiKey(apiKey: String)
     suspend fun setMuteSound(mute: Boolean)
     suspend fun setScanRadius(radius: Float)
+    suspend fun saveTargetSequence(seq: String)
 }
 
 class DefaultDataRepository(private val context: Context) : DataRepository {
@@ -84,9 +86,14 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
     override val scanRadius: Flow<Float>
         get() = settings.scanRadius
 
+    override val targetSequence: Flow<String>
+        get() = settings.targetSequence
+
     override suspend fun saveGeminiApiKey(apiKey: String) = settings.saveGeminiApiKey(apiKey)
 
     override suspend fun setMuteSound(mute: Boolean) = settings.setMuteSound(mute)
 
     override suspend fun setScanRadius(radius: Float) = settings.setScanRadius(radius)
+
+    override suspend fun saveTargetSequence(seq: String) = settings.saveTargetSequence(seq)
 }

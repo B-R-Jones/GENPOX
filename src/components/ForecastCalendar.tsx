@@ -433,14 +433,14 @@ export default function ForecastCalendar({ onPlayBeep, targetSequence, gameTime 
                   {/* Explain debuff/buff */}
                   {activeWaveConfig.isNewMoon && (
                     <div className="border-t border-red-950 pt-2 text-[8.5px] font-sans text-red-300/80 leading-normal">
-                      <strong className="text-red-500 uppercase font-mono text-[9px] block mb-0.5">⚠️ DISRUPTIVE LUNAR DEBUFF ACTIVATED</strong>
+                      <strong className="text-red-500 uppercase font-mono text-[9px] block mb-0.5">DISRUPTIVE LUNAR DEBUFF ACTIVATED</strong>
                       Gravitational nodes are aligned inversely, applying a <strong className="text-white font-mono">-0.0125</strong> debuff to base-pair spawn frequencies in the Bio-Lab Reactor.
                     </div>
                   )}
 
                   {activeWaveConfig.isFullMoon && (
                     <div className="border-t border-cyan-950 pt-2 text-[8.5px] font-sans text-cyan-300/80 leading-normal">
-                      <strong className="text-cyan-400 uppercase font-mono text-[9px] block mb-0.5">🌟 RESONATING LUNAR BUFF ENGAGED</strong>
+                      <strong className="text-cyan-400 uppercase font-mono text-[9px] block mb-0.5">RESONATING LUNAR BUFF ENGAGED</strong>
                       G.E.N. orbit satellites are illuminated completely, providing a <strong className="text-white font-mono">+0.0125</strong> buff to biological combination sequence rates.
                     </div>
                   )}
@@ -470,7 +470,7 @@ export default function ForecastCalendar({ onPlayBeep, targetSequence, gameTime 
                   {activeWaveConfig.isSuppressed ? (
                     <div className="space-y-1">
                       <p className="font-bold text-red-500 uppercase tracking-widest flex items-center gap-1 text-[8.5px]">
-                        ⚠️ STAGE DETECTOR: DECAY NULLIFIER FORCE
+                        STAGE DETECTOR: DECAY NULLIFIER FORCE
                       </p>
                       <p className="text-[8.5px] leading-relaxed font-sans text-neutral-400">
                         Atmospheric noise collapsed the base pair catalytic signal for this local calendar window. There is no active modifier in the Bio-Lab Reactor.

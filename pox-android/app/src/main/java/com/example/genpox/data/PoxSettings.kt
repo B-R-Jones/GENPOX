@@ -14,6 +14,7 @@ class PoxSettings(private val context: Context) {
         val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
         val MUTE_SOUND = booleanPreferencesKey("mute_sound")
         val SCAN_RADIUS = floatPreferencesKey("scan_radius")
+        val TARGET_SEQUENCE = stringPreferencesKey("target_sequence")
     }
 
     val geminiApiKey: Flow<String> = context.dataStore.data.map { preferences ->
@@ -26,6 +27,10 @@ class PoxSettings(private val context: Context) {
 
     val scanRadius: Flow<Float> = context.dataStore.data.map { preferences ->
         preferences[SCAN_RADIUS] ?: 55f
+    }
+
+    val targetSequence: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[TARGET_SEQUENCE] ?: ""
     }
 
     suspend fun saveGeminiApiKey(apiKey: String) {
@@ -43,6 +48,12 @@ class PoxSettings(private val context: Context) {
     suspend fun setScanRadius(radius: Float) {
         context.dataStore.edit { preferences ->
             preferences[SCAN_RADIUS] = radius
+        }
+    }
+
+    suspend fun saveTargetSequence(seq: String) {
+        context.dataStore.edit { preferences ->
+            preferences[TARGET_SEQUENCE] = seq
         }
     }
 }

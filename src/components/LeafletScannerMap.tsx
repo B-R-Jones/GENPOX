@@ -260,19 +260,19 @@ export const LeafletScannerMap: React.FC<LeafletScannerMapProps> = ({
       const remainingStr = `${minStr}:${secStr}`;
 
       let pulseColor = "bg-blue-500 shadow-[0_0_10px_#3b82f6]";
-      let iconAvatar = "🧬";
+      let iconAvatar = "DNA";
       if (mission.creatureFaction === "Infection") {
         pulseColor = "bg-red-500 shadow-[0_0_10px_#ef4444]";
-        iconAvatar = "⚠️";
+        iconAvatar = "!";
       } else if (mission.creatureFaction === "Mech") {
         pulseColor = "bg-yellow-500 shadow-[0_0_10px_#eab308]";
-        iconAvatar = "🤖";
+        iconAvatar = "MCH";
       } else if (mission.creatureFaction === "Parasite") {
         pulseColor = "bg-purple-500 shadow-[0_0_10px_#a855f7]";
-        iconAvatar = "👾";
+        iconAvatar = "PR";
       } else if (mission.creatureFaction === "Containment") {
         pulseColor = "bg-cyan-500 shadow-[0_0_10px_#22d3ee]";
-        iconAvatar = "🛰️";
+        iconAvatar = "CT";
       }
 
       const harvesterIcon = L.divIcon({

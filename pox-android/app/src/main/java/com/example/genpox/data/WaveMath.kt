@@ -47,7 +47,11 @@ object WaveMath {
         val id: String,
         val name: String,
         val description: String,
-        val effectType: String
+        val effectType: String,
+        val magnitude: Double = 0.0,
+        val chance: Double = 0.0,
+        val triggerIndex: Int = 0,
+        val triggerDesc: String = ""
     )
 
     fun getDeterministicHash(dateStr: String): Long {
@@ -238,39 +242,121 @@ object WaveMath {
     }
 
     fun getBenefitForAnomalousGene(gene: String): AnomalousBenefit {
-        val char = if (gene.isNotEmpty()) gene[0] else 'X'
-        return when (char) {
-            'X', 'Z' -> AnomalousBenefit(
-                id = "DOUBLE_STRIKE",
-                name = "Vortex Phase-Strike",
-                description = "Attacks twice in the same turn.",
-                effectType = "double_attack"
-            )
-            'Y', 'W' -> AnomalousBenefit(
-                id = "SELF_DESTRUCT",
-                name = "Supernova Reverb",
-                description = "Upon fall, self-destructs and vaporizes the opponent creature.",
-                effectType = "self_destruct"
-            )
-            '?', '!' -> AnomalousBenefit(
-                id = "HARVEST_BOOST",
-                name = "Quantum Extraction Unit",
-                description = "Dramatically boosts gene harvesting rates (+1 extra gene on win).",
-                effectType = "harvest_boost"
-            )
-            '$', '%' -> AnomalousBenefit(
-                id = "HEALTH_REGEN",
-                name = "Bio-Organic Siphon",
-                description = "Heals 15 HP on each attack.",
-                effectType = "health_regen"
-            )
-            else -> AnomalousBenefit(
-                id = "PHASE_SHIFT",
-                name = "Temporal Mirror Shield",
-                description = "30% evasion chance to phase shift past incoming attacks.",
-                effectType = "phase_shift"
-            )
+        val padded = gene.padEnd(8, 'A')
+        val s0 = padded[0]
+        val s1 = padded[1]
+        val s2 = padded[2]
+        val s3 = padded[3]
+        val s4 = padded[4]
+        val s5 = padded[5]
+        val s6 = padded[6]
+        val s7 = padded[7]
+
+        val prefix = when (s0) {
+            'X' -> "Vortex"
+            'Z' -> "Zero-Point"
+            'Y' -> "Quantum"
+            'W' -> "Tachyon"
+            '?' -> "Shrouded"
+            '!' -> "Overdrive"
+            '$' -> "Bio-Organic"
+            '%' -> "Plasma"
+            '&' -> "Eldritch"
+            '@' -> "Temporal"
+            '#' -> "Cosmic"
+            else -> "Prime"
         }
+
+        val suffix = when (s1) {
+            'X' -> "Phase-Strike"
+            'Z' -> "Mirror-Shield"
+            'Y' -> "Reverb"
+            'W' -> "Extraction-Unit"
+            '?' -> "Siphon"
+            '!' -> "Anomaly"
+            '$' -> "Resonance"
+            '%' -> "Helix"
+            '&' -> "Well"
+            '@' -> "Pulse"
+            '#' -> "Matrix"
+            else -> "Weld"
+        }
+
+        val charVal = { c: Char ->
+            when (c) {
+                'X', 'Z', 'Y', 'W' -> 3
+                '?', '!' -> 4
+                '$', '%' -> 5
+                '&', '@', '#' -> 6
+                else -> 1
+            }
+        }
+
+        val rawPower = charVal(s2) + charVal(s3) + charVal(s4) + charVal(s5)
+        val effectIndex = (s0.code + s1.code) % 5
+
+        var id = "DOUBLE_STRIKE"
+        var effectType = "double_attack"
+        var magnitude = 0.0
+        var chance = 0.0
+        var baseDesc = ""
+
+        when (effectIndex) {
+            0 -> {
+                id = "DOUBLE_STRIKE"
+                effectType = "double_attack"
+                magnitude = 1.2 + 0.04 * rawPower
+                baseDesc = "Attacks deal ${String.format(Locale.US, "%.2f", magnitude)}x damage."
+            }
+            1 -> {
+                id = "SELF_DESTRUCT"
+                effectType = "self_destruct"
+                magnitude = 40.0 + 8.0 * rawPower
+                baseDesc = "Upon fall, self-destructs and deals ${magnitude.toInt()} flat damage."
+            }
+            2 -> {
+                id = "HARVEST_BOOST"
+                effectType = "harvest_boost"
+                chance = (30.0 + 3.0 * rawPower).coerceAtMost(100.0)
+                baseDesc = "Dramatically boosts gene harvesting rates (${chance.toInt()}% chance for +1 extra gene on win)."
+            }
+            3 -> {
+                id = "HEALTH_REGEN"
+                effectType = "health_regen"
+                magnitude = 4.0 + rawPower
+                baseDesc = "Heals ${magnitude.toInt()} HP on each attack."
+            }
+            4 -> {
+                id = "PHASE_SHIFT"
+                effectType = "phase_shift"
+                chance = 10.0 + 1.5 * rawPower
+                baseDesc = "Grants a ${chance.toInt()}% evasion chance to phase shift past incoming attacks."
+            }
+        }
+
+        val triggerIndex = (s6.code + s7.code) % 8
+        val triggerDesc = when (triggerIndex) {
+            0 -> "Always active in combat."
+            1 -> "Only active during Dark moon phases."
+            2 -> "Only active during Light moon phases."
+            3 -> "Only active when under 40% Vitality."
+            4 -> "Only active when above 70% Vitality."
+            5 -> "Only active during the first 3 turns of combat."
+            6 -> "Only active after turn 6 of combat."
+            7 -> "Only active when local Spectrum Wave Coupling is above 82%."
+            else -> "Always active in combat."
+        }
+
+        return AnomalousBenefit(
+            id = id,
+            name = "$prefix $suffix",
+            description = "$baseDesc ($triggerDesc)",
+            effectType = effectType,
+            magnitude = magnitude,
+            chance = chance,
+            triggerIndex = triggerIndex,
+            triggerDesc = triggerDesc
+        )
     }
 
     fun getAnomalousBenefits(sequence: String): List<AnomalousBenefit> {
