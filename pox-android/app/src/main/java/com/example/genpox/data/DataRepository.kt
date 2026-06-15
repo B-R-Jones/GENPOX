@@ -14,8 +14,10 @@ interface DataRepository {
 
     val allGeneSequences: Flow<List<GeneSequence>>
     suspend fun insertGeneSequence(sequence: GeneSequence)
+    suspend fun insertGeneSequences(sequences: List<GeneSequence>)
     suspend fun updateGeneSequence(sequence: GeneSequence)
     suspend fun deleteGeneSequence(sequence: GeneSequence)
+    suspend fun updateGeneStock(toInsertOrUpdate: List<GeneSequence>, toDelete: List<GeneSequence>)
 
     val activeMissions: Flow<List<HarvestMission>>
     val allMissions: Flow<List<HarvestMission>>
@@ -62,9 +64,14 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
 
     override suspend fun insertGeneSequence(sequence: GeneSequence) = poxDao.insertGeneSequence(sequence)
 
+    override suspend fun insertGeneSequences(sequences: List<GeneSequence>) = poxDao.insertGeneSequences(sequences)
+
     override suspend fun updateGeneSequence(sequence: GeneSequence) = poxDao.updateGeneSequence(sequence)
 
     override suspend fun deleteGeneSequence(sequence: GeneSequence) = poxDao.deleteGeneSequence(sequence)
+
+    override suspend fun updateGeneStock(toInsertOrUpdate: List<GeneSequence>, toDelete: List<GeneSequence>) =
+        poxDao.updateGeneStock(toInsertOrUpdate, toDelete)
 
     override val activeMissions: Flow<List<HarvestMission>>
         get() = poxDao.getActiveMissions()

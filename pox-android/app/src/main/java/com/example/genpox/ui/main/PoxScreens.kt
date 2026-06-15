@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,6 +43,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlinx.coroutines.delay
 
 // ==========================================
 // 1. COMBINATOR VIEW (MAIN SCENE)
@@ -61,6 +63,7 @@ fun CombinatorView(viewModel: MainViewModel) {
     val scrollingGene by viewModel.scrollingGene.collectAsState()
     val grandTotalStandardNucleotides by viewModel.grandTotalStandardNucleotides.collectAsState()
     val geneSequences by viewModel.geneSequences.collectAsState()
+    val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
 
     // UI colors and themes based on subtab
     val activeColor = if (bioLabSubTab == "pox") CyberGreen else Color(0xFFA855F7)
@@ -854,10 +857,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                     ) {
                         Button(
                             onClick = { showStepSearchOverlay = true },
-                            modifier = Modifier.fillMaxWidth().height(34.dp),
+                            modifier = Modifier.fillMaxWidth().height(54.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color.Black.copy(alpha = 0.4f), contentColor = activeColor),
                             border = BorderStroke(1.dp, activeBorder),
-                            shape = RoundedCornerShape(4.dp),
+                            shape = RoundedCornerShape(2.dp),
                             contentPadding = PaddingValues(vertical = 0.dp)
                         ) {
                             Text(text = "MOLECULAR STEP-SEARCH", style = Typography.bodyMedium, fontWeight = FontWeight.Bold)
@@ -882,7 +885,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                             showPacketLogOverlay = true
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(30.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (bioLabSubTab == "anomaly") Color(0xFF701A75).copy(alpha = 0.2f) else Color(0xFF003CFF).copy(alpha = 0.2f),
                         contentColor = if (bioLabSubTab == "anomaly") Color(0xFFD8B4FE) else Color(0xFF00E1FF)
@@ -891,7 +894,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                         1.dp,
                         if (bioLabSubTab == "anomaly") Color(0xFFA855F7).copy(alpha = 0.5f) else Color(0xFF003CFF).copy(alpha = 0.5f)
                     ),
-                    shape = RoundedCornerShape(4.dp),
+                    shape = RoundedCornerShape(2.dp),
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Text(
@@ -903,7 +906,7 @@ fun CombinatorView(viewModel: MainViewModel) {
 
                 Button(
                     onClick = { viewModel.triggerManualAcceleration() },
-                    modifier = Modifier.fillMaxWidth().height(30.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (bioLabSubTab == "anomaly") Color(0xFF701A75).copy(alpha = 0.2f) else CyberGreenDim.copy(alpha = 0.2f),
                         contentColor = Color.White
@@ -912,7 +915,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                         1.dp,
                         if (bioLabSubTab == "anomaly") Color(0xFFA855F7).copy(alpha = 0.8f) else CyberGreen.copy(alpha = 0.8f)
                     ),
-                    shape = RoundedCornerShape(4.dp),
+                    shape = RoundedCornerShape(2.dp),
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Text(
@@ -920,6 +923,26 @@ fun CombinatorView(viewModel: MainViewModel) {
                         style = Typography.labelSmall,
                         fontWeight = FontWeight.Bold
                     )
+                }
+
+                if (devForceAnomaly) {
+                    Button(
+                        onClick = { viewModel.addDevGenes() },
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0x30F97316),
+                            contentColor = Color(0xFFF97316)
+                        ),
+                        border = BorderStroke(1.dp, Color(0xFFF97316)),
+                        shape = RoundedCornerShape(2.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = "DEV: INJECT 10K GENES",
+                            style = Typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -1079,7 +1102,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                 Text(
                                     text = "RESET",
                                     style = Typography.labelSmall,
-                                    color = Color.Red,
+                                    color = Color.Yellow,
                                     modifier = Modifier.clickable {
                                         stepSearchPrefix = ""
                                         viewStepSearchMatchesOnly = false
@@ -1225,8 +1248,9 @@ fun CombinatorView(viewModel: MainViewModel) {
                                                     Text(
                                                         text = "x$matchCount types",
                                                         style = Typography.labelSmall,
-                                                        fontSize = 6.5.sp,
-                                                        color = activeColorDim
+                                                        fontSize = 9.5.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = activeColor
                                                      )
                                                 }
                                             }
@@ -1273,9 +1297,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                                                     Text(
                                                         text = "x$matchCount types",
                                                         style = Typography.labelSmall,
-                                                        fontSize = 6.5.sp,
-                                                        color = activeColorDim
-                                                    )
+                                                        fontSize = 9.5.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = activeColor
+                                                     )
                                                 }
                                             }
                                         }
@@ -1308,55 +1333,123 @@ fun CombinatorView(viewModel: MainViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black)
-                    .border(2.dp, activeColor, RoundedCornerShape(6.dp))
-                    .padding(8.dp)
+                    .background(Color(0xFF020D04))
+                    .border(1.dp, Color(0xCC00FF41), RoundedCornerShape(6.dp))
+                    .padding(12.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Header
+                    // Header / Title bar
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "SYNTHESIS PACKET ARCHIVE LOG",
-                            style = Typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = activeColor
-                        )
-                        Text(
-                            text = "CLOSE",
-                            style = Typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Red,
-                            modifier = Modifier.clickable {
-                                showPacketLogOverlay = false
-                                packetLogQuery = ""
-                                selectedPacketByGene = null
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "●",
+                                color = Color(0xFF00FF41),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "[ GENE SYNTHESIS LOG ]",
+                                color = Color(0xFF00FF41),
+                                style = Typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                        
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // CLEAR ALL Button
+                            Box(
+                                modifier = Modifier
+                                    .border(1.dp, Color.Yellow, RoundedCornerShape(4.dp))
+                                    .background(Color.Transparent)
+                                    .clickable {
+                                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                        viewModel.clearDiscoveredPacketsLog()
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "✕ CLEAR ALL",
+                                    color = Color.Yellow,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
-                        )
+                            
+                            // CLOSE Button
+                            Box(
+                                modifier = Modifier
+                                    .border(1.dp, Color.Red, RoundedCornerShape(4.dp))
+                                    .background(Color.Transparent)
+                                    .clickable {
+                                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                        showPacketLogOverlay = false
+                                        packetLogQuery = ""
+                                        selectedPacketByGene = null
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "✕ CLOSE",
+                                    color = Color.Red,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
 
-                    // Search Box
-                    TextField(
-                        value = packetLogQuery,
-                        onValueChange = { packetLogQuery = it },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.LightGray,
-                            focusedBorderColor = activeColor,
-                            unfocusedBorderColor = activeBorder,
-                            focusedContainerColor = activePanel,
-                            unfocusedContainerColor = activePanel
+                    // Info Bar
+                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                    val alpha by infiniteTransition.animateFloat(
+                        initialValue = 0.2f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse
                         ),
-                        placeholder = { Text("Search gene sequence in logs...", color = activeColorDim, style = Typography.bodySmall) },
-                        textStyle = Typography.bodySmall
+                        label = "alpha"
                     )
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color(0xFF00FF41), RoundedCornerShape(4.dp))
+                            .background(Color.Transparent)
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color(0xFF00FF41).copy(alpha = alpha))
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "SELECT ANY GENE BLOCK TO LOAD DETAILED ANALYSIS",
+                            color = Color(0xFF00FF41),
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
 
                     // Logs List
                     val filteredPackets = discoveredPacketsLog.filter { packet ->
@@ -1364,10 +1457,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                     }
 
                     if (filteredPackets.isEmpty()) {
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                             Text(
                                 text = "NO SYNTHESIS PACKETS RECORDED IN THIS SECTOR.",
-                                color = activeColorDim,
+                                color = Color(0xFF00FF41).copy(alpha = 0.5f),
                                 style = Typography.bodySmall,
                                 textAlign = TextAlign.Center
                             )
@@ -1375,22 +1468,23 @@ fun CombinatorView(viewModel: MainViewModel) {
                     } else {
                         LazyColumn(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(filteredPackets) { packet ->
+                            itemsIndexed(filteredPackets) { pIdx, packet ->
                                 val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(packet.timestamp))
+                                val uniqueCount = packet.newGenes.size
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .border(
                                             1.dp,
-                                            if (packet.isAnomalous) Color(0xFFA855F7).copy(alpha = 0.5f) else activeBorder,
+                                            Color(0xFF00FF41).copy(alpha = 0.25f),
                                             RoundedCornerShape(4.dp)
                                         )
-                                        .background(if (packet.isAnomalous) Color(0xFF150B24) else activePanel)
-                                        .padding(6.dp)
+                                        .background(Color.Black.copy(alpha = 0.4f))
+                                        .padding(8.dp)
                                 ) {
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         // Packet Header
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -1398,86 +1492,119 @@ fun CombinatorView(viewModel: MainViewModel) {
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = if (packet.isAnomalous) "ANOMALOUS UNSTABLE FUSION" else "STANDARD REACTOR SYNTH",
+                                                text = "#${discoveredPacketsLog.size - pIdx} PACKET SPLICED",
                                                 style = Typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
-                                                color = if (packet.isAnomalous) Color(0xFFD8B4FE) else activeColor
+                                                color = Color(0xFF00FF41)
                                             )
-                                            Text(
-                                                text = timeStr,
-                                                style = Typography.labelSmall,
-                                                color = activeColorDim,
-                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                            )
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "$uniqueCount NEW GENES",
+                                                    style = Typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF22D3EE)
+                                                )
+                                                Text(
+                                                    text = timeStr,
+                                                    style = Typography.labelSmall,
+                                                    color = Color.Gray,
+                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                                )
+                                            }
                                         }
 
                                         // Genes display
                                         if (packet.isAnomalous) {
                                             val anomalousGene = packet.genes.firstOrNull() ?: "DECAYED!"
                                             val isDecayed = anomalousGene == "DECAYED!"
-                                            Row(
+                                            val isNew = packet.newGenes.contains(anomalousGene)
+                                            
+                                            val borderAlpha = if (isNew) alpha else 0.0f
+                                            val borderStroke = if (isNew) BorderStroke(1.dp, Color(0xFFA855F7).copy(alpha = borderAlpha)) else null
+                                            
+                                            Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .border(1.dp, if (isDecayed) Color.Red.copy(alpha = 0.3f) else Color(0xFFA855F7).copy(alpha = 0.4f), RoundedCornerShape(2.dp))
-                                                    .background(Color.Black)
+                                                    .then(if (borderStroke != null) Modifier.border(borderStroke, RoundedCornerShape(2.dp)) else Modifier)
+                                                    .background(Color.Transparent)
                                                     .clickable(enabled = !isDecayed) {
                                                         selectedPacketByGene = anomalousGene
                                                         viewModel.synthManager.playBeep(440f, 0.05f, "sine")
                                                     }
-                                                    .padding(6.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
+                                                    .padding(12.dp),
+                                                contentAlignment = Alignment.CenterStart
                                             ) {
-                                                Text(
-                                                    text = anomalousGene,
-                                                    style = Typography.bodyMedium,
-                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isDecayed) Color.Red else Color(0xFFD8B4FE)
-                                                )
-                                                if (!isDecayed) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
                                                     Text(
-                                                        text = "SECURED [DIAGNOSE]",
-                                                        style = Typography.labelSmall,
-                                                        fontSize = 7.5.sp,
-                                                        color = Color(0xFFD8B4FE)
+                                                        text = anomalousGene,
+                                                        style = Typography.bodyMedium,
+                                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (isDecayed) Color.Red else Color(0xFFA855F7).copy(alpha = if (isNew) alpha else 1f)
                                                     )
-                                                } else {
-                                                    Text(
-                                                        text = "DECOMPOSED",
-                                                        style = Typography.labelSmall,
-                                                        fontSize = 7.5.sp,
-                                                        color = Color.Red
-                                                    )
+                                                    if (!isDecayed) {
+                                                        Text(
+                                                            text = "SECURED [DIAGNOSE]",
+                                                            style = Typography.labelSmall,
+                                                            fontSize = 7.5.sp,
+                                                            color = Color(0xFFD8B4FE)
+                                                        )
+                                                    } else {
+                                                        Text(
+                                                            text = "DECOMPOSED",
+                                                            style = Typography.labelSmall,
+                                                            fontSize = 7.5.sp,
+                                                            color = Color.Red
+                                                        )
+                                                    }
                                                 }
                                             }
                                         } else {
-                                            // 8 standard genes grid (4x2)
-                                            LazyVerticalGrid(
-                                                columns = GridCells.Fixed(4),
-                                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
-                                                items(packet.genes) { gene ->
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .border(1.dp, activeBorder.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
-                                                            .background(Color.Black)
-                                                            .clickable {
-                                                                selectedPacketByGene = gene
-                                                                viewModel.synthManager.playBeep(330f, 0.04f, "sine")
-                                                            }
-                                                            .padding(2.dp),
-                                                        contentAlignment = Alignment.Center
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                for (row in 0 until 2) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                                                     ) {
-                                                        Text(
-                                                            text = gene,
-                                                            style = Typography.labelSmall,
-                                                            fontSize = 7.5.sp,
-                                                            color = activeColor,
-                                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                                        )
+                                                        for (col in 0 until 4) {
+                                                            val idx = row * 4 + col
+                                                            val gene = packet.genes.getOrNull(idx)
+                                                            if (gene != null) {
+                                                                val isNew = packet.newGenes.contains(gene)
+                                                                val borderStroke = if (isNew) BorderStroke(1.dp, Color(0xFF22D3EE).copy(alpha = alpha)) else null
+                                                                
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .weight(1f)
+                                                                        .then(if (borderStroke != null) Modifier.border(borderStroke, RoundedCornerShape(2.dp)) else Modifier)
+                                                                        .background(Color.Transparent)
+                                                                        .clickable {
+                                                                            selectedPacketByGene = gene
+                                                                            viewModel.synthManager.playBeep(330f, 0.04f, "sine")
+                                                                        }
+                                                                        .padding(vertical = 12.dp),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Text(
+                                                                        text = gene,
+                                                                        style = Typography.labelSmall,
+                                                                        fontSize = 7.5.sp,
+                                                                        color = if (isNew) Color(0xFF22D3EE).copy(alpha = alpha) else Color(0xFF00FF41),
+                                                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                                        fontWeight = FontWeight.Bold
+                                                                    )
+                                                                }
+                                                            } else {
+                                                                Spacer(modifier = Modifier.weight(1f))
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1486,6 +1613,41 @@ fun CombinatorView(viewModel: MainViewModel) {
                                 }
                             }
                         }
+                    }
+                    
+                    // Footer
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(Color(0xFF00FF41).copy(alpha = alpha))
+                            )
+                            Text(
+                                text = "STANDARD GENE SEARCH ACTIVE",
+                                color = Color(0xFF00FF41).copy(alpha = 0.8f),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            )
+                        }
+                        Text(
+                            text = "SECURE CONNECTION: AIS-DEV-ENV",
+                            color = Color(0xFF005511),
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
                     }
                 }
             }
@@ -1658,7 +1820,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Base sequence configuration matches local sector synthesis. Highly stable chromatids.",
+                                text = "This synthetic base has successfully bonded with organic nucelotides in the reactor. Stability of further splicing will not be adversely affected.",
                                 style = Typography.labelSmall,
                                 color = Color.LightGray,
                                 lineHeight = 12.sp
@@ -1824,73 +1986,93 @@ fun SplicerView(viewModel: MainViewModel) {
     val splicingProgress by viewModel.splicingProgress.collectAsState()
     val inventoryGenes by viewModel.geneSequences.collectAsState()
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val isWide = maxWidth > 600.dp
-        if (isWide) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(modifier = Modifier.weight(1.2f).fillMaxHeight()) {
-                    SplicerLeftPanel(
-                        viewModel = viewModel,
-                        targetSequence = targetSequence,
-                        splicerSlots = splicerSlots,
-                        activeSlotSelection = activeSlotSelection,
-                        isReactorFrozen = isReactorFrozen,
-                        reactorFreezeTimeLeft = reactorFreezeTimeLeft,
-                        isForcedConstructionActive = isForcedConstructionActive,
-                        isForcedLoopActive = isForcedLoopActive,
-                        forcedConstructionLogs = forcedConstructionLogs,
-                        isSplicing = isSplicing,
-                        splicingProgress = splicingProgress
-                    )
+    if (isForcedConstructionActive) {
+        SplicerLeftPanel(
+            viewModel = viewModel,
+            targetSequence = targetSequence,
+            splicerSlots = splicerSlots,
+            activeSlotSelection = activeSlotSelection,
+            isReactorFrozen = isReactorFrozen,
+            reactorFreezeTimeLeft = reactorFreezeTimeLeft,
+            isForcedConstructionActive = isForcedConstructionActive,
+            isForcedLoopActive = isForcedLoopActive,
+            forcedConstructionLogs = forcedConstructionLogs,
+            isSplicing = isSplicing,
+            splicingProgress = splicingProgress,
+            modifier = Modifier.fillMaxSize().padding(8.dp)
+        )
+    } else {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val isWide = maxWidth > 600.dp
+            if (isWide) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1.2f).fillMaxHeight()) {
+                        SplicerLeftPanel(
+                            viewModel = viewModel,
+                            targetSequence = targetSequence,
+                            splicerSlots = splicerSlots,
+                            activeSlotSelection = activeSlotSelection,
+                            isReactorFrozen = isReactorFrozen,
+                            reactorFreezeTimeLeft = reactorFreezeTimeLeft,
+                            isForcedConstructionActive = isForcedConstructionActive,
+                            isForcedLoopActive = isForcedLoopActive,
+                            forcedConstructionLogs = forcedConstructionLogs,
+                            isSplicing = isSplicing,
+                            splicingProgress = splicingProgress,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Box(modifier = Modifier.weight(0.8f).fillMaxHeight()) {
+                        SplicerRightPanel(
+                            viewModel = viewModel,
+                            activeSlotSelection = activeSlotSelection,
+                            targetSequence = targetSequence,
+                            slotSequenceFilter = slotSequenceFilter,
+                            inventoryGenes = inventoryGenes,
+                            isWide = isWide
+                        )
+                    }
                 }
-                Box(modifier = Modifier.weight(0.8f).fillMaxHeight()) {
-                    SplicerRightPanel(
-                        viewModel = viewModel,
-                        activeSlotSelection = activeSlotSelection,
-                        targetSequence = targetSequence,
-                        slotSequenceFilter = slotSequenceFilter,
-                        inventoryGenes = inventoryGenes,
-                        isWide = isWide
-                    )
-                }
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(modifier = Modifier.fillMaxWidth().height(370.dp)) {
-                    SplicerLeftPanel(
-                        viewModel = viewModel,
-                        targetSequence = targetSequence,
-                        splicerSlots = splicerSlots,
-                        activeSlotSelection = activeSlotSelection,
-                        isReactorFrozen = isReactorFrozen,
-                        reactorFreezeTimeLeft = reactorFreezeTimeLeft,
-                        isForcedConstructionActive = isForcedConstructionActive,
-                        isForcedLoopActive = isForcedLoopActive,
-                        forcedConstructionLogs = forcedConstructionLogs,
-                        isSplicing = isSplicing,
-                        splicingProgress = splicingProgress
-                    )
-                }
-                Box(modifier = Modifier.fillMaxWidth().height(210.dp)) {
-                    SplicerRightPanel(
-                        viewModel = viewModel,
-                        activeSlotSelection = activeSlotSelection,
-                        targetSequence = targetSequence,
-                        slotSequenceFilter = slotSequenceFilter,
-                        inventoryGenes = inventoryGenes,
-                        isWide = isWide
-                    )
+            } else {
+                val rightPanelHeight = if (activeSlotSelection != null) 140.dp else 75.dp
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth().wrapContentHeight()) {
+                        SplicerLeftPanel(
+                            viewModel = viewModel,
+                            targetSequence = targetSequence,
+                            splicerSlots = splicerSlots,
+                            activeSlotSelection = activeSlotSelection,
+                            isReactorFrozen = isReactorFrozen,
+                            reactorFreezeTimeLeft = reactorFreezeTimeLeft,
+                            isForcedConstructionActive = isForcedConstructionActive,
+                            isForcedLoopActive = isForcedLoopActive,
+                            forcedConstructionLogs = forcedConstructionLogs,
+                            isSplicing = isSplicing,
+                            splicingProgress = splicingProgress,
+                            modifier = Modifier.fillMaxWidth().wrapContentHeight()
+                        )
+                    }
+                    Box(modifier = Modifier.fillMaxWidth().height(rightPanelHeight)) {
+                        SplicerRightPanel(
+                            viewModel = viewModel,
+                            activeSlotSelection = activeSlotSelection,
+                            targetSequence = targetSequence,
+                            slotSequenceFilter = slotSequenceFilter,
+                            inventoryGenes = inventoryGenes,
+                            isWide = isWide
+                        )
+                    }
                 }
             }
         }
@@ -1909,13 +2091,13 @@ fun SplicerLeftPanel(
     isForcedLoopActive: Boolean,
     forcedConstructionLogs: List<String>,
     isSplicing: Boolean,
-    splicingProgress: Int
+    splicingProgress: Int,
+    modifier: Modifier = Modifier
 ) {
     if (isForcedConstructionActive) {
         // Emergency Forced Compile Terminal Screen
         Column(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = modifier
                 .border(1.dp, Color(0xFF991B1B), RoundedCornerShape(4.dp))
                 .background(Color.Black)
                 .padding(12.dp),
@@ -1928,13 +2110,7 @@ fun SplicerLeftPanel(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "[ EMERGENCY FORCED COMPILATION ]",
-                        color = Color.Red,
-                        style = Typography.labelSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "REACTOR STATUS: FROZEN (${reactorFreezeTimeLeft}s)",
+                        text = "[ FORCED SEQUENCING ACTIVE ]",
                         color = Color.Red,
                         style = Typography.labelSmall,
                         fontWeight = FontWeight.Bold
@@ -1942,7 +2118,7 @@ fun SplicerLeftPanel(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "BYPASSING GENE COMPILATION LOCKS",
+                    text = "P.O.X. REACTOR ACTIVE (OVERRIDE)",
                     color = Color.White,
                     style = Typography.bodyMedium,
                     fontWeight = FontWeight.Bold
@@ -1950,10 +2126,30 @@ fun SplicerLeftPanel(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // CRT scrolling terminal logs container
+                val displayedLogs = remember { mutableStateListOf<String>() }
+                LaunchedEffect(forcedConstructionLogs) {
+                    if (forcedConstructionLogs.isEmpty()) {
+                        displayedLogs.clear()
+                    } else {
+                        val isNewRun = displayedLogs.size > forcedConstructionLogs.size ||
+                                (displayedLogs.isNotEmpty() && forcedConstructionLogs.firstOrNull() != displayedLogs.firstOrNull())
+                        val startIdx = if (isNewRun) {
+                            displayedLogs.clear()
+                            0
+                        } else {
+                            displayedLogs.size
+                        }
+                        for (i in startIdx until forcedConstructionLogs.size) {
+                            delay(150L)
+                            displayedLogs.add(forcedConstructionLogs[i])
+                        }
+                    }
+                }
+
                 val listState = rememberLazyListState()
-                LaunchedEffect(forcedConstructionLogs.size) {
-                    if (forcedConstructionLogs.isNotEmpty()) {
-                        listState.animateScrollToItem(forcedConstructionLogs.size - 1)
+                LaunchedEffect(displayedLogs.size) {
+                    if (displayedLogs.isNotEmpty()) {
+                        listState.animateScrollToItem(displayedLogs.size - 1)
                     }
                 }
                 LazyColumn(
@@ -1966,7 +2162,7 @@ fun SplicerLeftPanel(
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(forcedConstructionLogs) { log ->
+                    items(displayedLogs) { log ->
                         val isAlert = log.contains("FAILED") || log.contains("WARNING") || log.contains("Failed") || log.contains("Sacrificed")
                         Text(
                             text = log,
@@ -1982,29 +2178,31 @@ fun SplicerLeftPanel(
             Spacer(modifier = Modifier.height(8.dp))
 
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0x20EF4444))
-                        .border(1.dp, Color(0x50EF4444), RoundedCornerShape(2.dp))
-                        .padding(6.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
+                if (!isForcedLoopActive) {
+                    Row(
                         modifier = Modifier
-                            .size(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color.Red)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isForcedLoopActive) "LOOP CASCADE ACTIVE: REACTOR COILS FROZEN" else "FREEZING REACTOR GENE CYCLE: ${reactorFreezeTimeLeft}s REMAINING",
-                        color = Color(0xFFFCA5A5),
-                        style = Typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                            .fillMaxWidth()
+                            .background(Color(0x20EF4444))
+                            .border(1.dp, Color(0x50EF4444), RoundedCornerShape(2.dp))
+                            .padding(6.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color.Red)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "P.O.X. REACTOR FROZEN: ${reactorFreezeTimeLeft}s REMAINING",
+                            color = Color(0xFFFCA5A5),
+                            style = Typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
 
                 if (isForcedLoopActive) {
@@ -2029,8 +2227,7 @@ fun SplicerLeftPanel(
     } else if (isSplicing) {
         // Splicing Morphogenesis Screen
         Column(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = modifier
                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(CyberPanel)
                 .padding(16.dp),
@@ -2117,8 +2314,7 @@ fun SplicerLeftPanel(
     } else {
         // Standard Re-sequencing grid layout panel
         Column(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = modifier
                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(CyberPanel)
                 .padding(10.dp),
@@ -2217,48 +2413,59 @@ fun SplicerLeftPanel(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Renders 8 blocks of 8 bases
-                    FlowRow(
+                    // Renders 8 blocks of 8 bases in a centered 2x4 grid
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        for (i in 0 until 8) {
-                            val segment = targetSequence.substring(i * 8, (i + 1) * 8)
-                            val isAnom = WaveMath.isAnomalousGene(segment)
-                            val color = if (isAnom) {
-                                Color(0xFFA855F7)
-                            } else {
-                                when (i % 4) {
-                                    0 -> CyberGreen
-                                    1 -> Color(0xFFFBBF24)
-                                    2 -> Color(0xFF60A5FA)
-                                    else -> Color(0xFFC084FC)
-                                }
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        color = if (isAnom) Color(0x20A855F7) else Color.Transparent,
-                                        shape = RoundedCornerShape(2.dp)
-                                    )
-                                    .border(
-                                        width = if (isAnom) 1.dp else 0.dp,
-                                        color = if (isAnom) Color(0x30A855F7) else Color.Transparent,
-                                        shape = RoundedCornerShape(2.dp)
-                                    )
-                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                        for (row in 0 until 2) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = segment,
-                                    color = color,
-                                    style = Typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                    fontSize = 10.sp,
-                                    letterSpacing = 1.sp
-                                )
+                                for (col in 0 until 4) {
+                                    val i = row * 4 + col
+                                    val segment = targetSequence.substring(i * 8, (i + 1) * 8)
+                                    val isAnom = WaveMath.isAnomalousGene(segment)
+                                    val color = if (isAnom) {
+                                        Color(0xFFA855F7)
+                                    } else {
+                                        when (i % 4) {
+                                            0 -> CyberGreen
+                                            1 -> Color(0xFFFBBF24)
+                                            2 -> Color(0xFF60A5FA)
+                                            else -> Color(0xFFC084FC)
+                                        }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(
+                                                color = if (isAnom) Color(0x20A855F7) else Color.Transparent,
+                                                shape = RoundedCornerShape(2.dp)
+                                            )
+                                            .border(
+                                                width = if (isAnom) 1.dp else 0.dp,
+                                                color = if (isAnom) Color(0x30A855F7) else Color.Transparent,
+                                                shape = RoundedCornerShape(2.dp)
+                                            )
+                                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = segment,
+                                            color = color,
+                                            style = Typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontSize = 10.sp,
+                                            letterSpacing = 1.sp,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -2268,26 +2475,80 @@ fun SplicerLeftPanel(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.Black)
-                        .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                        .background(Color(0xFF050C06))
+                        .border(1.dp, Color(0x4000FF41), RoundedCornerShape(4.dp))
                         .padding(6.dp)
                 ) {
                     Text(
-                        text = "[ Your Current Spliced Specimen ]",
-                        color = CyberGreenDim,
+                        text = "[ Current Spliced Sequence ]",
+                        color = CyberGreen,
                         style = Typography.labelSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    val currentDNA = splicerSlots.map { it ?: "--------" }.joinToString("")
-                    Text(
-                        text = currentDNA,
-                        color = Color.Gray,
-                        style = Typography.bodySmall,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        letterSpacing = 1.sp
-                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        for (row in 0 until 2) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                for (col in 0 until 4) {
+                                    val i = row * 4 + col
+                                    val slotGene = splicerSlots.getOrNull(i)
+                                    val segment = slotGene ?: "--------"
+                                    val isAnom = if (slotGene != null) {
+                                        val targetSegment = targetSequence.substring(i * 8, (i + 1) * 8)
+                                        WaveMath.isAnomalousGene(targetSegment)
+                                    } else false
+                                    
+                                    val color = if (slotGene == null) {
+                                        Color.Gray
+                                    } else if (isAnom) {
+                                        Color(0xFFA855F7)
+                                    } else {
+                                        when (i % 4) {
+                                            0 -> CyberGreen
+                                            1 -> Color(0xFFFBBF24)
+                                            2 -> Color(0xFF60A5FA)
+                                            else -> Color(0xFFC084FC)
+                                        }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(
+                                                color = if (isAnom) Color(0x20A855F7) else Color.Transparent,
+                                                shape = RoundedCornerShape(2.dp)
+                                            )
+                                            .border(
+                                                width = if (isAnom) 1.dp else 0.dp,
+                                                color = if (isAnom) Color(0x30A855F7) else Color.Transparent,
+                                                shape = RoundedCornerShape(2.dp)
+                                            )
+                                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = segment,
+                                            color = color,
+                                            style = Typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontSize = 10.sp,
+                                            letterSpacing = 1.sp,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2301,7 +2562,7 @@ fun SplicerLeftPanel(
                 ) {
                     Button(
                         onClick = { viewModel.autofillSplicerSlots() },
-                        modifier = Modifier.height(36.dp),
+                        modifier = Modifier.height(54.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White),
                         border = BorderStroke(1.dp, Color(0x8000FF41)),
                         shape = RoundedCornerShape(2.dp)
@@ -2314,7 +2575,7 @@ fun SplicerLeftPanel(
                         onClick = { viewModel.constructSplicedCreature() },
                         modifier = Modifier
                             .weight(1f)
-                            .height(36.dp),
+                            .height(54.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (hasEmpty) Color(0x1000FF41) else CyberGreen,
                             contentColor = if (hasEmpty) CyberGreenDim else Color.Black
@@ -2324,7 +2585,7 @@ fun SplicerLeftPanel(
                         enabled = !hasEmpty
                     ) {
                         Text(
-                            text = if (hasEmpty) "SYNTHESIZE GENOME" else "INITIALIZE MORPHOGENESIS",
+                            text = if (hasEmpty) "FILL EMPTY SLOTS OR FORCE" else "SEQUENCE P.O.X. GENOME",
                             style = Typography.bodySmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -2369,6 +2630,31 @@ fun SplicerLeftPanel(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
+                if (devForceAnomaly) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Button(
+                        onClick = { viewModel.devInjectMissingTargetGenes() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(32.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0x20A855F7),
+                            contentColor = Color(0xFFD8B4FE)
+                        ),
+                        border = BorderStroke(1.dp, Color(0x80A855F7)),
+                        shape = RoundedCornerShape(2.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = "🧪 DEV: INJECT MISSING GENES",
+                            style = Typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
             }
         }
     }
@@ -2640,7 +2926,7 @@ fun SplicerRightPanel(
                 .fillMaxSize()
                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(CyberPanel)
-                .padding(16.dp),
+                .padding(8.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -3205,7 +3491,7 @@ fun VaultView(viewModel: MainViewModel) {
                                     .background(CyberGreen)
                             )
                             Text(
-                                text = "[ GEN-VAULT DIRECTORY: P.O.X. SEQUENCE FILE ]",
+                                text = "[ P.O.X. SEQUENCE DIRECTORY ]",
                                 color = CyberGreen,
                                 fontSize = 10.sp,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
@@ -3224,7 +3510,7 @@ fun VaultView(viewModel: MainViewModel) {
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "✕ CLOSE WINDOW",
+                                text = "✕ CLOSE",
                                 color = Color.Red,
                                 fontSize = 8.sp,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,

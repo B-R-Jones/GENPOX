@@ -58,12 +58,33 @@ class MainScreenViewModelTest {
         override suspend fun insertGeneSequence(sequence: GeneSequence) {
             sequencesList.add(sequence)
         }
+        override suspend fun insertGeneSequences(sequences: List<GeneSequence>) {
+            sequences.forEach { seq ->
+                val index = sequencesList.indexOfFirst { it.sequence == seq.sequence }
+                if (index != -1) {
+                    sequencesList[index] = seq
+                } else {
+                    sequencesList.add(seq)
+                }
+            }
+        }
         override suspend fun updateGeneSequence(sequence: GeneSequence) {
             val index = sequencesList.indexOfFirst { it.sequence == sequence.sequence }
             if (index != -1) sequencesList[index] = sequence
         }
         override suspend fun deleteGeneSequence(sequence: GeneSequence) {
             sequencesList.remove(sequence)
+        }
+        override suspend fun updateGeneStock(toInsertOrUpdate: List<GeneSequence>, toDelete: List<GeneSequence>) {
+            toDelete.forEach { sequencesList.remove(it) }
+            toInsertOrUpdate.forEach { item ->
+                val index = sequencesList.indexOfFirst { it.sequence == item.sequence }
+                if (index != -1) {
+                    sequencesList[index] = item
+                } else {
+                    sequencesList.add(item)
+                }
+            }
         }
 
         override val activeMissions: Flow<List<HarvestMission>> = flowOf(missionsList)

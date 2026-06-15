@@ -133,6 +133,28 @@ fun MainScreen(
                             .padding(horizontal = 6.dp, vertical = 2.5.dp)
                     )
 
+                    // GNPX Developer Mode Badge
+                    val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
+                    Text(
+                        text = "GNPX",
+                        style = Typography.labelSmall,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (devForceAnomaly) Color(0xFFF97316) else Color.White,
+                        modifier = Modifier
+                            .background(
+                                if (devForceAnomaly) Color(0xFFF97316).copy(alpha = 0.15f) else Color(0xFF00FF41).copy(alpha = 0.10f),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .border(
+                                1.dp,
+                                if (devForceAnomaly) Color(0xFFF97316) else Color(0x8000FF41),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .clickable { viewModel.toggleDevForceAnomaly() }
+                            .padding(horizontal = 6.dp, vertical = 2.5.dp)
+                    )
+
                     // Active pulsator badge
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -250,7 +272,7 @@ fun MainScreen(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     listOf(
-                        Pair("combinator", "COMPILER"),
+                        Pair("combinator", "BIO-LAB"),
                         Pair("splicer", "SPLICER"),
                         Pair("vault", "GEN-VAULT"),
                         Pair("scanner", "SCANNER")

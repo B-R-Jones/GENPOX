@@ -23,12 +23,15 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
     // State flows from Repository
     val creatures: StateFlow<List<Creature>> = repository.allCreatures
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val geneSequences: StateFlow<List<GeneSequence>> = repository.allGeneSequences
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val activeMissions: StateFlow<List<HarvestMission>> = repository.activeMissions
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val geminiApiKey: StateFlow<String> = repository.geminiApiKey
@@ -119,6 +122,41 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
     private val _splicingProgress = MutableStateFlow(0)
     val splicingProgress: StateFlow<Int> = _splicingProgress.asStateFlow()
+
+    private val _devForceAnomaly = MutableStateFlow(false)
+    val devForceAnomaly: StateFlow<Boolean> = _devForceAnomaly.asStateFlow()
+
+    fun toggleDevForceAnomaly() {
+        _devForceAnomaly.value = !_devForceAnomaly.value
+        addLog("DEV: GNPX Mode toggled to ${_devForceAnomaly.value}")
+        synthManager.playBeep(650f, 0.05f, "sine")
+    }
+
+    fun addDevGenes() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val bases = listOf("A", "G", "T", "C")
+            val random = java.util.Random()
+            
+            val existingMap = geneSequences.value.associateBy { it.sequence }.toMutableMap()
+            
+            repeat(10000) {
+                var seq = ""
+                repeat(8) {
+                    seq += bases[random.nextInt(4)]
+                }
+                val existing = existingMap[seq]
+                if (existing != null) {
+                    existingMap[seq] = existing.copy(count = existing.count + 1)
+                } else {
+                    existingMap[seq] = GeneSequence(seq, 1, System.currentTimeMillis())
+                }
+            }
+            
+            repository.insertGeneSequences(existingMap.values.toList())
+            addLog("DEV: Injected 10,000 random genes into biological inventory.")
+            synthManager.playSynthesisSuccess()
+        }
+    }
 
     // Grand total nucleotide stockpile derived dynamically from standard genes in inventory (unique only)
     val grandTotalStandardNucleotides: StateFlow<Long> = geneSequences
@@ -302,7 +340,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 addLog("OK: Compiled creature \"${creature.name}\" of Sector [${creature.faction}]")
                 synthManager.playSynthesisSuccess()
                 _activeCreature.value = creature
-                _selectedTab.value = "library"
+                _selectedTab.value = "vault"
             } else {
                 addLog("ERR: Compilation reactor failure.")
                 synthManager.playReject()
@@ -560,7 +598,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 repository.insertCreature(creature)
                 addLog("SCAN: Compiled creature \"${creature.name}\"")
                 _activeCreature.value = creature
-                _selectedTab.value = "library"
+                _selectedTab.value = "vault"
             } else if (data.length == 64 && data.matches(Regex("[AGTCagtc]+"))) {
                 addLog("SCAN: Scanned raw DNA sequence. Compiling...")
                 compileCreature(data)
@@ -762,24 +800,26 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
     fun autofillSplicerSlots() {
         synthManager.playBeep(880f, 0.05f, "sine")
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             val target = _targetSequence.value
             if (target.length != 64) return@launch
 
             val updatedSlots = _splicerSlots.value.toMutableList()
+            val currentStockMap = geneSequences.value.associateBy { it.sequence }.toMutableMap()
+            val modifiedSequences = mutableSetOf<String>()
+
             var didChanges = false
             var autoFilledCount = 0
-
-            val tempInventory = geneSequences.value.map { it.copy() }.toMutableList()
 
             for (i in 0 until 8) {
                 if (updatedSlots[i] == null) {
                     val requiredGene = target.substring(i * 8, (i + 1) * 8)
-                    val matchIdx = tempInventory.indexOfFirst { it.sequence == requiredGene && it.count > 0 }
-                    if (matchIdx >= 0) {
-                        val updatedMatch = tempInventory[matchIdx]
-                        tempInventory[matchIdx] = updatedMatch.copy(count = updatedMatch.count - 1)
+                    val matchedGene = currentStockMap[requiredGene]
+                    if (matchedGene != null && matchedGene.count > 0) {
+                        val updatedGene = matchedGene.copy(count = matchedGene.count - 1)
+                        currentStockMap[requiredGene] = updatedGene
                         updatedSlots[i] = requiredGene
+                        modifiedSequences.add(requiredGene)
                         didChanges = true
                         autoFilledCount++
                     }
@@ -787,20 +827,64 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             }
 
             if (didChanges) {
-                for (gene in tempInventory) {
-                    val orig = geneSequences.value.find { it.sequence == gene.sequence }
-                    if (orig != null) {
-                        if (gene.count <= 0) {
-                            repository.deleteGeneSequence(orig)
-                        } else if (gene.count != orig.count) {
-                            repository.insertGeneSequence(gene)
+                val toUpdate = mutableListOf<GeneSequence>()
+                val toDelete = mutableListOf<GeneSequence>()
+
+                for (seq in modifiedSequences) {
+                    val originalGene = geneSequences.value.find { it.sequence == seq }
+                    val updatedGene = currentStockMap[seq]!!
+                    if (originalGene != null) {
+                        if (updatedGene.count <= 0) {
+                            toDelete.add(originalGene)
+                        } else {
+                            toUpdate.add(updatedGene)
                         }
                     }
                 }
+
+                withContext(Dispatchers.IO) {
+                    repository.updateGeneStock(toUpdate, toDelete)
+                }
+
                 _splicerSlots.value = updatedSlots
                 addLog("AUTO GENE: Filled $autoFilledCount matching slots with verified stock segments.")
             } else {
                 addLog("AUTO GENE: No matching segments found in stock for any unfilled slots.")
+            }
+        }
+    }
+
+    fun devInjectMissingTargetGenes() {
+        if (!_devForceAnomaly.value) return
+        val target = _targetSequence.value
+        if (target.length != 64) return
+        
+        viewModelScope.launch(Dispatchers.IO) {
+            val basesList = (0 until 8).map { target.substring(it * 8, (it + 1) * 8) }
+            val existingList = geneSequences.value.toMutableList()
+            var addedAny = false
+            
+            basesList.forEach { seq ->
+                val matchIdx = existingList.indexOfFirst { it.sequence == seq }
+                if (matchIdx >= 0) {
+                    val match = existingList[matchIdx]
+                    if (match.count <= 0) {
+                        existingList[matchIdx] = match.copy(count = 1)
+                        addedAny = true
+                    }
+                } else {
+                    existingList.add(GeneSequence(seq, 1, System.currentTimeMillis()))
+                    addedAny = true
+                }
+            }
+            
+            if (addedAny) {
+                repository.insertGeneSequences(existingList)
+                addLog("DEV: Injected missing target genes into stock archive.")
+                synthManager.playSynthesisSuccess()
+            } else {
+                addLog("DEV: All required target genes already exist in stock.")
+                synthManager.playBeep(440f, 0.1f, "sine")
             }
         }
     }
@@ -841,7 +925,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             _splicingProgress.value = 0
 
             _activeCreature.value = finalCreature
-            _selectedTab.value = "library"
+            _selectedTab.value = "vault"
         }
     }
 
@@ -887,22 +971,27 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
             val isLooping = _isForcedLoopActive.value
             val initialLogs = mutableListOf(
-                "[INIT] >> ENGAGING EMERGENCY GENE OVERRIDE SEQUENCE...",
+                "[INIT] >> FORCING TARGET SEQUENCE COMPILATION...",
                 if (isLooping) {
-                    "[STATUS: FREEZE MAINTAINED] >> Reactor thermal coils frozen for active construction loop."
+                    "[STATUS: FREEZE ACTIVE] >> TARGET SEQUENCE UNDERGOING FORCED SEQUENCING."
                 } else {
-                    "[WARNING] >> REACTOR OVERHEATING RISK: STABILIZING COILS FORCED TO FREEZE FOR 8.0 SECONDS."
+                    "[WARNING] >> G.E.N. NETWORK TAGS ALL FORCED SEQUENCES!"
                 },
                 if (isLooping) {
-                    "[REASON] >> SYSTEMS RUNNING UNDER CRITICAL LOOP VOLTAGE."
-                } else null,
-                "[LUNAR STATUS] >> Phase: ${wave.phaseName} | Effective Debuff Mod: $moonStatusLog",
-                "[CALCULATE] >> Analysing 64 bases against available nucleotide archives (Fail Chance: ${String.format("%.2f", failureChance)}%)..."
+                    "[REASON] >> SYSTEMS RUNNING UNDER ABNORMAL STRESS."
+                } else {
+                    "[WARNING] >> P.O.X. REACTOR LOCKED FOR SEQUENCING."
+                },
+                "[LUNAR STATUS] >> Phase: ${wave.phaseName} | Effective Debuff Mod: $moonStatusLog"
             ).filterNotNull().toMutableList()
 
-            _forcedConstructionLogs.value = initialLogs
-
             val currentStock = geneSequences.value.map { it.copy() }.toMutableList()
+
+            initialLogs.add(
+                "[CALCULATION] >> Base: 64 | Stock: ${currentStock.sumOf { it.count }} | Fail Chance: ${String.format("%.2f", failureChance)}%"
+            )
+
+            _forcedConstructionLogs.value = initialLogs.toList()
 
             val deductFromStock = { seq: String ->
                 val idx = currentStock.indexOfFirst { it.sequence == seq && it.count > 0 }
@@ -930,20 +1019,34 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 }
             }
 
-            var totalPrimaryConsumed = 0
-            var totalSacrificed = 0
-
             data class StepLog(val second: Int, val text: String)
             val stepLogs = mutableListOf<StepLog>()
 
             val activeSplicerSlots = _splicerSlots.value
+            var failedAtSecond = -1
 
             for (i in 0 until 8) {
                 val expectedGene = dnaSeq.substring(i * 8, (i + 1) * 8)
+                val isManualMatch = !isCustom && activeSplicerSlots.getOrNull(i) == expectedGene
+
+                // If inventory is empty at the start of slot processing and not manually aligned, abort!
+                if (currentStock.sumOf { it.count } == 0 && !isManualMatch && failedAtSecond == -1) {
+                    failedAtSecond = i + 1
+                    stepLogs.add(StepLog(
+                        second = i + 1,
+                        text = "Slot #${i + 1} processing using scaffold: VOID SYNTHESIS SCAFFOLD"
+                    ))
+                    stepLogs.add(StepLog(
+                        second = i + 1,
+                        text = "  ➔ [FATAL] >> SPLICING PROTOCOL ABORTED: Nucleotide stockpile fully depleted."
+                    ))
+                    break
+                }
+
                 var scaffoldStr = ""
                 var scaffoldType = ""
 
-                if (!isCustom && activeSplicerSlots.getOrNull(i) == expectedGene) {
+                if (isManualMatch) {
                     scaffoldStr = expectedGene
                     scaffoldType = "PRE-ALIGNED MANUAL GENE"
                 } else {
@@ -952,14 +1055,12 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                         deductFromStock(expectedGene)
                         scaffoldStr = expectedGene
                         scaffoldType = "MATCH STOCK RECRUITED"
-                        totalPrimaryConsumed++
                     } else {
                         val anyGene = currentStock.find { it.count > 0 }
                         if (anyGene != null) {
                             deductFromStock(anyGene.sequence)
                             scaffoldStr = anyGene.sequence
                             scaffoldType = "ANY GENE UNSTABLE BASE [${anyGene.sequence.take(4)}...]"
-                            totalPrimaryConsumed++
                         } else {
                             scaffoldStr = "--------"
                             scaffoldType = "VOID SYNTHESIS SCAFFOLD"
@@ -982,104 +1083,137 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                     } else {
                         val sacrificedSeq = findAndSacrificeGene(expectedChar, j)
                         if (sacrificedSeq != null) {
-                            totalSacrificed++
                             stepLogs.add(StepLog(
                                 second = minOf(7, i + 1),
-                                text = " ➔ FAILED APPEND (pos ${j + 1}). Sacrificed gene $sacrificedSeq (depleting pool)"
+                                text = "  ➔ FAILED APPEND (pos ${j + 1}). Sacrificed gene $sacrificedSeq (depleting pool)"
                             ))
                         } else {
                             val backupSacrifice = currentStock.find { it.count > 0 }
                             if (backupSacrifice != null) {
                                 deductFromStock(backupSacrifice.sequence)
-                                totalSacrificed++
                                 stepLogs.add(StepLog(
                                     second = minOf(7, i + 1),
-                                    text = " ➔ FAILED APPEND (pos ${j + 1}). Sacrificed backup gene ${backupSacrifice.sequence} to guarantee placement"
+                                    text = "  ➔ FAILED APPEND (pos ${j + 1}). Sacrificed backup gene ${backupSacrifice.sequence} to guarantee placement"
                                 ))
                             } else {
-                                stepLogs.add(StepLog(
-                                    second = minOf(7, i + 1),
-                                    text = " ➔ FAILED APPEND (pos ${j + 1}). Placed via thermal override with no remaining stock available"
-                                ))
+                                // Mismatch append failed and no stock remains to sacrifice
+                                if (failedAtSecond == -1) {
+                                    failedAtSecond = i + 1
+                                    stepLogs.add(StepLog(
+                                        second = i + 1,
+                                        text = "  ➔ [FATAL] >> SPLICING PROTOCOL ABORTED: Nucleotide stockpile fully depleted."
+                                    ))
+                                }
                             }
                         }
                         failureChance = maxOf(0.0, failureChance - 3.25)
                     }
                 }
+
+                if (failedAtSecond != -1) break
+
+                // If inventory becomes empty after slot processing, fail!
+                if (currentStock.sumOf { it.count } == 0 && failedAtSecond == -1) {
+                    failedAtSecond = i + 1
+                    stepLogs.add(StepLog(
+                        second = i + 1,
+                        text = "  ➔ [FATAL] >> SPLICING PROTOCOL ABORTED: Nucleotide stockpile fully depleted."
+                    ))
+                    break
+                }
             }
 
-            for (tenths in 1..80) {
+            val maxTenths = if (failedAtSecond != -1) failedAtSecond * 10 else 80
+
+            for (tenths in 1..maxTenths) {
                 kotlinx.coroutines.delay(100L)
-                _reactorFreezeTimeLeft.value = ((80 - tenths) / 10.0f)
+                _reactorFreezeTimeLeft.value = ((maxTenths - tenths) / 10.0f)
 
                 val lastWholeSec = (tenths - 1) / 10
                 val currWholeSec = tenths / 10
 
                 if (currWholeSec > lastWholeSec && currWholeSec <= 8) {
-                    initialLogs.add("[$currWholeSec.0s] >> Splicing thermal energy... Calibration progress: ${((currWholeSec / 8.0) * 100).toInt()}%")
+                    val currentLogs = _forcedConstructionLogs.value.toMutableList()
+                    currentLogs.add("[SEQUENCE PROGRESS] >> ${((currWholeSec / 8.0) * 100).toInt()}% Complete")
                     val matching = stepLogs.filter { it.second == currWholeSec }
                     for (log in matching) {
-                        initialLogs.add("  ${log.text}")
+                        currentLogs.add("  ${log.text}")
                     }
-                    _forcedConstructionLogs.value = initialLogs.toList()
+                    _forcedConstructionLogs.value = currentLogs
                 }
             }
 
-            val oldStock = repository.allGeneSequences.first().associateBy { it.sequence }
+            val oldStock = geneSequences.value.associateBy { it.sequence }
             val newStockMap = currentStock.associateBy { it.sequence }
+
+            val toDelete = mutableListOf<GeneSequence>()
+            val toUpdate = mutableListOf<GeneSequence>()
 
             for ((seq, oldGene) in oldStock) {
                 val newGene = newStockMap[seq]
                 if (newGene == null) {
-                    repository.deleteGeneSequence(oldGene)
+                    toDelete.add(oldGene)
                 } else if (newGene.count != oldGene.count) {
-                    repository.insertGeneSequence(newGene)
+                    toUpdate.add(newGene)
                 }
+            }
+
+            if (toDelete.isNotEmpty() || toUpdate.isNotEmpty()) {
+                repository.updateGeneStock(toUpdate, toDelete)
             }
 
             _splicerSlots.value = List<String?>(8) { null }
 
-            val spawned = compileDeterministicOffline(dnaSeq)
-            val idSuffix = UUID.randomUUID().toString().take(6).uppercase()
-            val finalCreature = spawned.copy(
-                id = "PX-$idSuffix",
-                name = "${spawned.name} [FORCED]",
-                lore = "This hybrid genome was forced together in the bio-lab reactor. ${spawned.lore}",
-                origin = "Forced Synthesis"
-            )
+            if (failedAtSecond != -1) {
+                _isReactorFrozen.value = false
+                _isForcedConstructionActive.value = false
+                _isForcedLoopActive.value = false
+                _selectedTab.value = "splicer"
+                synthManager.playReject()
+                addLog("FORCED CONSTRUCTION FAILED: Nucleotide stockpile depleted!")
+            } else {
+                val spawned = compileDeterministicOffline(dnaSeq)
+                val idSuffix = UUID.randomUUID().toString().take(6).uppercase()
+                val finalCreature = spawned.copy(
+                    id = "PX-$idSuffix",
+                    name = "${spawned.name} [FORCED]",
+                    lore = "This hybrid genome was forced together in the bio-lab reactor. ${spawned.lore}",
+                    origin = "Forced Synthesis"
+                )
 
-            repository.insertCreature(finalCreature)
-            synthManager.playSynthesisSuccess()
+                repository.insertCreature(finalCreature)
+                synthManager.playSynthesisSuccess()
 
-            if (_isForcedLoopActive.value) {
-                addLog("[FORCED LOOP] Specimen \"${finalCreature.name}\" assembled successfully! Continuing loop iteration...")
-
-                var nextDna = dnaSeq
-                if (!isCustom) {
-                    nextDna = generateRandom64Sequence()
-                    repository.saveTargetSequence(nextDna)
-                }
-
-                kotlinx.coroutines.delay(1000L)
                 if (_isForcedLoopActive.value) {
-                    runForcedConstructionCycle(nextDna, isCustom)
+                    addLog("[FORCED LOOP] Specimen \"${finalCreature.name}\" assembled successfully! Continuing loop iteration...")
+
+                    var nextDna = dnaSeq
+                    if (!isCustom) {
+                        nextDna = generateRandom64Sequence()
+                        repository.saveTargetSequence(nextDna)
+                    }
+
+                    kotlinx.coroutines.delay(1000L)
+                    if (_isForcedLoopActive.value) {
+                        runForcedConstructionCycle(nextDna, isCustom)
+                    } else {
+                        _isReactorFrozen.value = false
+                        _isForcedConstructionActive.value = false
+                        addLog("FORCED LOOP ENDED. Reactor is now available for normal sequencing.")
+                    }
                 } else {
                     _isReactorFrozen.value = false
                     _isForcedConstructionActive.value = false
-                    addLog("FORCED LOOP DEACTIVATED. Reactor coils warming up. Standby.")
-                }
-            } else {
-                _isReactorFrozen.value = false
-                _isForcedConstructionActive.value = false
-                _activeCreature.value = finalCreature
-                _selectedTab.value = "library"
+                    _activeCreature.value = finalCreature
+                    _selectedTab.value = "splicer"
 
-                if (!isCustom) {
-                    val nextTarget = generateRandom64Sequence()
-                    repository.saveTargetSequence(nextTarget)
-                }
+                    if (!isCustom) {
+                        val nextTarget = generateRandom64Sequence()
+                        repository.saveTargetSequence(nextTarget)
+                    }
 
-                addLog("FORCED CONSTRUCTION COMPLETED. Produced specimen: \"${finalCreature.name}\"!")
+                    addLog("FORCED CONSTRUCTION COMPLETED. Produced sequence: \"${finalCreature.name}\"!")
+                }
             }
         }
     }
@@ -1161,13 +1295,16 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             batch.add(WaveMath.generateWaveGeneBlock(wave, random))
         }
 
+        val currentList = geneSequences.value
+        val newGenesList = mutableListOf<String>()
+
         // Save each gene to database
         batch.forEach { sequence ->
-            val currentList = geneSequences.value
             val match = currentList.find { it.sequence == sequence }
             if (match != null) {
                 repository.insertGeneSequence(match.copy(count = match.count + 1))
             } else {
+                newGenesList.add(sequence)
                 repository.insertGeneSequence(GeneSequence(sequence, 1, System.currentTimeMillis()))
             }
         }
@@ -1177,7 +1314,8 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             id = "PKT-" + UUID.randomUUID().toString().take(6).uppercase(),
             genes = batch,
             timestamp = System.currentTimeMillis(),
-            isAnomalous = false
+            isAnomalous = false,
+            newGenes = newGenesList
         )
         _discoveredPacketsLog.value = (listOf(packet) + _discoveredPacketsLog.value).take(50)
 
@@ -1186,22 +1324,30 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     }
 
     private suspend fun triggerAnomalousSynthesis() {
-        val grandTotal = grandTotalStandardNucleotides.value
-        val coupling = WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis())
-        val chanceMetrics = WaveMath.getAnomalyEngineSuccessChance(grandTotal, coupling)
-        val roll = java.util.Random().nextDouble() * 100.0
+        val isDevMode = _devForceAnomaly.value
+        val isSuccess = if (isDevMode) {
+            true
+        } else {
+            val grandTotal = grandTotalStandardNucleotides.value
+            val coupling = WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis())
+            val chanceMetrics = WaveMath.getAnomalyEngineSuccessChance(grandTotal, coupling)
+            val roll = java.util.Random().nextDouble() * 100.0
 
-        // Consume standard nucleotides
-        consumeNucleotides(10000)
+            // Consume standard nucleotides
+            consumeNucleotides(10000)
+            roll <= chanceMetrics.finalChance
+        }
 
-        val isSuccess = roll <= chanceMetrics.finalChance
+        val currentList = geneSequences.value
+        val newGenesList = mutableListOf<String>()
+
         val generated = if (isSuccess) {
             val anomalousGene = WaveMath.generateAnomalousGene()
-            val currentList = geneSequences.value
             val match = currentList.find { it.sequence == anomalousGene }
             if (match != null) {
                 repository.insertGeneSequence(match.copy(count = match.count + 1))
             } else {
+                newGenesList.add(anomalousGene)
                 repository.insertGeneSequence(GeneSequence(anomalousGene, 1, System.currentTimeMillis()))
             }
             anomalousGene
@@ -1213,12 +1359,17 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             id = "ANM-" + UUID.randomUUID().toString().take(6).uppercase(),
             genes = listOf(generated),
             timestamp = System.currentTimeMillis(),
-            isAnomalous = true
+            isAnomalous = true,
+            newGenes = newGenesList
         )
         _discoveredPacketsLog.value = (listOf(packet) + _discoveredPacketsLog.value).take(50)
 
         if (isSuccess) {
-            addLog("[ANOMALY ENGINE] Unstable Fusion Success! Formed anomalous block $generated.")
+            if (isDevMode) {
+                addLog("[DEV MODE FUSION] Force-triggered successfully (Zero resources consumed). Generated anomalous block $generated.")
+            } else {
+                addLog("[ANOMALY ENGINE] Unstable Fusion Success! Formed anomalous block $generated.")
+            }
             synthManager.playSynthesisSuccess()
         } else {
             addLog("[ANOMALY ENGINE] Fusion decay: 10,000 standard nucleotides decomposed in buffer.")
@@ -1241,13 +1392,19 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             }
         }
     }
+
+    fun clearDiscoveredPacketsLog() {
+        _discoveredPacketsLog.value = emptyList()
+        addLog("GENE ARCHIVE: Cleared all packet records.")
+    }
 }
 
 data class GenePacket(
     val id: String,
     val genes: List<String>,
     val timestamp: Long,
-    val isAnomalous: Boolean
+    val isAnomalous: Boolean,
+    val newGenes: List<String> = emptyList()
 )
 
 data class PoxAnomaly(

@@ -966,6 +966,46 @@ export default function PoxConsole({
   const [newestSequence, setNewestSequence] = useState<string>("");
   const [isFreshSequence, setIsFreshSequence] = useState<boolean>(false);
   const [recentSplicedGenes, setRecentSplicedGenes] = useState<{ sequence: string; isNew: boolean }[]>([]);
+
+  const [displayedForcedLogs, setDisplayedForcedLogs] = useState<string[]>([]);
+  const displayedForcedLogsRef = useRef<string[]>([]);
+  useEffect(() => {
+    displayedForcedLogsRef.current = displayedForcedLogs;
+  }, [displayedForcedLogs]);
+
+  useEffect(() => {
+    if (forcedConstructionLogs.length === 0) {
+      setDisplayedForcedLogs([]);
+      return;
+    }
+    let isCancelled = false;
+    const currentDisplayed = displayedForcedLogsRef.current;
+    const isNewRun =
+      currentDisplayed.length > forcedConstructionLogs.length ||
+      (currentDisplayed.length > 0 && forcedConstructionLogs[0] !== currentDisplayed[0]);
+
+    const startIdx = isNewRun ? 0 : currentDisplayed.length;
+
+    const streamNext = async () => {
+      if (isNewRun) {
+        setDisplayedForcedLogs([]);
+      }
+      for (let i = startIdx; i < forcedConstructionLogs.length; i++) {
+        await new Promise(r => setTimeout(r, 150));
+        if (isCancelled) return;
+        setDisplayedForcedLogs(prev => {
+          if (prev.length === i) {
+            return [...prev, forcedConstructionLogs[i]];
+          }
+          return prev;
+        });
+      }
+    };
+    streamNext();
+    return () => {
+      isCancelled = true;
+    };
+  }, [forcedConstructionLogs]);
   
   const [discoveredPacketsLog, setDiscoveredPacketsLog] = useState<{
     id: string;
@@ -1536,13 +1576,13 @@ export default function PoxConsole({
 
   // Auto-scroll forced construction logs
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (forcedLogContainerRef.current) {
-        forcedLogContainerRef.current.scrollTop = forcedLogContainerRef.current.scrollHeight;
-      }
-    }, 60);
-    return () => clearTimeout(timer);
-  }, [forcedConstructionLogs]);
+    if (forcedLogContainerRef.current) {
+      forcedLogContainerRef.current.scrollTo({
+        top: forcedLogContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [displayedForcedLogs]);
 
   // Area Scanner States - Linked to GNPX badge toggling
   const scanRadius = React.useMemo(() => {
@@ -2658,6 +2698,38 @@ export default function PoxConsole({
     }
   };
 
+  const handleInjectMissingTargetGenes = () => {
+    if (!devForceAnomaly) return;
+    sound.playSynthesisSuccess();
+    const updatedSequences = [...sequences];
+    let addedAny = false;
+
+    for (let i = 0; i < 8; i++) {
+      const seq = targetSequence.slice(i * 8, (i + 1) * 8);
+      const idx = updatedSequences.findIndex(s => s.sequence === seq);
+      if (idx >= 0) {
+        if (updatedSequences[idx].count <= 0) {
+          updatedSequences[idx] = { ...updatedSequences[idx], count: 1 };
+          addedAny = true;
+        }
+      } else {
+        updatedSequences.push({
+          sequence: seq,
+          count: 1,
+          timestamp: Date.now()
+        });
+        addedAny = true;
+      }
+    }
+
+    if (addedAny) {
+      setSequences(updatedSequences);
+      triggerLog("DEV: Injected missing target genes into stock archive.", "success");
+    } else {
+      triggerLog("DEV: All required target genes already exist in stock.", "info");
+    }
+  };
+
   // Slot handlers
   const handleSlotClick = (slotIdx: number) => {
     if (isSplicing) return;
@@ -3071,21 +3143,21 @@ export default function PoxConsole({
     }
 
     const isLooping = isForcedLoopActiveRef.current;
+    let currentStock = [...sequences];
 
     const logs: string[] = [
-      `[INIT] >> ENGAGING EMERGENCY GENE OVERRIDE SEQUENCE...`,
+      `[INIT] >> FORCING TARGET SEQUENCE COMPILATION...`,
       ...(isLooping ? [
-        `[STATUS: FREEZE MAINTAINED] >> Reactor thermal coils frozen for active construction loop.`,
-        `[REASON] >> SYSTEMS RUNNING UNDER CRITICAL LOOP VOLTAGE.`
+        `[STATUS: FREEZE ACTIVE] >> TARGET SEQUENCE UNDERGOING FORCED SEQUENCING.`,
+        `[REASON] >> SYSTEMS RUNNING UNDER ABNORMAL STRESS.`
       ] : [
-        `[WARNING] >> REACTOR OVERHEATING RISK: STABILIZING COILS FORCED TO FREEZE FOR 8.0 SECONDS.`
+        `[WARNING] >> G.E.N. NETWORK TAGS ALL FORCED SEQUENCES!`,
+        `[WARNING] >> P.O.X. REACTOR LOCKED FOR SEQUENCING.`
       ]),
       `[LUNAR STATUS] >> Phase: ${activeWaveConfig.phaseName} | Effective Debuff Mod: ${moonStatusLog}`,
-      `[CALCULATE] >> Analysing 64 bases against available nucleotide archives (Fail Chance: ${failureChance.toFixed(2)}%)...`
+      `[CALCULATION] >> Base: 64 | Stock: ${currentStock.reduce((acc, s) => acc + s.count, 0)} | Fail Chance: ${failureChance.toFixed(2)}%`
     ];
     setForcedConstructionLogs(logs);
-
-    let currentStock = [...sequences];
 
     // Helper to deduct a gene from stock
     const deductFromStock = (seq: string): boolean => {
@@ -3120,14 +3192,33 @@ export default function PoxConsole({
     
     // Step logs to play out second-by-second
     const stepLogs: { second: number; text: string }[] = [];
+    let failedAtSecond = -1;
 
     // Analyze base by base
     for (let i = 0; i < 8; i++) {
       const expectedGene = fullDNASeq.substring(i * 8, (i + 1) * 8);
+      const isManualMatch = !isCustom && splicerSlots[i] === expectedGene;
+
+      const getStockCount = () => currentStock.reduce((acc, s) => acc + s.count, 0);
+
+      // If inventory is empty at the start of slot processing and not manually aligned, abort!
+      if (getStockCount() === 0 && !isManualMatch && failedAtSecond === -1) {
+        failedAtSecond = i + 1;
+        stepLogs.push({
+          second: i + 1,
+          text: `Slot #${i + 1} processing using scaffold: VOID SYNTHESIS SCAFFOLD`
+        });
+        stepLogs.push({
+          second: i + 1,
+          text: `  ➔ [FATAL] >> SPLICING PROTOCOL ABORTED: Nucleotide stockpile fully depleted.`
+        });
+        break;
+      }
+
       let scaffoldStr = "";
       let scaffoldType = "";
 
-      if (!isCustom && splicerSlots[i] === expectedGene) {
+      if (isManualMatch) {
         scaffoldStr = expectedGene;
         scaffoldType = "PRE-ALIGNED MANUAL GENE";
       } else {
@@ -3177,7 +3268,7 @@ export default function PoxConsole({
             totalSacrificed++;
             stepLogs.push({
               second: Math.min(7, i + 1),
-              text: ` ➔ FAILED APPEND (pos ${j + 1}). Sacrificed gene ${sacrificedSeq} (depleting pool)`
+              text: `  ➔ FAILED APPEND (pos ${j + 1}). Sacrificed gene ${sacrificedSeq} (depleting pool)`
             });
           } else {
             // If no gene fits, consume any available gene from stock
@@ -3187,19 +3278,34 @@ export default function PoxConsole({
               totalSacrificed++;
               stepLogs.push({
                 second: Math.min(7, i + 1),
-                text: ` ➔ FAILED APPEND (pos ${j + 1}). Sacrificed backup gene ${backupSacrifice.sequence} to guarantee placement`
+                text: `  ➔ FAILED APPEND (pos ${j + 1}). Sacrificed backup gene ${backupSacrifice.sequence} to guarantee placement`
               });
             } else {
-              stepLogs.push({
-                second: Math.min(7, i + 1),
-                text: ` ➔ FAILED APPEND (pos ${j + 1}). Placed via thermal override with no remaining stock available`
-              });
+              if (failedAtSecond === -1) {
+                failedAtSecond = i + 1;
+                stepLogs.push({
+                  second: i + 1,
+                  text: `  ➔ [FATAL] >> SPLICING PROTOCOL ABORTED: Nucleotide stockpile fully depleted.`
+                });
+              }
             }
           }
 
           // Reduce failure chance successively
           failureChance = Math.max(0, failureChance - 3.25);
         }
+      }
+
+      if (failedAtSecond !== -1) break;
+
+      // If inventory becomes empty after slot processing, fail!
+      if (getStockCount() === 0 && failedAtSecond === -1) {
+        failedAtSecond = i + 1;
+        stepLogs.push({
+          second: i + 1,
+          text: `  ➔ [FATAL] >> SPLICING PROTOCOL ABORTED: Nucleotide stockpile fully depleted.`
+        });
+        break;
       }
     }
 
@@ -3209,17 +3315,18 @@ export default function PoxConsole({
     // Run the 8-second interval ticker in tenths of a second
     let elapsedTenths = 0;
     const currentLogs = [...logs];
+    const maxTenths = failedAtSecond !== -1 ? failedAtSecond * 10 : 80;
 
     const interval = setInterval(() => {
       elapsedTenths++;
       const currentSecondsFloat = elapsedTenths / 10;
-      setReactorFreezeTimeLeft(Number(Math.max(0, 8.0 - currentSecondsFloat).toFixed(1)));
+      setReactorFreezeTimeLeft(Number(Math.max(0, (maxTenths / 10) - currentSecondsFloat).toFixed(1)));
 
       const lastWholeSec = Math.floor((elapsedTenths - 1) / 10);
       const currWholeSec = Math.floor(elapsedTenths / 10);
 
-      if (currWholeSec > lastWholeSec && currWholeSec <= 8) {
-        currentLogs.push(`[${currWholeSec}.0s] >> Splicing thermal energy... Calibration progress: ${Math.round((currWholeSec / 8) * 100)}%`);
+      if (currWholeSec > lastWholeSec && currWholeSec <= (maxTenths / 10)) {
+        currentLogs.push(`[SEQUENCE PROGRESS] >> ${Math.round((currWholeSec / 8) * 100)}% Complete`);
         
         // Add matching step logs for this elapsed second
         const matching = stepLogs.filter(el => el.second === currWholeSec);
@@ -3230,66 +3337,73 @@ export default function PoxConsole({
         setForcedConstructionLogs([...currentLogs]);
       }
 
-      if (elapsedTenths >= 80) {
+      if (elapsedTenths >= maxTenths) {
         clearInterval(interval);
         
         // Finalize state
         setSequences(finalStockResult);
         setSplicerSlots([null, null, null, null, null, null, null, null]);
 
-        // Synthesize creature and save targetSequence before rotating
-        const fallbackCreature = constructProceduralCreature(fullDNASeq, "Forced Unstable Splicing");
-        fallbackCreature.id = `PX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-        fallbackCreature.name = `${fallbackCreature.name} [FORCED]`;
-        fallbackCreature.lore = `This hybrid genome was forced together in the bio-lab reactor. ${fallbackCreature.lore}`;
-        fallbackCreature.origin = "Forced Synthesis";
-
-        // Append to creatures list
-        setCreatures(prev => [fallbackCreature, ...prev]);
-
-        setStats(prev => ({
-          ...prev,
-          totalSpliced: prev.totalSpliced + 1
-        }));
-
-        sound.playSynthesisSuccess();
-
-        // Check if loop is still active
-        if (isForcedLoopActiveRef.current) {
-          triggerLog(`[FORCED LOOP] Specimen "${fallbackCreature.name}" assembled successfully! Continuing loop iteration...`, "success");
-
-          // For the next loop iteration, rotate target sequence if we are not custom-splicing
-          let nextDna = fullDNASeq;
-          if (!isCustom) {
-            nextDna = generateRandom64Sequence();
-            setTargetSequence(nextDna);
-          }
-
-          // Delay starting the next loop iteration by 1 second to keep UI legible
-          setTimeout(() => {
-            if (isForcedLoopActiveRef.current) {
-              runForcedConstructionCycle(nextDna, isCustom);
-            } else {
-              setIsReactorFrozen(false);
-              setIsForcedConstructionActive(false);
-              triggerLog("FORCED LOOP DEACTIVATED. Reactor coils warming up. Standby.", "info");
-            }
-          }, 1000);
-
-        } else {
+        if (failedAtSecond !== -1) {
           setIsReactorFrozen(false);
           setIsForcedConstructionActive(false);
-          setCreatureCardOpenedFrom('Constructor');
-          setInspectedCreatureId(fallbackCreature.id);
-          setActiveTab('library');
+          setIsForcedLoopActive(false);
+          setActiveTab('splicer');
+          sound.playReject();
+          triggerLog("FORCED CONSTRUCTION FAILED: Nucleotide stockpile depleted!", "warn");
+        } else {
+          // Synthesize creature and save targetSequence before rotating
+          const fallbackCreature = constructProceduralCreature(fullDNASeq, "Forced Unstable Splicing");
+          fallbackCreature.id = `PX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+          fallbackCreature.name = `${fallbackCreature.name} [FORCED]`;
+          fallbackCreature.lore = `This hybrid genome was forced together in the bio-lab reactor. ${fallbackCreature.lore}`;
+          fallbackCreature.origin = "Forced Synthesis";
 
-          // Rotate target
-          if (!isCustom) {
-            const nextTarget = generateRandom64Sequence();
-            setTargetSequence(nextTarget);
+          // Append to creatures list
+          setCreatures(prev => [fallbackCreature, ...prev]);
+
+          setStats(prev => ({
+            ...prev,
+            totalSpliced: prev.totalSpliced + 1
+          }));
+
+          sound.playSynthesisSuccess();
+
+          // Check if loop is still active
+          if (isForcedLoopActiveRef.current) {
+            triggerLog(`[FORCED LOOP] Specimen "${fallbackCreature.name}" assembled successfully! Continuing loop iteration...`, "success");
+
+            // For the next loop iteration, rotate target sequence if we are not custom-splicing
+            let nextDna = fullDNASeq;
+            if (!isCustom) {
+              nextDna = generateRandom64Sequence();
+              setTargetSequence(nextDna);
+            }
+
+            // Delay starting the next loop iteration by 1 second to keep UI legible
+            setTimeout(() => {
+              if (isForcedLoopActiveRef.current) {
+                runForcedConstructionCycle(nextDna, isCustom);
+              } else {
+                setIsReactorFrozen(false);
+                setIsForcedConstructionActive(false);
+                triggerLog("FORCED LOOP ENDED. Reactor is now available for normal sequencing.", "info");
+              }
+            }, 1000);
+
+          } else {
+            setIsReactorFrozen(false);
+            setIsForcedConstructionActive(false);
+            setActiveTab('splicer');
+
+            // Rotate target
+            if (!isCustom) {
+              const nextTarget = generateRandom64Sequence();
+              setTargetSequence(nextTarget);
+            }
+
+            triggerLog(`FORCED CONSTRUCTION COMPLETED. Produced sequence: "${fallbackCreature.name}"!`, "success");
           }
-
-          triggerLog(`FORCED CONSTRUCTION COMPLETED. Produced specimen: "${fallbackCreature.name}"!`, "success");
         }
       }
     }, 100);
@@ -5095,8 +5209,8 @@ export default function PoxConsole({
                           {/* Title header */}
                           <div className="flex justify-between items-center border-b border-green-955 pb-2 mb-2.5 select-none">
                             <span className="text-[10px] text-[#00FF41] font-bold tracking-widest uppercase flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 bg-[#00FF41] rounded-full animate-pulse" />
-                              [ GENE SYNTHESIS LOG ]
+                              <span className="text-[#00FF41]">●</span>
+                              <span>[ GENE SYNTHESIS LOG ]</span>
                             </span>
                             <div className="flex items-center gap-2">
                               <button
@@ -5107,7 +5221,7 @@ export default function PoxConsole({
                                   setDiscoverySelectedGene(null);
                                   triggerLog("GENE ARCHIVE: Cleared all packet records.", "info");
                                 }}
-                                className="px-2 py-0.5 bg-red-950/20 hover:bg-red-900 border border-red-900/60 text-red-400 hover:text-white rounded text-[8px] cursor-pointer font-bold select-none transition-colors"
+                                className="px-2 py-0.5 bg-transparent hover:bg-yellow-500/10 border border-yellow-500 text-yellow-500 rounded text-[8px] cursor-pointer font-bold select-none transition-colors"
                               >
                                 ✕ CLEAR ALL
                               </button>
@@ -5117,7 +5231,7 @@ export default function PoxConsole({
                                   sound.playBeep(440, 0.05, "sine");
                                   setIsGeneLogPopupOpen(false);
                                 }}
-                                className="px-2 py-0.5 bg-green-950/80 hover:bg-green-900 border border-green-800 text-[#00FF41] hover:text-white rounded text-[8.5px] cursor-pointer font-bold tracking-wider"
+                                className="px-2 py-0.5 bg-transparent hover:bg-red-500/10 border border-red-500 text-red-500 rounded text-[8.5px] cursor-pointer font-bold tracking-wider transition-colors"
                               >
                                 ✕ CLOSE
                               </button>
@@ -5130,9 +5244,9 @@ export default function PoxConsole({
                               /* Spliced Packets Register / Log List */
                               <div className="flex-1 flex flex-col min-h-0 overflow-hidden space-y-2">
                                 {/* Top Flavor Text Bar replacing filter entry box as requested */}
-                                <div className="flex items-center justify-center gap-2 bg-green-950/15 border border-green-950/50 p-2.5 rounded-sm shrink-0 font-mono text-[8.5px] text-green-400 select-none uppercase tracking-wider text-center">
-                                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block animate-ping" />
-                                  <span>Select any gene block to load detailed analysis</span>
+                                <div className="flex items-center justify-center gap-2 bg-transparent border border-[#00FF41] p-2.5 rounded-sm shrink-0 font-mono text-[8.5px] text-[#00FF41] select-none uppercase tracking-wider text-center">
+                                  <span className="w-1.5 h-1.5 bg-[#00FF41] rounded-full inline-block animate-pulse" />
+                                  <span>SELECT ANY GENE BLOCK TO LOAD DETAILED ANALYSIS</span>
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto space-y-2 pr-0.5 custom-pox-scrollbar">
@@ -5156,18 +5270,17 @@ export default function PoxConsole({
                                       return (
                                         <div key={packet.id || pIdx} className="border border-green-950/60 bg-black/40 p-2 rounded-sm space-y-1.5 hover:border-green-800/40 transition-colors">
                                           <div className="flex justify-between items-center text-[7.5px] text-green-500 border-b border-green-950/30 pb-1 select-none">
-                                            <span className="font-bold flex items-center gap-1">
-                                              <span className="text-neutral-600">#{discoveredPacketsLog.length - pIdx}</span> PACKET SPLICED
+                                            <span className="font-bold text-[#00FF41] flex items-center gap-1">
+                                              #{discoveredPacketsLog.length - pIdx} PACKET SPLICED
                                             </span>
                                             <span className="font-mono flex items-center gap-2">
-                                              <span className="text-cyan-500 font-bold">{uniqueCount} NEW GENES</span>
+                                              <span className="text-cyan-400 font-bold">{uniqueCount} NEW GENES</span>
                                               <span className="text-neutral-500">{timeStr}</span>
                                             </span>
                                           </div>
                                           <div className="grid grid-cols-4 gap-1">
                                             {packet.genes.map((gene, cIdx) => {
                                               const isAnom = isAnomalousGene(gene.sequence);
-                                              const isSelected = discoverySelectedGene === gene.sequence;
                                               return (
                                                 <button
                                                   key={cIdx}
@@ -5175,18 +5288,14 @@ export default function PoxConsole({
                                                     sound.playBeep(450, 0.05, "sine");
                                                     setDiscoverySelectedGene(gene.sequence);
                                                   }}
-                                                  className={`px-1 py-1 border text-center font-mono rounded-sm select-none transition-all text-[8.5px] font-bold cursor-pointer hover:scale-[1.02] ${
-                                                    isSelected
+                                                  className={`px-2 py-3 border text-center font-mono rounded-sm select-none transition-all text-[8.5px] font-bold cursor-pointer hover:scale-[1.02] ${
+                                                    gene.isNew
                                                       ? isAnom
-                                                        ? "border-purple-400 bg-purple-950/50 text-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.3)] font-extrabold"
-                                                        : "border-[#00FF41] bg-green-900/30 text-[#00FF41] shadow-[0_0_8px_rgba(0,255,65,0.2)]"
-                                                      : gene.isNew
-                                                        ? isAnom
-                                                          ? "border-purple-650 bg-purple-950/20 text-purple-400 animate-pulse"
-                                                          : "border-green-500/50 bg-green-950/10 text-[#00FF41] animate-pulse"
-                                                        : isAnom
-                                                          ? "border-purple-950/60 bg-purple-950/5 text-purple-300/70"
-                                                          : "border-sky-950/50 bg-sky-950/10 text-sky-400/80"
+                                                        ? "border-purple-500 text-purple-400 bg-transparent animate-pulse"
+                                                        : "border-cyan-400 text-cyan-400 bg-transparent animate-pulse"
+                                                      : isAnom
+                                                        ? "border-transparent text-purple-400 bg-transparent"
+                                                        : "border-transparent text-[#00FF41] bg-transparent"
                                                   }`}
                                                 >
                                                   {gene.sequence}
@@ -5363,12 +5472,12 @@ export default function PoxConsole({
 
                           {/* Reset logs footer */}
                           <div className="pt-2 mt-2.5 border-t border-green-950 text-[8px] text-neutral-500 flex justify-between items-center select-none font-mono shrink-0">
-                            <span className="text-[#00FF41]/80 animate-pulse flex items-center gap-1 uppercase">
+                            <span className="text-[#00FF41]/80 animate-pulse flex items-center gap-1">
                               <span className="w-1 h-1 bg-[#00FF41] rounded-full inline-block" /> 
-                              Standard Gene Search Active
+                              STANDARD GENE SEARCH ACTIVE
                             </span>
-                            <span className="text-green-800 uppercase tracking-widest text-[7.5px]">
-                              Secure connection: AIS-DEV-ENV
+                            <span className="text-green-800 tracking-widest text-[7.5px] uppercase">
+                              SECURE CONNECTION: AIS-DEV-ENV
                             </span>
                           </div>
                         </motion.div>
@@ -5582,7 +5691,7 @@ export default function PoxConsole({
                             sound.playBeep(650, 0.05, "sine");
                             setIsGeneLogPopupOpen(true);
                           }}
-                          className={`w-full py-2 border font-mono font-bold uppercase text-[10px] rounded-sm cursor-pointer transition-all flex items-center justify-center gap-1.5 active:scale-[0.99] ${
+                          className={`w-full py-3 border font-mono font-bold uppercase text-[10px] rounded-sm cursor-pointer transition-all flex items-center justify-center gap-1.5 active:scale-[0.99] ${
                             bioLabSubTab === 'anomaly'
                               ? "bg-purple-950/40 hover:bg-purple-900/60 border-purple-500/50 text-purple-300"
                               : "bg-blue-950/40 hover:bg-blue-900/60 border-blue-500/50 text-[#00E1FF]"
@@ -5594,7 +5703,7 @@ export default function PoxConsole({
 
                         <button 
                           onClick={handleManualCombinatorClick}
-                          className={`w-full py-2 border text-white font-bold uppercase text-xs transition-all cursor-pointer rounded-sm active:scale-[0.99] ${
+                          className={`w-full py-3 border text-white font-bold uppercase text-xs transition-all cursor-pointer rounded-sm active:scale-[0.99] ${
                             bioLabSubTab === 'anomaly'
                               ? "bg-purple-900/40 border-purple-500/80 hover:bg-purple-900"
                               : "bg-green-900/40 border-green-500/80 hover:bg-green-900"
@@ -5642,7 +5751,7 @@ export default function PoxConsole({
                               setDiscoverySearchStep(0);
                               setIsGeneLedgerExpanded(true); 
                             }}
-                            className="w-full py-3.5 px-4 bg-black/60 border border-green-955 hover:border-[#00FF41] hover:bg-green-955/20 text-[#00FF41] rounded flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group text-center shadow-[0_0_15px_rgba(0,255,65,0.05)]"
+                            className="w-full py-3 px-4 bg-black/60 border border-green-955 hover:border-[#00FF41] hover:bg-green-955/20 text-[#00FF41] rounded flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group text-center shadow-[0_0_15px_rgba(0,255,65,0.05)]"
                           >
                             <span className="text-sm font-bold tracking-wider text-white font-mono uppercase group-hover:text-[#00FF41] transition-colors flex items-center justify-center gap-1.5">
                               <Search className="w-4 h-4 text-[#00FF41] animate-pulse" />
@@ -5843,7 +5952,7 @@ export default function PoxConsole({
                                   sound.playBeep(440, 0.05, "sine");
                                   setIsGeneLedgerExpanded(false);
                                 }}
-                                className="px-2 py-0.5 bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-500 hover:text-white rounded text-[8px] cursor-pointer font-bold tracking-wider"
+                                className="px-2 py-0.5 bg-transparent hover:bg-red-500/10 border border-red-500 text-red-500 rounded text-[8.5px] cursor-pointer font-bold tracking-wider transition-colors"
                               >
                                 ✕ CLOSE
                               </button>
@@ -5922,7 +6031,7 @@ export default function PoxConsole({
                                       setDiscoverySearchPrefix("");
                                       setDiscoverySearchStep(0);
                                     }}
-                                    className="px-1.5 py-0.5 bg-red-955/20 border border-red-955/40 text-red-500 hover:bg-red-955/40 rounded text-[7px] cursor-pointer font-bold uppercase select-none transition-colors"
+                                    className="px-1.5 py-0.5 bg-transparent hover:bg-yellow-500/10 border border-yellow-500 text-yellow-500 rounded text-[7px] cursor-pointer font-bold uppercase select-none transition-colors"
                                   >
                                     Reset
                                   </button>
@@ -5978,8 +6087,8 @@ export default function PoxConsole({
                                               {pair}
                                             </div>
                                             {available && (
-                                              <div className="text-[6px] text-[#00FF41] font-bold tracking-tighter">
-                                                {count} types
+                                              <div className="text-[9.5px] text-[#00FF41] font-bold tracking-normal">
+                                                x{count} types
                                               </div>
                                             )}
                                           </button>
@@ -6083,7 +6192,7 @@ export default function PoxConsole({
                                   sound.playBeep(440, 0.05, "sine");
                                   setIsAnomalousLedgerExpanded(false);
                                 }}
-                                className="px-2 py-0.5 bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-500 hover:text-white rounded text-[8.5px] cursor-pointer font-bold tracking-wider"
+                                className="px-2 py-0.5 bg-transparent hover:bg-red-500/10 border border-red-500 text-red-500 rounded text-[8.5px] cursor-pointer font-bold tracking-wider transition-colors"
                               >
                                 ✕ CLOSE
                               </button>
@@ -6145,40 +6254,41 @@ export default function PoxConsole({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full"
+                    className={`h-full ${isForcedConstructionActive ? 'w-full' : 'grid grid-cols-1 md:grid-cols-2 gap-4'}`}
                   >
                     
                     {/* Panel 2: Target Constructor (Left) */}
-                    <div className="bg-neutral-900/20 border border-green-900/40 p-5 rounded flex flex-col justify-between">
+                    <div className="bg-neutral-900/20 border border-green-900/40 p-4 rounded flex flex-col justify-start gap-3">
                       {isForcedConstructionActive ? (
                         <div className="flex-1 flex flex-col justify-between p-4 bg-black/90 border border-red-950/80 rounded relative min-h-[350px]">
                           <div>
                             <div className="flex justify-between items-center mb-2 text-[9px] uppercase text-red-500 font-bold tracking-widest animate-pulse">
-                              <span>[ EMERGENCY FORCED COMPILATION ]</span>
-                              <span>REACTOR STATUS: FROZEN ({reactorFreezeTimeLeft}s)</span>
+                              <span>[ FORCED SEQUENCING ACTIVE ]</span>
                             </div>
-                            <h3 className="text-xs font-black text-white uppercase tracking-wider mb-2">BYPASSING GENE COMPILATION LOCKS</h3>
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider mb-2">P.O.X. REACTOR ACTIVE (OVERRIDE)</h3>
                           </div>
 
                           {/* Scrolling Terminal Output logs */}
                           <div 
                             ref={forcedLogContainerRef}
-                            className="flex-1 my-3 p-2.5 bg-neutral-950 border border-red-950/60 rounded font-mono text-[9px] text-[#00FF41] overflow-y-auto space-y-1.5 max-h-[220px] select-text scrollbar-thin"
+                            className="flex-1 my-3 p-2.5 bg-neutral-950 border border-red-950/60 rounded font-mono text-[9px] text-[#00FF41] overflow-y-auto space-y-1.5 max-h-[500px] select-text scrollbar-thin"
                           >
-                            {forcedConstructionLogs.map((log, idx) => (
+                            {displayedForcedLogs.map((log, idx) => (
                               <div key={idx} className={log.includes("FAILED") || log.includes("WARNING") || log.includes("Failed") || log.includes("Sacrificed") ? "text-red-400 font-semibold" : "text-emerald-400"}>
                                 {log}
                               </div>
                             ))}
                           </div>
 
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-1.5 justify-center py-2 bg-red-950/30 border border-red-900/50 rounded">
-                              <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
-                              <span className="text-[9px] text-red-400 font-extrabold uppercase tracking-widest text-center px-1">
-                                {isForcedLoopActive ? "LOOP CASCADE ACTIVE: REACTOR COILS FROZEN" : `FREEZING REACTOR GENE CYCLE: ${reactorFreezeTimeLeft}s REMAINING`}
-                              </span>
-                            </div>
+                           <div className="space-y-2">
+                            {!isForcedLoopActive && (
+                              <div className="flex items-center gap-1.5 justify-center py-2 bg-red-950/30 border border-red-900/50 rounded">
+                                <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
+                                <span className="text-[9px] text-red-400 font-extrabold uppercase tracking-widest text-center px-1">
+                                  {`P.O.X. REACTOR FROZEN: ${reactorFreezeTimeLeft}s REMAINING`}
+                                </span>
+                              </div>
+                            )}
 
                             {isForcedLoopActive && (
                               <button
@@ -6211,7 +6321,7 @@ export default function PoxConsole({
                           <span className="text-[9px] text-green-700 mt-2 uppercase font-mono tracking-widest">SPLICING PACKETS BUFFER: {splicingProgress}%</span>
                         </div>
                       ) : (
-                        <div className="flex flex-col justify-between h-full">
+                        <div className="flex flex-col justify-start gap-2.5 h-full">
                           <div>
                             <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-green-700">
                               <span>[ CREATURE CONSTRUCTOR ]</span>
@@ -6269,16 +6379,16 @@ export default function PoxConsole({
                                 <span className="text-[8.5px] text-[#00FF41] font-bold uppercase tracking-widest">[ Required Target Sequence ]</span>
                                 <span className="text-[8px] text-green-500 font-mono font-bold">64-CHAR GENOME GOAL</span>
                               </div>
-                              <div className="break-all text-[11px] leading-relaxed font-mono select-all font-extrabold tracking-widest flex flex-wrap gap-x-2 gap-y-1">
+                              <div className="grid grid-cols-4 gap-2 text-center w-full break-all text-[11px] leading-relaxed font-mono select-all font-extrabold tracking-widest">
                                 {Array.from({ length: 8 }).map((_, i) => {
                                   const segment = targetSequence.slice(i * 8, (i + 1) * 8);
                                   const isAnom = isAnomalousGene(segment);
                                   return (
                                     <span
                                       key={i}
-                                      className={`${
+                                      className={`py-1 w-full text-center flex justify-center items-center ${
                                         isAnom 
-                                          ? 'text-purple-400 bg-purple-950/20 shadow-[0_0_8px_rgba(168,85,247,0.5)] border border-purple-500/30 px-1 py-0.5 rounded font-bold' 
+                                          ? 'text-purple-400 bg-purple-950/20 shadow-[0_0_8px_rgba(168,85,247,0.5)] border border-purple-500/30 rounded font-bold' 
                                           : i % 4 === 0 ? 'text-[#00FF41]' :
                                             i % 4 === 1 ? 'text-amber-400' :
                                             i % 4 === 2 ? 'text-blue-400' : 'text-purple-400'
@@ -6292,32 +6402,62 @@ export default function PoxConsole({
                             </div>
 
                             {/* Currently constructed DNA string */}
-                            <div className="p-2.5 bg-black border border-dashed border-green-900 rounded text-left">
-                              <div className="text-[8.5px] text-green-600 mb-1 font-bold uppercase tracking-widest select-none">[ Your Current Spliced Specimen ]</div>
-                              <div className="break-all text-[11px] text-neutral-400 leading-relaxed font-mono font-bold tracking-widest">
-                                {splicerSlots.map(s => s || "--------").join("")}
+                            <div className="p-2.5 bg-[#050c06] border border-[#00FF41]/40 rounded shadow-[inset_0_0_8px_rgba(0,255,102,0.1)] text-left">
+                              <div className="text-[8.5px] text-[#00FF41] mb-1 font-bold uppercase tracking-widest select-none">[ Current Spliced Sequence ]</div>
+                              <div className="grid grid-cols-4 gap-2 text-center w-full break-all text-[11px] leading-relaxed font-mono select-all font-extrabold tracking-widest">
+                                {Array.from({ length: 8 }).map((_, i) => {
+                                  const slotGene = splicerSlots[i];
+                                  const segment = slotGene || "--------";
+                                  const targetSegment = targetSequence.slice(i * 8, (i + 1) * 8);
+                                  const isAnom = slotGene ? isAnomalousGene(targetSegment) : false;
+                                  return (
+                                    <span
+                                      key={i}
+                                      className={`py-1 w-full text-center flex justify-center items-center ${
+                                        !slotGene 
+                                          ? 'text-neutral-500 font-normal' 
+                                          : isAnom 
+                                            ? 'text-purple-400 bg-purple-950/20 shadow-[0_0_8px_rgba(168,85,247,0.5)] border border-purple-500/30 rounded font-bold' 
+                                            : i % 4 === 0 ? 'text-[#00FF41]' :
+                                              i % 4 === 1 ? 'text-amber-400' :
+                                              i % 4 === 2 ? 'text-blue-400' : 'text-purple-400'
+                                      }`}
+                                    >
+                                      {segment}
+                                    </span>
+                                  );
+                                })}
                               </div>
                             </div>
 
                             <div className="flex gap-2">
                               <button
                                 onClick={handleAutofillSplicer}
-                                className="px-3 py-2 border border-green-500/50 text-white font-bold text-xs hover:bg-green-900/20 rounded-sm active:scale-[0.98] transition-all cursor-pointer font-mono whitespace-nowrap"
+                                className="px-3 py-3 flex items-center justify-center border border-green-500/50 text-white font-bold text-xs hover:bg-green-900/20 rounded-sm active:scale-[0.98] transition-all cursor-pointer font-mono whitespace-nowrap"
                               >
                                 AUTO SLOT
                               </button>
                               <button
                                 onClick={handleConstructCreature}
                                 disabled={splicerSlots.includes(null)}
-                                className={`flex-1 py-2 rounded text-xs font-bold uppercase tracking-widest transition-all ${
+                                className={`flex-1 py-3 flex items-center justify-center rounded text-xs font-bold uppercase tracking-widest transition-all ${
                                   splicerSlots.includes(null)
                                     ? "bg-green-950/20 text-green-900 border border-green-950 text-center cursor-not-allowed"
                                     : "bg-[#00FF41] text-black hover:bg-green-400 active:scale-[0.98] cursor-pointer shadow-[0_0_12px_rgba(0,255,65,0.3)] font-mono"
                                 }`}
                               >
-                                {splicerSlots.includes(null) ? "SYNTHESIZE GENOME" : "INITIALIZE MORPHOGENESIS"}
+                                {splicerSlots.includes(null) ? "FILL EMPTY SLOTS OR FORCE" : "SEQUENCE P.O.X. GENOME"}
                               </button>
                             </div>
+
+                            {devForceAnomaly && (
+                              <button
+                                onClick={handleInjectMissingTargetGenes}
+                                className="w-full py-1.5 bg-purple-950/30 hover:bg-purple-900/40 border border-purple-500/50 text-purple-300 font-bold uppercase text-[9px] font-mono tracking-widest cursor-pointer rounded-sm active:scale-[0.99] transition-all flex items-center justify-center gap-1"
+                              >
+                                🧪 DEV: INJECT MISSING GENES
+                              </button>
+                            )}
 
                             <div className="space-y-2">
                               <div className="flex gap-2">
@@ -6356,9 +6496,10 @@ export default function PoxConsole({
                     </div>
 
                     {/* Splicer select gene inventory (Right) */}
-                    <div className="bg-neutral-900/20 border border-green-900/40 p-5 rounded flex flex-col justify-between">
+                    {!isForcedConstructionActive && (
+                      <div className="bg-neutral-900/20 border border-green-900/40 p-4 rounded flex flex-col justify-start gap-3">
                       {activeSlotSelection !== null ? (
-                        <div className="flex flex-col justify-between h-full">
+                        <div className="flex flex-col justify-start gap-2.5 h-full">
                           <div>
                             <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-[#00FF41]">
                               <span>ASSIGN SLOT PROTOCOL #{activeSlotSelection + 1}</span>
@@ -6399,6 +6540,37 @@ export default function PoxConsole({
                              )}
                            </div>
 
+                           {/* List of compatible genes in stock */}
+                           <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5 custom-pox-scrollbar max-h-[140px] font-mono text-left">
+                             {sequences
+                               .filter((s) => s.count > 0 && s.sequence.includes(slotSequenceFilter))
+                               .map((item, idx) => {
+                                 const isMatch = item.sequence === expectedGene;
+                                 return (
+                                   <div
+                                     key={idx}
+                                     onClick={() => handleSelectSequenceForSlot(item.sequence)}
+                                     className={`p-1.5 rounded border flex justify-between items-center cursor-pointer transition-all ${
+                                       isMatch
+                                         ? "border-emerald-500 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-900/30 shadow-[0_0_8px_rgba(16,185,129,0.1)]"
+                                         : "border-red-950/50 bg-neutral-950/40 text-neutral-400 hover:border-red-500/20 hover:bg-red-950/10"
+                                     }`}
+                                   >
+                                     <div className="flex items-center gap-2">
+                                       <span className={`w-1.5 h-1.5 rounded-full ${isMatch ? "bg-emerald-400 animate-pulse" : "bg-red-900"}`} />
+                                       <span className="font-mono text-xs tracking-wider font-semibold">{item.sequence}</span>
+                                     </div>
+                                     <div className="flex items-center gap-1.5">
+                                       <span className="text-[7.5px] text-zinc-500">STOCK:</span>
+                                       <span className="bg-black/50 border border-green-950/45 px-1.5 py-0.5 rounded text-[10px] font-bold text-white">x{item.count}</span>
+                                     </div>
+                                   </div>
+                                 );
+                               })}
+                             {sequences.filter((s) => s.count > 0 && s.sequence.includes(slotSequenceFilter)).length === 0 && (
+                               <p className="text-center py-4 text-[9.5px] text-green-700 italic font-mono select-none">No compatible stock genes matching query</p>
+                             )}
+                           </div>
 
                           </div>
                         ) : (
@@ -6413,7 +6585,8 @@ export default function PoxConsole({
                           </div>
                         )}
                       </div>
-                    </motion.div>
+                    )}
+                  </motion.div>
                   )}
 
                   {activeTab === 'library' && (
@@ -7412,7 +7585,7 @@ export default function PoxConsole({
                                 <div className="flex justify-between items-center bg-green-950/40 border border-green-500/40 px-3 py-1.5 rounded-t-sm mb-3">
                                   <span className="text-[9.5px] text-[#00FF41] font-bold tracking-widest uppercase flex items-center gap-1.5 select-none">
                                     <span className="w-1.5 h-1.5 bg-[#00FF41] rounded-full animate-pulse" />
-                                    [ GEN-VAULT DIRECTORY: P.O.X. SEQUENCE FILE ]
+                                    [ P.O.X. SEQUENCE DIRECTORY ]
                                   </span>
                                   <button
                                     type="button"
@@ -7422,7 +7595,7 @@ export default function PoxConsole({
                                     }}
                                     className="px-2 py-0.5 bg-red-950 hover:bg-red-900 border border-red-500/50 text-red-400 hover:text-white rounded text-[8.5px] cursor-pointer font-bold tracking-wider transition-colors uppercase"
                                   >
-                                    ✕ CLOSE WINDOW
+                                    ✕ CLOSE
                                   </button>
                                 </div>
 

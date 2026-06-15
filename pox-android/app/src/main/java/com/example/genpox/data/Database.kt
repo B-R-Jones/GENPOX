@@ -46,11 +46,20 @@ interface PoxDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertGeneSequence(sequence: GeneSequence)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertGeneSequences(sequences: List<GeneSequence>)
+
     @Update
     suspend fun updateGeneSequence(sequence: GeneSequence)
 
     @Delete
     suspend fun deleteGeneSequence(sequence: GeneSequence)
+
+    @Transaction
+    suspend fun updateGeneStock(toInsertOrUpdate: List<GeneSequence>, toDelete: List<GeneSequence>) {
+        toDelete.forEach { deleteGeneSequence(it) }
+        insertGeneSequences(toInsertOrUpdate)
+    }
 
     // Harvest Missions
     @Query("SELECT * FROM harvest_missions WHERE isReturned = 0")

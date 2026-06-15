@@ -13,6 +13,13 @@ import com.example.genpox.theme.GENPOXTheme
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    try {
+        val field = android.database.CursorWindow::class.java.getDeclaredField("sCursorWindowSize")
+        field.isAccessible = true
+        field.set(null, 50 * 1024 * 1024) // 50MB
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 
     enableEdgeToEdge()
     setContent {
