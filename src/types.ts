@@ -28,6 +28,8 @@ export interface Creature {
   appendedGenes?: string[];
   isFavorite?: boolean;
   telomeres?: number; // Current telomere length out of 100
+  isFullCoherence?: boolean;
+  coherenceType?: 'Natural' | 'Forced';
 }
 
 export interface NearbyUser {

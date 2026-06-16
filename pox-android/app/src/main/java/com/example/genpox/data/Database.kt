@@ -75,7 +75,7 @@ interface PoxDao {
     suspend fun updateMission(mission: HarvestMission)
 }
 
-@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class], version = 2, exportSchema = false)
+@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class PoxDatabase : RoomDatabase() {
     abstract fun poxDao(): PoxDao

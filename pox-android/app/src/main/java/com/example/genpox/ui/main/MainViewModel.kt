@@ -53,6 +53,19 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     private val _activeCreature = MutableStateFlow<Creature?>(null)
     val activeCreature: StateFlow<Creature?> = _activeCreature.asStateFlow()
 
+    private val _creatureCardOpenedFrom = MutableStateFlow<String?>("vault")
+    val creatureCardOpenedFrom: StateFlow<String?> = _creatureCardOpenedFrom.asStateFlow()
+
+    private val _defenderCreatureId = MutableStateFlow<String?>(null)
+    val defenderCreatureId: StateFlow<String?> = _defenderCreatureId.asStateFlow()
+
+    private val _disintegratedModal = MutableStateFlow<DisintegratedModalData?>(null)
+    val disintegratedModal: StateFlow<DisintegratedModalData?> = _disintegratedModal.asStateFlow()
+
+    fun clearDisintegratedModal() {
+        _disintegratedModal.value = null
+    }
+
     private val _terminalLogs = MutableStateFlow<List<String>>(listOf("GENPOX COMPILER SYSTEM v2.0 READY."))
     val terminalLogs: StateFlow<List<String>> = _terminalLogs.asStateFlow()
 
@@ -224,11 +237,363 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         }
     }
 
-    fun setActiveCreature(creature: Creature?) {
+    fun setActiveCreature(creature: Creature?, openedFrom: String = "vault") {
         _activeCreature.value = creature
+        _creatureCardOpenedFrom.value = openedFrom
         if (creature != null) {
             synthManager.playCreatureSequenceAudio(creature.sequence)
         }
+    }
+
+    fun toggleFavoriteCreature(creature: Creature) {
+        viewModelScope.launch {
+            val updated = creature.copy(isFavorite = !creature.isFavorite)
+            repository.insertCreature(updated)
+            _activeCreature.value = updated
+            synthManager.playCombinatorTick()
+            addLog(if (updated.isFavorite) "FAV: Added \"${creature.name}\" to favorites." else "FAV: Removed \"${creature.name}\" from favorites.")
+        }
+    }
+
+    fun toggleAutoHackerCreature(creature: Creature) {
+        viewModelScope.launch {
+            val updated = creature.copy(isAutoHacker = !creature.isAutoHacker)
+            repository.insertCreature(updated)
+            _activeCreature.value = updated
+            synthManager.playBeep(520f, 0.05f, "sine")
+            addLog(if (updated.isAutoHacker) "HACK: Designated \"${creature.name}\" as Auto-Hacker." else "HACK: Deactivated Auto-Hacker for \"${creature.name}\".")
+        }
+    }
+
+    fun toggleDefenderCreature(id: String) {
+        _defenderCreatureId.value = if (_defenderCreatureId.value == id) null else id
+        synthManager.playBeep(440f, 0.05f, "sine")
+        val active = _defenderCreatureId.value == id
+        addLog(if (active) "DEF: Designated defender." else "DEF: Cleared defender designation.")
+    }
+
+    fun incinerateCreature(creature: Creature, harvestedGene: String) {
+        viewModelScope.launch {
+            repository.deleteCreature(creature)
+            val existing = geneSequences.value.find { it.sequence == harvestedGene }
+            if (existing != null) {
+                repository.insertGeneSequence(existing.copy(count = existing.count + 1))
+            } else {
+                repository.insertGeneSequence(GeneSequence(harvestedGene, 1, System.currentTimeMillis()))
+            }
+            addLog("PURGE: Purged specimen \"${creature.name}\". Segment cached in stock: $harvestedGene")
+            synthManager.playBeep(400f, 0.4f, "sawtooth")
+            setActiveCreature(null)
+        }
+    }
+
+    fun decreaseCreatureTelomeres(creatureId: String, amount: Int, reason: String) {
+        viewModelScope.launch {
+            val creature = repository.getCreatureById(creatureId) ?: return@launch
+            val nextT = (creature.telomeres - amount).coerceAtLeast(0)
+            if (nextT <= 0) {
+                // Creature is completely destroyed!
+                val genome = creature.sequence
+                val blocks = mutableListOf<String>()
+                for (i in 0 until 8) {
+                    if (i * 8 + 8 <= genome.length) {
+                        blocks.add(genome.substring(i * 8, i * 8 + 8))
+                    }
+                }
+                creature.appendedGenes.forEach { gene ->
+                    if (gene.length == 8) {
+                        blocks.add(gene)
+                    }
+                }
+
+                // Return a portion (50%, rounded up) and permanently destroy the rest:
+                val returnCount = (blocks.size + 1) / 2
+                val shuffled = blocks.shuffled()
+                val returnedBlocks = shuffled.take(returnCount)
+                val destroyedBlocks = shuffled.drop(returnCount)
+
+                // Add returned blocks to player's sequences pool
+                returnedBlocks.forEach { seq ->
+                    val upper = seq.uppercase()
+                    val existing = geneSequences.value.find { it.sequence == upper }
+                    if (existing != null) {
+                        repository.insertGeneSequence(existing.copy(count = existing.count + 1))
+                    } else {
+                        repository.insertGeneSequence(GeneSequence(upper, 1, System.currentTimeMillis()))
+                    }
+                }
+
+                repository.deleteCreature(creature)
+                if (_activeCreature.value?.id == creatureId) {
+                    _activeCreature.value = null
+                }
+                if (_defenderCreatureId.value == creatureId) {
+                    _defenderCreatureId.value = null
+                }
+
+                _disintegratedModal.value = DisintegratedModalData(
+                    name = creature.name,
+                    returnedBlocks = returnedBlocks,
+                    destroyedBlocks = destroyedBlocks
+                )
+
+                addLog("🚨 CHROMOSOMAL FAILURE: \"${creature.name}\" disintegrated! Telomeres reached 0%. Returned ${returnedBlocks.size} gene blocks, lost ${destroyedBlocks.size} permanently!")
+                synthManager.playReject()
+            } else {
+                val updated = creature.copy(telomeres = nextT)
+                repository.insertCreature(updated)
+                if (_activeCreature.value?.id == creatureId) {
+                    _activeCreature.value = updated
+                }
+                addLog("🧬 CELLULAR INTEGRITY: \"${creature.name}\" telomeres shortened by -$amount% due to $reason. [Current life: $nextT%]")
+            }
+        }
+    }
+
+    fun appendGeneToActiveCreature(creature: Creature, gene: String) {
+        viewModelScope.launch {
+            val match = geneSequences.value.find { it.sequence == gene && it.count > 0 }
+            if (match == null) {
+                addLog("ERR: Gene $gene not in inventory.")
+                synthManager.playReject()
+                return@launch
+            }
+
+            val updatedGene = match.copy(count = match.count - 1)
+            if (updatedGene.count == 0) {
+                repository.deleteGeneSequence(match)
+            } else {
+                repository.insertGeneSequence(updatedGene)
+            }
+
+            val newSeq = creature.sequence + gene
+            val newAppended = creature.appendedGenes + gene
+            val details = constructProceduralDetails(newSeq)
+            
+            val updatedCreature = creature.copy(
+                sequence = newSeq,
+                appendedGenes = newAppended,
+                vitality = details.vitality,
+                attack = details.attack,
+                defense = details.defense,
+                speed = details.speed,
+                type = details.type,
+                faction = details.faction,
+                lore = details.lore,
+                primaryWeapon = details.primaryWeapon
+            )
+            repository.insertCreature(updatedCreature)
+
+            addLog("MUTATION: Welded gene $gene to \"${creature.name}\". Stats updated.")
+            synthManager.playSynthesisSuccess()
+            _activeCreature.value = updatedCreature
+        }
+    }
+
+    private fun constructProceduralDetails(sequence: String): ProceduralDetails {
+        var countA = 0
+        var countG = 0
+        var countT = 0
+        var countC = 0
+        for (char in sequence.uppercase()) {
+            when (char) {
+                'A' -> countA++
+                'G' -> countG++
+                'T' -> countT++
+                'C' -> countC++
+            }
+        }
+        
+        var faction = "Infection"
+        val maxB = maxOf(countA, countG, countT, countC)
+        if (maxB == countA) faction = "Containment"
+        else if (maxB == countG) faction = "Infection"
+        else if (maxB == countT) faction = "Mech"
+        else if (maxB == countC) faction = "Parasite"
+
+        var type = "Parasitic Cyborg Insectoid"
+        if (faction == "Infection") type = "Organic Swarm Pathogen"
+        if (faction == "Mech") type = "Autonomous Chasis Chitin"
+        if (faction == "Containment") type = "Bacterial Nano Containment Grid"
+
+        val vitality = 100 + countA * 5 + (sequence.length / 2)
+        val attack = minOf(99, 15 + countG * 3)
+        val defense = minOf(99, 15 + countT * 3)
+        val speed = minOf(99, 15 + countC * 3)
+
+        val rawWeapons = listOf("Corrosive Spite-Needle", "Vaporizing Plasma-Claw", "Shocking Laser-Stinger", "Bio-Acid Venting-Pod", "Micro-Phage Injector")
+        val weaponIndex = (countA + countG + countT + countC) % rawWeapons.size
+        val primaryWeapon = rawWeapons[weaponIndex]
+
+        val lore = "Synthesized from custom sub-gene segments. Displays aggressive ${faction.lowercase()}-sector behavior with optimized $primaryWeapon payloads. Integrated weapon clusters operate at $attack-rating."
+
+        return ProceduralDetails(
+            faction = faction,
+            type = type,
+            vitality = vitality,
+            attack = attack,
+            defense = defense,
+            speed = speed,
+            primaryWeapon = primaryWeapon,
+            lore = lore
+        )
+    }
+
+    private data class ProceduralDetails(
+        val faction: String,
+        val type: String,
+        val vitality: Int,
+        val attack: Int,
+        val defense: Int,
+        val speed: Int,
+        val primaryWeapon: String,
+        val lore: String
+    )
+
+    fun getUnlockedMoves(sequence: String): List<UnlockedMove> {
+        val list = mutableListOf<UnlockedMove>()
+        if (sequence.length <= 64) return list
+
+        if (sequence.length >= 72) {
+            val gene1 = sequence.substring(64, 72)
+            var ga = 0
+            var tc = 0
+            for (char in gene1.uppercase()) {
+                if (char == 'A' || char == 'G') ga++
+                else if (char == 'T' || char == 'C') tc++
+            }
+            if (ga >= tc) {
+                list.add(
+                    UnlockedMove(
+                        type = "healing",
+                        name = "BIO-DRAIN REPAIR",
+                        description = "Repairs circuitry by siphoning 35 HP from defender."
+                    )
+                )
+            } else {
+                list.add(
+                    UnlockedMove(
+                        type = "evasive",
+                        name = "QUANTUM ESCAPE DEVIATION",
+                        description = "Evasive shift. Negates next attack damage in this round."
+                    )
+                )
+            }
+        }
+
+        if (sequence.length >= 80) {
+            val firstType = list.firstOrNull()?.type
+            if (firstType == "healing") {
+                list.add(
+                    UnlockedMove(
+                        type = "evasive",
+                        name = "ELECTROMAGNETIC SHELL DEFLECT",
+                        description = "Hardened shield. Negates defender damage for this round."
+                    )
+                )
+            } else {
+                list.add(
+                    UnlockedMove(
+                        type = "healing",
+                        name = "MICRO-PHAGE EXTRACTION",
+                        description = "Siphons 35 HP from opponent to mend system hardware."
+                    )
+                )
+            }
+        }
+
+        return list
+    }
+
+    fun getEmotSoundDetails(sequence: String): EmotSound {
+        val chars = sequence.uppercase().replace(Regex("[^AGTC]"), "")
+        if (chars.isEmpty()) {
+            return EmotSound("none", emptyList(), 0.08, 0.06)
+        }
+        val numNotes = minOf(8, maxOf(4, chars.length / 8))
+        var acount = 0
+        var gcount = 0
+        var tcount = 0
+        var ccount = 0
+        for (char in chars) {
+            when (char) {
+                'A' -> acount++
+                'G' -> gcount++
+                'T' -> tcount++
+                'C' -> ccount++
+            }
+        }
+        val maxCount = maxOf(acount, gcount, tcount, ccount)
+        val oscType = when (maxCount) {
+            acount -> "sine"
+            gcount -> "triangle"
+            tcount -> "sawtooth"
+            else -> "square"
+        }
+        val noteDelay = 0.08 + (acount % 3) * 0.02
+        val frequencies = mutableListOf<Int>()
+        for (i in 0 until numNotes) {
+            val start = i * 4
+            val end = minOf(chars.length, (i + 1) * 4)
+            if (start < chars.length) {
+                val charBlock = chars.substring(start, end)
+                var baseValue = 0
+                for (char in charBlock) {
+                    when (char) {
+                        'A' -> baseValue += 1
+                        'G' -> baseValue += 2
+                        'T' -> baseValue += 3
+                        'C' -> baseValue += 4
+                    }
+                }
+                val freq = 180 + (baseValue * 30) + (i * 40)
+                frequencies.add(freq)
+            }
+        }
+        val noteDuration = 0.06 + (gcount % 4) * 0.03
+        val roundedDelay = Math.round(noteDelay * 10000.0) / 10000.0
+        val roundedDuration = Math.round(noteDuration * 10000.0) / 10000.0
+        return EmotSound(oscType, frequencies, roundedDelay, roundedDuration)
+    }
+
+    fun encodeCreatureToBase64(creature: Creature): String {
+        val sound = getEmotSoundDetails(creature.sequence)
+        val moves = getUnlockedMoves(creature.sequence).map { it.name }
+        
+        val compact = buildJsonObject {
+            put("id", creature.id)
+            put("sequence", creature.sequence)
+            put("name", creature.name)
+            put("faction", creature.faction)
+            put("type", creature.type)
+            put("vitality", creature.vitality)
+            put("attack", creature.attack)
+            put("defense", creature.defense)
+            put("spd", creature.speed)
+            put("weapon", creature.primaryWeapon)
+            put("lore", creature.lore)
+            put("ascii", creature.asciiArt)
+            put("appended", JsonArray(creature.appendedGenes.map { JsonPrimitive(it) }))
+            put("moves", JsonArray(moves.map { JsonPrimitive(it) }))
+            put("visual", buildJsonObject {
+                put("faction", creature.faction)
+                put("type", creature.type)
+                put("ascii", creature.asciiArt)
+            })
+            put("sound", buildJsonObject {
+                put("oscillator", sound.oscillator)
+                put("frequencies", JsonArray(sound.frequencies.map { JsonPrimitive(it) }))
+                put("noteDelay", sound.noteDelay)
+                put("noteDuration", sound.noteDuration)
+            })
+            put("telomeres", creature.telomeres)
+            put("isFullCoherence", creature.isFullCoherence)
+            if (creature.coherenceType != null) {
+                put("coherenceType", creature.coherenceType)
+            }
+        }
+        val jsonStr = compact.toString()
+        return android.util.Base64.encodeToString(jsonStr.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
     }
 
     fun setSplicerCreature(creature: Creature?) {
@@ -321,6 +686,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
             val apiKey = geminiApiKey.value.trim()
 
+            val matchesTarget = getCoherence(sequence, _targetSequence.value) == "full"
             val creature = if (apiKey.isNotEmpty()) {
                 try {
                     compileWithGemini(sequence, apiKey)
@@ -331,6 +697,11 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             } else {
                 addLog("SYS: No API Key found. Running offline compiler engine.")
                 compileDeterministicOffline(sequence)
+            }?.let {
+                it.copy(
+                    isFullCoherence = matchesTarget,
+                    coherenceType = if (matchesTarget) "Natural" else null
+                )
             }
 
             if (creature != null) {
@@ -339,7 +710,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 // For simplicity, compilation costs 8 random genes
                 addLog("OK: Compiled creature \"${creature.name}\" of Sector [${creature.faction}]")
                 synthManager.playSynthesisSuccess()
-                _activeCreature.value = creature
+                setActiveCreature(creature, "combinator")
                 _selectedTab.value = "vault"
             } else {
                 addLog("ERR: Compilation reactor failure.")
@@ -528,7 +899,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             // Weld gene
             val newAppended = creature.appendedGenes + gene
             // welding restores 10% telomeres, capping at 100
-            val restoredTelomeres = (creature.telomeres ?: 100) + 10
+            val restoredTelomeres = creature.telomeres + 10
             val updatedCreature = creature.copy(
                 appendedGenes = newAppended,
                 telomeres = restoredTelomeres.coerceAtMost(100)
@@ -595,9 +966,10 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
             val creature = decodeCreatureFromBase64(data)
             if (creature != null) {
-                repository.insertCreature(creature)
-                addLog("SCAN: Compiled creature \"${creature.name}\"")
-                _activeCreature.value = creature
+                val transferredCreature = creature.copy(telomeres = 99)
+                repository.insertCreature(transferredCreature)
+                addLog("SCAN: Compiled creature \"${creature.name}\" [Telomeres: 99%]")
+                setActiveCreature(transferredCreature, "scanner")
                 _selectedTab.value = "vault"
             } else if (data.length == 64 && data.matches(Regex("[AGTCagtc]+"))) {
                 addLog("SCAN: Scanned raw DNA sequence. Compiling...")
@@ -637,6 +1009,8 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             val ascii = element["ascii"]?.jsonPrimitive?.content ?: element["asciiArt"]?.jsonPrimitive?.content ?: "o.x.o\n.###.\nx.o.x"
             val appended = element["appended"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
             val telomeres = element["telomeres"]?.jsonPrimitive?.intOrNull ?: 100
+            val isFullCoherence = element["isFullCoherence"]?.jsonPrimitive?.booleanOrNull ?: false
+            val coherenceType = element["coherenceType"]?.jsonPrimitive?.content
 
             Creature(
                 id = id,
@@ -654,7 +1028,9 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 discoveredAt = System.currentTimeMillis(),
                 origin = "Scanned transponder",
                 appendedGenes = appended,
-                telomeres = telomeres
+                telomeres = telomeres,
+                isFullCoherence = isFullCoherence,
+                coherenceType = coherenceType
             )
         } catch (e: Exception) {
             null
@@ -907,13 +1283,19 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 synthManager.playBeep(250f + prg * 5, 0.04f, "sine")
             }
 
+            // Wait 1.5s at 100% progress to appreciate the completed matrix/helix
+            kotlinx.coroutines.delay(1500L)
+
             val spawned = compileDeterministicOffline(fullDNASeq)
+            val matchesTarget = getCoherence(fullDNASeq, _targetSequence.value) == "full"
             val idSuffix = UUID.randomUUID().toString().take(6).uppercase()
             val finalCreature = spawned.copy(
                 id = "PX-$idSuffix",
                 name = spawned.name,
                 lore = spawned.lore,
-                origin = "Spliced Gene"
+                origin = "Spliced Gene",
+                isFullCoherence = matchesTarget,
+                coherenceType = if (matchesTarget) "Natural" else null
             )
 
             repository.insertCreature(finalCreature)
@@ -924,7 +1306,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             _isSplicing.value = false
             _splicingProgress.value = 0
 
-            _activeCreature.value = finalCreature
+            setActiveCreature(finalCreature, "splicer")
             _selectedTab.value = "vault"
         }
     }
@@ -1173,12 +1555,15 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 addLog("FORCED CONSTRUCTION FAILED: Nucleotide stockpile depleted!")
             } else {
                 val spawned = compileDeterministicOffline(dnaSeq)
+                val matchesTarget = getCoherence(dnaSeq, _targetSequence.value) == "full"
                 val idSuffix = UUID.randomUUID().toString().take(6).uppercase()
                 val finalCreature = spawned.copy(
                     id = "PX-$idSuffix",
                     name = "${spawned.name} [FORCED]",
                     lore = "This hybrid genome was forced together in the bio-lab reactor. ${spawned.lore}",
-                    origin = "Forced Synthesis"
+                    origin = "Forced Synthesis",
+                    isFullCoherence = matchesTarget,
+                    coherenceType = if (matchesTarget) "Forced" else null
                 )
 
                 repository.insertCreature(finalCreature)
@@ -1395,7 +1780,28 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
     fun clearDiscoveredPacketsLog() {
         _discoveredPacketsLog.value = emptyList()
-        addLog("GENE ARCHIVE: Cleared all packet records.")
+    }
+
+    private fun getCoherence(seq: String, target: String): String {
+        if (seq.isEmpty() || target.isEmpty()) return "none"
+        val seq64 = seq.take(64).uppercase()
+        val target64 = target.take(64).uppercase()
+        if (seq64 == target64) return "full"
+
+        var alignedMatches = 0
+        for (i in 0 until 8) {
+            val start = i * 8
+            val end = (i + 1) * 8
+            if (start < seq64.length && end <= seq64.length && start < target64.length && end <= target64.length) {
+                val seqGene = seq64.substring(start, end)
+                val tgtGene = target64.substring(start, end)
+                if (seqGene == tgtGene) {
+                    alignedMatches++
+                }
+            }
+        }
+        if (alignedMatches == 8) return "full"
+        return "none"
     }
 }
 
@@ -1427,3 +1833,22 @@ class MainViewModelFactory(private val repository: DataRepository) : ViewModelPr
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
+
+data class UnlockedMove(
+    val type: String,
+    val name: String,
+    val description: String
+)
+
+data class EmotSound(
+    val oscillator: String,
+    val frequencies: List<Int>,
+    val noteDelay: Double,
+    val noteDuration: Double
+)
+
+data class DisintegratedModalData(
+    val name: String,
+    val returnedBlocks: List<String>,
+    val destroyedBlocks: List<String>
+)

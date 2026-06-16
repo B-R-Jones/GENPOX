@@ -40,10 +40,40 @@ fun MainScreen(
         factory = MainViewModelFactory(app.repository)
     )
 
+    // Initialize synthManager context
+    LaunchedEffect(viewModel) {
+        viewModel.synthManager.initialize(context)
+    }
+
+    // Lifecycle observer to stop audio when app goes to background
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE ||
+                event == androidx.lifecycle.Lifecycle.Event.ON_STOP
+            ) {
+                viewModel.synthManager.stopAll()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Window focus observer to stop audio when app window loses focus (e.g. notification shade)
+    val isWindowFocused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
+    LaunchedEffect(isWindowFocused) {
+        if (!isWindowFocused) {
+            viewModel.synthManager.stopAll()
+        }
+    }
+
     val selectedTab by viewModel.selectedTab.collectAsState()
     val logs by viewModel.terminalLogs.collectAsState()
     val showScanner by viewModel.showScanner.collectAsState()
     val geneSequences by viewModel.geneSequences.collectAsState()
+    val disintegratedModal by viewModel.disintegratedModal.collectAsState()
 
     val countA = remember(geneSequences) {
         geneSequences.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
@@ -347,6 +377,177 @@ fun MainScreen(
                 },
                 modifier = Modifier.fillMaxSize()
             )
+        }
+
+        // Disintegration modal overlay (sci-fi retro red style)
+        disintegratedModal?.let { data ->
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = {
+                    viewModel.synthManager.playSynthesisSuccess()
+                    viewModel.clearDisintegratedModal()
+                    viewModel.selectTab("vault")
+                }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(0.95f)
+                        .border(2.dp, Color.Red, RoundedCornerShape(8.dp))
+                        .background(Color.Black)
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Titlebar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color.Red.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                            .background(Color.Red.copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(Color.Red, RoundedCornerShape(3.dp))
+                        )
+                        Text(
+                            text = "[ GENOME STABILITY FAILURE ]",
+                            color = Color.Red,
+                            style = Typography.labelSmall,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                        )
+                    }
+
+                    // Content
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color.Red.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                            .background(Color.Red.copy(alpha = 0.05f))
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            text = "SEQUENCE TERMINATED: ${data.name.uppercase()}",
+                            color = Color.Red,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        Text(
+                            text = "CRITICAL ALARM: Telomere length reached 0%. Cellular transcription has failed, leading to full chromosomal instability. The species' genetic carrier construct has disintegrated entirely.",
+                            color = Color.LightGray,
+                            fontSize = 9.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                            lineHeight = 12.sp
+                        )
+                    }
+
+                    // Genes grid / returned-lost list
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Genes Kept
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .border(1.dp, Color(0xFF1B4332).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                .background(Color.Black)
+                                .padding(8.dp)
+                                .height(120.dp)
+                        ) {
+                            Text(
+                                text = "GENES KEPT (${data.returnedBlocks.size})",
+                                color = Color(0xFF2D6A4F),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    data.returnedBlocks.forEach { seq ->
+                                        Text(
+                                            text = seq,
+                                            color = Color(0xFF52B788),
+                                            fontSize = 8.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            modifier = Modifier
+                                                .background(Color(0xFF1B4332).copy(alpha = 0.2f))
+                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Genes Lost
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .border(1.dp, Color(0xFF590D22).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                .background(Color.Black)
+                                .padding(8.dp)
+                                .height(120.dp)
+                        ) {
+                            Text(
+                                text = "GENES LOST (${data.destroyedBlocks.size})",
+                                color = Color(0xFFA4133C),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    data.destroyedBlocks.forEach { seq ->
+                                        Text(
+                                            text = seq,
+                                            color = Color(0xFFFF4D6D),
+                                            fontSize = 8.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            modifier = Modifier
+                                                .background(Color(0xFF590D22).copy(alpha = 0.2f))
+                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Button: RETURN TO GEN-VAULT DATA
+                    Button(
+                        onClick = {
+                            viewModel.synthManager.playSynthesisSuccess()
+                            viewModel.clearDisintegratedModal()
+                            viewModel.selectTab("vault")
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(38.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color.Red
+                        ),
+                        border = BorderStroke(1.dp, Color.Red),
+                        shape = RoundedCornerShape(2.dp)
+                    ) {
+                        Text(
+                            text = "RETURN TO GEN-VAULT DATA",
+                            style = Typography.labelSmall,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                        )
+                    }
+                }
+            }
         }
     }
 }

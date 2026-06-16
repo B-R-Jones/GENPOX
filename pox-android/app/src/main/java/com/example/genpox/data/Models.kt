@@ -24,7 +24,9 @@ data class Creature(
     val isAutoHacker: Boolean = false,
     val appendedGenes: List<String> = emptyList(),
     val isFavorite: Boolean = false,
-    val telomeres: Int = 100
+    val telomeres: Int = 100,
+    val isFullCoherence: Boolean = false,
+    val coherenceType: String? = null
 )
 
 @Entity(tableName = "gene_sequences")

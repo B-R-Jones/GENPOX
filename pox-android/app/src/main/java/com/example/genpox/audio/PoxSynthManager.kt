@@ -1,8 +1,11 @@
 package com.example.genpox.audio
 
+import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioTrack
+import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -13,9 +16,93 @@ class PoxSynthManager {
     private val sampleRate = 44100
     private val coroutineScope = CoroutineScope(Dispatchers.Default)
 
+    private var appContext: Context? = null
+    private var audioManager: AudioManager? = null
+    private var focusRequest: Any? = null
+
+    private val activeTracks = java.util.Collections.synchronizedSet(mutableSetOf<AudioTrack>())
+
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_LOSS,
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                stopAll()
+            }
+        }
+    }
+
+    fun initialize(context: Context) {
+        val app = context.applicationContext
+        appContext = app
+        audioManager = app.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    }
+
+    private fun requestFocus(): Boolean {
+        val am = audioManager ?: return true
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val playbackAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+                val request = android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                    .setAudioAttributes(playbackAttributes)
+                    .setAcceptsDelayedFocusGain(false)
+                    .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                    .build()
+                focusRequest = request
+                am.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+            } else {
+                @Suppress("DEPRECATION")
+                am.requestAudioFocus(
+                    audioFocusChangeListener,
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+                ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+            }
+        } catch (e: Exception) {
+            true
+        }
+    }
+
+    private fun abandonFocus() {
+        val am = audioManager ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                (focusRequest as? android.media.AudioFocusRequest)?.let {
+                    am.abandonAudioFocusRequest(it)
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                am.abandonAudioFocus(audioFocusChangeListener)
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+
+    fun stopAll() {
+        synchronized(activeTracks) {
+            val iterator = activeTracks.iterator()
+            while (iterator.hasNext()) {
+                val track = iterator.next()
+                try {
+                    track.stop()
+                    track.release()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+            activeTracks.clear()
+        }
+        abandonFocus()
+    }
+
     fun playBeep(freq: Float, durationSec: Float, type: String = "square") {
         if (isMuted) return
         coroutineScope.launch {
+            if (!requestFocus()) return@launch
             val numSamples = (sampleRate * durationSec).toInt()
             val samples = ShortArray(numSamples)
             val angleStep = 2.0 * Math.PI * freq / sampleRate
@@ -58,6 +145,7 @@ class PoxSynthManager {
     fun playSynthesisSuccess() {
         if (isMuted) return
         coroutineScope.launch {
+            if (!requestFocus()) return@launch
             val notes = floatArrayOf(523.25f, 587.33f, 659.25f, 698.46f, 783.99f, 880.00f)
             val noteDuration = 0.15f
             val noteDelay = 0.08f
@@ -92,6 +180,7 @@ class PoxSynthManager {
     fun playAlertBuzzer() {
         if (isMuted) return
         coroutineScope.launch {
+            if (!requestFocus()) return@launch
             val durationSec = 0.4f
             val numSamples = (sampleRate * durationSec).toInt()
             val samples = ShortArray(numSamples)
@@ -128,6 +217,7 @@ class PoxSynthManager {
     fun playCreatureSequenceAudio(sequence: String) {
         if (isMuted) return
         coroutineScope.launch {
+            if (!requestFocus()) return@launch
             val chars = sequence.uppercase().replace(Regex("[^AGTC]"), "")
             if (chars.isEmpty()) return@launch
 
@@ -215,6 +305,7 @@ class PoxSynthManager {
     fun playTradeSuccess() {
         if (isMuted) return
         coroutineScope.launch {
+            if (!requestFocus()) return@launch
             val durationSec = 0.5f
             val numSamples = (sampleRate * durationSec).toInt()
             val samples = ShortArray(numSamples)
@@ -241,8 +332,9 @@ class PoxSynthManager {
     }
 
     private fun writeAndPlay(samples: ShortArray) {
+        var track: AudioTrack? = null
         try {
-            val audioTrack = AudioTrack.Builder()
+            track = AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_GAME)
@@ -260,21 +352,32 @@ class PoxSynthManager {
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .build()
 
-            audioTrack.write(samples, 0, samples.size)
-            audioTrack.play()
-            
+            activeTracks.add(track)
+            track.write(samples, 0, samples.size)
+            track.play()
+
             val playDurationMs = (samples.size.toDouble() / sampleRate * 1000).toLong() + 100
             coroutineScope.launch {
                 kotlinx.coroutines.delay(playDurationMs)
                 try {
-                    audioTrack.stop()
-                    audioTrack.release()
+                    track.stop()
+                    track.release()
                 } catch (e: Exception) {
                     // Ignore release errors
+                } finally {
+                    activeTracks.remove(track)
+                    if (activeTracks.isEmpty()) {
+                        abandonFocus()
+                    }
                 }
             }
         } catch (e: Exception) {
-            // AudioTrack failed to initialize, e.g. lack of system audio
+            if (track != null) {
+                activeTracks.remove(track)
+            }
+            if (activeTracks.isEmpty()) {
+                abandonFocus()
+            }
         }
     }
 }

@@ -967,46 +967,6 @@ export default function PoxConsole({
   const [isFreshSequence, setIsFreshSequence] = useState<boolean>(false);
   const [recentSplicedGenes, setRecentSplicedGenes] = useState<{ sequence: string; isNew: boolean }[]>([]);
 
-  const [displayedForcedLogs, setDisplayedForcedLogs] = useState<string[]>([]);
-  const displayedForcedLogsRef = useRef<string[]>([]);
-  useEffect(() => {
-    displayedForcedLogsRef.current = displayedForcedLogs;
-  }, [displayedForcedLogs]);
-
-  useEffect(() => {
-    if (forcedConstructionLogs.length === 0) {
-      setDisplayedForcedLogs([]);
-      return;
-    }
-    let isCancelled = false;
-    const currentDisplayed = displayedForcedLogsRef.current;
-    const isNewRun =
-      currentDisplayed.length > forcedConstructionLogs.length ||
-      (currentDisplayed.length > 0 && forcedConstructionLogs[0] !== currentDisplayed[0]);
-
-    const startIdx = isNewRun ? 0 : currentDisplayed.length;
-
-    const streamNext = async () => {
-      if (isNewRun) {
-        setDisplayedForcedLogs([]);
-      }
-      for (let i = startIdx; i < forcedConstructionLogs.length; i++) {
-        await new Promise(r => setTimeout(r, 150));
-        if (isCancelled) return;
-        setDisplayedForcedLogs(prev => {
-          if (prev.length === i) {
-            return [...prev, forcedConstructionLogs[i]];
-          }
-          return prev;
-        });
-      }
-    };
-    streamNext();
-    return () => {
-      isCancelled = true;
-    };
-  }, [forcedConstructionLogs]);
-  
   const [discoveredPacketsLog, setDiscoveredPacketsLog] = useState<{
     id: string;
     timestamp: number;
@@ -1513,6 +1473,46 @@ export default function PoxConsole({
   const isForcedLoopActiveRef = useRef<boolean>(false);
   const [forcedConstructionLogs, setForcedConstructionLogs] = useState<string[]>([]);
   const isReactorFrozenRef = useRef<boolean>(false);
+
+  const [displayedForcedLogs, setDisplayedForcedLogs] = useState<string[]>([]);
+  const displayedForcedLogsRef = useRef<string[]>([]);
+  useEffect(() => {
+    displayedForcedLogsRef.current = displayedForcedLogs;
+  }, [displayedForcedLogs]);
+
+  useEffect(() => {
+    if (forcedConstructionLogs.length === 0) {
+      setDisplayedForcedLogs([]);
+      return;
+    }
+    let isCancelled = false;
+    const currentDisplayed = displayedForcedLogsRef.current;
+    const isNewRun =
+      currentDisplayed.length > forcedConstructionLogs.length ||
+      (currentDisplayed.length > 0 && forcedConstructionLogs[0] !== currentDisplayed[0]);
+
+    const startIdx = isNewRun ? 0 : currentDisplayed.length;
+
+    const streamNext = async () => {
+      if (isNewRun) {
+        setDisplayedForcedLogs([]);
+      }
+      for (let i = startIdx; i < forcedConstructionLogs.length; i++) {
+        await new Promise(r => setTimeout(r, 150));
+        if (isCancelled) return;
+        setDisplayedForcedLogs(prev => {
+          if (prev.length === i) {
+            return [...prev, forcedConstructionLogs[i]];
+          }
+          return prev;
+        });
+      }
+    };
+    streamNext();
+    return () => {
+      isCancelled = true;
+    };
+  }, [forcedConstructionLogs]);
 
   const [isSyncNetOn, setIsSyncNetOn] = useState<boolean>(true);
   const [batteryStatus, setBatteryStatus] = useState<{ level: number | null; charging: boolean | null; error: boolean }>({
@@ -5160,37 +5160,6 @@ export default function PoxConsole({
                     exit={{ opacity: 0, y: -10 }}
                     className="flex flex-col h-full space-y-3"
                   >
-                    {/* Top level sub-tabs for Bio-Lab */}
-                    <div className="flex border-b border-green-950/40 pb-2 gap-2 select-none shrink-0 font-mono">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          sound.playBeep(520, 0.05, "sine");
-                          setBioLabSubTab('pox');
-                        }}
-                        className={`px-4 py-1.5 text-[10px] font-bold border rounded transition-all uppercase tracking-wider cursor-pointer ${
-                          bioLabSubTab === 'pox'
-                            ? "bg-green-950/20 border-[#00FF41] text-[#00FF41] shadow-[0_0_8px_rgba(0,255,65,0.1)] font-extrabold"
-                            : "bg-black/40 border-green-955/40 text-green-700 hover:text-green-400"
-                        }`}
-                      >
-                        P.O.X. Reactor
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          sound.playBeep(520, 0.05, "sine");
-                          setBioLabSubTab('anomaly');
-                        }}
-                        className={`px-4 py-1.5 text-[10px] font-bold border rounded transition-all uppercase tracking-wider cursor-pointer ${
-                          bioLabSubTab === 'anomaly'
-                            ? "bg-purple-950/20 border-purple-500 text-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.15)] font-extrabold"
-                            : "bg-black/40 border-green-955/40 text-purple-800 hover:text-purple-400"
-                        }`}
-                      >
-                        {bioLabSubTab === 'anomaly' ? <FlickeringPurpleText text="Anomaly Engine" /> : "Anomaly Engine"}
-                      </button>
-                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow overflow-hidden">
                       
@@ -5486,20 +5455,23 @@ export default function PoxConsole({
                        {bioLabSubTab === 'pox' ? (
                         <div>
                           <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-green-700">
-                            <span>[ G.E.N. P.O.X. Tide Pool Reactor V2.4 ]</span>
+                            <span className="font-sans text-[10px] font-bold tracking-wider uppercase">[ G.E.N. P.O.X. TIDE POOL REACTOR V2.4 ]</span>
                             <span className="text-[#00FF41]">SYSTEMS ON</span>
                           </div>
-                          <h2 className="text-xs font-bold text-white tracking-wider mb-3 uppercase">Single-Node Cybernetic Synthesizer</h2>
+                          
+                          <div className="flex justify-between items-center h-8 mb-3 select-none">
+                            <h2 className="text-xs font-bold text-white tracking-wider uppercase">Single-Node Cybernetic Synthesizer</h2>
+                          </div>
 
                           {/* Top-Level Counts section as requested */}
                           <div className="grid grid-cols-2 gap-2 mb-4 border-t border-b border-green-950/70 py-2.5 bg-black/40 px-2 rounded-sm font-mono text-left">
-                            <div>
+                            <div className="p-1">
                               <span className="block text-[8.5px] text-green-600 uppercase tracking-widest leading-none">Unique Gene IDs</span>
                               <span className="text-lg font-bold text-white leading-none block mt-1">
                                 <span className="text-[#00FF41]">⬢</span> {sequences.length}
                               </span>
                             </div>
-                            <div className="border-l border-green-950/85 pl-3">
+                            <div className="border-l border-green-950/85 pl-3 p-1">
                               <span className="block text-[8.5px] text-green-600 uppercase tracking-widest leading-none">Multi-Count Gene IDs</span>
                               <span className="text-lg font-bold text-white leading-none block mt-1">
                                 <span className="text-[#00FF41]">⬢</span> {sequences.filter(s => s.count > 1).length}
@@ -5510,7 +5482,7 @@ export default function PoxConsole({
                           {/* Dynamic Daily Base-Pair Wave HUD Display */}
                           <div className={`mb-2 border rounded-sm p-2 flex items-center justify-between gap-2.5 bg-black/60 font-mono text-[9px] ${
                             todayWave.isSuppressed 
-                              ? "border-red-950/80 text-red-500 bg-red-955/5 animate-pulse" 
+                              ? "border-red-955/85 text-red-500 bg-red-955/5 animate-pulse" 
                               : "border-green-955 text-neutral-300"
                           }`}>
                             <div className="flex items-center gap-1.5 min-w-0">
@@ -5569,11 +5541,24 @@ export default function PoxConsole({
                       ) : (
                         <div>
                           <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-purple-400">
-                            <span>[ WARNING: UNKNOWN REACTOR ]</span>
-                            <span className="text-purple-300 animate-pulse">SYSTEMS ON</span>
+                            <span className="font-sans text-[10px] font-bold tracking-wider uppercase">[ WARNING: UNKNOWN REACTOR ]</span>
+                            <button 
+                              onClick={() => {
+                                sound.playBeep(450, 0.05, "sine");
+                                handleToggleAnomalyEngine(!anomalyEngineActive);
+                              }}
+                              className={`font-sans text-[10px] font-bold tracking-wider uppercase hover:text-purple-200 cursor-pointer select-none transition-colors ${
+                                anomalyEngineActive ? "text-purple-300 animate-pulse" : "text-neutral-500"
+                              }`}
+                            >
+                              {anomalyEngineActive ? "SYSTEMS ON" : "SYSTEMS OFF"}
+                            </button>
                           </div>
-                          <div className="mb-3">
-                            <FlickeringAnomalyTitle />
+                          
+                          <div className="flex justify-between items-center h-8 mb-3 select-none">
+                            <div className="flex-1 min-w-0 pr-2">
+                              <FlickeringAnomalyTitle />
+                            </div>
                           </div>
 
                           {/* Top-Level Counts section as requested */}
@@ -5589,12 +5574,67 @@ export default function PoxConsole({
                                 <span className="text-[6.5px] text-purple-400 bg-purple-950/60 border border-purple-500/20 px-1 py-0.5 rounded opacity-70 group-hover:opacity-100 transition-opacity">OPEN ➔</span>
                               </div>
                             </div>
-                            <div className="border-l border-purple-900/50 pl-3 pt-1">
+                            <div className="border-l border-purple-900/50 pl-3 p-1">
                               <span className="block text-[8.5px] text-purple-400 uppercase tracking-widest leading-none">Total Gene Stock</span>
                               <span className="text-lg font-bold text-white leading-none block mt-1">
                                 <span className="text-[#00FF41]">⬢</span> {sequences.length}
                               </span>
                             </div>
+                          </div>
+
+                          {/* Dynamic Anomalous Resource HUD Display */}
+                          <div className={`mb-2 border rounded-sm p-2 flex items-center justify-between gap-2.5 bg-black/60 font-mono text-[9px] ${
+                            baseTallies.grandTotal >= 250000 
+                              ? "border-purple-500 text-purple-300" 
+                              : "border-purple-955 text-neutral-300"
+                          }`}>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <Zap className={`w-3.5 h-3.5 ${baseTallies.grandTotal >= 250000 ? "text-purple-400 animate-pulse" : "text-purple-650"}`} />
+                              <div>
+                                <span className="text-[7.5px] text-purple-450 block leading-none font-bold select-none uppercase">ANOMALOUS RESOURCE &amp; LOAD</span>
+                                <span className="text-white font-bold tracking-wider uppercase truncate">
+                                  {baseTallies.grandTotal.toLocaleString()} / 250,000 NUCLEOTIDES
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-[10px] text-purple-405 font-bold block leading-none font-mono">RATE: -10K/LOOP</span>
+                              <span className="text-[7px] text-purple-650 block leading-none font-bold mt-0.5 uppercase">RESETS STABILITY</span>
+                            </div>
+                          </div>
+
+                          {/* Anomaly Engine Chances Compact Layout */}
+                          <div className="grid grid-cols-2 gap-2 mb-3">
+                            {/* Consolidation Chance */}
+                            {(() => {
+                              const chanceMetrics = getAnomalyEngineSuccessChance(baseTallies.grandTotal);
+                              const formattedChance = chanceMetrics.finalChance.toFixed(3) + "%";
+                              const formattedModifier = (chanceMetrics.harmonicModifier >= 0 ? "+" : "") + chanceMetrics.harmonicModifier.toFixed(3) + "%";
+                              return (
+                                <>
+                                  <div className="border border-purple-900/40 rounded-sm p-1.5 flex items-center justify-between gap-1 bg-black/45 font-mono text-[8px] text-neutral-450">
+                                    <div className="min-w-0">
+                                      <span className="text-[6.5px] text-purple-450 block leading-none font-bold select-none uppercase">CONSOLIDATION CHANCE</span>
+                                      <span className="text-white font-bold tracking-wider uppercase truncate text-[8px] mt-0.5 block">
+                                        SUCCESS PROBABILITY
+                                      </span>
+                                    </div>
+                                    <span className="text-[8.5px] text-purple-300 font-bold font-mono pl-1 shrink-0">{formattedChance}</span>
+                                  </div>
+
+                                  {/* Spectrum Coupling */}
+                                  <div className="border border-purple-900/40 rounded-sm p-1.5 flex items-center justify-between gap-1 bg-black/45 font-mono text-[8px] text-neutral-450">
+                                    <div className="min-w-0">
+                                      <span className="text-[6.5px] text-purple-450 block leading-none font-bold select-none uppercase">SPECTRUM COUPLING</span>
+                                      <span className="text-white font-bold tracking-wider uppercase truncate text-[8px] mt-0.5 block">
+                                        HARMONIC MODIFIER
+                                      </span>
+                                    </div>
+                                    <span className="text-[8.5px] text-purple-300 font-bold font-mono pl-1 shrink-0">{formattedModifier}</span>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       )}
@@ -5711,6 +5751,37 @@ export default function PoxConsole({
                         >
                           Manual Acceleration (-2s)
                         </button>
+
+                        <div className="flex border-t border-green-900/40 pt-2 gap-2 select-none font-mono">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sound.playBeep(520, 0.05, "sine");
+                              setBioLabSubTab('pox');
+                            }}
+                            className={`flex-1 py-1.5 text-[10px] font-bold border rounded transition-all uppercase tracking-wider cursor-pointer ${
+                              bioLabSubTab === 'pox'
+                                ? "bg-green-950/20 border-[#00FF41] text-[#00FF41] shadow-[0_0_8px_rgba(0,255,65,0.1)] font-extrabold"
+                                : "bg-black/40 border-green-955/40 text-green-700 hover:text-green-400"
+                            }`}
+                          >
+                            P.O.X. Reactor
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sound.playBeep(520, 0.05, "sine");
+                              setBioLabSubTab('anomaly');
+                            }}
+                            className={`flex-1 py-1.5 text-[10px] font-bold border rounded transition-all uppercase tracking-wider cursor-pointer ${
+                              bioLabSubTab === 'anomaly'
+                                ? "bg-purple-950/20 border-purple-500 text-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.15)] font-extrabold"
+                                : "bg-black/40 border-green-955/40 text-purple-800 hover:text-purple-400"
+                            }`}
+                          >
+                            {bioLabSubTab === 'anomaly' ? <FlickeringPurpleText text="Anomaly Engine" /> : "Anomaly Engine"}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -5843,84 +5914,6 @@ export default function PoxConsole({
                               <FlickeringPurpleText text="[ DECRYPT ANOMALY VAULT ▼ ]" />
                             </span>
                           </button>
-                        )}
-
-                        {bioLabSubTab === 'anomaly' && (
-                          <div className={`border p-2.5 rounded-sm font-mono text-[9px] transition-colors ${
-                            anomalyEngineActive 
-                              ? "border-purple-500/70 bg-[#0c0512]" 
-                              : "border-purple-900/30 bg-black/35"
-                          }`}>
-                            <div className="flex items-center justify-between mb-1.5 select-none">
-                              <span className={`font-bold tracking-wider uppercase flex items-center gap-1.5 ${
-                                anomalyEngineActive ? "text-purple-400" : "text-purple-500"
-                              }`}>
-                                <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-ping" />
-                                <FlickeringPurpleText text="Anomaly Engine" />
-                              </span>
-                              <label className="relative inline-flex items-center cursor-pointer select-none">
-                                <input 
-                                  type="checkbox" 
-                                  checked={anomalyEngineActive} 
-                                  onChange={(e) => handleToggleAnomalyEngine(e.target.checked)}
-                                  className="sr-only peer"
-                                />
-                                <div className="w-7 h-4 bg-neutral-800 border border-neutral-700/60 rounded-full peer peer-focus:ring-0 peer-checked:bg-purple-600 after:content-[''] after:absolute after:top-[4px] after:left-[3px] after:bg-neutral-400 after:rounded-full after:h-2 after:w-2 after:transition-all peer-checked:after:translate-x-3.5 peer-checked:after:bg-purple-200" />
-                              </label>
-                            </div>
-
-                            <div className="space-y-1 bg-black/45 p-1.5 rounded-sm border border-neutral-900/60 text-[7px] leading-normal mb-2.5">
-                              {/* Requirement 1: Material stockpile key */}
-                              <div className="flex justify-between items-center">
-                                <span className="text-neutral-500 uppercase">RESOURCE COUNT:</span>
-                                <span className={`font-semibold ${
-                                  baseTallies.grandTotal >= 250000 
-                                    ? "text-[#00FF41]" 
-                                    : "text-red-400 animate-pulse"
-                                }`}>
-                                  {baseTallies.grandTotal.toLocaleString()} / 250,000 NUCLEOTIDES  {baseTallies.grandTotal >= 250000 ? "✓" : "✗"}
-                                </span>
-                              </div>
-
-                              {/* Requirement 2: Energy Drain Warnings */}
-                              <div className="flex justify-between items-center">
-                                <span className="text-neutral-500 uppercase">LOAD WARNING:</span>
-                                <span className="text-yellow-500/90 font-bold uppercase">RESETS STABILITY &amp; EMISSIONS TO 0</span>
-                              </div>
-
-                              {/* Cycle Cost */}
-                              <div className="flex justify-between items-center">
-                                <span className="text-neutral-500 uppercase">CURRENT RATE:</span>
-                                <span className={anomalyEngineActive ? "text-purple-400 font-bold" : "text-neutral-450"}>
-                                  -10,000 BASES / LOOP
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Success Chance Live Dial Breakdown */}
-                            {(() => {
-                              const statsChance = getAnomalyEngineSuccessChance(baseTallies.grandTotal);
-                              return (
-                                <div className="p-2 border border-purple-950/70 bg-[#0f0417] rounded-sm space-y-1 font-mono text-[7px]">
-                                  <div className="text-[7.5px] font-bold text-purple-400 tracking-wider uppercase border-b border-purple-950/40 pb-0.5 flex justify-between">
-                                    <span><FlickeringPurpleText text="ANOMALOUS DISCOVERY" /></span>
-                                    <span className="text-white font-black">{statsChance.finalChance.toFixed(3)}%</span>
-                                  </div>
-
-                                  {statsChance.peakBoost > 0 && (
-                                    <div className="flex justify-between text-pink-400 animate-pulse">
-                                      <span>Resonance Peak Wave Spike:</span>
-                                      <span>+{statsChance.peakBoost.toFixed(1)}%</span>
-                                    </div>
-                                  )}
-                                  <div className="flex justify-between text-cyan-400">
-                                    <span>Spectrum Dial Coupling Modifier:</span>
-                                    <span>{statsChance.harmonicModifier >= 0 ? "+" : ""}{statsChance.harmonicModifier.toFixed(3)}%</span>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
                         )}
                       </div>
 
@@ -6324,7 +6317,7 @@ export default function PoxConsole({
                         <div className="flex flex-col justify-start gap-2.5 h-full">
                           <div>
                             <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-green-700">
-                              <span>[ CREATURE CONSTRUCTOR ]</span>
+                              <span className="font-sans text-[10px] font-bold tracking-wider uppercase">[ G.E.N. P.O.X. E-MERGE SEQUENCER V1.7 ]</span>
                               <span>64-CHAR ASSEMBLY GRID</span>
                             </div>
                             <h2 className="text-xs font-bold text-white tracking-wider mb-2">TARGET GENOME RE-SEQUENCING</h2>
@@ -6545,6 +6538,7 @@ export default function PoxConsole({
                              {sequences
                                .filter((s) => s.count > 0 && s.sequence.includes(slotSequenceFilter))
                                .map((item, idx) => {
+                                 const expectedGene = targetSequence.substring(activeSlotSelection * 8, (activeSlotSelection + 1) * 8);
                                  const isMatch = item.sequence === expectedGene;
                                  return (
                                    <div
@@ -6602,38 +6596,72 @@ export default function PoxConsole({
                           const bot = creatures.find(c => c.id === inspectedCreatureId);
                           if (!bot) return null;
                           return (
-                            <div className="bg-neutral-900/20 border border-green-900/40 p-4 rounded flex-1 flex flex-col justify-between overflow-y-auto animate-fade-in">
+                            <div className="bg-neutral-900/20 border border-green-900/40 p-4 pt-3 rounded flex-1 flex flex-col justify-between overflow-y-auto animate-fade-in">
                               <div className="space-y-3.5">
-                                <div className="flex justify-between items-start border-b border-green-900/30 pb-2">
-                                  <div>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">{bot.name}</h3>
-                                      <span className="text-[8.5px] font-mono tracking-widest text-[#00FF41]">{bot.id}</span>
-                                      {defenderCreatureId === bot.id && (
-                                        <span className="bg-blue-950 border border-blue-400/50 text-blue-400 px-1.5 py-0.5 rounded text-[7.5px] font-bold font-sans flex items-center gap-0.5 shadow-[0_0_6px_rgba(59,130,246,0.2)] select-none">
-                                          <Shield className="w-2.5 h-2.5" /> DEFENDER
-                                        </span>
-                                      )}
-                                      {getCoherence(bot.sequence, targetSequence) === "full" ? (
-                                        <span className="px-1.5 py-0.5 bg-emerald-950 text-[#00FF41] border border-emerald-500 rounded text-[7.5px] font-bold font-mono tracking-widest animate-pulse select-none">
-                                          FULL COHERENCE
-                                        </span>
-                                      ) : getCoherence(bot.sequence, targetSequence) === "partial" ? (
-                                        <span className="px-1.5 py-0.5 bg-yellow-950/80 text-yellow-500 border border-yellow-600/55 rounded text-[7.5px] font-bold font-mono tracking-wider select-none">
-                                          PARTIAL COHERENCE
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                    <span className="text-[10px] text-green-700 block font-mono mt-0.5">{bot.type}</span>
-                                  </div>
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-black uppercase tracking-wider ${
-                                    bot.faction === "Infection" ? "bg-red-500 font-sans" :
-                                    bot.faction === "Mech" ? "bg-blue-400 font-sans" :
-                                    bot.faction === "Parasite" ? "bg-purple-500 font-sans" : "bg-green-400 font-sans"
-                                  }`}>
-                                    {bot.faction}
-                                  </span>
-                                </div>
+                                 {/* Row 1: Seabed Vault Title & Close */}
+                                 <div className="flex justify-between items-center border-b border-green-900/30 pb-2">
+                                   <span className="font-sans text-[10px] text-green-700 font-bold tracking-wider uppercase">[ G.E.N. P.O.X. SEABED VAULT v0.4 ]</span>
+                                   <button
+                                     type="button"
+                                     onClick={() => {
+                                       sound.playBeep(440, 0.05, "sine");
+                                       setInspectedCreatureId(null);
+                                       if (creatureCardOpenedFrom === 'Constructor') {
+                                         setActiveTab('splicer');
+                                       } else if (creatureCardOpenedFrom === 'Trade') {
+                                         setActiveTab('gen_network');
+                                         setGenNetworkSubTab('nodes');
+                                         setNodesSubTab('qr_trade');
+                                       } else if (creatureCardOpenedFrom === 'Scanner') {
+                                         setActiveTab('transceiver');
+                                         setSyncNetTab('scanner');
+                                       } else {
+                                         setActiveTab('library');
+                                       }
+                                     }}
+                                     className="px-2 py-0.5 bg-transparent hover:bg-red-500/10 border border-red-500 text-red-500 rounded text-[8.5px] cursor-pointer font-bold tracking-wider transition-colors"
+                                   >
+                                     ✕ CLOSE
+                                   </button>
+                                 </div>
+
+                                 {/* Row 2: Creature Name & ID */}
+                                 <div className="pt-2">
+                                   <div className="flex items-baseline gap-2 flex-wrap">
+                                     <h3 className="text-base font-extrabold text-white uppercase tracking-wider">{bot.name}</h3>
+                                     <span className="text-[8.5px] font-mono tracking-widest text-[#00FF41]/80">{bot.id}</span>
+                                   </div>
+                                 </div>
+
+                                 {/* Row 3: Creature Type */}
+                                 <div className="text-[10px] text-green-700 block font-sans uppercase tracking-wider mt-0.5">
+                                   {bot.type}
+                                 </div>
+
+                                 {/* Row 4: Badges */}
+                                 <div className="flex items-center gap-2 flex-wrap mt-2 pb-1.5 border-b border-green-900/20">
+                                   <span className={`px-2 py-0.5 rounded text-[8.5px] font-bold text-black uppercase tracking-wider ${
+                                     bot.faction === "Infection" ? "bg-red-500 font-sans" :
+                                     bot.faction === "Mech" ? "bg-blue-400 font-sans" :
+                                     bot.faction === "Parasite" ? "bg-purple-500 font-sans" : "bg-green-400 font-sans"
+                                   }`}>
+                                     {bot.faction}
+                                   </span>
+                                   {defenderCreatureId === bot.id && (
+                                     <span className="bg-blue-950 border border-blue-400/50 text-blue-400 px-1.5 py-0.5 rounded text-[7.5px] font-bold font-sans flex items-center gap-0.5 shadow-[0_0_6px_rgba(59,130,246,0.2)] select-none">
+                                       <Shield className="w-2.5 h-2.5" /> DEFENDER
+                                     </span>
+                                   )}
+                                   {getCoherence(bot.sequence, targetSequence) === "full" ? (
+                                     <span className="px-1.5 py-0.5 bg-emerald-950 text-[#00FF41] border border-emerald-500 rounded text-[7.5px] font-bold font-mono tracking-widest animate-pulse select-none">
+                                       FULL COHERENCE
+                                     </span>
+                                   ) : getCoherence(bot.sequence, targetSequence) === "partial" ? (
+                                     <span className="px-1.5 py-0.5 bg-yellow-950/80 text-yellow-500 border border-yellow-600/55 rounded text-[7.5px] font-bold font-mono tracking-wider select-none">
+                                       PARTIAL COHERENCE
+                                     </span>
+                                   ) : null}
+                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div className="space-y-2">
@@ -7287,15 +7315,16 @@ export default function PoxConsole({
                         };
 
                         return (
-                          <div className="bg-neutral-900/20 border border-green-900/40 p-3 sm:p-5 rounded flex-1 flex flex-col justify-between overflow-y-auto custom-pox-scrollbar relative">
+                          <div className="bg-neutral-900/20 border border-green-900/40 p-4 pt-3 rounded flex-1 flex flex-col justify-between overflow-y-auto custom-pox-scrollbar relative">
                             <div className="space-y-4">
                               <div className="flex justify-between items-start flex-wrap gap-2">
-                                <div>
-                                  <div className="flex items-center gap-1.5 text-[10px] uppercase text-green-700">
-                                    <span>[ GENETIC VAULT REGISTRY ]</span>
-                                    <span className="text-[#00FF41]">ACTIVE SELECTION: {filteredSortedCreatures.length} / {creatures.length}</span>
+                                <div className="flex-1 min-w-[200px]">
+                                  <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-green-700">
+                                    <span className="font-sans text-[10px] font-bold tracking-wider uppercase">[ G.E.N. P.O.X. SEABED VAULT v0.4 ]</span>
+                                    <span className="text-[#00FF41] font-bold">SYSTEMS ON</span>
                                   </div>
-                                  <h2 className="text-xs font-bold text-white tracking-wider">STORED P.O.X. SEQUENCES</h2>
+                                  <h2 className="text-xs font-bold text-white tracking-wider">NODE P.O.X. SEQUENCES REGISTRY</h2>
+                                  <p className="text-[10px] text-green-700 font-mono mt-1 select-none">View or filter your spliced P.O.X. sequences below</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {/* Filter Activation Force Switch */}
@@ -7321,7 +7350,7 @@ export default function PoxConsole({
                                       sound.playBeep(520, 0.05, "sine");
                                       setIsFilterPanelExpanded(!isFilterPanelExpanded);
                                     }}
-                                    className="px-2 py-1 text-[8.5px] font-bold border border-green-900 bg-neutral-950 text-[#00FF41] hover:bg-green-950/20 rounded cursor-pointer transition-all flex items-center gap-1"
+                                    className="px-2 py-1 text-[8.5px] font-bold border border-green-900 bg-neutral-950 text-[#00FF41] hover:bg-green-955/20 rounded cursor-pointer transition-all flex items-center gap-1"
                                   >
                                     {isFilterPanelExpanded ? "⬘ COLLAPSE FILTERS" : "⬙ EXPLORE FILTER SUITE"}
                                     {activeFiltersCount > 0 && (
@@ -7330,6 +7359,10 @@ export default function PoxConsole({
                                       </span>
                                     )}
                                   </button>
+
+                                  <span className="text-[9px] font-mono text-[#00FF41] ml-2 select-none whitespace-nowrap">
+                                    ACTIVE SELECTIONS: {filteredSortedCreatures.length} / {creatures.length}
+                                  </span>
                                 </div>
                               </div>
 

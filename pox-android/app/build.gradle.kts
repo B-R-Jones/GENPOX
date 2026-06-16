@@ -110,6 +110,9 @@ dependencies {
   // ML Kit Barcode Scanning
   implementation(libs.play.services.mlkit.barcode.scanning)
 
+  // ZXing QR Generation
+  implementation(libs.zxing.core)
+
   // Kotlinx Serialization JSON
   implementation(libs.kotlinx.serialization.json)
 
