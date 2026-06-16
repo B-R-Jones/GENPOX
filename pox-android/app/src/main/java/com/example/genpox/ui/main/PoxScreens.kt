@@ -3104,7 +3104,8 @@ fun SplicerLeftPanel(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "[ G.E.N. P.O.X. E-MERGE SEQUENCER v1.7 ]",
@@ -3122,13 +3123,22 @@ fun SplicerLeftPanel(
                     )
                 }
 
-                Text(
-                    text = "SINGLE-NODE SEQUENCING",
-                    color = Color.White,
-                    style = Typography.bodyMedium,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .requiredHeight(24.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "SINGLE-NODE SEQUENCING",
+                        color = Color.White,
+                        style = Typography.bodyMedium,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 Text(
                     text = "Fill all slots with stockpiled genes to assemble the target genome.",
                     color = CyberGreenDim,
@@ -3840,7 +3850,7 @@ fun VaultView(viewModel: MainViewModel) {
                     .fillMaxSize()
                     .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                     .background(CyberPanel)
-                    .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 12.dp)
+                    .padding(12.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -3851,43 +3861,49 @@ fun VaultView(viewModel: MainViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "[ G.E.N. P.O.X. SEABED VAULT v0.4 ]",
-                                color = CyberGreenDim,
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "SYSTEMS ON",
-                                color = CyberGreen,
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "[ G.E.N. P.O.X. SEABED VAULT v0.4 ]",
+                            color = CyberGreenDim,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "SYSTEMS ON",
+                            color = CyberGreen,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .requiredHeight(24.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             text = "NODE P.O.X. SEQUENCES REGISTRY",
                             color = Color.White,
                             style = Typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
-                        )
-                        Text(
-                            text = "View or filter your spliced P.O.X. sequences below",
-                            color = CyberGreenDim,
-                            fontSize = 8.5.sp,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            modifier = Modifier.padding(top = 1.dp)
+                            fontFamily = FontFamily.Default,
+                            modifier = Modifier.weight(1f)
                         )
                     }
+                    Text(
+                        text = "View or filter your spliced P.O.X. sequences below",
+                        color = CyberGreenDim,
+                        style = Typography.bodySmall,
+                        fontFamily = FontFamily.Default,
+                        fontSize = 10.sp
+                    )
  
                     Row(
                         modifier = Modifier.fillMaxWidth(),

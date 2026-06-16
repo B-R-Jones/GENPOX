@@ -5459,7 +5459,7 @@ export default function PoxConsole({
                             <span className="text-[#00FF41]">SYSTEMS ON</span>
                           </div>
                           
-                          <div className="flex justify-between items-center h-8 mb-3 select-none">
+                          <div className="flex justify-between items-center h-8 mb-2 select-none">
                             <h2 className="text-xs font-bold text-white tracking-wider uppercase">Single-Node Cybernetic Synthesizer</h2>
                           </div>
 
@@ -6320,8 +6320,10 @@ export default function PoxConsole({
                               <span className="font-sans text-[10px] font-bold tracking-wider uppercase">[ G.E.N. P.O.X. E-MERGE SEQUENCER V1.7 ]</span>
                               <span>64-CHAR ASSEMBLY GRID</span>
                             </div>
-                            <h2 className="text-xs font-bold text-white tracking-wider mb-2">TARGET GENOME RE-SEQUENCING</h2>
-                            <p className="text-[10px] text-green-700 mb-3 font-mono leading-tight">Fill all slots with stockpiled genes to assemble the target genome.</p>
+                            <div className="flex justify-between items-center h-8 mb-2 select-none">
+                              <h2 className="text-xs font-bold text-white tracking-wider uppercase">TARGET GENOME RE-SEQUENCING</h2>
+                            </div>
+                            <p className="text-[10px] text-green-700 mb-3 font-sans leading-tight">Fill all slots with stockpiled genes to assemble the target genome.</p>
 
                             {/* Dash grid representations of 8 slots */}
                             <div className="grid grid-cols-4 gap-1.5 bg-black p-2 rounded border border-green-900/40 mb-3">
@@ -6596,7 +6598,7 @@ export default function PoxConsole({
                           const bot = creatures.find(c => c.id === inspectedCreatureId);
                           if (!bot) return null;
                           return (
-                            <div className="bg-neutral-900/20 border border-green-900/40 p-4 pt-3 rounded flex-1 flex flex-col justify-between overflow-y-auto animate-fade-in">
+                            <div className="bg-neutral-900/20 border border-green-900/40 p-4 rounded flex-1 flex flex-col justify-between overflow-y-auto animate-fade-in">
                               <div className="space-y-3.5">
                                  {/* Row 1: Seabed Vault Title & Close */}
                                  <div className="flex justify-between items-center border-b border-green-900/30 pb-2">
@@ -7315,7 +7317,7 @@ export default function PoxConsole({
                         };
 
                         return (
-                          <div className="bg-neutral-900/20 border border-green-900/40 p-4 pt-3 rounded flex-1 flex flex-col justify-between overflow-y-auto custom-pox-scrollbar relative">
+                          <div className="bg-neutral-900/20 border border-green-900/40 p-4 rounded flex-1 flex flex-col justify-between overflow-y-auto custom-pox-scrollbar relative">
                             <div className="space-y-4">
                               <div className="flex justify-between items-start flex-wrap gap-2">
                                 <div className="flex-1 min-w-[200px]">
@@ -7323,8 +7325,10 @@ export default function PoxConsole({
                                     <span className="font-sans text-[10px] font-bold tracking-wider uppercase">[ G.E.N. P.O.X. SEABED VAULT v0.4 ]</span>
                                     <span className="text-[#00FF41] font-bold">SYSTEMS ON</span>
                                   </div>
-                                  <h2 className="text-xs font-bold text-white tracking-wider">NODE P.O.X. SEQUENCES REGISTRY</h2>
-                                  <p className="text-[10px] text-green-700 font-mono mt-1 select-none">View or filter your spliced P.O.X. sequences below</p>
+                                  <div className="flex justify-between items-center h-8 mb-2 select-none">
+                                    <h2 className="text-xs font-bold text-white tracking-wider uppercase">NODE P.O.X. SEQUENCES REGISTRY</h2>
+                                  </div>
+                                  <p className="text-[10px] text-green-700 mb-3 font-sans leading-tight">View or filter your spliced P.O.X. sequences below</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {/* Filter Activation Force Switch */}
