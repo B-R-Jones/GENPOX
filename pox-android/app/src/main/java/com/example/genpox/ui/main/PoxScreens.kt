@@ -7502,9 +7502,21 @@ fun HolographicRadarScanner(
                     // Render groups
                     groups.forEach { group ->
                         if (group.isNotEmpty()) {
-                            // Draw radial gradient fills for each anomaly, clipped to their individual irregular paths
-                            group.forEach { item ->
-                                clipPath(item.path) {
+                            // Compute unified merged path for clipping
+                            var mergedPath = group.first().path
+                            for (mIdx in 1 until group.size) {
+                                mergedPath = androidx.compose.ui.graphics.Path.combine(
+                                    androidx.compose.ui.graphics.PathOperation.Union,
+                                    mergedPath,
+                                    group[mIdx].path
+                                )
+                            }
+
+                            // Draw radial gradient fills for each anomaly, clipped to the UNIFIED merged path.
+                            // This allows individual gradients to fade out naturally beyond their individual boundaries
+                            // without causing sharp color cut-offs in overlapping regions.
+                            clipPath(mergedPath) {
+                                group.forEach { item ->
                                     drawCircle(
                                         brush = Brush.radialGradient(
                                             colors = listOf(item.factionColor, Color.Transparent),
