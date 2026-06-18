@@ -1289,6 +1289,193 @@ fun CombinatorView(viewModel: MainViewModel) {
                             }
                         }
 
+                        // Today's base-pair wave card
+                        val todayWave = wave
+                        val tomorrowWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 86400000L)
+                        val dayAfterWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 172800000L)
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(
+                                    1.dp,
+                                    if (todayWave.isSuppressed) Color(0xFF990000).copy(alpha = 0.8f) else CyberGreen,
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .background(if (todayWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.6f))
+                                .padding(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
+                                    Text(
+                                        text = "⚡",
+                                        color = if (todayWave.isSuppressed) Color.Red else Color(0xFFFFB300),
+                                        fontSize = 14.sp
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "TODAY'S BASE-PAIR WAVE",
+                                            color = CyberGreenDim,
+                                            style = Typography.labelSmall,
+                                            fontFamily = FontFamily.Default,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = if (todayWave.isSuppressed) "DORMANT (CONGESTED DECAY)" else "ACTIVE: ${todayWave.pair} WAVE",
+                                            color = Color.White,
+                                            style = Typography.bodySmall,
+                                            fontFamily = FontFamily.Default,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                if (!todayWave.isSuppressed) {
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "${todayWave.primary} ➔ ${todayWave.secondary}",
+                                            color = CyberGreen,
+                                            style = Typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "1.12x & 1.62x BOOST",
+                                            color = CyberGreenDim,
+                                            style = Typography.labelSmall,
+                                            fontFamily = FontFamily.Default,
+                                            fontSize = 7.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                } else {
+                                    Text(
+                                        text = "NULL",
+                                        color = Color.Red,
+                                        style = Typography.labelSmall,
+                                        fontFamily = FontFamily.Default,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier
+                                            .background(Color(0xFF330000), RoundedCornerShape(2.dp))
+                                            .border(1.dp, Color.Red, RoundedCornerShape(2.dp))
+                                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Forecast Grid
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Tomorrow
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .border(
+                                        1.dp,
+                                        if (tomorrowWave.isSuppressed) Color(0xFF990000).copy(alpha = 0.6f) else Color.DarkGray,
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .background(if (tomorrowWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f))
+                                    .padding(6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "TOMORROW BASE-PAIR",
+                                            color = CyberGreenDim,
+                                            style = Typography.labelSmall,
+                                            fontFamily = FontFamily.Default,
+                                            fontSize = 7.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = if (tomorrowWave.isSuppressed) "DORMANT" else "${tomorrowWave.pair} WAVE",
+                                            color = Color.White,
+                                            style = Typography.labelSmall,
+                                            fontFamily = FontFamily.Default,
+                                            fontSize = 8.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    if (!tomorrowWave.isSuppressed) {
+                                        Text(
+                                            text = "${tomorrowWave.primary}➔${tomorrowWave.secondary}",
+                                            color = CyberGreen,
+                                            style = Typography.labelSmall,
+                                            fontSize = 8.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Day After Tomorrow
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .border(
+                                        1.dp,
+                                        if (dayAfterWave.isSuppressed) Color(0xFF990000).copy(alpha = 0.6f) else Color.DarkGray,
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .background(if (dayAfterWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f))
+                                    .padding(6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "DAY AFTER TOMORROW",
+                                            color = CyberGreenDim,
+                                            style = Typography.labelSmall,
+                                            fontFamily = FontFamily.Default,
+                                            fontSize = 7.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = if (dayAfterWave.isSuppressed) "DORMANT" else "${dayAfterWave.pair} WAVE",
+                                            color = Color.White,
+                                            style = Typography.labelSmall,
+                                            fontFamily = FontFamily.Default,
+                                            fontSize = 8.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    if (!dayAfterWave.isSuppressed) {
+                                        Text(
+                                            text = "${dayAfterWave.primary}➔${dayAfterWave.secondary}",
+                                            color = CyberGreen,
+                                            style = Typography.labelSmall,
+                                            fontSize = 8.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+
                     } else {
                         // Anomaly tab content
                         Row(
