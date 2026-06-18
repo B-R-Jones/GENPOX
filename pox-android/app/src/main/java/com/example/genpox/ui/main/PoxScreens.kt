@@ -2039,8 +2039,7 @@ fun CombinatorView(viewModel: MainViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black)
-                    .border(2.dp, activeColor, RoundedCornerShape(6.dp))
+                    .cyberglass(borderColor = activeColor, backgroundColor = Color.Black)
                     .padding(8.dp)
             ) {
                 Column(
@@ -2096,12 +2095,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .border(
-                                        1.dp,
-                                        if (isActive) activeColor else if (isCompleted) activeColorDim.copy(alpha = 0.5f) else Color.DarkGray,
-                                        RoundedCornerShape(2.dp)
+                                    .cyberglass(
+                                        borderColor = if (isActive) activeColor else if (isCompleted) activeColorDim.copy(alpha = 0.5f) else Color.DarkGray,
+                                        backgroundColor = if (isActive) activeColor.copy(alpha = 0.15f) else Color.Transparent
                                     )
-                                    .background(if (isActive) activeColor.copy(alpha = 0.15f) else Color.Transparent)
                                     .padding(vertical = 4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -2121,8 +2118,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
-                            .background(activePanel)
+                            .cyberglass(borderColor = activeBorder, backgroundColor = activePanel)
                             .padding(8.dp)
                     ) {
                         Row(
@@ -2257,12 +2253,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .border(
-                                                    1.dp,
-                                                    if (isAnom) Color(0xFFA855F7).copy(alpha = 0.5f) else activeBorder,
-                                                    RoundedCornerShape(4.dp)
+                                                .cyberglass(
+                                                    borderColor = if (isAnom) Color(0xFFA855F7).copy(alpha = 0.5f) else activeBorder,
+                                                    backgroundColor = if (isAnom) Color(0xFF1E0B36) else activePanel
                                                 )
-                                                .background(if (isAnom) Color(0xFF1E0B36) else activePanel)
                                                 .clickable {
                                                     stepSearchSelectedGene = matchSeq
                                                     viewModel.synthManager.playBeep(440f, 0.05f, "sine")
@@ -2333,12 +2327,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         
                                         Box(
                                             modifier = Modifier
-                                                .border(
-                                                    1.dp,
-                                                    if (isEnabled) activeColor else Color.DarkGray.copy(alpha = 0.2f),
-                                                    RoundedCornerShape(4.dp)
+                                                .cyberglass(
+                                                    borderColor = if (isEnabled) activeColor else Color.DarkGray.copy(alpha = 0.2f),
+                                                    backgroundColor = if (isEnabled) activePanel else Color.Transparent
                                                 )
-                                                .background(if (isEnabled) activePanel else Color.Transparent)
                                                 .clickable(enabled = isEnabled) {
                                                     stepSearchPrefix = tentative
                                                     viewModel.synthManager.playCombinatorTick()
@@ -2401,12 +2393,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         
                                         Box(
                                             modifier = Modifier
-                                                .border(
-                                                    1.dp,
-                                                    if (isEnabled) activeColor else Color.DarkGray.copy(alpha = 0.2f),
-                                                    RoundedCornerShape(4.dp)
+                                                .cyberglass(
+                                                    borderColor = if (isEnabled) activeColor else Color.DarkGray.copy(alpha = 0.2f),
+                                                    backgroundColor = if (isEnabled) activePanel else Color.Transparent
                                                 )
-                                                .background(if (isEnabled) activePanel else Color.Transparent)
                                                 .clickable(enabled = isEnabled) {
                                                     stepSearchPrefix = tentative
                                                     viewModel.synthManager.playCombinatorTick()
