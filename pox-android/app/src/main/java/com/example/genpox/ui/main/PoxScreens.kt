@@ -7529,11 +7529,13 @@ fun HolographicRadarScanner(
                                 }
                             }
 
-                            // Draw 5 evenly spaced concentric contour lines inside each anomaly shape
-                            group.forEach { item ->
-                                val numContours = 5
-                                for (c in 1..numContours) {
-                                    val scaleVal = c.toFloat() / numContours
+                            // Draw 5 evenly spaced concentric contour lines merged seamlessly for the entire group shape
+                            val numContours = 5
+                            for (c in 1..numContours) {
+                                val scaleVal = c.toFloat() / numContours
+                                var mergedContourPath: androidx.compose.ui.graphics.Path? = null
+                                
+                                group.forEach { item ->
                                     val contourPath = androidx.compose.ui.graphics.Path()
                                     val steps = 36
                                     for (step in 0..steps) {
@@ -7548,10 +7550,26 @@ fun HolographicRadarScanner(
                                         }
                                     }
                                     contourPath.close()
+                                    
+                                    if (mergedContourPath == null) {
+                                        mergedContourPath = contourPath
+                                    } else {
+                                        mergedContourPath = androidx.compose.ui.graphics.Path.combine(
+                                            androidx.compose.ui.graphics.PathOperation.Union,
+                                            mergedContourPath,
+                                            contourPath
+                                        )
+                                    }
+                                }
+                                
+                                if (mergedContourPath != null) {
+                                    val groupColor = group.first().factionColor
+                                    val groupAlpha = group.maxOf { it.contourAlpha }
                                     val alphaFactor = 0.35f + (scaleVal * 0.45f)
+                                    
                                     drawPath(
-                                        path = contourPath,
-                                        color = item.factionColor.copy(alpha = item.contourAlpha * alphaFactor),
+                                        path = mergedContourPath,
+                                        color = groupColor.copy(alpha = groupAlpha * alphaFactor),
                                         style = Stroke(width = 1.2f)
                                     )
                                 }
