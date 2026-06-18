@@ -70,6 +70,13 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     private val _showScanner = MutableStateFlow(false)
     val showScanner: StateFlow<Boolean> = _showScanner.asStateFlow()
 
+    private val _trackedMissionId = MutableStateFlow<String?>(null)
+    val trackedMissionId: StateFlow<String?> = _trackedMissionId.asStateFlow()
+
+    fun setTrackedMissionId(id: String?) {
+        _trackedMissionId.value = id
+    }
+
     // UI Local State Flow
     private val _selectedTab = MutableStateFlow("combinator")
     val selectedTab: StateFlow<String> = _selectedTab.asStateFlow()
@@ -1644,6 +1651,10 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             val rewardedGenes = listOf(updatedPrimaryGene) + bonusGene
             val updated = mission.copy(isReturned = true, harvestedGenes = rewardedGenes, missionLogs = finalLogs)
             repository.insertMission(updated)
+
+            if (_trackedMissionId.value == mission.id) {
+                _trackedMissionId.value = null
+            }
 
             // Add harvested genes to inventory using a batch insert
             val toInsertOrUpdate = mutableListOf<GeneSequence>()

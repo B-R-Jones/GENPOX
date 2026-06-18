@@ -6591,6 +6591,40 @@ fun LockedAnomalyActiveMissionContent(
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            val trackedMissionId by viewModel.trackedMissionId.collectAsState()
+            val isTrackingThis = trackedMissionId == activeMission.id
+
+            Button(
+                onClick = {
+                    viewModel.synthManager.playBeep(480f, 0.05f, "sine")
+                    if (isTrackingThis) {
+                        viewModel.setTrackedMissionId(null)
+                    } else {
+                        viewModel.setTrackedMissionId(activeMission.id)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(30.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isTrackingThis) CyberGreen else Color.Transparent,
+                    contentColor = if (isTrackingThis) Color.Black else CyberGreen
+                ),
+                border = BorderStroke(1.dp, CyberGreen.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(2.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                Text(
+                    text = if (isTrackingThis) "✕ STOP TRACKING" else "🛰️ TRACK HARVESTER",
+                    style = Typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 8.5.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
             if (activeMission.isCompleted) {
                 Button(
                     onClick = {
@@ -6822,7 +6856,8 @@ fun LockedAnomalyDetails(
 @Composable
 fun ActiveDeployedSequencesList(
     activeMissions: List<HarvestMission>,
-    onSelectAnomalyByLatLng: (Double, Double) -> Unit
+    onSelectAnomalyByLatLng: (Double, Double) -> Unit,
+    viewModel: MainViewModel
 ) {
     if (activeMissions.isEmpty()) return
 
@@ -6905,6 +6940,34 @@ fun ActiveDeployedSequencesList(
                     }
 
                     Spacer(modifier = Modifier.width(10.dp))
+
+                    val trackedMissionId by viewModel.trackedMissionId.collectAsState()
+                    val isTrackingThis = trackedMissionId == m.id
+
+                    Box(
+                        modifier = Modifier
+                            .border(1.dp, if (isTrackingThis) CyberGreen else Color.Gray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                            .background(if (isTrackingThis) CyberGreen.copy(alpha = 0.15f) else Color.Transparent)
+                            .clickable {
+                                viewModel.synthManager.playBeep(480f, 0.05f, "sine")
+                                if (isTrackingThis) {
+                                    viewModel.setTrackedMissionId(null)
+                                } else {
+                                    viewModel.setTrackedMissionId(m.id)
+                                }
+                            }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = if (isTrackingThis) "🛰️ TRK_ON" else "🛰️ TRACK",
+                            color = if (isTrackingThis) CyberGreen else Color.Gray,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
 
                     Box(
                         modifier = Modifier
@@ -7079,6 +7142,22 @@ fun ScannerView(viewModel: MainViewModel) {
                         }
                     }
 
+                    val activeMissions by viewModel.activeMissions.collectAsState()
+                    val activeMissionsList = activeMissions.filter { !it.isReturned }
+                    if (activeMissionsList.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        ActiveDeployedSequencesList(
+                            activeMissions = activeMissionsList,
+                            onSelectAnomalyByLatLng = { mLat, mLng ->
+                                val anomaly = anomalies.find { Math.abs(it.lat - mLat) < 0.0001 && Math.abs(it.lng - mLng) < 0.0001 }
+                                if (anomaly != null) {
+                                    viewModel.setSelectedAnomalyId(anomaly.id)
+                                }
+                            },
+                            viewModel = viewModel
+                        )
+                    }
+
                 }
             }
         }
@@ -7233,6 +7312,10 @@ fun HolographicRadarScanner(
     val directionTracker = remember { DirectionTracker() }
     val activeMissions by viewModel.activeMissions.collectAsState()
     val geometryCache = remember { mutableMapOf<String, CreatureGeometry>() }
+    val trackedMissionId by viewModel.trackedMissionId.collectAsState()
+    val trackedMission = remember(activeMissions, trackedMissionId) {
+        activeMissions.find { it.id == trackedMissionId && !it.isReturned }
+    }
     val density = androidx.compose.ui.platform.LocalDensity.current
     val infiniteTransition = rememberInfiniteTransition(label = "scanline_sweep")
     val scanlineFraction by infiniteTransition.animateFloat(
@@ -7266,8 +7349,50 @@ fun HolographicRadarScanner(
         viewModel.updateZoom(zoomMultiplier)
     }
 
-    val localMapCenterLat = userLat
-    val localMapCenterLng = userLng
+    var localMapCenterLat = userLat
+    var localMapCenterLng = userLng
+
+    if (trackedMission != null) {
+        val tm = trackedMission
+        val dLatAnom = userLat - tm.lat
+        val dLngAnom = (userLng - tm.lng) * Math.cos(Math.toRadians(userLat))
+        val distGeo = kotlin.math.sqrt(dLatAnom * dLatAnom + dLngAnom * dLngAnom)
+        val rMaxGeo = tm.dispatchDistance / 111000.0
+        val tGeo = if (distGeo > 0.0) (rMaxGeo / distGeo).coerceIn(0.0, 1.0) else 0.0
+        val boundLat = tm.lat + tGeo * (userLat - tm.lat)
+        val boundLng = tm.lng + tGeo * (userLng - tm.lng)
+
+        val dTravel = tm.travelDuration.toFloat()
+        val dDescent = tm.descentDuration.toFloat()
+        val dHarvest = tm.harvestDuration.toFloat()
+        val dAscent = tm.ascentDuration.toFloat()
+        val dReturn = tm.transitBackDuration.toFloat()
+
+        val elapsedSec = (System.currentTimeMillis() - tm.startTime) / 1000f
+
+        if (elapsedSec < dTravel) {
+            val p = (elapsedSec / dTravel.coerceAtLeast(1f)).toDouble()
+            localMapCenterLat = userLat + p * (boundLat - userLat)
+            localMapCenterLng = userLng + p * (boundLng - userLng)
+        } else if (elapsedSec < dTravel + dDescent) {
+            val p = ((elapsedSec - dTravel) / dDescent.coerceAtLeast(1f)).toDouble()
+            localMapCenterLat = boundLat + p * 0.3 * (tm.lat - boundLat)
+            localMapCenterLng = boundLng + p * 0.3 * (tm.lng - boundLng)
+        } else if (elapsedSec < dTravel + dDescent + dHarvest) {
+            localMapCenterLat = boundLat + 0.3 * (tm.lat - boundLat)
+            localMapCenterLng = boundLng + 0.3 * (tm.lng - boundLng)
+        } else if (elapsedSec < dTravel + dDescent + dHarvest + dAscent) {
+            val p = ((elapsedSec - dTravel - dDescent - dHarvest) / dAscent.coerceAtLeast(1f)).toDouble()
+            val startLat = boundLat + 0.3 * (tm.lat - boundLat)
+            val startLng = boundLng + 0.3 * (tm.lng - boundLng)
+            localMapCenterLat = startLat + p * (boundLat - startLat)
+            localMapCenterLng = startLng + p * (boundLng - startLng)
+        } else if (elapsedSec < dTravel + dDescent + dHarvest + dAscent + dReturn) {
+            val p = ((elapsedSec - dTravel - dDescent - dHarvest - dAscent) / dReturn.coerceAtLeast(1f)).toDouble()
+            localMapCenterLat = boundLat + p * (userLat - boundLat)
+            localMapCenterLng = boundLng + p * (userLng - boundLng)
+        }
+    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -7687,8 +7812,8 @@ fun HolographicRadarScanner(
                         val breathScale = 1.0 + geometry.breatheAmp * kotlin.math.sin(breathingPhase * geometry.breatheFreq)
 
                         // Scale factor for miniature hologram
-                        val minScale = 0.08f // extremely compact
-                        val modelSize = 6.dp.toPx()
+                        val minScale = 0.14f // slightly larger but still compact
+                        val modelSize = 10.dp.toPx()
 
                         val tilt = Math.toRadians(18.0) // tilt angle
                         val cosT = kotlin.math.cos(tilt)
@@ -7805,6 +7930,47 @@ fun HolographicRadarScanner(
                             creatureY - modelSize - 4f,
                             textPaint
                         )
+
+                        // Draw a target lock indicator around the tracked creature
+                        val isTracked = m.id == trackedMissionId
+                        if (isTracked) {
+                            val lockSize = 14.dp.toPx()
+                            val tickLen = 4.dp.toPx()
+                            val lockColor = factionColor.copy(alpha = 0.8f)
+                            val strokeW = 1.5f
+
+                            // Top-left corner
+                            drawLine(lockColor, Offset(creatureX - lockSize, creatureY - lockSize), Offset(creatureX - lockSize + tickLen, creatureY - lockSize), strokeWidth = strokeW)
+                            drawLine(lockColor, Offset(creatureX - lockSize, creatureY - lockSize), Offset(creatureX - lockSize, creatureY - lockSize + tickLen), strokeWidth = strokeW)
+
+                            // Top-right corner
+                            drawLine(lockColor, Offset(creatureX + lockSize, creatureY - lockSize), Offset(creatureX + lockSize - tickLen, creatureY - lockSize), strokeWidth = strokeW)
+                            drawLine(lockColor, Offset(creatureX + lockSize, creatureY - lockSize), Offset(creatureX + lockSize, creatureY - lockSize + tickLen), strokeWidth = strokeW)
+
+                            // Bottom-left corner
+                            drawLine(lockColor, Offset(creatureX - lockSize, creatureY + lockSize), Offset(creatureX - lockSize + tickLen, creatureY + lockSize), strokeWidth = strokeW)
+                            drawLine(lockColor, Offset(creatureX - lockSize, creatureY + lockSize), Offset(creatureX - lockSize, creatureY + lockSize - tickLen), strokeWidth = strokeW)
+
+                            // Bottom-right corner
+                            drawLine(lockColor, Offset(creatureX + lockSize, creatureY + lockSize), Offset(creatureX + lockSize - tickLen, creatureY + lockSize), strokeWidth = strokeW)
+                            drawLine(lockColor, Offset(creatureX + lockSize, creatureY + lockSize), Offset(creatureX + lockSize, creatureY + lockSize - tickLen), strokeWidth = strokeW)
+
+                            // Small flashing indicator text
+                            if ((System.currentTimeMillis() / 400) % 2 == 0L) {
+                                val lockPaint = android.graphics.Paint().apply {
+                                    color = factionColor.toArgb()
+                                    textSize = 7.dp.toPx()
+                                    typeface = android.graphics.Typeface.MONOSPACE
+                                    textAlign = android.graphics.Paint.Align.CENTER
+                                }
+                                drawContext.canvas.nativeCanvas.drawText(
+                                    "TRK_LOCK",
+                                    creatureX,
+                                    creatureY + lockSize + 10f,
+                                    lockPaint
+                                )
+                            }
+                        }
                     }
 
                 // 5. Draw bright horizontal scanline sweep ray spanning full width of the container
