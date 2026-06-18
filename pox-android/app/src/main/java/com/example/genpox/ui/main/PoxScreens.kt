@@ -1151,8 +1151,7 @@ fun CombinatorView(viewModel: MainViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
-                    .background(activePanel)
+                    .cyberglass(borderColor = activeBorder, backgroundColor = activePanel)
                     .padding(12.dp)
             ) {
                 Column(
@@ -1218,8 +1217,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                                .background(Color.Black.copy(alpha = 0.4f))
+                                .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
                                 .padding(vertical = 10.dp, horizontal = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -1297,12 +1295,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(
-                                    1.dp,
-                                    if (todayWave.isSuppressed) Color(0xFF990000).copy(alpha = 0.8f) else CyberGreen,
-                                    RoundedCornerShape(4.dp)
+                                .cyberglass(
+                                    borderColor = if (todayWave.isSuppressed) Color(0xFF990000) else CyberGreen,
+                                    backgroundColor = if (todayWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.6f)
                                 )
-                                .background(if (todayWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.6f))
                                 .padding(8.dp)
                         ) {
                             Row(
@@ -1382,12 +1378,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .border(
-                                        1.dp,
-                                        if (tomorrowWave.isSuppressed) Color(0xFF990000).copy(alpha = 0.6f) else Color.DarkGray,
-                                        RoundedCornerShape(4.dp)
+                                    .cyberglass(
+                                        borderColor = if (tomorrowWave.isSuppressed) Color(0xFF990000) else Color.DarkGray,
+                                        backgroundColor = if (tomorrowWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f)
                                     )
-                                    .background(if (tomorrowWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f))
                                     .padding(6.dp)
                             ) {
                                 Row(
@@ -1430,12 +1424,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .border(
-                                        1.dp,
-                                        if (dayAfterWave.isSuppressed) Color(0xFF990000).copy(alpha = 0.6f) else Color.DarkGray,
-                                        RoundedCornerShape(4.dp)
+                                    .cyberglass(
+                                        borderColor = if (dayAfterWave.isSuppressed) Color(0xFF990000) else Color.DarkGray,
+                                        backgroundColor = if (dayAfterWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f)
                                     )
-                                    .background(if (dayAfterWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f))
                                     .padding(6.dp)
                             ) {
                                 Row(
@@ -1533,8 +1525,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, Color(0xFF4A125E), RoundedCornerShape(4.dp))
-                                .background(Color.Black.copy(alpha = 0.4f))
+                                .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color.Black.copy(alpha = 0.4f))
                                 .padding(vertical = 10.dp, horizontal = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -1617,12 +1608,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(
-                                    1.dp,
-                                    if (meetsRequirement) Color(0xFFA855F7) else Color(0xFF4A125E),
-                                    RoundedCornerShape(4.dp)
+                                .cyberglass(
+                                    borderColor = if (meetsRequirement) Color(0xFFA855F7) else Color(0xFF4A125E),
+                                    backgroundColor = Color.Black.copy(alpha = 0.6f)
                                 )
-                                .background(Color.Black.copy(alpha = 0.6f))
                                 .padding(8.dp)
                         ) {
                             Row(
@@ -1691,12 +1680,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .border(
-                                        1.dp,
-                                        Color(0xFF4A125E),
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .background(Color.Black.copy(alpha = 0.45f))
+                                    .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color.Black.copy(alpha = 0.45f))
                                     .padding(6.dp)
                             ) {
                                 Row(
@@ -1737,12 +1721,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .border(
-                                        1.dp,
-                                        Color(0xFF4A125E),
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .background(Color.Black.copy(alpha = 0.45f))
+                                    .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color.Black.copy(alpha = 0.45f))
                                     .padding(6.dp)
                             ) {
                                 Row(
