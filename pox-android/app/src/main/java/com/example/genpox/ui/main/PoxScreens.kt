@@ -2484,8 +2484,7 @@ fun CombinatorView(viewModel: MainViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFF020D04))
-                    .border(1.dp, Color(0xCC00FF41), RoundedCornerShape(6.dp))
+                    .cyberglass(borderColor = Color(0xFF00FF41), backgroundColor = Color(0xFF020D04))
                     .padding(12.dp)
             ) {
                 Column(
@@ -2525,8 +2524,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                             // CLEAR ALL Button
                             Box(
                                 modifier = Modifier
-                                    .border(1.dp, Color.Yellow, RoundedCornerShape(4.dp))
-                                    .background(Color.Transparent)
+                                    .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
                                     .clickable {
                                         viewModel.synthManager.playBeep(440f, 0.05f, "sine")
                                         viewModel.clearDiscoveredPacketsLog()
@@ -2546,8 +2544,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                             // CLOSE Button
                             Box(
                                 modifier = Modifier
-                                    .border(1.dp, Color.Red, RoundedCornerShape(4.dp))
-                                    .background(Color.Transparent)
+                                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
                                     .clickable {
                                         viewModel.synthManager.playBeep(440f, 0.05f, "sine")
                                         showPacketLogOverlay = false
@@ -2583,8 +2580,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, Color(0xFF00FF41), RoundedCornerShape(4.dp))
-                            .background(Color.Transparent)
+                            .cyberglass(borderColor = Color(0xFF00FF41), backgroundColor = Color.Transparent)
                             .padding(8.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
@@ -2631,12 +2627,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .border(
-                                            1.dp,
-                                            Color(0xFF00FF41).copy(alpha = 0.25f),
-                                            RoundedCornerShape(4.dp)
+                                        .cyberglass(
+                                            borderColor = Color(0xFF00FF41).copy(alpha = 0.25f),
+                                            backgroundColor = Color.Black.copy(alpha = 0.4f)
                                         )
-                                        .background(Color.Black.copy(alpha = 0.4f))
                                         .padding(8.dp)
                                 ) {
                                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -2704,14 +2698,19 @@ fun CombinatorView(viewModel: MainViewModel) {
                                             val isDecayed = anomalousGene == "DECAYED!"
                                             val isNew = packet.newGenes.contains(anomalousGene)
                                             
-                                            val borderAlpha = if (isNew) alpha else 0.0f
-                                            val borderStroke = if (isNew) BorderStroke(1.dp, Color(0xFFA855F7).copy(alpha = borderAlpha)) else null
-                                            
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .then(if (borderStroke != null) Modifier.border(borderStroke, RoundedCornerShape(2.dp)) else Modifier)
-                                                    .background(Color.Transparent)
+                                                    .then(
+                                                        if (isNew) {
+                                                            Modifier.cyberglass(
+                                                                borderColor = Color(0xFFA855F7).copy(alpha = alpha),
+                                                                backgroundColor = Color.Transparent
+                                                            )
+                                                        } else {
+                                                            Modifier
+                                                        }
+                                                    )
                                                     .clickable(enabled = !isDecayed) {
                                                         selectedPacketByGene = anomalousGene
                                                         viewModel.synthManager.playBeep(440f, 0.05f, "sine")
@@ -2762,13 +2761,20 @@ fun CombinatorView(viewModel: MainViewModel) {
                                                             val gene = packet.genes.getOrNull(idx)
                                                             if (gene != null) {
                                                                 val isNew = packet.newGenes.contains(gene)
-                                                                val borderStroke = if (isNew) BorderStroke(1.dp, Color(0xFF22D3EE).copy(alpha = alpha)) else null
                                                                 
                                                                 Box(
                                                                     modifier = Modifier
                                                                         .weight(1f)
-                                                                        .then(if (borderStroke != null) Modifier.border(borderStroke, RoundedCornerShape(2.dp)) else Modifier)
-                                                                        .background(Color.Transparent)
+                                                                        .then(
+                                                                            if (isNew) {
+                                                                                Modifier.cyberglass(
+                                                                                    borderColor = Color(0xFF22D3EE).copy(alpha = alpha),
+                                                                                    backgroundColor = Color.Transparent
+                                                                                )
+                                                                            } else {
+                                                                                Modifier
+                                                                            }
+                                                                        )
                                                                         .clickable {
                                                                             selectedPacketByGene = gene
                                                                             viewModel.synthManager.playBeep(330f, 0.04f, "sine")
@@ -2844,8 +2850,7 @@ fun CombinatorView(viewModel: MainViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black)
-                    .border(2.dp, Color(0xFFA855F7), RoundedCornerShape(6.dp))
+                    .cyberglass(borderColor = Color(0xFFA855F7), backgroundColor = Color.Black)
                     .padding(8.dp)
             ) {
                 Column(
@@ -2902,8 +2907,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .border(1.dp, Color(0xFF4A125E), RoundedCornerShape(4.dp))
-                                        .background(Color(0xFF1E0B36))
+                                        .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color(0xFF1E0B36))
                                         .clickable {
                                             selectedAnomalousGene = gene.sequence
                                             viewModel.synthManager.playBeep(587f, 0.05f, "triangle")
