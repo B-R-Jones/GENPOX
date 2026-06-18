@@ -2450,17 +2450,26 @@ fun CombinatorView(viewModel: MainViewModel) {
 
                     // Intermediate matches shortcut button
                     if (!isDone && stepSearchPrefix.isNotEmpty() && !viewStepSearchMatchesOnly) {
-                        Button(
-                            onClick = { viewStepSearchMatchesOnly = true },
-                            modifier = Modifier.fillMaxWidth().height(36.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = activeColorDim.copy(alpha = 0.15f), contentColor = activeColor),
-                            border = BorderStroke(1.dp, activeColorDim.copy(alpha = 0.5f)),
-                            shape = RoundedCornerShape(4.dp)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(36.dp)
+                                .cyberglass(
+                                    borderColor = activeColorDim.copy(alpha = 0.5f),
+                                    backgroundColor = activeColorDim.copy(alpha = 0.15f)
+                                )
+                                .clickable {
+                                    viewStepSearchMatchesOnly = true
+                                    viewModel.synthManager.playCombinatorTick()
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "VIEW INTERMEDIATE MATCHES",
                                 style = Typography.labelSmall,
-                                fontFamily = FontFamily.Default
+                                color = activeColor,
+                                fontFamily = FontFamily.Default,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -2964,7 +2973,11 @@ fun CombinatorView(viewModel: MainViewModel) {
             
             AlertDialog(
                 onDismissRequest = { selectedPacketByGene = null },
-                containerColor = if (isAnom) Color(0xFF150B24) else activePanel,
+                modifier = Modifier.cyberglass(
+                    borderColor = if (isAnom) Color(0xFFA855F7) else activeColor,
+                    backgroundColor = if (isAnom) Color(0xFF150B24) else activePanel
+                ),
+                containerColor = Color.Transparent,
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -3048,15 +3061,23 @@ fun CombinatorView(viewModel: MainViewModel) {
                     }
                 },
                 confirmButton = {
-                    Button(
-                        onClick = { selectedPacketByGene = null },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isAnom) Color(0xFFA855F7) else activeColor,
-                            contentColor = Color.Black
-                        ),
-                        shape = RoundedCornerShape(4.dp)
+                    Box(
+                        modifier = Modifier
+                            .cyberglass(
+                                borderColor = if (isAnom) Color(0xFFA855F7) else activeColor,
+                                backgroundColor = if (isAnom) Color(0xFFA855F7).copy(alpha = 0.15f) else activeColor.copy(alpha = 0.15f)
+                            )
+                            .clickable { selectedPacketByGene = null }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("CLOSE DIAGNOSTIC", style = Typography.labelSmall, fontFamily = FontFamily.Default)
+                        Text(
+                            text = "CLOSE DIAGNOSTIC",
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            color = if (isAnom) Color(0xFFD8B4FE) else activeColor,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             )
@@ -3071,7 +3092,11 @@ fun CombinatorView(viewModel: MainViewModel) {
             
             AlertDialog(
                 onDismissRequest = { stepSearchSelectedGene = null },
-                containerColor = if (isAnom) Color(0xFF150B24) else activePanel,
+                modifier = Modifier.cyberglass(
+                    borderColor = if (isAnom) Color(0xFFA855F7) else activeColor,
+                    backgroundColor = if (isAnom) Color(0xFF150B24) else activePanel
+                ),
+                containerColor = Color.Transparent,
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -3141,15 +3166,23 @@ fun CombinatorView(viewModel: MainViewModel) {
                     }
                 },
                 confirmButton = {
-                    Button(
-                        onClick = { stepSearchSelectedGene = null },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isAnom) Color(0xFFA855F7) else activeColor,
-                            contentColor = Color.Black
-                        ),
-                        shape = RoundedCornerShape(4.dp)
+                    Box(
+                        modifier = Modifier
+                            .cyberglass(
+                                borderColor = if (isAnom) Color(0xFFA855F7) else activeColor,
+                                backgroundColor = if (isAnom) Color(0xFFA855F7).copy(alpha = 0.15f) else activeColor.copy(alpha = 0.15f)
+                            )
+                            .clickable { stepSearchSelectedGene = null }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("DISMISS", style = Typography.labelSmall, fontFamily = FontFamily.Default)
+                        Text(
+                            text = "DISMISS",
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            color = if (isAnom) Color(0xFFD8B4FE) else activeColor,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             )
@@ -3163,7 +3196,11 @@ fun CombinatorView(viewModel: MainViewModel) {
             
             AlertDialog(
                 onDismissRequest = { selectedAnomalousGene = null },
-                containerColor = Color(0xFF150B24),
+                modifier = Modifier.cyberglass(
+                    borderColor = Color(0xFFA855F7),
+                    backgroundColor = Color(0xFF150B24)
+                ),
+                containerColor = Color.Transparent,
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -3214,12 +3251,23 @@ fun CombinatorView(viewModel: MainViewModel) {
                     }
                 },
                 confirmButton = {
-                    Button(
-                        onClick = { selectedAnomalousGene = null },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA855F7), contentColor = Color.White),
-                        shape = RoundedCornerShape(4.dp)
+                    Box(
+                        modifier = Modifier
+                            .cyberglass(
+                                borderColor = Color(0xFFA855F7),
+                                backgroundColor = Color(0xFFA855F7).copy(alpha = 0.15f)
+                            )
+                            .clickable { selectedAnomalousGene = null }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("DISMISS", style = Typography.labelSmall, fontFamily = FontFamily.Default)
+                        Text(
+                            text = "DISMISS",
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            color = Color(0xFFD8B4FE),
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             )
