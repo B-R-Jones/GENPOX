@@ -7245,6 +7245,16 @@ fun HolographicRadarScanner(
         label = "scanline"
     )
 
+    val contourFlowProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "contour_flow"
+    )
+
     var sliderValue by remember { mutableStateOf(2.0f) }
     val zoomSteps = listOf(4.0f, 2.0f, 1.0f, 0.5f, 0.25f)
     val lowerIndex = sliderValue.toInt().coerceIn(0, 3)
@@ -7529,10 +7539,12 @@ fun HolographicRadarScanner(
                                 }
                             }
 
-                            // Draw 5 evenly spaced concentric contour lines merged seamlessly for the entire group shape
+                            // Draw 5 evenly spaced concentric contour lines merged seamlessly and animating outward
                             val numContours = 5
                             for (c in 1..numContours) {
-                                val scaleVal = c.toFloat() / numContours
+                                val scaleVal = (c.toFloat() - 1f + contourFlowProgress) / numContours
+                                if (scaleVal < 0.02f) continue
+                                
                                 var mergedContourPath: androidx.compose.ui.graphics.Path? = null
                                 
                                 group.forEach { item ->
@@ -7565,11 +7577,12 @@ fun HolographicRadarScanner(
                                 if (mergedContourPath != null) {
                                     val groupColor = group.first().factionColor
                                     val groupAlpha = group.maxOf { it.contourAlpha }
-                                    val alphaFactor = 0.35f + (scaleVal * 0.45f)
+                                    // Parabolic window function to fade out smoothly at the epicenter and the outer boundary
+                                    val alphaFactor = (4.0f * scaleVal * (1.0f - scaleVal)).coerceIn(0.0f, 1.0f)
                                     
                                     drawPath(
                                         path = mergedContourPath,
-                                        color = groupColor.copy(alpha = groupAlpha * alphaFactor),
+                                        color = groupColor.copy(alpha = groupAlpha * alphaFactor * 0.8f),
                                         style = Stroke(width = 1.2f)
                                     )
                                 }
