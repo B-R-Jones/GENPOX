@@ -632,14 +632,14 @@ fun QrRevealVisual(modifier: Modifier = Modifier) {
                 color = CyberGreen,
                 fontSize = 7.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                fontFamily = FontFamily.Monospace,
                 textAlign = TextAlign.Center
             )
             Text(
                 text = "[ TAP TO REVEAL ]",
                 color = Color.Gray,
                 fontSize = 5.sp,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                fontFamily = FontFamily.Monospace,
                 textAlign = TextAlign.Center
             )
         }
@@ -1654,7 +1654,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         color = Color(0xFFA855F7),
                                         style = Typography.bodySmall,
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        fontFamily = FontFamily.Monospace
                                     )
                                     Text(
                                         text = "RESETS STABILITY",
@@ -1712,7 +1712,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         style = Typography.labelSmall,
                                         fontSize = 8.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        fontFamily = FontFamily.Monospace
                                     )
                                 }
                             }
@@ -1753,7 +1753,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         style = Typography.labelSmall,
                                         fontSize = 8.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        fontFamily = FontFamily.Monospace
                                     )
                                 }
                             }
@@ -2147,7 +2147,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         Text(
                                             text = charStr,
                                             style = Typography.bodyMedium,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold,
                                             color = if (isCurrent) Color.White else if (charStr != "•") activeColor else Color.DarkGray
                                         )
@@ -2163,7 +2163,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         Text(
                                             text = block,
                                             style = Typography.bodyMedium,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold,
                                             color = if (isCurrent) Color.White else if (block != "••") activeColor else Color.DarkGray
                                         )
@@ -2269,7 +2269,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                                 Text(
                                                     text = matchSeq,
                                                     style = Typography.bodyMedium,
-                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                    fontFamily = FontFamily.Monospace,
                                                     fontWeight = FontWeight.Bold,
                                                     color = if (isAnom) Color(0xFFD8B4FE) else activeColor
                                                 )
@@ -2344,7 +2344,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                                     style = Typography.bodyMedium,
                                                     fontWeight = FontWeight.Bold,
                                                     color = if (isEnabled) Color.White else Color.Gray.copy(alpha = 0.3f),
-                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                                    fontFamily = FontFamily.Monospace
                                                 )
                                                 if (isEnabled) {
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2410,7 +2410,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                                     style = Typography.bodyMedium,
                                                     fontWeight = FontWeight.Bold,
                                                     color = if (isEnabled) Color.White else Color.Gray.copy(alpha = 0.3f),
-                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                                    fontFamily = FontFamily.Monospace
                                                 )
                                                 if (isEnabled) {
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2687,7 +2687,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                                     text = timeStr,
                                                     style = Typography.labelSmall,
                                                     color = Color.Gray,
-                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                                    fontFamily = FontFamily.Monospace
                                                 )
                                             }
                                         }
@@ -2726,7 +2726,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                                     Text(
                                                         text = anomalousGene,
                                                         style = Typography.bodyMedium,
-                                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                        fontFamily = FontFamily.Monospace,
                                                         fontWeight = FontWeight.Bold,
                                                         color = if (isDecayed) Color.Red else Color(0xFFA855F7).copy(alpha = if (isNew) alpha else 1f)
                                                     )
@@ -2787,7 +2787,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                                                         style = Typography.labelSmall,
                                                                         fontSize = 7.5.sp,
                                                                         color = if (isNew) Color(0xFF22D3EE).copy(alpha = alpha) else Color(0xFF00FF41),
-                                                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                                        fontFamily = FontFamily.Monospace,
                                                                         fontWeight = FontWeight.Bold
                                                                     )
                                                                 }
@@ -2923,19 +2923,19 @@ fun CombinatorView(viewModel: MainViewModel) {
                                             Text(
                                                 text = gene.sequence,
                                                 style = Typography.bodyMedium,
-                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                fontFamily = FontFamily.Monospace,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color(0xFFD8B4FE)
                                             )
                                             Text(
-                                                text = benefit.name,
+                                                text = benefit.name.uppercase(),
                                                 style = Typography.bodySmall,
                                                 fontFamily = FontFamily.Default,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color(0xFFA855F7)
                                             )
                                             Text(
-                                                text = benefit.description,
+                                                text = benefit.description.uppercase(),
                                                 style = Typography.labelSmall,
                                                 fontFamily = FontFamily.Default,
                                                 color = Color(0xFFCCC2DC),
@@ -3019,7 +3019,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                         Text(
                             text = "SEQUENCE: $gene",
                             style = Typography.bodyMedium,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             color = if (isAnom) Color(0xFFD8B4FE) else activeColor
                         )
@@ -3138,7 +3138,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                         Text(
                             text = "SEQUENCE: $gene",
                             style = Typography.bodyMedium,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             color = if (isAnom) Color(0xFFD8B4FE) else activeColor
                         )
@@ -3228,7 +3228,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                         Text(
                             text = "SEQUENCE: $gene",
                             style = Typography.bodyMedium,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFD8B4FE)
                         )
@@ -3479,7 +3479,7 @@ fun SplicerLeftPanel(
                             text = log,
                             color = if (isAlert) Color(0xFFFCA5A5) else Color(0xFF34D399),
                             style = Typography.bodySmall,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontFamily = FontFamily.Monospace,
                             fontSize = 9.sp
                         )
                     }
@@ -3723,7 +3723,7 @@ fun SplicerLeftPanel(
                             color = if (isSegmentLoaded) color.copy(alpha = 0.8f) else Color.Gray,
                             style = Typography.bodySmall,
                             fontSize = 10.sp,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace
                         )
 
                         if (isSegmentLoaded) {
@@ -3732,7 +3732,7 @@ fun SplicerLeftPanel(
                                 color = color,
                                 style = Typography.bodySmall,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
                                 letterSpacing = 1.sp
                             )
@@ -3931,7 +3931,7 @@ fun SplicerLeftPanel(
                                             color = color,
                                             style = Typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontFamily = FontFamily.Monospace,
                                             fontSize = 10.sp,
                                             letterSpacing = 1.sp,
                                             textAlign = TextAlign.Center
@@ -4012,7 +4012,7 @@ fun SplicerLeftPanel(
                                             color = color,
                                             style = Typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontFamily = FontFamily.Monospace,
                                             fontSize = 10.sp,
                                             letterSpacing = 1.sp,
                                             textAlign = TextAlign.Center
@@ -4287,7 +4287,7 @@ fun SplicerRightPanel(
                     text = expected,
                     color = Color(0xFF22D3EE),
                     style = Typography.bodyMedium,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
                     letterSpacing = 1.sp
@@ -4339,7 +4339,7 @@ fun SplicerRightPanel(
                             text = matchingGene.sequence,
                             color = CyberGreen,
                             style = Typography.bodyMedium,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
                             letterSpacing = 1.sp
@@ -4652,7 +4652,7 @@ fun VaultView(viewModel: MainViewModel) {
                                 text = "${filteredSortedCreatures.size} / ${creatures.size}",
                                 color = CyberGreen,
                                 fontSize = 8.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -4824,7 +4824,7 @@ fun VaultView(viewModel: MainViewModel) {
                                         color = CyberGreen,
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Black,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        fontFamily = FontFamily.Monospace,
                                         textAlign = TextAlign.Center
                                     )
                                 }
@@ -4995,7 +4995,7 @@ fun VaultView(viewModel: MainViewModel) {
                                 text = "${filteredSortedCreatures.size}",
                                 color = CyberGreen,
                                 fontSize = 9.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
@@ -5235,7 +5235,7 @@ fun CreatureDetailCard(
                 Text(
                     text = c.id,
                     style = Typography.bodySmall,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    fontFamily = FontFamily.Monospace,
                     color = CyberGreen,
                     fontSize = 9.sp
                 )
@@ -5512,7 +5512,7 @@ fun CreatureDetailCard(
                         color = if (isDegraded) Color(0xFFEF4444) else Color.White,
                         style = Typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace
                     )
                 }
 
@@ -5559,7 +5559,7 @@ fun CreatureDetailCard(
                             color = if (isDegraded) Color(0xFFEF4444) else Color.White,
                             style = Typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace
                         )
                     }
                 }
@@ -5607,7 +5607,7 @@ fun CreatureDetailCard(
                             color = if (isDegraded) Color(0xFFEF4444) else Color.White,
                             style = Typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace
                         )
                     }
                 }
@@ -5655,7 +5655,7 @@ fun CreatureDetailCard(
                             color = if (isDegraded) Color(0xFFEF4444) else Color.White,
                             style = Typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace
                         )
                     }
                 }
@@ -5690,7 +5690,7 @@ fun CreatureDetailCard(
                             color = Color.White,
                             style = Typography.labelSmall,
                             fontWeight = FontWeight.ExtraBold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace
                         )
                     }
                     val telomereColor = when {
@@ -5770,7 +5770,7 @@ fun CreatureDetailCard(
                                         color = color,
                                         style = Typography.bodySmall,
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        fontFamily = FontFamily.Monospace,
                                         letterSpacing = 1.sp
                                     )
                                 }
@@ -5910,7 +5910,7 @@ fun CreatureDetailCard(
                                             color = textColor,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontFamily = FontFamily.Monospace,
                                             letterSpacing = 0.5.sp,
                                             modifier = Modifier.align(Alignment.BottomCenter)
                                         )
@@ -6103,7 +6103,7 @@ fun CreatureDetailCard(
                                                 color = color,
                                                 style = Typography.bodySmall,
                                                 fontWeight = FontWeight.Bold,
-                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                                fontFamily = FontFamily.Monospace
                                             )
                                         }
                                     }
@@ -6190,7 +6190,7 @@ fun CreatureDetailCard(
                                                     color = Color.White,
                                                     fontSize = 9.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                                    fontFamily = FontFamily.Monospace
                                                 )
                                             }
                                         }
@@ -6977,7 +6977,7 @@ fun LockedAnomalyActiveMissionContent(
                         text = log,
                         color = if (isAlert) Color(0xFFFCA5A5) else Color(0xFF34D399),
                         style = Typography.bodySmall,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontFamily = FontFamily.Monospace,
                         fontSize = 9.sp
                     )
                 }
@@ -8909,7 +8909,7 @@ fun BioLabTestView(viewModel: MainViewModel) {
                         color = CyberGreen,
                         style = Typography.titleLarge,
                         fontSize = 26.sp,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 4.sp
                     )
@@ -8926,13 +8926,13 @@ fun BioLabTestView(viewModel: MainViewModel) {
                         text = "REACTOR STATE: ${if (poxReactorActive) "ACTIVE" else "IDLE"}",
                         color = CyberGreenDim,
                         style = Typography.labelSmall,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace
                     )
                     Text(
                         text = "NEXT CYCLE IN: ${poxIdleTime}S",
                         color = CyberGreenDim,
                         style = Typography.labelSmall,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace
                     )
                 }
             },
@@ -8960,7 +8960,7 @@ fun BioLabTestView(viewModel: MainViewModel) {
                             text = "LOG EMPTY: NO ACTIVE PACKETS CACHED",
                             color = Color.Gray,
                             style = Typography.bodySmall,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontFamily = FontFamily.Monospace,
                             fontSize = 9.sp
                         )
                     } else {
@@ -8970,7 +8970,7 @@ fun BioLabTestView(viewModel: MainViewModel) {
                                 text = "• [${packet.genes.size} GENES] $typeStr SUCCESS",
                                 color = if (packet.isAnomalous) Color(0xFFA855F7) else CyberGreen,
                                 style = Typography.bodySmall,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontFamily = FontFamily.Monospace,
                                 fontSize = 9.sp
                             )
                         }
@@ -9032,14 +9032,14 @@ fun SplicerTestView(viewModel: MainViewModel) {
                                 text = "SLOT #${i + 1}",
                                 color = Color.Gray,
                                 style = Typography.bodySmall,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontFamily = FontFamily.Monospace,
                                 fontSize = 9.sp
                             )
                             Text(
                                 text = slotGene ?: "--------",
                                 color = if (slotGene != null) CyberGreen else Color.DarkGray,
                                 style = Typography.bodySmall,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontFamily = FontFamily.Monospace,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -9083,7 +9083,7 @@ fun SplicerTestView(viewModel: MainViewModel) {
                                         text = block,
                                         color = Color(0xFFA855F7),
                                         style = Typography.bodySmall,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        fontFamily = FontFamily.Monospace,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold
                                     )
