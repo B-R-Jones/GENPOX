@@ -7202,7 +7202,11 @@ private data class ProjectedAnomaly(
     val rMax: Float,
     val factionColor: Color,
     val contourAlpha: Float,
-    val path: androidx.compose.ui.graphics.Path
+    val path: androidx.compose.ui.graphics.Path,
+    val r0Pixels: Double,
+    val epsilon: Double,
+    val k: Int,
+    val phi: Double
 )
 
 class DirectionTracker {
@@ -7461,7 +7465,7 @@ fun HolographicRadarScanner(
                         }
                         path.close()
 
-                        ProjectedAnomaly(ax, ay, rMax, factionColor, contourAlpha, path)
+                        ProjectedAnomaly(ax, ay, rMax, factionColor, contourAlpha, path, r0Pixels, epsilon, k, phi)
                     }
 
                     // Group overlapping anomalies
@@ -7513,19 +7517,33 @@ fun HolographicRadarScanner(
                                 }
                             }
 
-                            var mergedPath = group.first().path
-                            for (mIdx in 1 until group.size) {
-                                mergedPath = androidx.compose.ui.graphics.Path.combine(
-                                    androidx.compose.ui.graphics.PathOperation.Union,
-                                    mergedPath,
-                                    group[mIdx].path
-                                )
+                            // Draw 5 evenly spaced concentric contour lines inside each anomaly shape
+                            group.forEach { item ->
+                                val numContours = 5
+                                for (c in 1..numContours) {
+                                    val scaleVal = c.toFloat() / numContours
+                                    val contourPath = androidx.compose.ui.graphics.Path()
+                                    val steps = 36
+                                    for (step in 0..steps) {
+                                        val theta = (step * 2.0 * Math.PI) / steps
+                                        val rBase = item.r0Pixels * (1.0 + item.epsilon * kotlin.math.cos(item.k * theta + item.phi)) * scaleVal
+                                        val py = (item.ay + rBase * kotlin.math.sin(theta)).toFloat()
+                                        val px = (item.ax + rBase * kotlin.math.cos(theta) + getGlitchOffsetX(py)).toFloat()
+                                        if (step == 0) {
+                                            contourPath.moveTo(px, py)
+                                        } else {
+                                            contourPath.lineTo(px, py)
+                                        }
+                                    }
+                                    contourPath.close()
+                                    val alphaFactor = 0.35f + (scaleVal * 0.45f)
+                                    drawPath(
+                                        path = contourPath,
+                                        color = item.factionColor.copy(alpha = item.contourAlpha * alphaFactor),
+                                        style = Stroke(width = 1.2f)
+                                    )
+                                }
                             }
-                            
-                            val groupColor = group.first().factionColor
-                            val groupAlpha = group.maxOf { it.contourAlpha }
-                            
-                            drawPath(mergedPath, color = groupColor.copy(alpha = groupAlpha), style = Stroke(width = 2.0f))
                             
                             group.forEach { item ->
                                 drawCircle(item.factionColor, radius = 3.5f, center = Offset(item.ax, item.ay))
