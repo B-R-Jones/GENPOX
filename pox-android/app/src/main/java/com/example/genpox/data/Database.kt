@@ -62,7 +62,7 @@ interface PoxDao {
     }
 
     // Harvest Missions
-    @Query("SELECT * FROM harvest_missions WHERE isReturned = 0")
+    @Query("SELECT * FROM harvest_missions WHERE isReturned = 0 ORDER BY startTime ASC")
     fun getActiveMissions(): Flow<List<HarvestMission>>
 
     @Query("SELECT * FROM harvest_missions")
@@ -73,9 +73,19 @@ interface PoxDao {
 
     @Update
     suspend fun updateMission(mission: HarvestMission)
+
+    // Cached Road Cells
+    @Query("SELECT * FROM cached_road_cells WHERE cellKey = :cellKey LIMIT 1")
+    suspend fun getCachedRoadCell(cellKey: String): CachedRoadCell?
+
+    @Query("SELECT * FROM cached_road_cells")
+    suspend fun getAllCachedRoadCells(): List<CachedRoadCell>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCachedRoadCell(cell: CachedRoadCell)
 }
 
-@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class], version = 3, exportSchema = false)
+@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class, CachedRoadCell::class], version = 6, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class PoxDatabase : RoomDatabase() {
     abstract fun poxDao(): PoxDao

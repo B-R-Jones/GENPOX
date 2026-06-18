@@ -17,3 +17,12 @@ The rotating double-helix DNA graphic (rendered dynamically using trigonometric 
     *   *Idea*: A rotating hexagonal cyber-shell loader that unlocks layer-by-layer (spinning out outer shells) as security clearances are resolved during cataloging.
 *   **NTP Sync status (Main Header)**:
     *   *Idea*: Replacing the simple blinking green dot with a micro-spinning gear or signal wave vector animation next to `NTP_SYNC`.
+
+---
+
+## 2. Atmospheric / Oscillation Cycles Discussion
+*   **Concept**: Synodic oscillation wave patterns or shifting atmospheric cycles that dynamically impact localized environmental variables like scan accuracy, mutation frequencies, and well density fluctuations over time.
+*   **Discussion Points**:
+    - How do these cycles synchronize with the standard 29.53-day lunar age?
+    - Should the frequency of these cycles trigger on exact calendar dates, system uptime, or active reactor temperature parameters?
+    - Visual display design: rendering oscillating sine waves or shifting atmospheric particle densities directly inside the target scanning dashboard.

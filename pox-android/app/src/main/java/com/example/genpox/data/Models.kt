@@ -26,7 +26,9 @@ data class Creature(
     val isFavorite: Boolean = false,
     val telomeres: Int = 100,
     val isFullCoherence: Boolean = false,
-    val coherenceType: String? = null
+    val coherenceType: String? = null,
+    val isMutated: Boolean = false,
+    val originalSequence: String? = null
 )
 
 @Entity(tableName = "gene_sequences")
@@ -50,7 +52,19 @@ data class HarvestMission(
     val totalDuration: Long,
     val harvestedGenes: List<String> = emptyList(),
     val isCompleted: Boolean = false,
-    val isReturned: Boolean = false
+    val isReturned: Boolean = false,
+    val dispatchDistance: Double = 0.0,
+    val stalledDepth: Double = 0.0,
+    val originalSequence: String? = null,
+    val elapsedSeconds: Long = 0,
+    val missionLogs: List<String> = emptyList(),
+    val phase: String = "TRAVEL",
+    val travelDuration: Long = 0,
+    val descentDuration: Long = 0,
+    val harvestDuration: Long = 60,
+    val ascentDuration: Long = 0,
+    val transitBackDuration: Long = 0,
+    val currentPhaseElapsed: Long = 0
 )
 
 @Serializable
@@ -61,3 +75,14 @@ data class NearbyUser(
     val creaturesAvailable: List<Creature> = emptyList(),
     val targetSequence: String? = null
 )
+
+@Entity(tableName = "cached_road_cells")
+@Serializable
+data class CachedRoadCell(
+    @PrimaryKey val cellKey: String, // "cellX,cellY"
+    val roadsJson: String,           // JSON representation of List<List<RoadPoint>>
+    val fetchedAt: Long              // Timestamp in ms
+)
+
+@Serializable
+data class RoadPoint(val lat: Double, val lng: Double)

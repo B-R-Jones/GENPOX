@@ -293,7 +293,7 @@ object WaveMath {
         }
 
         val rawPower = charVal(s2) + charVal(s3) + charVal(s4) + charVal(s5)
-        val effectIndex = (s0.code + s1.code) % 5
+        val effectIndex = (s0.code + s1.code) % 6
 
         var id = "DOUBLE_STRIKE"
         var effectType = "double_attack"
@@ -331,6 +331,12 @@ object WaveMath {
                 effectType = "phase_shift"
                 chance = 10.0 + 1.5 * rawPower
                 baseDesc = "Grants a ${chance.toInt()}% evasion chance to phase shift past incoming attacks."
+            }
+            5 -> {
+                id = "COHERENCE_SHIELD"
+                effectType = "coherence_shield"
+                magnitude = 1.0
+                baseDesc = "Grants immunity to positive density drag during descent/ascent into anomalies."
             }
         }
 

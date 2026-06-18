@@ -24,6 +24,11 @@ interface DataRepository {
     suspend fun insertMission(mission: HarvestMission)
     suspend fun updateMission(mission: HarvestMission)
 
+    // Cached road cells
+    suspend fun getCachedRoadCell(cellKey: String): CachedRoadCell?
+    suspend fun getAllCachedRoadCells(): List<CachedRoadCell>
+    suspend fun insertCachedRoadCell(cell: CachedRoadCell)
+
     // Settings access
     val geminiApiKey: Flow<String>
     val muteSound: Flow<Boolean>
@@ -82,6 +87,12 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
     override suspend fun insertMission(mission: HarvestMission) = poxDao.insertMission(mission)
 
     override suspend fun updateMission(mission: HarvestMission) = poxDao.updateMission(mission)
+
+    override suspend fun getCachedRoadCell(cellKey: String): CachedRoadCell? = poxDao.getCachedRoadCell(cellKey)
+
+    override suspend fun getAllCachedRoadCells(): List<CachedRoadCell> = poxDao.getAllCachedRoadCells()
+
+    override suspend fun insertCachedRoadCell(cell: CachedRoadCell) = poxDao.insertCachedRoadCell(cell)
 
     // Settings access overrides
     override val geminiApiKey: Flow<String>

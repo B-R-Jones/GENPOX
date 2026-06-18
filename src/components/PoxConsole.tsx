@@ -25,6 +25,7 @@ import { sound } from "../utils/audio";
 import { getDailyWaveConfig, generateWaveGeneBlock } from "../utils/wave";
 import ForecastCalendar from "./ForecastCalendar";
 import { Circle } from "./circle";
+import DualPaneConsoleFrame, { ConsolePanel } from "./DualPaneConsoleFrame";
 
 // Deterministic 128 daily target sequences generator
 export const generateDailyBountySequences = (seedStr: string): string[] => {
@@ -786,6 +787,73 @@ export function getEffectiveStats(c: Creature) {
   };
 }
 
+const SingleDnaDotGrid = ({ sequence, label }: { sequence: string; label: string }) => {
+  const columns = 8;
+  const rows = Math.ceil(sequence.length / columns);
+  
+  const getDotColor = (char: string, blockIndex: number) => {
+    const blockStart = blockIndex * 8;
+    const blockEnd = Math.min(sequence.length, blockStart + 8);
+    const block = sequence.substring(blockStart, blockEnd);
+    
+    const isAnomalous = block.split("").some(c => "XZYW?!$%&@#".includes(c));
+    if (isAnomalous) return "#A855F7"; // Purple
+    
+    switch (char.toUpperCase()) {
+      case 'A': return "#00FF41"; // Green
+      case 'G': return "#FBBF24"; // Yellow
+      case 'T': return "#60A5FA"; // Blue
+      case 'C': return "#EC4899"; // Magenta
+      default: return "#404040";
+    }
+  };
+  
+  return (
+    <div className="flex flex-col items-center gap-1 flex-1">
+      <span className="text-[8px] font-bold text-white font-mono mb-1">{label}</span>
+      <div className="flex flex-col gap-1">
+        {Array.from({ length: rows }).map((_, r) => (
+          <div key={r} className="flex gap-1 justify-center">
+            {Array.from({ length: columns }).map((_, c) => {
+              const idx = r * columns + c;
+              if (idx < sequence.length) {
+                const char = sequence[idx];
+                const color = getDotColor(char, r);
+                return (
+                  <div
+                    key={c}
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: color }}
+                    title={`Pos ${idx}: ${char}`}
+                  />
+                );
+              } else {
+                return <div key={c} className="w-2 h-2" />;
+              }
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export const renderDnaComparison = (original: string, current: string, isGreen: boolean) => {
+  return (
+    <div className={`bg-black/90 p-2 border rounded space-y-1 font-mono text-[9px] ${
+      isGreen ? 'border-green-950/40' : 'border-purple-950/40'
+    }`}>
+      <div className={`text-[7px] uppercase font-bold tracking-wider ${
+        isGreen ? 'text-green-500' : 'text-purple-400'
+      }`}>DNA MUTATION TELEMETRY SCAN</div>
+      <div className="flex justify-between gap-4 p-1">
+        <SingleDnaDotGrid sequence={original || ""} label="SEQ. SCAN: Original" />
+        <SingleDnaDotGrid sequence={current || ""} label="SEQ. SCAN: Mutated" />
+      </div>
+    </div>
+  );
+};
+
 export default function PoxConsole({ 
   isMobileView = false, 
   viewportProfile = "desktop",
@@ -955,13 +1023,27 @@ export default function PoxConsole({
     };
   }, [baseTallies]);
   
-  const [idleTime, setIdleTime] = useState<number>(16); 
-  const idleTimeRef = useRef<number>(16);
+  const [poxReactorActive, setPoxReactorActive] = useState<boolean>(true);
+  const poxReactorActiveRef = useRef<boolean>(true);
+  useEffect(() => {
+    poxReactorActiveRef.current = poxReactorActive;
+  }, [poxReactorActive]);
+
+  const [poxIdleTime, setPoxIdleTime] = useState<number>(16);
+  const poxIdleTimeRef = useRef<number>(16);
+  useEffect(() => {
+    poxIdleTimeRef.current = poxIdleTime;
+  }, [poxIdleTime]);
+
+  const [anomalyIdleTime, setAnomalyIdleTime] = useState<number>(16);
+  const anomalyIdleTimeRef = useRef<number>(16);
+  useEffect(() => {
+    anomalyIdleTimeRef.current = anomalyIdleTime;
+  }, [anomalyIdleTime]);
+
   const tickIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tickerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  useEffect(() => {
-    idleTimeRef.current = idleTime;
-  }, [idleTime]);
+
   const [scrollingGene, setScrollingGene] = useState<string>("--------");
   const [newestSequence, setNewestSequence] = useState<string>("");
   const [isFreshSequence, setIsFreshSequence] = useState<boolean>(false);
@@ -1056,6 +1138,13 @@ export default function PoxConsole({
         description: "Heals 15 HP on each attack.",
         effectType: "health_regen"
       };
+    } else if (char === '&' || char === '@') {
+      return {
+        id: "COHERENCE_SHIELD",
+        name: "Cosmic Mirror-Shield",
+        description: "Grants immunity to positive density drag during descent/ascent into anomalies.",
+        effectType: "coherence_shield"
+      };
     } else {
       return {
         id: "PHASE_SHIFT",
@@ -1133,6 +1222,10 @@ export default function PoxConsole({
       constructProceduralCreature("AGTCGTACCCCGGMAATTTAAACGAGTCGTACCCCGGMAATTTAAACGTTTAAACGAGTCGTAC"),
     ];
   });
+  const creaturesRef = useRef<Creature[]>(creatures);
+  useEffect(() => {
+    creaturesRef.current = creatures;
+  }, [creatures]);
   const [inspectedCreatureId, setInspectedCreatureId] = useState<string | null>(null);
   const [creatureCardOpenedFrom, setCreatureCardOpenedFrom] = useState<'Constructor' | 'Gen-Vault Data' | 'Trade' | 'Scanner'>('Gen-Vault Data');
   const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
@@ -1423,6 +1516,13 @@ export default function PoxConsole({
   useEffect(() => {
     boostSecondsLeftRef.current = boostSecondsLeft;
   }, [boostSecondsLeft]);
+
+  const isBoostActive = boostSecondsLeft > 0;
+  const resetVal = isBoostActive ? 8 : 16;
+  const currentIdleTime = bioLabSubTab === 'anomaly' ? anomalyIdleTime : poxIdleTime;
+  const isReactorActive = bioLabSubTab === 'anomaly' ? anomalyEngineActive : poxReactorActive;
+  const progressPercent = isReactorActive ? (((resetVal - currentIdleTime) / resetVal) * 100) : 0;
+  const showTransition = currentIdleTime !== resetVal && isReactorActive;
 
   // Transceiver / Trading State
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
@@ -1805,7 +1905,24 @@ export default function PoxConsole({
     setIsTradeQrEnlarged(false);
   }, [selectedAnomalyId, activeTab, syncNetTab]);
 
-  // Real-time tick engine for harvesting
+  const getSynodicResonanceMod = (faction: string, phaseName: string): number => {
+    if (faction === "Infection") {
+      if (phaseName === "Waxing Crescent" || phaseName === "Waxing Gibbous") return 15;
+      if (phaseName === "Waning Crescent" || phaseName === "Waning Gibbous") return -10;
+    } else if (faction === "Mech") {
+      if (phaseName === "First Quarter" || phaseName === "Third Quarter") return 15;
+      if (phaseName === "New Moon" || phaseName === "Full Moon") return -10;
+    } else if (faction === "Parasite") {
+      if (phaseName === "Full Moon") return 15;
+      if (phaseName === "New Moon") return -10;
+    } else if (faction === "Containment") {
+      if (phaseName === "New Moon") return 15;
+      if (phaseName === "Full Moon") return -10;
+    }
+    return 0;
+  };
+
+  // Real-time tick engine for harvesting in Mutation Wells
   const handleTickHarvestingMissions = () => {
     setHarvestingMissions(prevMissions => {
       if (prevMissions.length === 0) return prevMissions;
@@ -1815,36 +1932,79 @@ export default function PoxConsole({
         if (m.isReturned) return m;
 
         const now = Date.now();
-        // Determine seconds elapsed. Support dev speed multiplier (+60x speed) if GNPX is toggled on
         const secondsPerTick = (isDevSpeedActive && devForceAnomaly) ? 60 : 1;
         const fakeElapsed = (m.elapsedSeconds || 0) + secondsPerTick;
         const elapsedSeconds = Math.min(m.totalDuration, fakeElapsed);
         
-        const quarterDuration = m.totalDuration / 4;
-        const currentQuarters = Math.min(4, Math.floor(elapsedSeconds / quarterDuration));
-        
         let harvestedGenes = [...(m.harvestedGenes || [])];
         let quartersHarvested = m.quartersHarvested || 0;
+        const quarterDuration = m.totalDuration / 4;
+        const currentQuarters = Math.min(4, Math.floor(elapsedSeconds / quarterDuration));
+
+        let localLogs = [...(m.missionLogs || [])];
+        let nextMutationSeconds = (m.nextMutationSeconds || 0) + secondsPerTick;
+        const originalSequence = m.originalSequence;
+
+        const isCompleted = elapsedSeconds >= m.totalDuration;
+        const activeCreature = creaturesRef.current.find(c => c.id === m.creatureId);
         
+        if (nextMutationSeconds >= m.mutationInterval && !isCompleted && activeCreature) {
+          shouldUpdate = true;
+          // Trigger base mutation in creatures array
+          const sequence = activeCreature.sequence;
+          const bases = ["A", "G", "T", "C"];
+          const chars = sequence.split("");
+          const mutationIndex = Math.floor(Math.random() * chars.length);
+          const oldBase = chars[mutationIndex];
+          const choices = bases.filter(b => b !== oldBase);
+          const newBase = choices[Math.floor(Math.random() * choices.length)];
+          chars[mutationIndex] = newBase;
+          const mutatedSequence = chars.join("");
+          
+          const proc = constructProceduralCreature(mutatedSequence, activeCreature.origin);
+          
+          setCreatures(prevC => prevC.map(c => {
+            if (c.id === activeCreature.id) {
+              return {
+                ...c,
+                sequence: mutatedSequence,
+                vitality: proc.vitality,
+                attack: proc.attack,
+                defense: proc.defense,
+                speed: proc.speed,
+                type: proc.type,
+                faction: proc.faction,
+                lore: proc.lore,
+                primaryWeapon: proc.primaryWeapon,
+                isMutated: true,
+                originalSequence: c.originalSequence || originalSequence || sequence
+              };
+            }
+            return c;
+          }));
+
+          const mutationMsg = `[MUTATION] Pos ${mutationIndex}: ${oldBase} -> ${newBase}. Stats re-calculated.`;
+          localLogs.push(mutationMsg);
+          addScannerLog(`MUTATION: "${activeCreature.name}" DNA decayed at pos ${mutationIndex}: ${oldBase} -> ${newBase}`);
+          
+          nextMutationSeconds = nextMutationSeconds % m.mutationInterval;
+        }
+
         if (currentQuarters > quartersHarvested) {
           shouldUpdate = true;
           for (let q = quartersHarvested + 1; q <= currentQuarters; q++) {
-            // Pick acquired gene depending on accuracy
             const anom = bioAnomalies.find(a => a.id === m.anomalyId);
             const baseGene = anom ? anom.gene : "AGTCGTAC";
-            const heatZoneRadius = (anom?.heatZoneDiameter || 20) / 2;
             
-            // Proximity ratio: 0.0 is center, 1.0 is maximum boundary of the circle
-            const ratio = Math.min(1, m.dispatchDistance / Math.max(1, heatZoneRadius));
-            const perfectYieldChance = 1 - ratio; // 100% chance at center, 0% at boundary
-            
+            // Purity check based on stalling depth D
+            const purityChance = m.stalledDepth / 100;
             let geneGot = baseGene;
-            if (Math.random() > perfectYieldChance) {
-              // Mutated gene (different/mutated sequence)
+            if (Math.random() > purityChance) {
+              // Mutated gene collected from well environment
               const bases = ["A", "G", "T", "C"];
               const chars = baseGene.split("");
-              // Mutate depending on distance
-              const numMutations = ratio > 0.6 ? 2 : 1;
+              // Mutate 1 or 2 bases depending on depth (less depth, more mutation)
+              const numMutations = m.stalledDepth < 40 ? 2 : 1;
               for (let mut = 0; mut < numMutations; mut++) {
                 const idx = Math.floor(Math.random() * 8);
                 const oldBase = chars[idx];
@@ -1852,21 +2012,30 @@ export default function PoxConsole({
                 chars[idx] = choices[Math.floor(Math.random() * choices.length)];
               }
               geneGot = chars.join("");
+              localLogs.push(`[HARVEST] Quarter ${q}: Segment extract failed. Retrieved mutated segment "${geneGot}".`);
+            } else {
+              localLogs.push(`[HARVEST] Quarter ${q}: Target segment extracted successfully: "${geneGot}".`);
             }
             harvestedGenes.push(geneGot);
           }
           quartersHarvested = currentQuarters;
         }
 
-        const isCompleted = elapsedSeconds >= m.totalDuration;
-        if (m.elapsedSeconds !== elapsedSeconds || quartersHarvested !== m.quartersHarvested || isCompleted !== m.isCompleted) {
+        if (isCompleted && !m.isCompleted) {
+          localLogs.push(`[COMPLETE] Anomaly extraction finished. Specimen ready for retrieval.`);
+          addScannerLog(`COMPLETE: "${m.creatureName}" finished extraction at Anomaly ${m.anomalyId}`);
+        }
+
+        if (m.elapsedSeconds !== elapsedSeconds || quartersHarvested !== m.quartersHarvested || isCompleted !== m.isCompleted || nextMutationSeconds !== m.nextMutationSeconds) {
           shouldUpdate = true;
           return {
             ...m,
             elapsedSeconds,
             quartersHarvested,
             harvestedGenes,
-            isCompleted
+            isCompleted,
+            nextMutationSeconds,
+            missionLogs: localLogs
           };
         }
         
@@ -1897,11 +2066,23 @@ export default function PoxConsole({
     if (nodeStability >= 100) {
       totalDuration *= 2;
     }
-    
-    // Set dispatch lat/lng/dist
-    const lat = customTapCoords ? customTapCoords.lat : anom.lat;
-    const lng = customTapCoords ? customTapCoords.lng : anom.lng;
-    const dist = customTapCoords ? customTapCoords.distance : 0.0;
+
+    const waveCfg = getDailyWaveConfig(currentTime);
+    const phaseFraction = waveCfg.lunarAge / 29.53059;
+    const lunarPhaseScale = (1 - Math.cos(phaseFraction * 2 * Math.PI)) / 2;
+    const lunarResistanceMod = 0.7 + 0.6 * lunarPhaseScale;
+    const lunarMutationMod = 0.5 + 1.0 * lunarPhaseScale;
+
+    const R_base = anom.heatZoneDiameter * 3;
+    const R_anom = R_base * lunarResistanceMod;
+
+    const resonanceMod = getSynodicResonanceMod(creature.faction, waveCfg.phaseName);
+    const effectiveDefense = creature.defense + resonanceMod;
+
+    const stalledDepth = Math.min(100, Math.max(0, Math.round((effectiveDefense / R_anom) * 100)));
+    const dispatchDistance = (anom.heatZoneDiameter / 2) * (1 - stalledDepth / 100);
+
+    const mutationInterval = Math.round((480 * Math.pow(2, -stalledDepth / 25)) / lunarMutationMod);
 
     const newMission = {
       id: `HSP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -1910,24 +2091,36 @@ export default function PoxConsole({
       creatureFaction: creature.faction,
       anomalyId: anom.id,
       anomalyName: anom.name,
-      lat,
-      lng,
-      dispatchDistance: dist,
+      lat: anom.lat,
+      lng: anom.lng,
+      dispatchDistance,
+      stalledDepth,
       startTime: Date.now(),
       totalDuration,
       elapsedSeconds: 0,
       quartersHarvested: 0,
       harvestedGenes: [],
       isCompleted: false,
-      isReturned: false
+      isReturned: false,
+      originalSequence: creature.sequence,
+      lunarMod: lunarMutationMod,
+      mutationInterval,
+      nextMutationSeconds: 0,
+      missionLogs: [
+        `[LAUNCH] Specimen "${creature.name}" dispatched to Anomaly ${anom.id}.`,
+        `[TELEMETRY] Synodic Resonance: ${resonanceMod >= 0 ? '+' : ''}${resonanceMod} DEF (${waveCfg.phaseName}).`,
+        `[TELEMETRY] Effective Defense: ${effectiveDefense} | Anomaly Resistance: ${R_anom.toFixed(1)} (Base: ${R_base}, Lunar: ${lunarResistanceMod.toFixed(2)}x).`,
+        `[TELEMETRY] Stalled Depth resolved: ${stalledDepth}% (${dispatchDistance.toFixed(1)}ft from epicenter).`,
+        `[TELEMETRY] Mutation Well active. Expected base decay: every ${mutationInterval}s.`
+      ]
     };
 
     setHarvestingMissions(prev => [...prev, newMission]);
     sound.playBeep(440, 0.15, "square");
     setTimeout(() => sound.playBeep(880, 0.25, "sine"), 120);
     
-    triggerLog(`Dispatched "${creature.name}" on harvest mission. Base duration: ${Math.round(totalDuration / 60)}m. Unit distance: ${dist.toFixed(1)}ft.`, "success");
-    addScannerLog(`DISPATCH: "${creature.name}" targeted Anomaly ${anom.id} (Distance: ${dist.toFixed(1)}ft)`);
+    triggerLog(`Dispatched "${creature.name}" on harvest mission. Depth reached: ${stalledDepth}%. Unit distance: ${dispatchDistance.toFixed(1)}ft.`, "success");
+    addScannerLog(`DISPATCH: "${creature.name}" targeted Anomaly ${anom.id} (Distance: ${dispatchDistance.toFixed(1)}ft, Depth: ${stalledDepth}%)`);
     setCustomTapCoords(null);
   };
 
@@ -2435,46 +2628,16 @@ export default function PoxConsole({
 
       const isBoostActive = boostSecondsLeftRef.current > 0;
       const resetVal = isBoostActive ? 8 : 16;
-      const prevVal = idleTimeRef.current;
-      
-      let nextVal = prevVal - 1;
-      if (isBoostActive && prevVal > 8) {
-        nextVal = 8;
-      }
 
-      if (nextVal <= 0) {
-        if (devForceAnomalyRef.current) {
-          // Dev force toggle active: Bypass fuel consumption & guarantee success
-          const anomalousGene = generateAnomalousGene();
-          sound.playSynthesisSuccess();
-          triggerAddGeneSequence(anomalousGene);
-          triggerLog(`[DEV MODE FUSION] Force-triggered successfully (Zero resources consumed). Gene block: ${anomalousGene}`, "success");
-          addScannerLog(`[DEV INJECTED UNIT] Forced anomalous creation of: ${anomalousGene}`);
-        } else if (anomalyEngineActiveRef.current && baseTalliesRef.current.grandTotal >= 250000) {
-          // Calculate active scaling chance based on current grand total nucleotide stockpile
-          const currentTotal = baseTalliesRef.current.grandTotal;
-          const chanceMetrics = getAnomalyEngineSuccessChance(currentTotal);
-          const roll = Math.random() * 100;
+      // 1. Tick P.O.X. Reactor if active
+      if (poxReactorActiveRef.current) {
+        const prevPoxVal = poxIdleTimeRef.current;
+        let nextPoxVal = prevPoxVal - 1;
+        if (isBoostActive && prevPoxVal > 8) {
+          nextPoxVal = 8;
+        }
 
-          // Consume 10k nucleotides
-          consumeNucleotides(10000);
-
-          if (roll <= chanceMetrics.finalChance) {
-            const anomalousGene = generateAnomalousGene();
-            sound.playSynthesisSuccess();
-            triggerAddGeneSequence(anomalousGene);
-            triggerLog(`[ANOMALY ENGINE] Fusion successful! Probability was ${chanceMetrics.finalChance.toFixed(3)}% (Rolled: ${roll.toFixed(3)}%). Generated anomalous block ${anomalousGene}.`, "success");
-            addScannerLog(`[ANOMALY GENERATOR SUCCESS] Synthesized gene block ${anomalousGene} under unstable fusion conditions.`);
-          } else {
-            sound.playBeep(220, 0.35, "sawtooth");
-            triggerLog(`[ANOMALY ENGINE] Decoupling failure. Fusion chanced: ${chanceMetrics.finalChance.toFixed(3)}% (Rolled: ${roll.toFixed(3)}%). 10,000 nucleotides decomposed in magnetic buffer.`, "warn");
-            addScannerLog("[ANOMALY FAILED] Fusion was unsuccessful. Energy discharged without gene yield.");
-          }
-        } else {
-          if (anomalyEngineActiveRef.current) {
-            setAnomalyEngineActive(false);
-            triggerLog("ANOMALY ENGINE SHUT DOWN: Nucleotide reserves fell below minimum 250k threshold.", "warn");
-          }
+        if (nextPoxVal <= 0) {
           // Trigger standard gene splicing 8-gene packet
           const batch: string[] = [];
           for (let i = 0; i < 8; i++) {
@@ -2482,11 +2645,55 @@ export default function PoxConsole({
           }
           sound.playCombinatorTick();
           triggerAddGeneSequences(batch);
+          nextPoxVal = resetVal;
         }
-        nextVal = resetVal;
+        setPoxIdleTime(nextPoxVal);
       }
 
-      setIdleTime(nextVal);
+      // 2. Tick Anomaly Engine if active
+      if (anomalyEngineActiveRef.current) {
+        const prevAnomalyVal = anomalyIdleTimeRef.current;
+        let nextAnomalyVal = prevAnomalyVal - 1;
+        if (isBoostActive && prevAnomalyVal > 8) {
+          nextAnomalyVal = 8;
+        }
+
+        if (nextAnomalyVal <= 0) {
+          if (devForceAnomalyRef.current) {
+            // Dev force toggle active: Bypass fuel consumption & guarantee success
+            const anomalousGene = generateAnomalousGene();
+            sound.playSynthesisSuccess();
+            triggerAddGeneSequence(anomalousGene);
+            triggerLog(`[DEV MODE FUSION] Force-triggered successfully (Zero resources consumed). Gene block: ${anomalousGene}`, "success");
+            addScannerLog(`[DEV INJECTED UNIT] Forced anomalous creation of: ${anomalousGene}`);
+          } else if (baseTalliesRef.current.grandTotal >= 250000) {
+            // Calculate active scaling chance based on current grand total nucleotide stockpile
+            const currentTotal = baseTalliesRef.current.grandTotal;
+            const chanceMetrics = getAnomalyEngineSuccessChance(currentTotal);
+            const roll = Math.random() * 100;
+
+            // Consume 10k nucleotides
+            consumeNucleotides(10000);
+
+            if (roll <= chanceMetrics.finalChance) {
+              const anomalousGene = generateAnomalousGene();
+              sound.playSynthesisSuccess();
+              triggerAddGeneSequence(anomalousGene);
+              triggerLog(`[ANOMALY ENGINE] Fusion successful! Probability was ${chanceMetrics.finalChance.toFixed(3)}% (Rolled: ${roll.toFixed(3)}%). Generated anomalous block ${anomalousGene}.`, "success");
+              addScannerLog(`[ANOMALY GENERATOR SUCCESS] Synthesized gene block ${anomalousGene} under unstable fusion conditions.`);
+            } else {
+              sound.playBeep(220, 0.35, "sawtooth");
+              triggerLog(`[ANOMALY ENGINE] Decoupling failure. Fusion chanced: ${chanceMetrics.finalChance.toFixed(3)}% (Rolled: ${roll.toFixed(3)}%). 10,000 nucleotides decomposed in magnetic buffer.`, "warn");
+              addScannerLog("[ANOMALY FAILED] Fusion was unsuccessful. Energy discharged without gene yield.");
+            }
+          } else {
+            setAnomalyEngineActive(false);
+            triggerLog("ANOMALY ENGINE SHUT DOWN: Nucleotide reserves fell below minimum 250k threshold.", "warn");
+          }
+          nextAnomalyVal = resetVal;
+        }
+        setAnomalyIdleTime(nextAnomalyVal);
+      }
     }, 1000);
 
     return () => {
@@ -2522,6 +2729,19 @@ export default function PoxConsole({
     });
   };
 
+  const handleTogglePoxReactor = (checked: boolean) => {
+    if (checked) {
+      setPoxReactorActive(true);
+      setAnomalyEngineActive(false);
+      triggerLog("P.O.X. REACTOR ACTIVE: Standard gene synthesis engaged.", "success");
+      sound.playBeep(440, 0.15, "sine");
+    } else {
+      setPoxReactorActive(false);
+      triggerLog("P.O.X. Reactor disengaged. Reactor power offline.", "info");
+      sound.playBeep(350, 0.15, "sine");
+    }
+  };
+
   const handleToggleAnomalyEngine = (checked: boolean) => {
     if (checked) {
       if (baseTallies.grandTotal < 250000) {
@@ -2529,6 +2749,7 @@ export default function PoxConsole({
         return;
       }
       setAnomalyEngineActive(true);
+      setPoxReactorActive(false);
       setNodeStability(0);
       setNodeEmissivity(0);
       triggerLog("ANOMALY ENGINE ENGAGED! High voltage strain resets Node Stability & Emissions to 0.", "warn");
@@ -2636,13 +2857,17 @@ export default function PoxConsole({
   // Click manual tactical acceleration
   const handleManualCombinatorClick = () => {
     if (!isPowered) return;
+    if (!poxReactorActive) {
+      sound.playReject();
+      return;
+    }
     sound.playCombinatorTick();
     setStats((prev) => ({
       ...prev,
       totalManualAccelerations: prev.totalManualAccelerations + 1
     }));
 
-    const prevTime = idleTimeRef.current;
+    const prevTime = poxIdleTimeRef.current;
     const isBoostActive = boostSecondsLeftRef.current > 0;
     const resetVal = isBoostActive ? 8 : 16;
 
@@ -2657,7 +2882,7 @@ export default function PoxConsole({
       triggerAddGeneSequences(batch);
     }
 
-    setIdleTime(nextTime);
+    setPoxIdleTime(nextTime);
   };
 
   // Splicing Autofill for matching target sequence
@@ -5161,12 +5386,44 @@ export default function PoxConsole({
                     className="flex flex-col h-full space-y-3"
                   >
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow overflow-hidden">
+                    <DualPaneConsoleFrame
+                      theme={bioLabSubTab === 'anomaly' ? "purple" : "green"}
+                      flavorTitle={bioLabSubTab === 'anomaly' ? "[ WARNING: UNKNOWN REACTOR ]" : "[ G.E.N. P.O.X. TIDE POOL REACTOR V2.4 ]"}
+                      statusElement={
+                        bioLabSubTab === 'anomaly' ? (
+                          <button 
+                            onClick={() => {
+                              sound.playBeep(450, 0.05, "sine");
+                              handleToggleAnomalyEngine(!anomalyEngineActive);
+                            }}
+                            className={`font-sans text-[10px] font-bold tracking-wider uppercase cursor-pointer select-none transition-colors ${
+                              anomalyEngineActive ? "text-[#00FF41]" : "text-red-500"
+                            }`}
+                          >
+                            {anomalyEngineActive ? "SYSTEMS ON" : "SYSTEMS OFF"}
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => {
+                              sound.playBeep(450, 0.05, "sine");
+                              handleTogglePoxReactor(!poxReactorActive);
+                            }}
+                            className={`font-sans text-[10px] font-bold tracking-wider uppercase cursor-pointer select-none transition-colors ${
+                              poxReactorActive ? "text-[#00FF41]" : "text-red-500"
+                            }`}
+                          >
+                            {poxReactorActive ? "SYSTEMS ON" : "SYSTEMS OFF"}
+                          </button>
+                        )
+                      }
+                    >
                       
                       {/* Panel 1: Genetic Combinator (Left) */}
-                      <div className={`bg-neutral-900/20 p-4 rounded flex flex-col justify-between relative overflow-y-auto custom-pox-scrollbar min-h-[300px] border transition-all ${
-                        bioLabSubTab === 'anomaly' ? "border-purple-900/40" : "border-green-900/40"
-                      }`}>
+                      <ConsolePanel
+                        theme={bioLabSubTab === 'anomaly' ? "purple" : "green"}
+                        title={bioLabSubTab === 'anomaly' ? <FlickeringAnomalyTitle /> : "Single-Node Cybernetic Synthesizer"}
+                        className="relative overflow-y-auto custom-pox-scrollbar"
+                      >
                       {isGeneLogPopupOpen && (
                         <motion.div
                           key="gene-log-popup"
@@ -5454,15 +5711,11 @@ export default function PoxConsole({
 
                        {bioLabSubTab === 'pox' ? (
                         <div>
-                          <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-green-700">
-                            <span className="font-sans text-[10px] font-bold tracking-wider uppercase">[ G.E.N. P.O.X. TIDE POOL REACTOR V2.4 ]</span>
-                            <span className="text-[#00FF41]">SYSTEMS ON</span>
+                          {/* Flavor text */}
+                          <div className="text-[10px] text-green-500/80 mb-3 italic font-sans text-left select-none leading-normal">
+                            Synthesize genes at a set rate or manually accelerate to speed up the P.O.X. Reactor.
                           </div>
                           
-                          <div className="flex justify-between items-center h-8 mb-2 select-none">
-                            <h2 className="text-xs font-bold text-white tracking-wider uppercase">Single-Node Cybernetic Synthesizer</h2>
-                          </div>
-
                           {/* Top-Level Counts section as requested */}
                           <div className="grid grid-cols-2 gap-2 mb-4 border-t border-b border-green-950/70 py-2.5 bg-black/40 px-2 rounded-sm font-mono text-left">
                             <div className="p-1">
@@ -5540,25 +5793,9 @@ export default function PoxConsole({
                         </div>
                       ) : (
                         <div>
-                          <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-purple-400">
-                            <span className="font-sans text-[10px] font-bold tracking-wider uppercase">[ WARNING: UNKNOWN REACTOR ]</span>
-                            <button 
-                              onClick={() => {
-                                sound.playBeep(450, 0.05, "sine");
-                                handleToggleAnomalyEngine(!anomalyEngineActive);
-                              }}
-                              className={`font-sans text-[10px] font-bold tracking-wider uppercase hover:text-purple-200 cursor-pointer select-none transition-colors ${
-                                anomalyEngineActive ? "text-purple-300 animate-pulse" : "text-neutral-500"
-                              }`}
-                            >
-                              {anomalyEngineActive ? "SYSTEMS ON" : "SYSTEMS OFF"}
-                            </button>
-                          </div>
-                          
-                          <div className="flex justify-between items-center h-8 mb-3 select-none">
-                            <div className="flex-1 min-w-0 pr-2">
-                              <FlickeringAnomalyTitle />
-                            </div>
+                          {/* Flavor text */}
+                          <div className="text-[10px] text-purple-400/80 mb-3 italic font-sans text-left select-none leading-normal">
+                            Sacrifice existing genes to synthesize anomalous genes in the Anomaly Engine.
                           </div>
 
                           {/* Top-Level Counts section as requested */}
@@ -5679,16 +5916,14 @@ export default function PoxConsole({
                               ? "bg-red-600 h-full rounded-sm animate-[pulse_2s_infinite]" 
                               : bioLabSubTab === 'anomaly'
                                 ? anomalyEngineActive
-                                  ? "bg-gradient-to-r from-purple-600 to-pink-500 h-full rounded-sm transition-all duration-1000 ease-linear"
+                                  ? `bg-gradient-to-r from-purple-600 to-pink-500 h-full rounded-sm ${showTransition ? "transition-all duration-1000 ease-linear" : ""}`
                                   : "bg-neutral-800/40 h-full rounded-sm"
-                                : "bg-gradient-to-r from-emerald-600 to-[#00FF41] h-full rounded-sm transition-all duration-1000 ease-linear"
+                                : `bg-gradient-to-r from-emerald-600 to-[#00FF41] h-full rounded-sm ${showTransition ? "transition-all duration-1000 ease-linear" : ""}`
                             }
                             style={{ 
                               width: isForcedLoopActive 
                                 ? "100%" 
-                                : (bioLabSubTab === 'anomaly' && !anomalyEngineActive)
-                                  ? "0%"
-                                  : `${(((boostSecondsLeft > 0 ? 8 : 16) - idleTime) / (boostSecondsLeft > 0 ? 8 : 16)) * 100}%` 
+                                : `${progressPercent}%`
                             }}
                           />
                         </div>
@@ -5702,12 +5937,16 @@ export default function PoxConsole({
                             <div className={bioLabSubTab === 'anomaly' ? "text-purple-400 font-bold" : "text-green-500 font-bold"}>
                               {bioLabSubTab === 'anomaly' ? (
                                 anomalyEngineActive ? (
-                                  <><FlickeringPurpleText text="Anomalous Consolidation in:" /> <span className="text-white font-bold">{idleTime}s</span></>
+                                  <><FlickeringPurpleText text="Anomalous Consolidation in:" /> <span className="text-white font-bold">{anomalyIdleTime}s</span></>
                                 ) : (
                                   <><FlickeringPurpleText text="Anomalous Consolidation:" /> <span className="text-neutral-500 font-bold">IDLE</span></>
                                 )
                               ) : (
-                                <>Gene Array Ready in: <span className="text-white font-bold">{idleTime}s</span></>
+                                poxReactorActive ? (
+                                  <>Gene Array Ready in: <span className="text-white font-bold">{poxIdleTime}s</span></>
+                                ) : (
+                                  <>Gene Array Reactor: <span className="text-red-500 font-bold uppercase font-mono">OFFLINE</span></>
+                                )
                               )}
                             </div>
                           )}
@@ -5783,22 +6022,15 @@ export default function PoxConsole({
                           </button>
                         </div>
                       </div>
-                    </div>
+                    </ConsolePanel>
 
-                    {/* Combinator Help Code & Sequence Ledger (Right) */}
-                    <div className={`p-4 rounded flex flex-col justify-between relative overflow-y-auto custom-pox-scrollbar min-h-[300px] bg-neutral-900/20 border transition-all ${
-                      bioLabSubTab === 'anomaly' ? "border-purple-900/45" : "border-green-900/40"
-                    }`}>
-                      <div>
-                        <div className={`text-[10px] uppercase mb-1.5 font-mono ${
-                          bioLabSubTab === 'anomaly' ? "text-purple-400" : "text-green-700"
-                        }`}>
-                          {bioLabSubTab === 'anomaly' ? (
-                            <FlickeringPurpleText text="[ SPLICER STOCK GENE LEDGER ]" />
-                          ) : (
-                            "[ SPLICER STOCK GENE LEDGER ]"
-                          )}
-                        </div>
+                      {/* Combinator Help Code & Sequence Ledger (Right) */}
+                      <ConsolePanel
+                        theme={bioLabSubTab === 'anomaly' ? "purple" : "green"}
+                        title={bioLabSubTab === 'anomaly' ? <FlickeringPurpleText text="[ SPLICER STOCK GENE LEDGER ]" /> : "[ SPLICER STOCK GENE LEDGER ]"}
+                        className="relative overflow-y-auto custom-pox-scrollbar"
+                      >
+                        <div>
                         <h2 className="text-xs font-bold text-white tracking-wider mb-1.5 uppercase">Gene Inventory</h2>
                         <b className={`text-[10px] mb-3 block leading-tight font-mono ${
                           bioLabSubTab === 'anomaly' ? "text-purple-500/90" : "text-[#00c93c]"
@@ -6234,10 +6466,9 @@ export default function PoxConsole({
                           </motion.div>
                         )}
                       </AnimatePresence>
-                    </div>
+                    </ConsolePanel>
 
-                    </div>
-
+                    </DualPaneConsoleFrame>
                   </motion.div>
                 )}
 
@@ -6247,11 +6478,26 @@ export default function PoxConsole({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className={`h-full ${isForcedConstructionActive ? 'w-full' : 'grid grid-cols-1 md:grid-cols-2 gap-4'}`}
+                    className="h-full flex flex-col"
                   >
-                    
-                    {/* Panel 2: Target Constructor (Left) */}
-                    <div className="bg-neutral-900/20 border border-green-900/40 p-4 rounded flex flex-col justify-start gap-3">
+                    <DualPaneConsoleFrame
+                      theme="green"
+                      flavorTitle="[ G.E.N. P.O.X. E-MERGE SEQUENCER V1.7 ]"
+                      statusElement={<span>64-CHAR ASSEMBLY GRID</span>}
+                      isSinglePane={isForcedConstructionActive}
+                    >
+                      {/* Panel 2: Target Constructor (Left) */}
+                      <ConsolePanel
+                        theme="green"
+                        title={
+                          isForcedConstructionActive
+                            ? "P.O.X. REACTOR ACTIVE (OVERRIDE)"
+                            : isSplicing
+                              ? "AUTOTRONIC MORPHOGENESIS ENGINE ENGAGED"
+                              : "TARGET GENOME RE-SEQUENCING"
+                        }
+                        className="relative overflow-y-auto custom-pox-scrollbar"
+                      >
                       {isForcedConstructionActive ? (
                         <div className="flex-1 flex flex-col justify-between p-4 bg-black/90 border border-red-950/80 rounded relative min-h-[350px]">
                           <div>
@@ -6316,13 +6562,7 @@ export default function PoxConsole({
                       ) : (
                         <div className="flex flex-col justify-start gap-2.5 h-full">
                           <div>
-                            <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-green-700">
-                              <span className="font-sans text-[10px] font-bold tracking-wider uppercase">[ G.E.N. P.O.X. E-MERGE SEQUENCER V1.7 ]</span>
-                              <span>64-CHAR ASSEMBLY GRID</span>
-                            </div>
-                            <div className="flex justify-between items-center h-8 mb-2 select-none">
-                              <h2 className="text-xs font-bold text-white tracking-wider uppercase">TARGET GENOME RE-SEQUENCING</h2>
-                            </div>
+
                             <p className="text-[10px] text-green-700 mb-3 font-sans leading-tight">Fill all slots with stockpiled genes to assemble the target genome.</p>
 
                             {/* Dash grid representations of 8 slots */}
@@ -6488,19 +6728,28 @@ export default function PoxConsole({
                           </div>
                         </div>
                       )}
-                    </div>
+                      </ConsolePanel>
 
-                    {/* Splicer select gene inventory (Right) */}
-                    {!isForcedConstructionActive && (
-                      <div className="bg-neutral-900/20 border border-green-900/40 p-4 rounded flex flex-col justify-start gap-3">
+                      {/* Splicer select gene inventory (Right) */}
+                      {!isForcedConstructionActive && (
+                        <ConsolePanel
+                          theme="green"
+                          title={
+                            activeSlotSelection !== null ? (
+                              <div className="flex justify-between items-center w-full">
+                                <span className="text-xs font-bold text-white tracking-wider uppercase">CHOOSE GENE SEGMENT</span>
+                                <div className="flex items-center gap-2 font-mono text-[9px] uppercase text-[#00FF41]">
+                                  <span>SLOT #{activeSlotSelection + 1}</span>
+                                  <button onClick={() => { sound.playBeep(450,0.05,"sine"); setActiveSlotSelection(null); }} className="text-red-500 hover:text-white font-bold cursor-pointer">[ CANCEL ]</button>
+                                </div>
+                              </div>
+                            ) : null
+                          }
+                          className="relative overflow-y-auto custom-pox-scrollbar"
+                        >
                       {activeSlotSelection !== null ? (
                         <div className="flex flex-col justify-start gap-2.5 h-full">
                           <div>
-                            <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-[#00FF41]">
-                              <span>ASSIGN SLOT PROTOCOL #{activeSlotSelection + 1}</span>
-                              <button onClick={() => { sound.playBeep(450,0.05,"sine"); setActiveSlotSelection(null); }} className="text-red-500 hover:text-white font-bold cursor-pointer">[ CANCEL ]</button>
-                            </div>
-                            <h2 className="text-xs font-bold text-white tracking-wider mb-1">CHOOSE GENE SEGMENT</h2>
                             <p className="text-[10px] text-green-700 font-mono mb-2 leading-tight">Selecting one gene stock decants it directly into the assembly matrix.</p>
                             
                             {/* Expected gene info block */}
@@ -6580,53 +6829,62 @@ export default function PoxConsole({
                             </p>
                           </div>
                         )}
-                      </div>
-                    )}
+                        </ConsolePanel>
+                      )}
+                    </DualPaneConsoleFrame>
                   </motion.div>
-                  )}
-
-                  {activeTab === 'library' && (
-                    <motion.div
-                      key="library"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="h-full flex flex-col min-h-0"
+                )}
+{activeTab === 'library' && (
+                  <motion.div
+                    key="library"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="h-full flex flex-col min-h-0"
+                  >
+                    <DualPaneConsoleFrame
+                      theme="green"
+                      flavorTitle="[ G.E.N. P.O.X. SEABED VAULT v0.4 ]"
+                      statusElement={<span>NODE P.O.X. REGISTRY</span>}
+                      isSinglePane={true}
                     >
                       {inspectedCreatureId ? (
                         (() => {
                           const bot = creatures.find(c => c.id === inspectedCreatureId);
                           if (!bot) return null;
                           return (
-                            <div className="bg-neutral-900/20 border border-green-900/40 p-4 rounded flex-1 flex flex-col justify-between overflow-y-auto animate-fade-in">
+                            <ConsolePanel
+                              theme="green"
+                              title={
+                                <div className="flex justify-between items-center w-full">
+                                  <span className="text-xs font-bold text-white tracking-wider uppercase">{bot.name} - SPECIMEN DATA</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      sound.playBeep(440, 0.05, "sine");
+                                      setInspectedCreatureId(null);
+                                      if (creatureCardOpenedFrom === 'Constructor') {
+                                        setActiveTab('splicer');
+                                      } else if (creatureCardOpenedFrom === 'Trade') {
+                                        setActiveTab('gen_network');
+                                        setGenNetworkSubTab('nodes');
+                                        setNodesSubTab('qr_trade');
+                                      } else if (creatureCardOpenedFrom === 'Scanner') {
+                                        setActiveTab('transceiver');
+                                        setSyncNetTab('scanner');
+                                      } else {
+                                        setActiveTab('library');
+                                      }
+                                    }}
+                                    className="px-2 py-0.5 bg-transparent hover:bg-red-500/10 border border-red-500 text-red-500 rounded text-[8.5px] cursor-pointer font-bold tracking-wider transition-colors"
+                                  >
+                                    ✕ CLOSE
+                                  </button>
+                                </div>
+                              }
+                              className="relative overflow-y-auto custom-pox-scrollbar"
+                            >
                               <div className="space-y-3.5">
-                                 {/* Row 1: Seabed Vault Title & Close */}
-                                 <div className="flex justify-between items-center border-b border-green-900/30 pb-2">
-                                   <span className="font-sans text-[10px] text-green-700 font-bold tracking-wider uppercase">[ G.E.N. P.O.X. SEABED VAULT v0.4 ]</span>
-                                   <button
-                                     type="button"
-                                     onClick={() => {
-                                       sound.playBeep(440, 0.05, "sine");
-                                       setInspectedCreatureId(null);
-                                       if (creatureCardOpenedFrom === 'Constructor') {
-                                         setActiveTab('splicer');
-                                       } else if (creatureCardOpenedFrom === 'Trade') {
-                                         setActiveTab('gen_network');
-                                         setGenNetworkSubTab('nodes');
-                                         setNodesSubTab('qr_trade');
-                                       } else if (creatureCardOpenedFrom === 'Scanner') {
-                                         setActiveTab('transceiver');
-                                         setSyncNetTab('scanner');
-                                       } else {
-                                         setActiveTab('library');
-                                       }
-                                     }}
-                                     className="px-2 py-0.5 bg-transparent hover:bg-red-500/10 border border-red-500 text-red-500 rounded text-[8.5px] cursor-pointer font-bold tracking-wider transition-colors"
-                                   >
-                                     ✕ CLOSE
-                                   </button>
-                                 </div>
-
                                  {/* Row 2: Creature Name & ID */}
                                  <div className="pt-2">
                                    <div className="flex items-baseline gap-2 flex-wrap">
@@ -6649,6 +6907,11 @@ export default function PoxConsole({
                                    }`}>
                                      {bot.faction}
                                    </span>
+                                   {bot.isMutated && (
+                                      <span className="flex items-center gap-0.5 border border-orange-500 bg-gradient-to-r from-orange-900 to-red-900 px-1.5 py-0.5 rounded text-[7.5px] font-bold text-orange-400 font-sans shadow-[0_0_6px_rgba(249,115,22,0.35)] select-none animate-pulse">
+                                        ⚡
+                                      </span>
+                                    )}
                                    {defenderCreatureId === bot.id && (
                                      <span className="bg-blue-950 border border-blue-400/50 text-blue-400 px-1.5 py-0.5 rounded text-[7.5px] font-bold font-sans flex items-center gap-0.5 shadow-[0_0_6px_rgba(59,130,246,0.2)] select-none">
                                        <Shield className="w-2.5 h-2.5" /> DEFENDER
@@ -6734,6 +6997,11 @@ export default function PoxConsole({
                                       })}
                                     </div>
                                   </div>
+                                  {bot.isMutated && bot.originalSequence && (
+                                    <div className="mt-2.5">
+                                      {renderDnaComparison(bot.originalSequence, bot.sequence, true)}
+                                    </div>
+                                  )}
                                 </div>
 
                                 {/* Right column: Weapon list, lore and Combat Stats bar */}
@@ -7185,7 +7453,7 @@ export default function PoxConsole({
                                 AUDIO EMIT
                               </button>
                             </div>
-                          </div>
+                          </ConsolePanel>
                         );
                       })()
                     ) : (
@@ -7215,6 +7483,9 @@ export default function PoxConsole({
                           } else if (item.origin && item.origin.startsWith("Traded")) {
                             tags.push("MERCENARY");
                           }
+                          if (item.isMutated) {
+                            tags.push("MUTATED");
+                          }
                           return tags;
                         };
 
@@ -7222,7 +7493,7 @@ export default function PoxConsole({
                         const uniqueTypes = Array.from(new Set(creatures.map(c => c.type || "Unknown Type"))).filter(Boolean) as string[];
                         
                         // Selectable tag categories
-                        const availableTags = ["FAVORITE", "DEFENDER", "AUTO-HACKER", "FULL COHERENCE", "PARTIAL COHERENCE", "ALPHA GENE", "MODIFIED", "ORIGINAL", "MERCENARY"];
+                        const availableTags = ["FAVORITE", "DEFENDER", "AUTO-HACKER", "FULL COHERENCE", "PARTIAL COHERENCE", "ALPHA GENE", "MODIFIED", "ORIGINAL", "MERCENARY", "MUTATED"];
 
                         // Calculate dynamic maximum bounds based on real database entries
                         const computedMaxVitality = creatures.length > 0 ? Math.max(...creatures.map(c => c.vitality), 100) : 250;
@@ -7317,19 +7588,11 @@ export default function PoxConsole({
                         };
 
                         return (
-                          <div className="bg-neutral-900/20 border border-green-900/40 p-4 rounded flex-1 flex flex-col justify-between overflow-y-auto custom-pox-scrollbar relative">
-                            <div className="space-y-4">
-                              <div className="flex justify-between items-start flex-wrap gap-2">
-                                <div className="flex-1 min-w-[200px]">
-                                  <div className="flex justify-between items-center mb-1 text-[10px] uppercase text-green-700">
-                                    <span className="font-sans text-[10px] font-bold tracking-wider uppercase">[ G.E.N. P.O.X. SEABED VAULT v0.4 ]</span>
-                                    <span className="text-[#00FF41] font-bold">SYSTEMS ON</span>
-                                  </div>
-                                  <div className="flex justify-between items-center h-8 mb-2 select-none">
-                                    <h2 className="text-xs font-bold text-white tracking-wider uppercase">NODE P.O.X. SEQUENCES REGISTRY</h2>
-                                  </div>
-                                  <p className="text-[10px] text-green-700 mb-3 font-sans leading-tight">View or filter your spliced P.O.X. sequences below</p>
-                                </div>
+                          <ConsolePanel
+                            theme="green"
+                            title={
+                              <div className="flex justify-between items-center w-full flex-wrap gap-2">
+                                <span className="text-xs font-bold text-white tracking-wider uppercase">NODE P.O.X. REGISTRY</span>
                                 <div className="flex items-center gap-2">
                                   {/* Filter Activation Force Switch */}
                                   <button
@@ -7369,6 +7632,10 @@ export default function PoxConsole({
                                   </span>
                                 </div>
                               </div>
+                            }
+                            className="relative overflow-y-auto custom-pox-scrollbar"
+                          >
+                            <div className="space-y-4">
 
                               {/* Accordion Collapsible Filter Console */}
                               {isFilterPanelExpanded && (
@@ -7671,6 +7938,11 @@ export default function PoxConsole({
                                                 <Shield className="w-2.5 h-2.5" /> DEFENDER
                                               </span>
                                             )}
+                                            {item.isMutated && (
+                                              <span className="flex items-center gap-0.5 border border-orange-550 bg-gradient-to-r from-orange-955 to-red-955 px-1 py-0.5 rounded text-[7.5px] font-bold text-orange-400 font-sans shadow-[0_0_6px_rgba(249,115,22,0.35)] select-none animate-pulse" title="Mutated">
+                                                ⚡
+                                              </span>
+                                            )}
                                             {currentTags.includes("FULL COHERENCE") ? (
                                               <span className="px-1.5 py-0.5 bg-emerald-950 text-[#00FF41] border border-emerald-500 rounded text-[7.5px] font-bold font-mono tracking-widest animate-pulse select-none">
                                                 FULL COHERENCE
@@ -7687,7 +7959,7 @@ export default function PoxConsole({
                                           <div className="flex flex-wrap gap-1.5 items-center mt-1">
                                             <span className="text-[8.5px] text-green-600 font-mono font-bold">{item.type}</span>
                                             {currentTags.map((t) => {
-                                              if (t === "DEFENDER" || t === "FULL COHERENCE" || t === "PARTIAL COHERENCE") return null;
+                                              if (t === "DEFENDER" || t === "FULL COHERENCE" || t === "PARTIAL COHERENCE" || t === "MUTATED") return null;
                                               return (
                                                 <span 
                                                   key={t}
@@ -7753,10 +8025,11 @@ export default function PoxConsole({
                             <span className="text-[9px] text-green-700/80 mt-3 block font-mono border-t border-green-900/20 pt-2 select-none">
                               WARNING: Trading creatures with other emulators within 30ft transfers custody. Transferred specimens are cleared permanently from memory sectors upon accepted linkage.
                             </span>
-                          </div>
+                          </ConsolePanel>
                         );
                       })()
                     )}
+                    </DualPaneConsoleFrame>
 
                   </motion.div>
                 )}
@@ -9151,6 +9424,26 @@ export default function PoxConsole({
                                                     ? m.harvestedGenes.join(", ") 
                                                     : "INTEGRATION LINKING..."}
                                                 </span>
+                                              </div>
+
+                                              {/* DNA Mutation Comparison Grid */}
+                                              {(() => {
+                                                const activeC = creatures.find(c => c.id === m.creatureId);
+                                                const currentSeq = activeC ? activeC.sequence : m.originalSequence;
+                                                const originalSeq = m.originalSequence || currentSeq;
+                                                return renderDnaComparison(originalSeq, currentSeq, false);
+                                              })()}
+
+                                              {/* Mission Telemetry Logs */}
+                                              <div className="bg-black/95 p-2 rounded border border-purple-950/40 text-[7.5px] font-mono text-purple-300 space-y-1 h-20 overflow-y-auto custom-pox-scrollbar select-none">
+                                                <div className="text-[7px] text-purple-500 uppercase tracking-widest border-b border-purple-950 pb-0.5 mb-1 font-bold">
+                                                  MISSION TELEMETRY LOGS
+                                                </div>
+                                                {[...(m.missionLogs || [])].reverse().map((log, lIdx) => (
+                                                  <div key={lIdx} className="leading-tight break-words">
+                                                    {log}
+                                                  </div>
+                                                ))}
                                               </div>
 
                                               {m.isCompleted && (
@@ -12087,8 +12380,9 @@ export default function PoxConsole({
                                     sound.playSynthesisSuccess();
                                     sound.playBeep(880, 0.45, "triangle");
                                     setBoostSecondsLeft(300);
-                                    // Clamp current tick if it is larger than 8
-                                    setIdleTime(prev => Math.min(prev, 8));
+                                    // Clamp current ticks if they are larger than 8
+                                    setPoxIdleTime(prev => Math.min(prev, 8));
+                                    setAnomalyIdleTime(prev => Math.min(prev, 8));
                                     triggerLog("BIO-LAB ACTIVATION: Temporary Reactor Catalysis Boost activated. Reactor tick speed boosted to 8s/cycle for 5 minutes.", "success");
                                   }}
                                   className="w-full py-2 bg-amber-600 hover:bg-amber-550 border border-amber-500 text-black font-black text-[10px] uppercase tracking-wider rounded-sm transition-all shadow-[0_0_10px_rgba(245,158,11,0.2)] cursor-pointer hover:scale-[1.01] active:scale-95"

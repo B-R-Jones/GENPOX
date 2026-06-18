@@ -45,6 +45,114 @@ fun MainScreen(
         viewModel.synthManager.initialize(context)
     }
 
+    // ------------------ GEOLOCATION CLIENT IMPLEMENTATION ------------------
+    var locationPermissionGranted by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseGranted = permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (fineGranted || coarseGranted) {
+            locationPermissionGranted = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!locationPermissionGranted) {
+            permissionLauncher.launch(
+                arrayOf(
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    DisposableEffect(locationPermissionGranted) {
+        if (!locationPermissionGranted) return@DisposableEffect onDispose {}
+
+        val locationManager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+        
+        val locationListener = object : android.location.LocationListener {
+            override fun onLocationChanged(location: android.location.Location) {
+                viewModel.updateLocation(location.latitude, location.longitude)
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {}
+        }
+
+        // Fetch initial last known location to start immediately
+        try {
+            var bestLocation: android.location.Location? = null
+            if (locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
+                val loc = locationManager.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                if (loc != null) bestLocation = loc
+            }
+            if (locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
+                val loc = locationManager.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                if (loc != null) {
+                    if (bestLocation == null || loc.time > bestLocation.time) {
+                        bestLocation = loc
+                    }
+                }
+            }
+            bestLocation?.let {
+                viewModel.updateLocation(it.latitude, it.longitude)
+            }
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // Request periodic updates
+        try {
+            if (locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                    android.location.LocationManager.GPS_PROVIDER,
+                    5000L, // 5 seconds
+                    5f, // 5 meters
+                    locationListener
+                )
+            }
+            if (locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                    android.location.LocationManager.NETWORK_PROVIDER,
+                    5000L,
+                    5f,
+                    locationListener
+                )
+            }
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        onDispose {
+            try {
+                locationManager.removeUpdates(locationListener)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    // -----------------------------------------------------------------------
+
     // Lifecycle observer to stop audio when app goes to background
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -75,26 +183,10 @@ fun MainScreen(
     val geneSequences by viewModel.geneSequences.collectAsState()
     val disintegratedModal by viewModel.disintegratedModal.collectAsState()
 
-    val countA = remember(geneSequences) {
-        geneSequences.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
-            gene.sequence.count { it == 'A' || it == 'a' } * gene.count
-        }
-    }
-    val countG = remember(geneSequences) {
-        geneSequences.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
-            gene.sequence.count { it == 'G' || it == 'g' } * gene.count
-        }
-    }
-    val countT = remember(geneSequences) {
-        geneSequences.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
-            gene.sequence.count { it == 'T' || it == 't' } * gene.count
-        }
-    }
-    val countC = remember(geneSequences) {
-        geneSequences.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
-            gene.sequence.count { it == 'C' || it == 'c' } * gene.count
-        }
-    }
+    val countA by viewModel.countA.collectAsState()
+    val countG by viewModel.countG.collectAsState()
+    val countT by viewModel.countT.collectAsState()
+    val countC by viewModel.countC.collectAsState()
 
     val logListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -255,8 +347,7 @@ fun MainScreen(
                     "splicer" -> SplicerView(viewModel)
                     "vault" -> VaultView(viewModel)
                     "scanner" -> ScannerView(viewModel)
-                    "forecast" -> ForecastView(viewModel)
-                    "inventory" -> InventoryView(viewModel)
+                    "telemetry" -> TelemetryView(viewModel)
                     "settings" -> SettingsView(viewModel)
                 }
             }
@@ -304,14 +395,13 @@ fun MainScreen(
                     listOf(
                         Pair("combinator", "BIO-LAB"),
                         Pair("splicer", "SPLICER"),
-                        Pair("vault", "GEN-VAULT"),
-                        Pair("scanner", "SCANNER")
+                        Pair("vault", "GEN-VAULT")
                     ).forEach { tab ->
                         Button(
                             onClick = { viewModel.selectTab(tab.first) },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(38.dp),
+                                .height(36.dp),
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                                 containerColor = if (selectedTab == tab.first) CyberGreen else CyberPanel,
                                 contentColor = if (selectedTab == tab.first) Color.Black else CyberGreenDim
@@ -336,15 +426,15 @@ fun MainScreen(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     listOf(
-                        Pair("forecast", "FORECAST"),
-                        Pair("inventory", "INVENTORY"),
+                        Pair("scanner", "SCANNER"),
+                        Pair("telemetry", "TELEMETRY"),
                         Pair("settings", "SETTINGS")
                     ).forEach { tab ->
                         Button(
                             onClick = { viewModel.selectTab(tab.first) },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(34.dp),
+                                .height(36.dp),
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                                 containerColor = if (selectedTab == tab.first) CyberGreen else CyberPanel,
                                 contentColor = if (selectedTab == tab.first) Color.Black else CyberGreenDim

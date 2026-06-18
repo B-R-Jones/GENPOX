@@ -30,6 +30,8 @@ export interface Creature {
   telomeres?: number; // Current telomere length out of 100
   isFullCoherence?: boolean;
   coherenceType?: 'Natural' | 'Forced';
+  isMutated?: boolean;
+  originalSequence?: string;
 }
 
 export interface NearbyUser {

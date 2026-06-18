@@ -83,10 +83,13 @@ class PoxSynthManager {
     }
 
     fun stopAll() {
-        synchronized(activeTracks) {
-            val iterator = activeTracks.iterator()
-            while (iterator.hasNext()) {
-                val track = iterator.next()
+        val tracksToStop = synchronized(activeTracks) {
+            val list = activeTracks.toList()
+            activeTracks.clear()
+            list
+        }
+        coroutineScope.launch {
+            tracksToStop.forEach { track ->
                 try {
                     track.stop()
                     track.release()
@@ -94,9 +97,8 @@ class PoxSynthManager {
                     // Ignore
                 }
             }
-            activeTracks.clear()
+            abandonFocus()
         }
-        abandonFocus()
     }
 
     fun playBeep(freq: Float, durationSec: Float, type: String = "square") {
@@ -359,23 +361,30 @@ class PoxSynthManager {
             val playDurationMs = (samples.size.toDouble() / sampleRate * 1000).toLong() + 100
             coroutineScope.launch {
                 kotlinx.coroutines.delay(playDurationMs)
-                try {
-                    track.stop()
-                    track.release()
-                } catch (e: Exception) {
-                    // Ignore release errors
-                } finally {
+                val shouldRelease = synchronized(activeTracks) {
                     activeTracks.remove(track)
-                    if (activeTracks.isEmpty()) {
+                }
+                if (shouldRelease) {
+                    try {
+                        track.stop()
+                        track.release()
+                    } catch (e: Exception) {
+                        // Ignore release errors
+                    }
+                    val isEmpty = synchronized(activeTracks) { activeTracks.isEmpty() }
+                    if (isEmpty) {
                         abandonFocus()
                     }
                 }
             }
         } catch (e: Exception) {
             if (track != null) {
-                activeTracks.remove(track)
+                synchronized(activeTracks) {
+                    activeTracks.remove(track)
+                }
             }
-            if (activeTracks.isEmpty()) {
+            val isEmpty = synchronized(activeTracks) { activeTracks.isEmpty() }
+            if (isEmpty) {
                 abandonFocus()
             }
         }

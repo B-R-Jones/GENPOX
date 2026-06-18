@@ -19,12 +19,17 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clipToBounds
 
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
@@ -39,6 +44,7 @@ import com.example.genpox.ui.components.CanvasMetrics
 import com.example.genpox.ui.components.NodeCrystalCanvas
 import com.example.genpox.ui.components.MapStyle
 import com.example.genpox.ui.components.QrCodeImage
+import com.example.genpox.ui.components.DualPaneConsoleFrame
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
@@ -360,11 +366,25 @@ fun WireframeForced(color: Color, modifier: Modifier = Modifier) {
 }
 
 @Composable
+fun WireframeMutated(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(14.dp)) {
+        val w = size.width
+        val h = size.height
+        val stroke = 1.2.dp.toPx()
+        drawLine(color, Offset(w * 0.2f, h * 0.2f), Offset(w * 0.45f, h * 0.45f), strokeWidth = stroke)
+        drawLine(color, Offset(w * 0.55f, h * 0.55f), Offset(w * 0.8f, h * 0.8f), strokeWidth = stroke)
+        drawLine(color, Offset(w * 0.8f, h * 0.2f), Offset(w * 0.2f, h * 0.8f), strokeWidth = stroke)
+        drawLine(color, Offset(w * 0.35f, h * 0.35f), Offset(w * 0.65f, h * 0.35f), strokeWidth = 0.8.dp.toPx())
+    }
+}
+
+@Composable
 fun TagBadge(tag: String, modifier: Modifier = Modifier) {
     val (color, content) = when (tag) {
         "FAVORITE" -> Color(0xFFFFB300) to @Composable { WireframeStar(Color(0xFFFFB300), filled = true, modifier = modifier.size(10.dp)) }
         "DEFENDER" -> Color(0xFF60A5FA) to @Composable { WireframeShield(Color(0xFF60A5FA), modifier = modifier.size(10.dp)) }
         "AUTO-HACKER" -> Color(0xFFFBBF24) to @Composable { WireframeGear(Color(0xFFFBBF24), modifier = modifier.size(10.dp)) }
+        "HARVESTING" -> Color(0xFF00E1FF) to @Composable { WireframeGalaxy(Color(0xFF00E1FF), modifier = modifier.size(10.dp)) }
         "FULL COHERENCE" -> CyberGreen to @Composable { WireframeDna(CyberGreen, modifier = modifier.size(10.dp)) }
         "NATURAL" -> Color(0xFF10B981) to @Composable { WireframeNatural(Color(0xFF10B981), modifier = modifier.size(10.dp)) }
         "FORCED" -> Color(0xFFF59E0B) to @Composable { WireframeForced(Color(0xFFF59E0B), modifier = modifier.size(10.dp)) }
@@ -372,6 +392,7 @@ fun TagBadge(tag: String, modifier: Modifier = Modifier) {
         "MODIFIED" -> Color(0xFFC084FC) to @Composable { WireframeSparkle(Color(0xFFC084FC), modifier = modifier.size(10.dp)) }
         "ORIGINAL" -> CyberGreen to @Composable { WireframeOriginal(CyberGreen, modifier = modifier.size(10.dp)) }
         "TRANSFER-ORIGIN" -> Color(0xFFEF4444) to @Composable { WireframeTransfer(Color(0xFFEF4444), modifier = modifier.size(10.dp)) }
+        "MUTATED" -> Color(0xFFF97316) to @Composable { WireframeMutated(Color(0xFFF97316), modifier = modifier.size(10.dp)) }
         else -> return
     }
     
@@ -381,7 +402,123 @@ fun TagBadge(tag: String, modifier: Modifier = Modifier) {
             .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
             .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
-        content()
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+fun SingleDnaDotGrid(
+    sequence: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    val columns = 8
+    val rows = (sequence.length + columns - 1) / columns
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = label.uppercase(),
+            color = Color.White,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Default,
+            modifier = Modifier.padding(bottom = 2.dp)
+        )
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            for (r in 0 until rows) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    for (c in 0 until columns) {
+                        val idx = r * columns + c
+                        if (idx < sequence.length) {
+                            val baseChar = sequence[idx]
+                            
+                            val blockStart = (idx / 8) * 8
+                            val blockEnd = minOf(sequence.length, blockStart + 8)
+                            val geneBlock = sequence.substring(blockStart, blockEnd)
+                            
+                            val isAnomalous = geneBlock.any { it in "XZYW?!$%&@#" }
+                            val dotColor = if (isAnomalous) {
+                                Color(0xFFA855F7)
+                            } else {
+                                when (baseChar.uppercaseChar()) {
+                                    'A' -> Color(0xFF00FF41)
+                                    'G' -> Color(0xFFFBBF24)
+                                    'T' -> Color(0xFF60A5FA)
+                                    'C' -> Color(0xFFEC4899)
+                                    else -> Color(0xFF404040)
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(dotColor)
+                            )
+                        } else {
+                            Box(modifier = Modifier.size(10.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DnaComparisonGrid(original: String, current: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(1.dp, CyberBorder.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+            .background(Color.Black.copy(alpha = 0.6f))
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "DNA MUTATION TELEMETRY SCAN",
+            style = Typography.labelSmall,
+            color = Color(0xFFF97316),
+            fontSize = 8.5.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Default,
+            modifier = Modifier.align(Alignment.Start)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.Top
+        ) {
+            SingleDnaDotGrid(
+                sequence = original,
+                label = "SEQ. SCAN: Original",
+                modifier = Modifier.weight(1f)
+            )
+
+            SingleDnaDotGrid(
+                sequence = current,
+                label = "SEQ. SCAN: Mutated",
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 
@@ -488,7 +625,9 @@ fun QrRevealVisual(modifier: Modifier = Modifier) {
 @Composable
 fun CombinatorView(viewModel: MainViewModel) {
     val bioLabSubTab by viewModel.bioLabSubTab.collectAsState()
-    val idleTime by viewModel.idleTime.collectAsState()
+    val poxReactorActive by viewModel.poxReactorActive.collectAsState()
+    val poxIdleTime by viewModel.poxIdleTime.collectAsState()
+    val anomalyIdleTime by viewModel.anomalyIdleTime.collectAsState()
     val boostSecondsLeft by viewModel.boostSecondsLeft.collectAsState()
     val anomalyEngineActive by viewModel.anomalyEngineActive.collectAsState()
     val discoveredPacketsLog by viewModel.discoveredPacketsLog.collectAsState()
@@ -562,14 +701,24 @@ fun CombinatorView(viewModel: MainViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Main Screen Content
+        // Outer Column to structure scrollable content (weight 1f) and bottom switcher
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
 
             // 2. MAIN REACTOR CARD (representing Left Pane)
             Box(
@@ -598,11 +747,14 @@ fun CombinatorView(viewModel: MainViewModel) {
                                 fontFamily = FontFamily.Default
                             )
                             Text(
-                                text = "SYSTEMS ON",
-                                color = CyberGreen,
+                                text = if (poxReactorActive) "SYSTEMS ON" else "SYSTEMS OFF",
+                                color = if (poxReactorActive) CyberGreen else Color.Red,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Default
+                                fontFamily = FontFamily.Default,
+                                modifier = Modifier.clickable {
+                                    viewModel.setPoxReactorActive(!poxReactorActive)
+                                }
                             )
                         }
 
@@ -623,6 +775,17 @@ fun CombinatorView(viewModel: MainViewModel) {
                                 modifier = Modifier.weight(1f)
                             )
                         }
+
+                        // Flavor text
+                        Text(
+                            text = "Synthesize genes at a set rate or manually accelerate to speed up the P.O.X. Reactor.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = CyberGreen.copy(alpha = 0.8f),
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
 
                         // Top-Level Counts section
                         Row(
@@ -900,7 +1063,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                             )
                             Text(
                                 text = if (anomalyEngineActive) "SYSTEMS ON" else "SYSTEMS OFF",
-                                color = if (anomalyEngineActive) Color(0xFFD8B4FE) else Color.Gray,
+                                color = if (anomalyEngineActive) CyberGreen else Color.Red,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Default,
@@ -925,6 +1088,17 @@ fun CombinatorView(viewModel: MainViewModel) {
                                 modifier = Modifier.weight(1f)
                             )
                         }
+
+                        // Flavor text
+                        Text(
+                            text = "Sacrifice existing genes to synthesize anomalous genes in the Anomaly Engine.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFA855F7).copy(alpha = 0.8f),
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
 
                         // Top-Level Counts section for Anomaly tab (standardized padding)
                         Row(
@@ -1192,7 +1366,11 @@ fun CombinatorView(viewModel: MainViewModel) {
                             }.joinToString("")
                         }
                     } else {
-                        scrollingGene
+                        if (!poxReactorActive) {
+                            "--------"
+                        } else {
+                            scrollingGene
+                        }
                     }
 
                     Box(
@@ -1217,20 +1395,39 @@ fun CombinatorView(viewModel: MainViewModel) {
                     // Progress bar
                     val isBoosted = boostSecondsLeft > 0
                     val totalCycle = if (isBoosted) 8 else 16
-                    val progress = if (bioLabSubTab == "anomaly" && !anomalyEngineActive) {
-                        0f
+                    val targetProgress = if (bioLabSubTab == "anomaly") {
+                        if (anomalyEngineActive) {
+                            ((totalCycle - anomalyIdleTime).toFloat() / totalCycle.toFloat()).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
                     } else {
-                        ((totalCycle - idleTime).toFloat() / totalCycle.toFloat()).coerceIn(0f, 1f)
+                        if (poxReactorActive) {
+                            ((totalCycle - poxIdleTime).toFloat() / totalCycle.toFloat()).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
                     }
+
+                    // Smoothly animate progress using snap on reset
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = targetProgress,
+                        animationSpec = if (targetProgress == 0f) {
+                            snap()
+                        } else {
+                            tween(durationMillis = 1000, easing = LinearEasing)
+                        },
+                        label = "reactorProgress"
+                    )
 
                     val progressColor = if (bioLabSubTab == "anomaly") {
                         if (anomalyEngineActive) Color(0xFFA855F7) else Color.DarkGray
                     } else {
-                        CyberGreen
+                        if (poxReactorActive) CyberGreen else Color.DarkGray
                     }
 
                     LinearProgressIndicator(
-                        progress = { progress },
+                        progress = { animatedProgress },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(8.dp)
@@ -1248,14 +1445,14 @@ fun CombinatorView(viewModel: MainViewModel) {
                     ) {
                         Text(
                             text = if (bioLabSubTab == "anomaly") {
-                                if (anomalyEngineActive) "ANOMALOUS CONSOLIDATION IN: ${idleTime}S" else "ANOMALOUS CONSOLIDATION: IDLE"
+                                if (anomalyEngineActive) "ANOMALOUS CONSOLIDATION IN: ${anomalyIdleTime}S" else "ANOMALOUS CONSOLIDATION: IDLE"
                             } else {
-                                "GENE ARRAY READY IN: ${idleTime}S"
+                                if (poxReactorActive) "GENE ARRAY READY IN: ${poxIdleTime}S" else "GENE ARRAY REACTOR: OFFLINE"
                             },
                             color = if (bioLabSubTab == "anomaly") {
                                 if (anomalyEngineActive) Color(0xFFA855F7) else Color.Gray
                             } else {
-                                CyberGreenDim
+                                if (poxReactorActive) CyberGreenDim else Color.Red
                             },
                             fontFamily = FontFamily.Default,
                             fontWeight = FontWeight.Bold,
@@ -1359,55 +1556,8 @@ fun CombinatorView(viewModel: MainViewModel) {
                     )
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // SUB-TAB SWITCHER (P.O.X. Reactor & Anomaly Engine)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
-                        .background(activePanel)
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Button(
-                        onClick = { viewModel.setBioLabSubTab("pox") },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (bioLabSubTab == "pox") CyberGreen else Color.Transparent,
-                            contentColor = if (bioLabSubTab == "pox") Color.Black else CyberGreenDim
-                        ),
-                        shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "P.O.X. REACTOR",
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Button(
-                        onClick = { viewModel.setBioLabSubTab("anomaly") },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (bioLabSubTab == "anomaly") Color(0xFFA855F7) else Color.Transparent,
-                            contentColor = if (bioLabSubTab == "anomaly") Color.White else Color(0xFF701A75)
-                        ),
-                        shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "ANOMALY ENGINE",
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
                 if (devForceAnomaly) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Button(
                         onClick = { viewModel.addDevGenes() },
                         modifier = Modifier.fillMaxWidth().height(54.dp),
@@ -1429,6 +1579,56 @@ fun CombinatorView(viewModel: MainViewModel) {
                 }
             }
         }
+    }
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    // SUB-TAB SWITCHER (P.O.X. Reactor & Anomaly Engine)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
+            .background(activePanel)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Button(
+            onClick = { viewModel.setBioLabSubTab("pox") },
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (bioLabSubTab == "pox") CyberGreen else Color.Transparent,
+                contentColor = if (bioLabSubTab == "pox") Color.Black else CyberGreenDim
+            ),
+            shape = RoundedCornerShape(4.dp),
+            contentPadding = PaddingValues(vertical = 8.dp)
+        ) {
+            Text(
+                text = "P.O.X. REACTOR",
+                style = Typography.labelSmall,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Button(
+            onClick = { viewModel.setBioLabSubTab("anomaly") },
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (bioLabSubTab == "anomaly") Color(0xFFA855F7) else Color.Transparent,
+                contentColor = if (bioLabSubTab == "anomaly") Color.White else Color(0xFFA855F7)
+            ),
+            shape = RoundedCornerShape(4.dp),
+            contentPadding = PaddingValues(vertical = 8.dp)
+        ) {
+            Text(
+                text = "ANOMALY ENGINE",
+                style = Typography.labelSmall,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
 
         // ==========================================
         // OVERLAY 1: MOLECULAR STEP-SEARCH
@@ -3101,14 +3301,14 @@ fun SplicerLeftPanel(
                 .padding(12.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "[ G.E.N. P.O.X. E-MERGE SEQUENCER v1.7 ]",
+                        text = "[ G.E.N. P.O.X. E-MERGE SEQUENCER V1.7 ]",
                         color = CyberGreenDim,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
@@ -3141,7 +3341,7 @@ fun SplicerLeftPanel(
                 }
                 Text(
                     text = "Fill all slots with stockpiled genes to assemble the target genome.",
-                    color = CyberGreenDim,
+                    color = CyberGreen.copy(alpha = 0.8f),
                     style = Typography.bodySmall,
                     fontFamily = FontFamily.Default,
                     fontSize = 10.sp
@@ -3784,6 +3984,8 @@ fun VaultView(viewModel: MainViewModel) {
     val geneSequences by viewModel.geneSequences.collectAsState()
     val discoveredPacketsLog by viewModel.discoveredPacketsLog.collectAsState()
     val defenderId by viewModel.defenderCreatureId.collectAsState()
+    val openedFrom by viewModel.creatureCardOpenedFrom.collectAsState()
+    val harvestingCreatureIds by viewModel.harvestingCreatureIds.collectAsState()
 
     // Local UI states
     var applyLibFilters by remember { mutableStateOf(false) }
@@ -3801,7 +4003,7 @@ fun VaultView(viewModel: MainViewModel) {
 
     // Filter and Sort logic
     val filteredSortedCreatures = remember(
-        creatures, applyLibFilters, libSortBy, libFilterFaction, libFilterType, libFilterTag, targetSequence, defenderId
+        creatures, applyLibFilters, libSortBy, libFilterFaction, libFilterType, libFilterTag, targetSequence, defenderId, harvestingCreatureIds
     ) {
         var result = creatures
         if (applyLibFilters) {
@@ -3812,7 +4014,7 @@ fun VaultView(viewModel: MainViewModel) {
                 result = result.filter { it.type.equals(libFilterType, ignoreCase = true) }
             }
             if (libFilterTag != "ALL") {
-                result = result.filter { getCreatureTags(it, targetSequence, defenderId).contains(libFilterTag) }
+                result = result.filter { getCreatureTags(it, targetSequence, defenderId, harvestingCreatureIds).contains(libFilterTag) }
             }
         }
 
@@ -3826,7 +4028,7 @@ fun VaultView(viewModel: MainViewModel) {
             "attack-desc" -> result.sortedByDescending { it.attack }
             "defense-desc" -> result.sortedByDescending { it.defense }
             "speed-desc" -> result.sortedByDescending { it.speed }
-            "tags-desc" -> result.sortedByDescending { getCreatureTags(it, targetSequence, defenderId).size }
+            "tags-desc" -> result.sortedByDescending { getCreatureTags(it, targetSequence, defenderId, harvestingCreatureIds).size }
             else -> result
         }
     }
@@ -3859,7 +4061,7 @@ fun VaultView(viewModel: MainViewModel) {
                 // 1. Registry Header (Aligned stacked layout for mobile screens)
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -3867,7 +4069,7 @@ fun VaultView(viewModel: MainViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "[ G.E.N. P.O.X. SEABED VAULT v0.4 ]",
+                            text = "[ G.E.N. P.O.X. SEABED VAULT V0.4 ]",
                             color = CyberGreenDim,
                             fontSize = 9.sp,
                             fontFamily = FontFamily.Default,
@@ -3899,7 +4101,7 @@ fun VaultView(viewModel: MainViewModel) {
                     }
                     Text(
                         text = "View or filter your spliced P.O.X. sequences below",
-                        color = CyberGreenDim,
+                        color = CyberGreen.copy(alpha = 0.8f),
                         style = Typography.bodySmall,
                         fontFamily = FontFamily.Default,
                         fontSize = 10.sp
@@ -4243,7 +4445,15 @@ fun VaultView(viewModel: MainViewModel) {
             }
         } else {
             val c = activeCreature!!
-            CreatureDetailCard(c = c, viewModel = viewModel)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                    .background(CyberPanel)
+                    .padding(12.dp)
+            ) {
+                CreatureDetailCard(c = c, viewModel = viewModel)
+            }
         }
 
         // Overlay is drawn on top when viewingArchiveSearch is true and activeCreature is null
@@ -4263,30 +4473,19 @@ fun VaultView(viewModel: MainViewModel) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFF071A09))
-                            .border(1.dp, CyberBorder)
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                            .border(1.dp, CyberBorder.copy(alpha = 0.2f), RoundedCornerShape(2.dp))
+                            .background(Color.Black.copy(alpha = 0.3f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(CyberGreen)
-                            )
-                            Text(
-                                text = "[ P.O.X. SEQUENCE DIRECTORY ]",
-                                color = CyberGreen,
-                                fontSize = 10.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        Text(
+                            text = "[ P.O.X. SEQUENCE DIRECTORY ]",
+                            color = CyberGreenDim,
+                            fontSize = 9.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
 
                         Box(
                             modifier = Modifier
@@ -4361,8 +4560,8 @@ fun VaultView(viewModel: MainViewModel) {
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         items(filteredSortedCreatures) { item ->
-                            val currentTags = remember(item, targetSequence, defenderId) {
-                                getCreatureTags(item, targetSequence, defenderId)
+                            val currentTags = remember(item, targetSequence, defenderId, harvestingCreatureIds) {
+                                getCreatureTags(item, targetSequence, defenderId, harvestingCreatureIds)
                             }
                             Row(
                                 modifier = Modifier
@@ -4371,51 +4570,42 @@ fun VaultView(viewModel: MainViewModel) {
                                     .background(CyberPanel)
                                     .clickable {
                                         viewModel.synthManager.playBeep(700f, 0.05f, "sine")
-                                        viewModel.setActiveCreature(item)
+                                        viewModel.setActiveCreature(item, openedFrom ?: "vault")
                                     }
                                     .padding(10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            text = item.name.uppercase(),
-                                            color = Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
-                                        )
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            currentTags.forEach { tag ->
-                                                TagBadge(tag = tag)
-                                            }
-                                        }
-                                    }
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+                                        .background(Color.Black.copy(alpha = 0.4f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    com.example.genpox.ui.components.CreatureWireframeView(
+                                        dna = item.sequence,
+                                        faction = item.faction,
+                                        modifier = Modifier.fillMaxSize().padding(4.dp)
+                                    )
+                                }
 
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.name.uppercase(),
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Row(
-                                        modifier = Modifier.padding(top = 2.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = item.type.uppercase(),
-                                            color = CyberGreenDim,
-                                            fontSize = 8.5.sp,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
-                                        )
-                                        Text(
-                                            text = "SECTOR: ${item.faction.uppercase()}",
-                                            color = CyberGreenDim,
-                                            fontSize = 8.5.sp,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
-                                        )
+                                        currentTags.forEach { tag ->
+                                            TagBadge(tag = tag)
+                                        }
                                     }
                                 }
 
@@ -4436,11 +4626,60 @@ fun VaultView(viewModel: MainViewModel) {
 }
 
 @Composable
+fun HarvestingCountdownTimer(
+    viewModel: MainViewModel,
+    creatureId: String
+) {
+    val activeMissions by viewModel.activeMissions.collectAsState()
+    val m = remember(activeMissions, creatureId) {
+        activeMissions.find { it.creatureId == creatureId && !it.isReturned }
+    }
+
+    if (m != null) {
+        if (m.isCompleted) {
+            // RECALL BUTTON
+            Button(
+                onClick = {
+                    viewModel.recallMission(m)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(38.dp)
+                    .padding(bottom = 6.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E1FF), contentColor = Color.Black),
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text(
+                    text = "RECALL SEQUENCE & BANK Stockpile",
+                    style = Typography.labelSmall,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        } else {
+            // HARVESTING TEXT
+            val remaining = maxOf(0L, m.totalDuration - m.elapsedSeconds)
+            val timeStr = String.format(java.util.Locale.US, "%02dm %02ds", remaining / 60, remaining % 60)
+            val targetGene = m.harvestedGenes.firstOrNull() ?: "UNKNOWN"
+            Text(
+                text = "Harvesting: $targetGene ($timeStr remaining)",
+                color = Color(0xFF00E1FF),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(bottom = 6.dp, start = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
 fun CreatureDetailCard(
     c: Creature,
     viewModel: MainViewModel
 ) {
     var showEnlargedQr by remember { mutableStateOf(false) }
+    var showWireframeModel by remember { mutableStateOf(false) }
     val qrContent = remember(c) { viewModel.encodeCreatureToBase64(c) }
 
     // Effective stats computations scaled by telomeres
@@ -4456,14 +4695,14 @@ fun CreatureDetailCard(
     val targetSequence by viewModel.targetSequence.collectAsState()
     val defenderId by viewModel.defenderCreatureId.collectAsState()
     val openedFrom by viewModel.creatureCardOpenedFrom.collectAsState()
-    val activeTags = remember(c, targetSequence, defenderId) {
-        getCreatureTags(c, targetSequence, defenderId)
+    val harvestingCreatureIds by viewModel.harvestingCreatureIds.collectAsState()
+    val activeTags = remember(c, targetSequence, defenderId, harvestingCreatureIds) {
+        getCreatureTags(c, targetSequence, defenderId, harvestingCreatureIds)
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -4495,7 +4734,7 @@ fun CreatureDetailCard(
                         if (openedFrom == "splicer") {
                             viewModel.selectTab("splicer")
                         } else if (openedFrom == "scanner") {
-                            viewModel.selectTab("transceiver")
+                            viewModel.selectTab("scanner")
                         }
                     }
                     .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -4599,6 +4838,10 @@ fun CreatureDetailCard(
                     .weight(1f)
                     .border(1.dp, CyberBorder.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                     .background(Color.Black)
+                    .clickable {
+                        viewModel.synthManager.playBeep(520f, 0.05f, "sine")
+                        showWireframeModel = true
+                    }
                     .padding(8.dp)
                     .height(115.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -4613,16 +4856,13 @@ fun CreatureDetailCard(
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default
                 )
                 Box(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = c.asciiArt.lines().joinToString("\n") { it.trim() },
-                        style = Typography.bodySmall,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        color = CyberGreen,
-                        lineHeight = 13.sp,
-                        textAlign = TextAlign.Center
+                    com.example.genpox.ui.components.CreatureWireframeView(
+                        dna = c.sequence,
+                        faction = c.faction,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -4702,6 +4942,73 @@ fun CreatureDetailCard(
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                     lineHeight = 14.sp
                 )
+            }
+        }
+
+        // DYNAMIC HARVESTING / DISPATCH MODULE (Placed just above Vitality)
+        val isHarvesting = remember(harvestingCreatureIds, c.id) {
+            harvestingCreatureIds.contains(c.id)
+        }
+        val selectedAnomaly by viewModel.selectedAnomaly.collectAsState()
+
+        if (isHarvesting) {
+            HarvestingCountdownTimer(viewModel = viewModel, creatureId = c.id)
+        } else if (openedFrom == "scanner") {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+                    .border(1.dp, Color(0xFFA855F7).copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .padding(10.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "ANOMALY HARVEST TRANSMISSION LINK",
+                        color = Color(0xFFA855F7),
+                        style = Typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    if (selectedAnomaly != null) {
+                        val lockedAnom = selectedAnomaly!!
+                        Text(
+                            text = "Ready to dispatch to Anomaly ${lockedAnom.id} (Gene: ${lockedAnom.gene}). Dispatch duration scaled by Speed stat.",
+                            color = Color.LightGray,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Default
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Button(
+                            onClick = {
+                                viewModel.dispatchMission(c, lockedAnom)
+                                viewModel.setSelectedAnomalyId(null)
+                                viewModel.setActiveCreature(null)
+                                viewModel.selectTab("scanner")
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(38.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA855F7), contentColor = Color.Black),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "DISPATCH SEQUENCE TO ANOMALY",
+                                style = Typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "NO ANOMALY TARGET LOCKED. SCAN FOR ANOMALIES FIRST.",
+                            color = Color.Gray,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Default
+                        )
+                    }
+                }
             }
         }
 
@@ -5007,6 +5314,13 @@ fun CreatureDetailCard(
                     }
                 }
             }
+        }
+
+        if (c.isMutated && c.originalSequence != null) {
+            DnaComparisonGrid(
+                original = c.originalSequence,
+                current = c.sequence
+            )
         }
 
         // Box 6: GENE HARVESTING MATRIX
@@ -5701,6 +6015,7 @@ fun CreatureDetailCard(
                     )
                 }
             }
+
         }
     }
 
@@ -5737,6 +6052,59 @@ fun CreatureDetailCard(
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.clickable { showEnlargedQr = false }
+                    )
+                }
+            }
+        }
+    }
+
+    if (showWireframeModel) {
+        val fColor = when (c.faction) {
+            "Infection" -> Color(0xFFEF4444)
+            "Mech" -> Color(0xFF60A5FA)
+            "Parasite" -> Color(0xFFA855F7)
+            else -> Color(0xFF00FF41)
+        }
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showWireframeModel = false }) {
+            Box(
+                modifier = Modifier
+                    .size(320.dp)
+                    .border(2.dp, fColor, RoundedCornerShape(8.dp))
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                // Background: full-frame scanner static + 3D creature
+                com.example.genpox.ui.components.CreatureWireframeView(
+                    dna = c.sequence,
+                    faction = c.faction,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Foreground: Text overlay elements
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "3D HOLO-STRUCT RECON",
+                        color = Color.White,
+                        style = Typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                    )
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                    
+                    Text(
+                        text = "CLOSE",
+                        color = Color.Red,
+                        style = Typography.labelSmall,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { showWireframeModel = false }
                     )
                 }
             }
@@ -5781,12 +6149,14 @@ private fun getCoherence(seq: String, target: String): String {
 private fun getCreatureTags(
     item: Creature,
     targetSequence: String,
-    defenderId: String? = null
+    defenderId: String? = null,
+    harvestingCreatureIds: Set<String> = emptySet()
 ): List<String> {
     val tags = mutableListOf<String>()
     if (item.isFavorite) tags.add("FAVORITE")
     if (defenderId == item.id) tags.add("DEFENDER")
     if (item.isAutoHacker) tags.add("AUTO-HACKER")
+    if (harvestingCreatureIds.contains(item.id)) tags.add("HARVESTING")
 
     if (item.isFullCoherence) {
         tags.add("FULL COHERENCE")
@@ -5802,6 +6172,9 @@ private fun getCreatureTags(
     }
     if (item.appendedGenes.isNotEmpty()) {
         tags.add("MODIFIED")
+    }
+    if (item.isMutated) {
+        tags.add("MUTATED")
     }
     if (item.origin == "Created") {
         tags.add("ORIGINAL")
@@ -5888,405 +6261,1512 @@ private fun PoxDropdown(
 // 4. SCANNER VIEW (styled MAP or fallback RADAR)
 // ==========================================
 @Composable
-fun ScannerView(viewModel: MainViewModel) {
-    val mapVisible = remember { mutableStateOf(false) } // Toggle to holographic radar by default for retro look
+fun AnomalyItemStatus(
+    viewModel: MainViewModel,
+    anomaly: PoxAnomaly,
+    factionColor: Color
+) {
+    val activeMissions by viewModel.activeMissions.collectAsState()
+    val activeMission = remember(activeMissions, anomaly) {
+        activeMissions.find { Math.abs(it.lat - anomaly.lat) < 0.0001 && Math.abs(it.lng - anomaly.lng) < 0.0001 && !it.isReturned }
+    }
+    
+    val statusText = if (activeMission == null) {
+        "No Active Harvester"
+    } else {
+        val remaining = maxOf(0L, activeMission.totalDuration - activeMission.elapsedSeconds)
+        val timeStr = String.format(java.util.Locale.US, "%02dm %02ds", remaining / 60, remaining % 60)
+        "Harvesting: $timeStr"
+    }
+    val statusColor = if (activeMission == null) Color.Gray else Color(0xFF00E1FF)
+    Text(
+        text = statusText,
+        color = statusColor,
+        fontSize = 8.sp,
+        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Monospace,
+        modifier = Modifier.padding(top = 2.dp)
+    )
+}
 
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+@Composable
+fun AnomalyItemRow(
+    anomaly: PoxAnomaly,
+    userLat: Double,
+    userLng: Double,
+    viewModel: MainViewModel,
+    onClick: () -> Unit
+) {
+    val latDiff = anomaly.lat - userLat
+    val lngDiff = anomaly.lng - userLng
+    val direction = remember(latDiff, lngDiff) {
+        val angle = Math.toDegrees(Math.atan2(latDiff, lngDiff))
+        val normalizedAngle = (angle + 360) % 360
+        when {
+            normalizedAngle >= 337.5 || normalizedAngle < 22.5 -> "E"
+            normalizedAngle >= 22.5 && normalizedAngle < 67.5 -> "NE"
+            normalizedAngle >= 67.5 && normalizedAngle < 112.5 -> "N"
+            normalizedAngle >= 112.5 && normalizedAngle < 157.5 -> "NW"
+            normalizedAngle >= 157.5 && normalizedAngle < 202.5 -> "W"
+            normalizedAngle >= 202.5 && normalizedAngle < 247.5 -> "SW"
+            normalizedAngle >= 247.5 && normalizedAngle < 292.5 -> "S"
+            else -> "SE"
+        }
+    }
+
+    val factionColor = when (anomaly.faction) {
+        "Infection" -> Color(0xFFEF4444)
+        "Mech" -> Color(0xFFFBBF24)
+        "Parasite" -> Color(0xFFA855F7)
+        else -> Color(0xFF22D3EE) // Containment
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+            .background(CyberPanel)
+            .padding(10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Text(text = "TACTICAL AREA SCANNER", style = Typography.titleMedium, color = CyberGreen)
-            Text(
-                text = if (mapVisible.value) "HOLO-RADAR" else "GEOMAP",
-                style = Typography.labelSmall,
-                color = CyberGreen,
-                modifier = Modifier
-                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                    .clickable { mapVisible.value = !mapVisible.value }
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(factionColor)
+                )
+                Text(
+                    text = anomaly.name.uppercase(),
+                    style = Typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = "[${anomaly.faction.uppercase()}]",
+                    style = Typography.labelSmall,
+                    fontSize = 8.sp,
+                    color = factionColor
+                )
+            }
+            val densityVal = Math.round(anomaly.density * 100.0).toInt()
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "DIST: ${anomaly.distance.toInt()} FT",
+                    style = Typography.bodySmall,
+                    color = CyberGreenDim,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp
+                )
+                Text(
+                    text = "DIR: $direction",
+                    style = Typography.bodySmall,
+                    color = CyberGreenDim,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp
+                )
+                Text(
+                    text = "DENSITY: ${if (densityVal >= 0) "+" else ""}$densityVal%",
+                    style = Typography.bodySmall,
+                    color = CyberGreenDim,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp
+                )
+            }
+            
+            AnomalyItemStatus(
+                viewModel = viewModel,
+                anomaly = anomaly,
+                factionColor = factionColor
             )
         }
 
-        if (mapVisible.value) {
-            // Real map screen container
-            GoogleMapsScanner(viewModel)
-        } else {
-            // Holographic radar sweep view
-            HolographicRadarScanner(viewModel)
+        Box(
+            modifier = Modifier
+                .border(1.dp, factionColor.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                .background(Color.Black.copy(alpha = 0.4f))
+                .padding(horizontal = 6.dp, vertical = 3.dp)
+        ) {
+            Text(
+                text = "🧬 ${anomaly.gene}",
+                color = factionColor,
+                style = Typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp
+            )
         }
+    }
+}
 
-        // Active harvest missions list
-        Text(text = "ACTIVE HARVEST DISPATCHES:", style = Typography.labelSmall, color = CyberGreenDim)
-        val activeMissions by viewModel.activeMissions.collectAsState()
+@Composable
+private fun getPhaseLabel(phase: String): String {
+    return when (phase) {
+        "TRAVEL" -> "TRANSIT TO BOUNDARY"
+        "DESCENT" -> "DESCENT INTO WELL"
+        "HARVESTING" -> "ACTIVE EXTRACTION"
+        "ASCENT" -> "ASCENT TO BOUNDARY"
+        "TRANST_BACK" -> "TRANSIT TO BASE"
+        else -> "EXTRACTION COMPLETED"
+    }
+}
 
-        if (activeMissions.isEmpty()) {
-            Box(
+@Composable
+fun LockedAnomalyActiveMissionContent(
+    viewModel: MainViewModel,
+    anomaly: PoxAnomaly,
+    factionColor: Color,
+    activeAnomalyTab: String,
+    creatures: List<Creature>
+) {
+    val activeMissions by viewModel.activeMissions.collectAsState()
+    val activeMission = remember(activeMissions, anomaly) {
+        activeMissions.find { Math.abs(it.lat - anomaly.lat) < 0.0001 && Math.abs(it.lng - anomaly.lng) < 0.0001 && !it.isReturned }
+    }
+
+    if (activeMission == null) return
+
+    val isLogTab = activeAnomalyTab == "logs"
+
+    if (isLogTab) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "[ MISSION TELEMETRY LOGS ACTIVE ]",
+                    color = factionColor,
+                    style = Typography.labelSmall,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "ANOMALY PROBE TELEMETRY (OVERRIDE)",
+                color = Color.White,
+                style = Typography.bodyMedium,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val displayedLogs = remember { mutableStateListOf<String>() }
+            LaunchedEffect(activeMission.missionLogs) {
+                if (activeMission.missionLogs.isEmpty()) {
+                    displayedLogs.clear()
+                } else {
+                    val isNewRun = displayedLogs.size > activeMission.missionLogs.size ||
+                            (displayedLogs.isNotEmpty() && activeMission.missionLogs.firstOrNull() != displayedLogs.firstOrNull())
+                    val startIdx = if (isNewRun) {
+                        displayedLogs.clear()
+                        0
+                    } else {
+                        displayedLogs.size
+                    }
+                    for (i in startIdx until activeMission.missionLogs.size) {
+                        delay(150L)
+                        displayedLogs.add(activeMission.missionLogs[i])
+                    }
+                }
+            }
+
+            val listState = rememberLazyListState()
+            LaunchedEffect(displayedLogs.size) {
+                if (displayedLogs.isNotEmpty()) {
+                    listState.animateScrollToItem(displayedLogs.size - 1)
+                }
+            }
+
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.4f)
-                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                    .background(Color.Black),
-                contentAlignment = Alignment.Center
+                    .weight(1f)
+                    .background(Color(0xFF050505))
+                    .border(1.dp, Color(0xFF2D0A0A), RoundedCornerShape(2.dp))
+                    .padding(6.dp),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(text = "NO HARVEST SHUTTLES DISPATCHED.", style = Typography.bodySmall, color = CyberGreenDim)
+                items(displayedLogs) { log ->
+                    val isAlert = log.contains("FAILED") || log.contains("WARNING") || log.contains("Failed") || log.contains("stalled") || log.contains("STALL") || log.contains("stalling")
+                    Text(
+                        text = log,
+                        color = if (isAlert) Color(0xFFFCA5A5) else Color(0xFF34D399),
+                        style = Typography.bodySmall,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontSize = 9.sp
+                    )
+                }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(0.4f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                items(activeMissions) { mission ->
-                    val elapsed = (System.currentTimeMillis() - mission.startTime) / 1000f
-                    val progress = (elapsed / mission.totalDuration).coerceIn(0f, 1f)
-                    val isDone = progress >= 1f
+        }
+    } else {
+        val elapsed = activeMission.elapsedSeconds
+        val total = activeMission.totalDuration
+        val progressPercent = if (total > 0) (elapsed.toFloat() / total.toFloat()).coerceIn(0f, 1f) else 0f
+        val remaining = maxOf(0L, total - elapsed)
 
-                    Row(
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "HARVEST DISPATCH IN PROGRESS",
+                color = Color.White,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+
+            // Progress bar
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(8.dp)
+                        .background(Color.Black, RoundedCornerShape(4.dp))
+                        .border(1.dp, factionColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progressPercent)
+                            .background(Color(0xFF00E1FF), RoundedCornerShape(4.dp))
+                    )
+                }
+                Text(
+                    text = "${(progressPercent * 100).toInt()}%",
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = "MISSION PHASE:", color = CyberGreenDim, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                Text(
+                    text = getPhaseLabel(activeMission.phase),
+                    color = Color(0xFF00E1FF),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = "EST. REMAINING:", color = CyberGreenDim, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                Text(
+                    text = String.format(java.util.Locale.US, "%02dm %02ds", remaining / 60, remaining % 60),
+                    color = Color.White,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            if (activeMission.isCompleted) {
+                Button(
+                    onClick = {
+                        viewModel.recallMission(activeMission)
+                        viewModel.setSelectedAnomalyId(null)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(38.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = factionColor, contentColor = Color.Black),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = "RECALL SEQUENCE & BANK Stockpile",
+                        style = Typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "ANALYSIS IN PROGRESS. RETRIEVAL ACTIVE UPON SYNC COMPLETION.",
+                    color = Color.Gray,
+                    fontSize = 7.5.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            val activeCreature = remember(creatures, activeMission.creatureId) {
+                creatures.find { it.id == activeMission.creatureId }
+            }
+            val currentSeq = activeCreature?.sequence ?: activeMission.originalSequence ?: ""
+            val originalSeq = activeMission.originalSequence ?: currentSeq
+
+            DnaComparisonGrid(
+                original = originalSeq,
+                current = currentSeq
+            )
+        }
+    }
+}
+
+@Composable
+fun LockedAnomalyDetails(
+    anomaly: PoxAnomaly,
+    viewModel: MainViewModel,
+    userLat: Double,
+    userLng: Double,
+    activeMissionCoords: Set<String>,
+    depletedAnomalyCoords: Set<String>,
+    activeAnomalyTab: String,
+    modifier: Modifier = Modifier
+) {
+    val factionColor = when (anomaly.faction) {
+        "Infection" -> Color(0xFFEF4444)
+        "Mech" -> Color(0xFFFBBF24)
+        "Parasite" -> Color(0xFFA855F7)
+        else -> Color(0xFF22D3EE)
+    }
+
+    val creatures by viewModel.creatures.collectAsState()
+
+    val isHarvesting = remember(activeMissionCoords, anomaly) {
+        activeMissionCoords.contains("${anomaly.lat},${anomaly.lng}")
+    }
+
+    val isDepleted = remember(depletedAnomalyCoords, anomaly) {
+        depletedAnomalyCoords.contains("${anomaly.lat},${anomaly.lng}")
+    }
+
+    val scanRadius by viewModel.scanRadius.collectAsState()
+    val isHarvestable = anomaly.distance <= scanRadius
+
+    val isLogTab = isHarvesting && activeAnomalyTab == "logs"
+
+    Column(
+        modifier = modifier
+            .border(1.dp, factionColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+            .background(CyberPanel)
+            .padding(if (isLogTab) 0.dp else 8.dp),
+        verticalArrangement = Arrangement.spacedBy(if (isLogTab) 0.dp else 6.dp)
+    ) {
+        if (isLogTab) {
+            LockedAnomalyActiveMissionContent(
+                viewModel = viewModel,
+                anomaly = anomaly,
+                factionColor = factionColor,
+                activeAnomalyTab = activeAnomalyTab,
+                creatures = creatures
+            )
+        } else {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "[ TARGET ZONE LOCK: ${anomaly.id} ]",
+                    color = factionColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Box(
+                    modifier = Modifier
+                        .border(1.dp, Color(0xFF990000), RoundedCornerShape(2.dp))
+                        .background(Color.Black)
+                        .clickable {
+                            viewModel.synthManager.playBeep(450f, 0.05f, "sine")
+                            viewModel.setSelectedAnomalyId(null)
+                        }
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "✕ CLOSE",
+                        color = Color.Red,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            // Details Grid
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .border(1.dp, CyberBorder.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                    .padding(6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "CLASSIFICATION:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    Text(text = anomaly.faction.uppercase(), color = factionColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "COORDINATES:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    Text(
+                        text = String.format(java.util.Locale.US, "%.5f, %.5f", anomaly.lat, anomaly.lng),
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "DISTANCE:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    Text(text = "${anomaly.distance.toInt()} FT", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "ENVIRONMENT DENSITY:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    val densityVal = Math.round(anomaly.density * 100.0).toInt()
+                    val densityStr = "${if (densityVal >= 0) "+" else ""}$densityVal%"
+                    Text(text = densityStr, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "GENE CARRIER:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    Text(text = "🧬 ${anomaly.gene}", color = factionColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "EST. ACCURACY:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    val boundaryRadius = anomaly.getBoundaryRadiusForPlayer(userLat, userLng)
+                    val yieldChance = Math.max(0, Math.round(100.0 - (anomaly.distance / boundaryRadius) * 100.0))
+                    Text(text = "$yieldChance% EXTRACT", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+            }
+
+            // Action or status
+            when {
+                isHarvesting -> {
+                    LockedAnomalyActiveMissionContent(
+                        viewModel = viewModel,
+                        anomaly = anomaly,
+                        factionColor = factionColor,
+                        activeAnomalyTab = activeAnomalyTab,
+                        creatures = creatures
+                    )
+                }
+                isDepleted -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .padding(10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "✕ ANOMALY SIGNATURE DEPLETED",
+                            color = Color.Gray,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+                else -> {
+                    Button(
+                        onClick = {
+                            viewModel.setSelectedAnomalyId(anomaly.id)
+                            viewModel.setActiveCreature(null, openedFrom = "scanner")
+                            viewModel.synthManager.playBeep(520f, 0.08f, "sine")
+                            viewModel.selectTab("vault")
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(38.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = factionColor, contentColor = Color.Black),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "DISPATCH SEQUENCE TO ANOMALY",
+                            style = Typography.labelSmall,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ActiveDeployedSequencesList(
+    activeMissions: List<HarvestMission>,
+    onSelectAnomalyByLatLng: (Double, Double) -> Unit
+) {
+    if (activeMissions.isEmpty()) return
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CyberBorder.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+            .background(CyberPanel)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "ACTIVE DEPLOYED SEQUENCES (${activeMissions.size})",
+            color = Color.White,
+            style = Typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            activeMissions.forEach { m ->
+                val progressPercent = if (m.totalDuration > 0) (m.elapsedSeconds.toFloat() / m.totalDuration.toFloat()).coerceIn(0f, 1f) else 0f
+                val remaining = maxOf(0L, m.totalDuration - m.elapsedSeconds)
+                val factionColor = when (m.creatureFaction) {
+                    "Infection" -> Color(0xFFEF4444)
+                    "Mech" -> Color(0xFFFBBF24)
+                    "Parasite" -> Color(0xFFA855F7)
+                    else -> Color(0xFF22D3EE)
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, factionColor.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                        .background(Color.Black.copy(alpha = 0.4f))
+                        .clickable { onSelectAnomalyByLatLng(m.lat, m.lng) }
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = m.creatureName.uppercase(),
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = String.format(java.util.Locale.US, "REM: %02dm %02ds", remaining / 60, remaining % 60),
+                                color = CyberGreenDim,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = String.format(java.util.Locale.US, "STALL: %3d%%", m.stalledDepth.toInt()),
+                                color = CyberGreenDim,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .background(Color.DarkGray, RoundedCornerShape(2.dp))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(progressPercent)
+                                    .background(Color(0xFF00E1FF), RoundedCornerShape(2.dp))
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .border(
+                                1.dp,
+                                if (m.isCompleted) factionColor else Color.Gray.copy(alpha = 0.4f),
+                                RoundedCornerShape(2.dp)
+                            )
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = if (m.isCompleted) "⚡ READY" else "HARVESTING",
+                            color = if (m.isCompleted) factionColor else Color.Gray,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ScannerView(viewModel: MainViewModel) {
+    val anomalies by viewModel.anomalies.collectAsState()
+    val lat by viewModel.latitude.collectAsState()
+    val lng by viewModel.longitude.collectAsState()
+    val roads by viewModel.roads.collectAsState()
+    val selectedAnomalyId by viewModel.selectedAnomalyId.collectAsState()
+    val selectedAnomaly by viewModel.selectedAnomaly.collectAsState()
+    val activeMissionCoords by viewModel.activeMissionCoords.collectAsState()
+    val depletedAnomalyCoords by viewModel.depletedAnomalyCoords.collectAsState()
+    var scannerSubTab by remember { mutableStateOf("list") }
+    var activeAnomalyTab by remember { mutableStateOf("scan") }
+
+    val isHarvesting = remember(activeMissionCoords, selectedAnomaly) {
+        selectedAnomaly?.let { anomaly ->
+            activeMissionCoords.contains("${anomaly.lat},${anomaly.lng}")
+        } ?: false
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            if (selectedAnomalyId != null && selectedAnomaly != null) {
+                LockedAnomalyDetails(
+                    anomaly = selectedAnomaly!!,
+                    viewModel = viewModel,
+                    userLat = lat,
+                    userLng = lng,
+                    activeMissionCoords = activeMissionCoords,
+                    depletedAnomalyCoords = depletedAnomalyCoords,
+                    activeAnomalyTab = activeAnomalyTab,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else if (scannerSubTab == "radar") {
+                HolographicRadarScanner(
+                    viewModel = viewModel,
+                    anomalies = anomalies,
+                    userLat = lat,
+                    userLng = lng,
+                    roads = roads,
+                    selectedAnomalyId = selectedAnomalyId,
+                    onSelectAnomaly = { id -> viewModel.setSelectedAnomalyId(id) },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                             .background(CyberPanel)
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(12.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "${mission.creatureName} (${mission.creatureFaction})", style = Typography.bodySmall, fontWeight = FontWeight.Bold, color = CyberGreen)
-                            Text(text = "GENE DEST: ${mission.harvestedGenes.joinToString()}", style = Typography.bodySmall, color = CyberGreenDim)
-                            LinearProgressIndicator(
-                                progress = { progress },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 4.dp),
-                                color = CyberGreen,
-                                trackColor = Color.Black
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = { viewModel.recallMission(mission) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isDone) CyberGreen else CyberPanel,
-                                contentColor = if (isDone) Color.Black else CyberGreenDim
-                            ),
-                            shape = RoundedCornerShape(4.dp),
-                            border = BorderStroke(1.dp, CyberBorder),
-                            enabled = isDone,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.Start
                         ) {
-                            Text(text = "RECALL", style = Typography.labelSmall)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// 4a. Google Maps wrapper
-@Composable
-fun GoogleMapsScanner(viewModel: MainViewModel) {
-    val lat by viewModel.latitude.collectAsState()
-    val lng by viewModel.longitude.collectAsState()
-    val scanRadius by viewModel.scanRadius.collectAsState()
-    val anomalies by viewModel.anomalies.collectAsState()
-    val creatures by viewModel.creatures.collectAsState()
-
-    val location = LatLng(lat, lng)
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(location, 17f)
-    }
-
-    val selectedAnomaly = remember { mutableStateOf<PoxAnomaly?>(null) }
-
-    LaunchedEffect(lat, lng) {
-        cameraPositionState.position = CameraPosition.fromLatLngZoom(LatLng(lat, lng), 17f)
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-            .clip(RoundedCornerShape(4.dp))
-    ) {
-        GoogleMap(
-            modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraPositionState,
-            properties = MapProperties(
-                mapStyleOptions = MapStyleOptions(MapStyle.JSON_STYLE)
-            )
-        ) {
-            // Draw center player location
-            Marker(
-                state = MarkerState(position = location),
-                title = "PLAYER TRANSMITTER BEACON"
-            )
-
-            // Draw Anomalies
-            anomalies.forEach { anomaly ->
-                Marker(
-                    state = MarkerState(position = LatLng(anomaly.lat, anomaly.lng)),
-                    title = "${anomaly.name} (${anomaly.gene})",
-                    onClick = {
-                        selectedAnomaly.value = anomaly
-                        viewModel.synthManager.playBeep(770f, 0.05f, "square")
-                        false
-                    }
-                )
-            }
-        }
-
-        // Selected anomaly popup HUD overlay
-        selectedAnomaly.value?.let { anomaly ->
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.9f))
-                    .border(1.dp, CyberGreen, RoundedCornerShape(4.dp))
-                    .padding(8.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = anomaly.name, style = Typography.bodySmall, fontWeight = FontWeight.Bold, color = CyberGreen)
-                        Text(
-                            text = "CLOSE",
-                            style = Typography.labelSmall,
-                            color = Color.Red,
-                            modifier = Modifier.clickable { selectedAnomaly.value = null }
-                        )
-                    }
-                    Text(text = "GENE SIGNATURE: ${anomaly.gene}", style = Typography.bodySmall, color = CyberGreenDim)
-                    Text(text = "DISTANCE: ${anomaly.distance.toInt()} FT | SECTOR: ${anomaly.faction}", style = Typography.bodySmall, color = CyberGreenDim)
-
-                    if (creatures.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(text = "DISPATCH FOR PROBE:", style = Typography.labelSmall, color = CyberGreenDim)
-                            val listState = remember { mutableStateOf(false) }
-
-                            Button(
-                                onClick = { listState.value = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = CyberPanel, contentColor = CyberGreen),
-                                shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "CHOOSE UNIT", style = Typography.labelSmall)
-                            }
-
-                            if (listState.value) {
-                                AlertDialog(
-                                    onDismissRequest = { listState.value = false },
-                                    containerColor = CyberPanel,
-                                    title = { Text("SELECT EXPEDITION UNIT", style = Typography.titleMedium, color = CyberGreen) },
-                                    text = {
-                                        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            items(creatures) { c ->
-                                                Text(
-                                                    text = c.name,
-                                                    style = Typography.bodyMedium,
-                                                    color = CyberGreen,
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable {
-                                                            viewModel.dispatchMission(c, anomaly)
-                                                            listState.value = false
-                                                            selectedAnomaly.value = null
-                                                        }
-                                                        .padding(vertical = 8.dp)
-                                                )
-                                            }
-                                        }
-                                    },
-                                    confirmButton = {}
+                                Text(
+                                    text = "[ G.E.N. P.O.X. ANOMALY LOG V1.2 ]",
+                                    color = CyberGreenDim,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Default
+                                )
+                                Text(
+                                    text = "ONLINE",
+                                    color = CyberGreen,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Default
                                 )
                             }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .requiredHeight(24.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "NEARBY FREQUENCY LOCATOR",
+                                    color = Color.White,
+                                    style = Typography.bodyMedium,
+                                    fontFamily = FontFamily.Default,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Text(
+                                text = "Analyze the detailed telemetry signature of detected local anomalies.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = CyberGreen.copy(alpha = 0.8f),
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Default,
+                                fontWeight = FontWeight.Normal,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (anomalies.isEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(200.dp)
+                                            .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                            .background(Color.Black.copy(alpha = 0.4f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "NO ANOMALIES IN RANGE.",
+                                            style = Typography.bodySmall,
+                                            color = CyberGreenDim
+                                        )
+                                    }
+                                } else {
+                                    anomalies.take(5).forEach { anomaly ->
+                                        AnomalyItemRow(
+                                            anomaly = anomaly,
+                                            userLat = lat,
+                                            userLng = lng,
+                                            viewModel = viewModel,
+                                            onClick = { viewModel.setSelectedAnomalyId(anomaly.id) }
+                                        )
+                                    }
+                                }
+                            }
                         }
-                    } else {
-                        Text(text = "NO COMPILED CREATURES AVAILABLE TO DISPATCH.", style = Typography.bodySmall, color = Color.Red)
                     }
+
+                }
+            }
+        }
+
+        if (selectedAnomalyId == null) {
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        if (selectedAnomalyId == null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                    .background(CyberPanel)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Button(
+                    onClick = {
+                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                        scannerSubTab = "list"
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (scannerSubTab == "list") CyberGreen else Color.Transparent,
+                        contentColor = if (scannerSubTab == "list") Color.Black else CyberGreenDim
+                    ),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "NEARBY LIST",
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                        scannerSubTab = "radar"
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (scannerSubTab == "radar") CyberGreen else Color.Transparent,
+                        contentColor = if (scannerSubTab == "radar") Color.Black else CyberGreenDim
+                    ),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "TACTICAL RADAR",
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        } else if (isHarvesting) {
+            // SEQUENCE SCAN / TELEMETRY LOGS switcher (emulating Bio-Lab switcher exactly)
+            val factionColor = when (selectedAnomaly?.faction) {
+                "Infection" -> Color(0xFFEF4444)
+                "Mech" -> Color(0xFFFBBF24)
+                "Parasite" -> Color(0xFFA855F7)
+                else -> Color(0xFF22D3EE)
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, factionColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Button(
+                    onClick = { activeAnomalyTab = "scan" },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (activeAnomalyTab == "scan") factionColor else Color.Transparent,
+                        contentColor = if (activeAnomalyTab == "scan") (if (selectedAnomaly?.faction == "Parasite") Color.White else Color.Black) else factionColor.copy(alpha = 0.7f)
+                    ),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "SEQUENCE SCAN",
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Button(
+                    onClick = { activeAnomalyTab = "logs" },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (activeAnomalyTab == "logs") factionColor else Color.Transparent,
+                        contentColor = if (activeAnomalyTab == "logs") (if (selectedAnomaly?.faction == "Parasite") Color.White else Color.Black) else factionColor.copy(alpha = 0.7f)
+                    ),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "TELEMETRY LOGS",
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
     }
 }
 
-// 4b. Custom holographic radar view fallback (Premium retro visual)
-@Composable
-fun HolographicRadarScanner(viewModel: MainViewModel) {
-    val anomalies by viewModel.anomalies.collectAsState()
-    val creatures by viewModel.creatures.collectAsState()
-    val selectedAnomaly = remember { mutableStateOf<PoxAnomaly?>(null) }
+private data class ProjectedAnomaly(
+    val ax: Float,
+    val ay: Float,
+    val rMax: Float,
+    val factionColor: Color,
+    val contourAlpha: Float,
+    val path: androidx.compose.ui.graphics.Path
+)
 
-    val infiniteTransition = rememberInfiniteTransition(label = "radar_sweep")
-    val sweepAngle by infiniteTransition.animateFloat(
+class DirectionTracker {
+    var lastValue: Float = 0f
+    var isMovingUp: Boolean = false
+    fun update(newValue: Float): Boolean {
+        if (newValue != lastValue) {
+            isMovingUp = newValue < lastValue
+            lastValue = newValue
+        }
+        return isMovingUp
+    }
+}
+
+@Composable
+fun HolographicRadarScanner(
+    viewModel: MainViewModel,
+    anomalies: List<PoxAnomaly>,
+    userLat: Double,
+    userLng: Double,
+    roads: List<List<Pair<Double, Double>>>,
+    selectedAnomalyId: String?,
+    onSelectAnomaly: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val directionTracker = remember { DirectionTracker() }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val infiniteTransition = rememberInfiniteTransition(label = "scanline_sweep")
+    val scanlineFraction by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 360f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            animation = tween(4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        label = "angle"
+        label = "scanline"
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
+    var sliderValue by remember { mutableStateOf(2.0f) }
+    val zoomSteps = listOf(4.0f, 2.0f, 1.0f, 0.5f, 0.25f)
+    val lowerIndex = sliderValue.toInt().coerceIn(0, 3)
+    val upperIndex = lowerIndex + 1
+    val fraction = sliderValue - lowerIndex
+    val zoomMultiplier = zoomSteps[lowerIndex] + fraction * (zoomSteps[upperIndex] - zoomSteps[lowerIndex])
+
+    LaunchedEffect(zoomMultiplier) {
+        viewModel.updateZoom(zoomMultiplier)
+    }
+
+    val localMapCenterLat = userLat
+    val localMapCenterLng = userLng
+
+    BoxWithConstraints(
+        modifier = modifier
             .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(190.dp)) {
-            val cx = size.width / 2
-            val cy = size.height / 2
-            val maxR = size.width / 2 * 0.9f
+        val width = maxWidth
+        val height = maxHeight
+        val cxDp = width / 2
+        val cyDp = height / 2
+        val maxRDp = minOf(width, height) / 2 * 0.9f
 
-            // Radar concentric rings
-            drawCircle(Color(0xFF00FF41).copy(alpha = 0.15f), radius = maxR, center = Offset(cx, cy), style = Stroke(width = 1f))
-            drawCircle(Color(0xFF00FF41).copy(alpha = 0.1f), radius = maxR * 0.6f, center = Offset(cx, cy), style = Stroke(width = 0.5f))
-            drawCircle(Color(0xFF00FF41).copy(alpha = 0.05f), radius = maxR * 0.3f, center = Offset(cx, cy), style = Stroke(width = 0.5f))
+        val heightPx = with(density) { height.toPx() }
+        val widthPx = with(density) { width.toPx() }
 
-            // Crosshair lines
-            drawLine(Color(0xFF00FF41).copy(alpha = 0.15f), Offset(cx - maxR, cy), Offset(cx + maxR, cy), strokeWidth = 0.5f)
-            drawLine(Color(0xFF00FF41).copy(alpha = 0.15f), Offset(cx, cy - maxR), Offset(cx, cy + maxR), strokeWidth = 0.5f)
+        // Dynamic Analog CRT static aberrations & horizontal tears
+        val timeMs = System.currentTimeMillis()
+        val isGlitching = (timeMs % 1600 < 160) // Glitch for 160ms every 1.6s
+        val glitchCenterY = ((timeMs / 10) % heightPx.toInt()).toFloat()
+        val glitchHeight = 90f
 
-            // Dynamic sweep ray
-            val radians = Math.toRadians(sweepAngle.toDouble())
-            val sweepX = cx + maxR * cos(radians).toFloat()
-            val sweepY = cy + maxR * sin(radians).toFloat()
-            drawLine(
-                brush = Brush.sweepGradient(
-                    colors = listOf(CyberGreen.copy(alpha = 0.4f), Color.Transparent),
-                    center = Offset(cx, cy)
-                ),
-                start = Offset(cx, cy),
-                end = Offset(sweepX, sweepY),
-                strokeWidth = 2f
-            )
-
-            // Draw center beacon player transceiver
-            drawCircle(CyberGreen, radius = 3.5f, center = Offset(cx, cy))
-        }
-
-        // Clickable interactive blips matching anomalies
-        Box(modifier = Modifier.size(190.dp)) {
-            anomalies.forEachIndexed { idx, anomaly ->
-                val angleOffset = idx * 72f
-                val distanceFraction = 0.2f + (idx * 0.15f)
-                val rad = Math.toRadians(angleOffset.toDouble())
-                val x = 95 + (85 * distanceFraction * cos(rad)).toFloat()
-                val y = 95 + (85 * distanceFraction * sin(rad)).toFloat()
-
-                val factionColor = when (anomaly.faction) {
-                    "Infection" -> Color.Red
-                    "Mech" -> Color.Yellow
-                    "Parasite" -> Color(0xFFA855F7)
-                    else -> Color.Cyan
-                }
-
-                Box(
-                    modifier = Modifier
-                        .offset(x.dp - 6.dp, y.dp - 6.dp)
-                        .size(12.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(factionColor.copy(alpha = 0.8f))
-                        .clickable {
-                            selectedAnomaly.value = anomaly
-                            viewModel.synthManager.playBeep(660f, 0.05f, "sine")
-                        }
-                )
+        fun getGlitchOffsetX(y: Float): Float {
+            if (!isGlitching) return 0f
+            val dy = kotlin.math.abs(y - glitchCenterY)
+            if (dy < glitchHeight) {
+                val factor = 1.0f - (dy / glitchHeight)
+                return (kotlin.math.sin(y * 0.15f) * 14f * factor).toFloat()
             }
+            return 0f
         }
 
-        // Anomaly overlay
-        selectedAnomaly.value?.let { anomaly ->
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.95f))
-                    .border(1.dp, CyberGreen, RoundedCornerShape(4.dp))
-                    .padding(8.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = anomaly.name, style = Typography.bodySmall, fontWeight = FontWeight.Bold, color = CyberGreen)
-                        Text(
-                            text = "CLOSE",
-                            style = Typography.labelSmall,
-                            color = Color.Red,
-                            modifier = Modifier.clickable { selectedAnomaly.value = null }
-                        )
+        // Touch deck for tap targeting and map dragging
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(anomalies, localMapCenterLat, localMapCenterLng, zoomMultiplier) {
+                    detectTapGestures { tapOffset ->
+                        val cx = size.width / 2f
+                        val cy = size.height / 2f
+                        val maxR = minOf(size.width, size.height) / 2f * 0.9f
+                        val minTapRadius = 24.dp.toPx()
+
+                        val clickedAnomalies = mutableListOf<Pair<PoxAnomaly, Double>>()
+
+                        val maxRangeLat = 0.009 * zoomMultiplier
+                        val scale = maxR.toDouble() / maxRangeLat
+                        val cosLat = Math.cos(Math.toRadians(localMapCenterLat))
+
+                        anomalies.forEach { anomaly ->
+                            val dLat = anomaly.lat - localMapCenterLat
+                            val dLng = (anomaly.lng - localMapCenterLng) * cosLat
+
+                            val ax = cx + (dLng * scale).toFloat()
+                            val ay = cy - (dLat * scale).toFloat()
+
+                            val dx = tapOffset.x - ax
+                            val dy = tapOffset.y - ay
+                            val tapDistPixels = kotlin.math.sqrt((dx * dx + dy * dy).toDouble())
+
+                            // Determine approach angle theta relative to epicenter
+                            val theta = kotlin.math.atan2(dy.toDouble(), dx.toDouble())
+
+                            // Convert heatZoneDiameter/2 (feet) to canvas pixels
+                            val r0Pixels = ((anomaly.heatZoneDiameter / 2.0) / 111000.0) * scale
+
+                            val seed = anomaly.id.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
+                            val epsilon = 0.15 + (seed % 3) * 0.05
+                            val k = 3 + (seed % 3)
+                            val phi = (seed % 360) * (Math.PI / 180.0)
+
+                            val boundaryRadiusPixels = r0Pixels * (1.0 + epsilon * kotlin.math.cos(k * theta + phi))
+                            val containmentRadius = maxOf(boundaryRadiusPixels, minTapRadius.toDouble())
+
+                            if (tapDistPixels <= containmentRadius) {
+                                clickedAnomalies.add(anomaly to tapDistPixels)
+                            }
+                        }
+
+                        if (clickedAnomalies.isNotEmpty()) {
+                            val selected = clickedAnomalies.minByOrNull { it.second }?.first
+                            if (selected != null) {
+                                onSelectAnomaly(selected.id)
+                            }
+                        }
                     }
-                    Text(text = "GENE COORD: ${anomaly.gene}", style = Typography.bodySmall, color = CyberGreenDim)
-                    Text(text = "SECTOR: ${anomaly.faction} | DIST: ${anomaly.distance.toInt()} FT", style = Typography.bodySmall, color = CyberGreenDim)
+                }
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val cx = size.width / 2
+                val cy = size.height / 2
+                val maxR = minOf(size.width, size.height) / 2 * 0.9f
 
-                    if (creatures.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(text = "DEPLOY EXPEDITION UNIT:", style = Typography.labelSmall, color = CyberGreenDim)
-                            val listState = remember { mutableStateOf(false) }
+                val maxRangeLat = 0.009 * zoomMultiplier
+                val scale = maxR.toDouble() / maxRangeLat
+                val cosLat = Math.cos(Math.toRadians(localMapCenterLat))
 
-                            Button(
-                                onClick = { listState.value = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = CyberPanel, contentColor = CyberGreen),
-                                shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                            ) {
-                                Text(text = "SELECT UNIT", style = Typography.labelSmall)
+                // Project Player screen coordinate relative to mapCenter coordinates
+                val dLatPlayer = userLat - localMapCenterLat
+                val dLngPlayer = (userLng - localMapCenterLng) * cosLat
+                val playerX = cx + (dLngPlayer * scale).toFloat()
+                val playerY = cy - (dLatPlayer * scale).toFloat()
+
+                // Calculate scanline vertical position
+                val scanlineY = size.height * scanlineFraction
+                val movingUp = directionTracker.update(scanlineY)
+
+
+
+                    // 1. Draw concentric scope rings centered on player position
+                    drawCircle(Color(0xFF00FF41).copy(alpha = 0.15f), radius = maxR, center = Offset(playerX, playerY), style = Stroke(width = 1f))
+                    drawCircle(Color(0xFF00FF41).copy(alpha = 0.08f), radius = maxR * 0.6f, center = Offset(playerX, playerY), style = Stroke(width = 0.5f))
+                    drawCircle(Color(0xFF00FF41).copy(alpha = 0.04f), radius = maxR * 0.3f, center = Offset(playerX, playerY), style = Stroke(width = 0.5f))
+
+                    // 2. Draw crosshair scope lines centered on player position
+                    drawLine(Color(0xFF00FF41).copy(alpha = 0.15f), Offset(playerX - maxR, playerY), Offset(playerX + maxR, playerY), strokeWidth = 0.5f)
+                    drawLine(Color(0xFF00FF41).copy(alpha = 0.15f), Offset(playerX, playerY - maxR), Offset(playerX, playerY + maxR), strokeWidth = 0.5f)
+
+                    // 3. Draw Vector Roads with map center offset, horizontal sync tear, and scanline excitation
+                    roads.forEach { road ->
+                        for (j in 0 until road.size - 1) {
+                            val pt1 = road[j]
+                            val pt2 = road[j + 1]
+
+                            val dLat1 = pt1.first - localMapCenterLat
+                            val dLng1 = (pt1.second - localMapCenterLng) * cosLat
+                            val y1 = cy - (dLat1 * scale).toFloat()
+                            val x1 = cx + (dLng1 * scale).toFloat() + getGlitchOffsetX(y1)
+
+                            val dLat2 = pt2.first - localMapCenterLat
+                            val dLng2 = (pt2.second - localMapCenterLng) * cosLat
+                            val y2 = cy - (dLat2 * scale).toFloat()
+                            val x2 = cx + (dLng2 * scale).toFloat() + getGlitchOffsetX(y2)
+
+                            // Frustum culling: check if segment is within canvas bounds
+                            val margin = 50f
+                            val isVisible = (x1 >= -margin && x1 <= size.width + margin && y1 >= -margin && y1 <= size.height + margin) ||
+                                            (x2 >= -margin && x2 <= size.width + margin && y2 >= -margin && y2 <= size.height + margin)
+                            if (!isVisible) continue
+
+                            // Excitation check based on distance from the vertical scanline
+                            val midY = (y1 + y2) / 2f
+                            var diffY = scanlineY - midY
+                            if (diffY < 0f) diffY += size.height
+
+                            val intensity = if (diffY < 300f) {
+                                1.0f - (diffY / 300f) * 0.60f
+                            } else {
+                                0.40f
                             }
 
-                            if (listState.value) {
-                                AlertDialog(
-                                    onDismissRequest = { listState.value = false },
-                                    containerColor = CyberPanel,
-                                    title = { Text("CHOOSE EXPEDITION UNIT", style = Typography.titleMedium, color = CyberGreen) },
-                                    text = {
-                                        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            items(creatures) { c ->
-                                                Text(
-                                                    text = c.name,
-                                                    style = Typography.bodyMedium,
-                                                    color = CyberGreen,
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable {
-                                                            viewModel.dispatchMission(c, anomaly)
-                                                            listState.value = false
-                                                            selectedAnomaly.value = null
-                                                        }
-                                                        .padding(vertical = 8.dp)
-                                                )
-                                            }
+                            drawLine(
+                                color = CyberGreen.copy(alpha = intensity * 0.85f),
+                                start = Offset(x1, y1),
+                                end = Offset(x2, y2),
+                                strokeWidth = 2.0f
+                            )
+                        }
+                    }
+
+                    // 4. Draw Volumetric Irregular Heatmaps (Outer Boundary static outline ONLY, glowing when swept)
+                    val projected = anomalies.map { anomaly ->
+                        val dLat = anomaly.lat - localMapCenterLat
+                        val dLng = (anomaly.lng - localMapCenterLng) * cosLat
+                        val ay = cy - (dLat * scale).toFloat()
+                        val ax = cx + (dLng * scale).toFloat() + getGlitchOffsetX(ay)
+
+                        val factionColor = when (anomaly.faction) {
+                            "Infection" -> Color.Red
+                            "Mech" -> Color.Yellow
+                            "Parasite" -> Color(0xFFA855F7)
+                            else -> Color.Cyan
+                        }
+
+                        var diffY = scanlineY - ay
+                        if (diffY < 0f) diffY += size.height
+
+                        val sweepIntensity = if (diffY < 250f) {
+                            1.0f - (diffY / 250f)
+                        } else {
+                            0.0f
+                        }
+
+                        val contourAlpha = 0.5f + 0.45f * sweepIntensity
+
+                        val r0Pixels = ((anomaly.heatZoneDiameter / 2.0) / 111000.0) * scale
+                        val seed = anomaly.id.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
+                        val epsilon = 0.15 + (seed % 3) * 0.05
+                        val k = 3 + (seed % 3)
+                        val phi = (seed % 360) * (Math.PI / 180.0)
+                        val rMax = (r0Pixels * (1.0 + epsilon)).toFloat()
+
+                        val path = androidx.compose.ui.graphics.Path()
+                        val steps = 36
+                        for (step in 0..steps) {
+                            val theta = (step * 2.0 * Math.PI) / steps
+                            val rBase = r0Pixels * (1.0 + epsilon * kotlin.math.cos(k * theta + phi))
+                            val py = (ay + rBase * kotlin.math.sin(theta)).toFloat()
+                            val px = (ax + rBase * kotlin.math.cos(theta) + getGlitchOffsetX(py)).toFloat()
+                            if (step == 0) {
+                                path.moveTo(px, py)
+                            } else {
+                                path.lineTo(px, py)
+                            }
+                        }
+                        path.close()
+
+                        ProjectedAnomaly(ax, ay, rMax, factionColor, contourAlpha, path)
+                    }
+
+                    // Group overlapping anomalies
+                    val visited = BooleanArray(projected.size)
+                    val groups = mutableListOf<List<ProjectedAnomaly>>()
+
+                    for (i in projected.indices) {
+                        if (!visited[i]) {
+                            val currentGroup = mutableListOf<ProjectedAnomaly>()
+                            val queue = mutableListOf<Int>()
+                            queue.add(i)
+                            visited[i] = true
+
+                            while (queue.isNotEmpty()) {
+                                val curr = queue.removeAt(0)
+                                currentGroup.add(projected[curr])
+
+                                for (j in projected.indices) {
+                                    if (!visited[j]) {
+                                        val dx = projected[curr].ax - projected[j].ax
+                                        val dy = projected[curr].ay - projected[j].ay
+                                        val dist = kotlin.math.sqrt(dx * dx + dy * dy)
+                                        if (dist < (projected[curr].rMax + projected[j].rMax)) {
+                                            visited[j] = true
+                                            queue.add(j)
                                         }
-                                    },
-                                    confirmButton = {}
+                                    }
+                                }
+                            }
+                            groups.add(currentGroup)
+                        }
+                    }
+
+                    // Render groups
+                    groups.forEach { group ->
+                        if (group.isNotEmpty()) {
+                            // Draw radial gradient fills for each anomaly, clipped to their individual irregular paths
+                            group.forEach { item ->
+                                clipPath(item.path) {
+                                    drawCircle(
+                                        brush = Brush.radialGradient(
+                                            colors = listOf(item.factionColor, Color.Transparent),
+                                            center = Offset(item.ax, item.ay),
+                                            radius = item.rMax
+                                        ),
+                                        radius = item.rMax,
+                                        center = Offset(item.ax, item.ay)
+                                    )
+                                }
+                            }
+
+                            var mergedPath = group.first().path
+                            for (mIdx in 1 until group.size) {
+                                mergedPath = androidx.compose.ui.graphics.Path.combine(
+                                    androidx.compose.ui.graphics.PathOperation.Union,
+                                    mergedPath,
+                                    group[mIdx].path
                                 )
                             }
+                            
+                            val groupColor = group.first().factionColor
+                            val groupAlpha = group.maxOf { it.contourAlpha }
+                            
+                            drawPath(mergedPath, color = groupColor.copy(alpha = groupAlpha), style = Stroke(width = 2.0f))
+                            
+                            group.forEach { item ->
+                                drawCircle(item.factionColor, radius = 3.5f, center = Offset(item.ax, item.ay))
+                                drawCircle(Color.White, radius = 1.2f, center = Offset(item.ax, item.ay))
+                            }
                         }
-                    } else {
-                        Text(text = "NO TELEMETRY HOSTS TO DEPLOY.", style = Typography.bodySmall, color = Color.Red)
+                    }
+
+                    // 6. Draw player transceiver beacon center
+                    drawCircle(CyberGreen, radius = 3.5f, center = Offset(playerX, playerY))
+
+                // 5. Draw bright horizontal scanline sweep ray spanning full width of the container
+                // Outer blooming glow
+                drawLine(
+                    color = CyberGreen.copy(alpha = 0.35f),
+                    start = Offset(0f, scanlineY),
+                    end = Offset(size.width, scanlineY),
+                    strokeWidth = 6.0f
+                )
+                // Main laser line
+                drawLine(
+                    color = CyberGreen.copy(alpha = 0.9f),
+                    start = Offset(0f, scanlineY),
+                    end = Offset(size.width, scanlineY),
+                    strokeWidth = 2.5f
+                )
+                // Bright white hot core
+                drawLine(
+                    color = Color.White.copy(alpha = 0.95f),
+                    start = Offset(0f, scanlineY),
+                    end = Offset(size.width, scanlineY),
+                    strokeWidth = 1.0f
+                )
+                
+                // Draw trailing scanline glow spanning full width (flipping direction correctly when moving up vs down)
+                val startY = if (movingUp) scanlineY - 3f else scanlineY - 110f
+                val endY = if (movingUp) scanlineY + 110f else scanlineY + 3f
+                val colors = if (movingUp) {
+                    listOf(
+                        Color.Transparent,
+                        CyberGreen.copy(alpha = 0.25f),
+                        CyberGreen.copy(alpha = 0.03f),
+                        Color.Transparent
+                    )
+                } else {
+                    listOf(
+                        Color.Transparent,
+                        CyberGreen.copy(alpha = 0.03f),
+                        CyberGreen.copy(alpha = 0.25f),
+                        Color.Transparent
+                    )
+                }
+                val scanlineGlow = Brush.verticalGradient(
+                    colors = colors,
+                    startY = startY,
+                    endY = endY
+                )
+                drawRect(brush = scanlineGlow, size = size)
+
+                // 7. Render light analog static line aberrations & CRT noise snow
+                val rand = java.util.Random(timeMs / 120)
+                
+                // Random horizontal static line cuts (original effect enhanced)
+                if (rand.nextFloat() < 0.5f) {
+                    val linesCount = rand.nextInt(4) + 1
+                    for (i in 0 until linesCount) {
+                        val staticY = rand.nextFloat() * size.height
+                        val staticAlpha = rand.nextFloat() * 0.18f + 0.05f
+                        val staticWidth = rand.nextFloat() * 300f + 50f
+                        val staticX = rand.nextFloat() * (size.width - staticWidth)
+                        drawLine(
+                            color = CyberGreen.copy(alpha = staticAlpha),
+                            start = Offset(staticX, staticY),
+                            end = Offset(staticX + staticWidth, staticY),
+                            strokeWidth = 1f
+                        )
+                    }
+                }
+
+                // CRT Phosphor Noise Snow / Small static ticks
+                if (isGlitching || rand.nextFloat() < 0.25f) {
+                    val noiseTicks = if (isGlitching) 35 else 12
+                    for (i in 0 until noiseTicks) {
+                        val py = rand.nextFloat() * size.height
+                        val px = rand.nextFloat() * size.width
+                        val tickWidth = rand.nextFloat() * 10f + 3f
+                        val alpha = rand.nextFloat() * 0.3f + 0.05f
+                        val color = if (rand.nextBoolean()) CyberGreen else Color.White
+                        
+                        drawLine(
+                            color = color.copy(alpha = alpha),
+                            start = Offset(px, py),
+                            end = Offset(px + tickWidth, py),
+                            strokeWidth = 1f
+                        )
+                    }
+                }
+
+                // Random full-width scanline horizontal tracking glitch bar
+                if (isGlitching && rand.nextFloat() < 0.3f) {
+                    val glitchBarY = rand.nextFloat() * size.height
+                    val barHeight = rand.nextFloat() * 15f + 5f
+                    drawRect(
+                        color = CyberGreen.copy(alpha = 0.08f),
+                        topLeft = Offset(0f, glitchBarY),
+                        size = androidx.compose.ui.geometry.Size(size.width, barHeight)
+                    )
+                }
+            }
+
+            // Draw Epicenter Hover Labels (shifted with map viewport coordinates and horizontal glitch offset)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clipToBounds()
+            ) {
+                anomalies.forEach { anomaly ->
+                    val dLat = anomaly.lat - localMapCenterLat
+                    val dLng = (anomaly.lng - localMapCenterLng) * Math.cos(Math.toRadians(localMapCenterLat))
+
+                    val maxRangeLat = 0.009 * zoomMultiplier
+                    val scale = maxRDp.value / maxRangeLat
+                    val y = cyDp - (dLat * scale).dp
+                    
+                    // We calculate x with glitch offset in dp
+                    val yPx = with(density) { y.toPx() }
+                    val glitchOffsetPx = getGlitchOffsetX(yPx)
+                    val glitchOffsetDp = with(density) { glitchOffsetPx.toDp() }
+                    val x = cxDp + (dLng * scale).dp + glitchOffsetDp
+
+                    val factionColor = when (anomaly.faction) {
+                        "Infection" -> Color.Red
+                        "Mech" -> Color.Yellow
+                        "Parasite" -> Color(0xFFA855F7)
+                        else -> Color.Cyan
+                    }
+
+                    // Verify if epicenter is inside the rectangular scanner viewport
+                    if (x >= 0.dp && x <= width && y >= 0.dp && y <= height) {
+                        Box(
+                            modifier = Modifier
+                                .offset(x = x - 35.dp, y = y - 22.dp)
+                                .width(70.dp)
+                                .border(0.5.dp, factionColor.copy(alpha = 0.7f), RoundedCornerShape(2.dp))
+                                .background(Color.Transparent)
+                                .padding(vertical = 2.dp, horizontal = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = anomaly.name.uppercase(),
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontSize = 6.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
+        }
+
+        // HUD Zoom controller along the right side of the map (full vertical length)
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(60.dp)
+                .background(Color.Black.copy(alpha = 0.7f))
+                .border(1.dp, CyberBorder, RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp))
+                .padding(vertical = 16.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val currentLabel = String.format(java.util.Locale.US, "%.2f", zoomMultiplier)
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "ZOOM",
+                    style = Typography.labelSmall,
+                    color = CyberGreenDim,
+                    fontSize = 7.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = "${currentLabel}x",
+                    style = Typography.labelSmall,
+                    color = CyberGreen,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            Text(
+                text = "0.25x",
+                style = Typography.labelSmall,
+                color = CyberGreenDim,
+                fontSize = 7.sp,
+                fontFamily = FontFamily.Monospace
+            )
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                val sliderLength = height - 120.dp
+                Box(
+                    modifier = Modifier
+                        .rotate(270f)
+                        .requiredWidth(sliderLength)
+                        .height(30.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { sliderValue = it },
+                        valueRange = 0f..4f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = CyberGreen,
+                            activeTrackColor = CyberGreen,
+                            inactiveTrackColor = CyberGreenDim.copy(alpha = 0.3f),
+                            activeTickColor = Color.Transparent,
+                            inactiveTickColor = Color.Transparent
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Text(
+                text = "4.00x",
+                style = Typography.labelSmall,
+                color = CyberGreenDim,
+                fontSize = 7.sp,
+                fontFamily = FontFamily.Monospace
+            )
+
+            
         }
     }
 }
@@ -6482,5 +7962,234 @@ fun SettingsView(viewModel: MainViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun BioLabTestView(viewModel: MainViewModel) {
+    val scrollingGene by viewModel.scrollingGene.collectAsState()
+    val poxIdleTime by viewModel.poxIdleTime.collectAsState()
+    val discoveredPacketsLog by viewModel.discoveredPacketsLog.collectAsState()
+    val poxReactorActive by viewModel.poxReactorActive.collectAsState()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
+        DualPaneConsoleFrame(
+            theme = "green",
+            flavorTitle = "[ G.E.N. P.O.X. BIO-LAB (T) TEST INTERFACE ]",
+            statusText = if (poxReactorActive) "SYSTEMS ON" else "SYSTEMS OFF",
+            statusColor = if (poxReactorActive) CyberGreen else Color.Red,
+            primaryTitle = "Primary Node Combinator (T)",
+            primaryContent = {
+                Text(
+                    text = "Observe live single-node cybernetic synthesis values and ticks below.",
+                    color = CyberGreen.copy(alpha = 0.8f),
+                    style = Typography.bodySmall,
+                    fontFamily = FontFamily.Default
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black)
+                        .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = scrollingGene,
+                        color = CyberGreen,
+                        style = Typography.titleLarge,
+                        fontSize = 26.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 4.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "REACTOR STATE: ${if (poxReactorActive) "ACTIVE" else "IDLE"}",
+                        color = CyberGreenDim,
+                        style = Typography.labelSmall,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
+                    Text(
+                        text = "NEXT CYCLE IN: ${poxIdleTime}S",
+                        color = CyberGreenDim,
+                        style = Typography.labelSmall,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
+                }
+            },
+            secondaryTitle = "Discovered Gene Packets Log (T)",
+            secondaryContent = {
+                Text(
+                    text = "Live telemetry transcription feed from the active synthesis processor.",
+                    color = CyberGreen.copy(alpha = 0.8f),
+                    style = Typography.bodySmall,
+                    fontFamily = FontFamily.Default
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .border(1.dp, CyberBorder.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (discoveredPacketsLog.isEmpty()) {
+                        Text(
+                            text = "LOG EMPTY: NO ACTIVE PACKETS CACHED",
+                            color = Color.Gray,
+                            style = Typography.bodySmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 9.sp
+                        )
+                    } else {
+                        discoveredPacketsLog.takeLast(3).reversed().forEach { packet ->
+                            val typeStr = if (packet.isAnomalous) "ANOMALOUS FUSION" else "GENE SYNTHESIS"
+                            Text(
+                                text = "• [${packet.genes.size} GENES] $typeStr SUCCESS",
+                                color = if (packet.isAnomalous) Color(0xFFA855F7) else CyberGreen,
+                                style = Typography.bodySmall,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontSize = 9.sp
+                            )
+                        }
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun SplicerTestView(viewModel: MainViewModel) {
+    val targetSequence by viewModel.targetSequence.collectAsState()
+    val splicerSlots by viewModel.splicerSlots.collectAsState()
+
+    val targetBlocks = remember(targetSequence) {
+        (0 until 8).map { i ->
+            if (i * 8 + 8 <= targetSequence.length) targetSequence.substring(i * 8, i * 8 + 8) else "--------"
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
+        DualPaneConsoleFrame(
+            theme = "purple",
+            flavorTitle = "[ G.E.N. P.O.X. SPLICER (T) TEST INTERFACE ]",
+            statusText = "CALIBRATION ONLINE",
+            statusColor = Color(0xFFA855F7),
+            primaryTitle = "Genetic Splicing Matrix (T)",
+            primaryContent = {
+                Text(
+                    text = "Observe the 8 slots representing raw blocks cached to compile the target sequence.",
+                    color = Color(0xFFA855F7).copy(alpha = 0.8f),
+                    style = Typography.bodySmall,
+                    fontFamily = FontFamily.Default
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black)
+                        .border(1.dp, Color(0xFFA855F7).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    for (i in 0 until 8) {
+                        val slotGene = splicerSlots.getOrNull(i)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "SLOT #${i + 1}",
+                                color = Color.Gray,
+                                style = Typography.bodySmall,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontSize = 9.sp
+                            )
+                            Text(
+                                text = slotGene ?: "--------",
+                                color = if (slotGene != null) CyberGreen else Color.DarkGray,
+                                style = Typography.bodySmall,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            },
+            secondaryTitle = "Target Alignment Buffer (T)",
+            secondaryContent = {
+                Text(
+                    text = "Required target sequence broken down into 8-character blocks.",
+                    color = Color(0xFFA855F7).copy(alpha = 0.8f),
+                    style = Typography.bodySmall,
+                    fontFamily = FontFamily.Default
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .border(1.dp, Color(0xFFA855F7).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    targetBlocks.chunked(4).forEach { rowBlocks ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            rowBlocks.forEach { block ->
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .border(1.dp, Color(0xFFA855F7).copy(alpha = 0.2f), RoundedCornerShape(2.dp))
+                                        .padding(vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = block,
+                                        color = Color(0xFFA855F7),
+                                        style = Typography.bodySmall,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        )
     }
 }

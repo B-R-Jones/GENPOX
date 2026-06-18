@@ -7,6 +7,34 @@ import React, { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
+const absHash = (str: string): number => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+};
+
+const getBoundaryRadius = (anomaly: any, theta: number): number => {
+  const seed = absHash(anomaly.id);
+  const r0 = (anomaly.heatZoneDiameter || 20) / 2; // in feet
+  const epsilon = 0.15 + (seed % 3) * 0.05;
+  const k = 3 + (seed % 3);
+  const phi = (seed % 360) * (Math.PI / 180.0);
+  return r0 * (1.0 + epsilon * Math.cos(k * theta + phi));
+};
+
+const isPointInsideAnomaly = (lat: number, lng: number, anomaly: any): boolean => {
+  const dy = (lat - anomaly.lat) * 111000 * 3.28084;
+  const dx = (lng - anomaly.lng) * 111000 * Math.cos(lat * Math.PI / 180) * 3.28084;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  
+  const theta = Math.atan2(dy, dx);
+  const boundaryRad = getBoundaryRadius(anomaly, theta);
+  return dist <= boundaryRad;
+};
+
 interface LeafletScannerMapProps {
   userCoords: { lat: number; lng: number };
   scanRadius: number;
@@ -171,80 +199,189 @@ export const LeafletScannerMap: React.FC<LeafletScannerMapProps> = ({
     // Clear previous elements
     group.clearLayers();
 
-    // 1. Draw Anomaly Heat Zone circular ranges and markers
+    // Helper to calculate distance in feet
+    const getDistanceInFeet = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+      const dy = (lat2 - lat1) * 111000 * 3.28084;
+      const dx = (lng2 - lng1) * 111000 * Math.cos(lat1 * Math.PI / 180) * 3.28084;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    // Group overlapping anomalies
+    const visited = new Set<string>();
+    const groupedAnomalies: any[][] = [];
+
     bioAnomalies.forEach((anom) => {
-      const isSelected = selectedAnomalyId === anom.id;
-      const heatZoneDiameter = anom.heatZoneDiameter || 20;
-      const heatZoneRadiusInMeters = (heatZoneDiameter / 2) * 0.3048;
+      if (visited.has(anom.id)) return;
+
+      const currentGroup: any[] = [];
+      const queue: any[] = [anom];
+      visited.add(anom.id);
+
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        currentGroup.push(curr);
+
+        const currSeed = absHash(curr.id);
+        const currR0 = (curr.heatZoneDiameter || 20) / 2;
+        const currEpsilon = 0.15 + (currSeed % 3) * 0.05;
+        const currMaxRad = currR0 * (1.0 + currEpsilon);
+
+        bioAnomalies.forEach((other) => {
+          if (visited.has(other.id)) return;
+
+          const otherSeed = absHash(other.id);
+          const otherR0 = (other.heatZoneDiameter || 20) / 2;
+          const otherEpsilon = 0.15 + (otherSeed % 3) * 0.05;
+          const otherMaxRad = otherR0 * (1.0 + otherEpsilon);
+
+          const dist = getDistanceInFeet(curr.lat, curr.lng, other.lat, other.lng);
+          if (dist < (currMaxRad + otherMaxRad)) {
+            visited.add(other.id);
+            queue.push(other);
+          }
+        });
+      }
+      groupedAnomalies.push(currentGroup);
+    });
+
+    // Draw Anomaly groups (fills and outline contours)
+    groupedAnomalies.forEach((g) => {
+      if (g.length === 0) return;
+
+      const hasSelected = g.some((anom) => selectedAnomalyId === anom.id);
+      const leadAnom = g[0];
 
       let colorHex = "#EF4444"; // Infection: Red
       let pulseColorClass = "bg-red-500";
-      if (anom.faction === "Mech") {
+      let gradId = "grad-infection";
+      if (leadAnom.faction === "Mech") {
         colorHex = "#EAB308";
         pulseColorClass = "bg-yellow-500";
-      } else if (anom.faction === "Parasite") {
+        gradId = "grad-mech";
+      } else if (leadAnom.faction === "Parasite") {
         colorHex = "#A855F7";
         pulseColorClass = "bg-purple-500";
-      } else if (anom.faction === "Containment") {
+        gradId = "grad-parasite";
+      } else if (leadAnom.faction === "Containment") {
         colorHex = "#22D3EE";
         pulseColorClass = "bg-cyan-500";
+        gradId = "grad-containment";
       }
 
-      // Add Heat Zone Circle outline + fill representing temperature radiation
-      const heatZoneCircle = L.circle([anom.lat, anom.lng], {
-        radius: heatZoneRadiusInMeters,
-        color: colorHex,
-        weight: isSelected ? 2 : 1.2,
-        opacity: isSelected ? 0.8 : 0.45,
-        fillColor: colorHex,
-        fillOpacity: isSelected ? 0.22 : 0.12,
-        dashArray: isSelected ? "3, 3" : undefined,
-      }).addTo(group);
+      // Draw individual wavy fills referencing the global SVG radial gradient definition for a completely smooth fade
+      g.forEach((anom) => {
+        const points: [number, number][] = [];
+        const steps = 36;
+        for (let i = 0; i <= steps; i++) {
+          const theta = (i * 2 * Math.PI) / steps;
+          const r = getBoundaryRadius(anom, theta); // in feet
+          const rMeters = r * 0.3048;
+          const dy = rMeters * Math.sin(theta);
+          const dx = rMeters * Math.cos(theta);
+          const dLat = dy / 111000;
+          const dLng = dx / (111000 * Math.cos(anom.lat * Math.PI / 180));
+          points.push([anom.lat + dLat, anom.lng + dLng]);
+        }
 
-      // Cybernetic heat spot marker tag
-      const borderClass = isSelected 
-        ? "border-2 border-purple-400 scale-125 ring-2 ring-purple-500/50" 
-        : "border border-black";
+        L.polygon(points, {
+          stroke: false,
+          fillColor: `url(#${gradId})`,
+          fillOpacity: hasSelected ? 1.0 : 0.75,
+          interactive: false,
+        }).addTo(group);
+      });
 
-      const anomalyIcon = L.divIcon({
-        html: `
-          <div class="relative flex items-center justify-center cursor-pointer font-mono" style="width: 24px; height: 24px;">
-            <span class="absolute inline-flex h-full w-full rounded-full ${pulseColorClass} opacity-20 animate-ping"></span>
-            <span class="relative inline-flex rounded-full h-3.5 w-3.5 ${pulseColorClass} ${borderClass} shadow-[0_0_8px_rgba(0,0,0,0.6)]"></span>
+      // Draw merged outline contour using outside segments
+      const outlineSegments: [number, number][][] = [];
+      g.forEach((anom) => {
+        const steps = 72;
+        const getLatLngAtAngle = (theta: number): [number, number] => {
+          const r = getBoundaryRadius(anom, theta); // in feet
+          const rMeters = r * 0.3048;
+          const dy = rMeters * Math.sin(theta);
+          const dx = rMeters * Math.cos(theta);
+          const dLat = dy / 111000;
+          const dLng = dx / (111000 * Math.cos(anom.lat * Math.PI / 180));
+          return [anom.lat + dLat, anom.lng + dLng];
+        };
+
+        for (let i = 0; i < steps; i++) {
+          const theta1 = (i * 2 * Math.PI) / steps;
+          const theta2 = ((i + 1) * 2 * Math.PI) / steps;
+          const p1 = getLatLngAtAngle(theta1);
+          const p2 = getLatLngAtAngle(theta2);
+
+          // Check if midpoint is outside all other anomalies in the group
+          const midLat = (p1[0] + p2[0]) / 2;
+          const midLng = (p1[1] + p2[1]) / 2;
+
+          const isOutside = g.every((other) => {
+            if (other.id === anom.id) return true;
+            return !isPointInsideAnomaly(midLat, midLng, other);
+          });
+
+          if (isOutside) {
+            outlineSegments.push([p1, p2]);
+          }
+        }
+      });
+
+      if (outlineSegments.length > 0) {
+        L.polyline(outlineSegments, {
+          color: colorHex,
+          weight: hasSelected ? 2 : 1.2,
+          opacity: hasSelected ? 0.8 : 0.45,
+          dashArray: hasSelected ? "3, 3" : undefined,
+        }).addTo(group);
+      }
+
+      // Draw individual targetable markers
+      g.forEach((anom) => {
+        const isSelected = selectedAnomalyId === anom.id;
+        const heatZoneDiameter = anom.heatZoneDiameter || 20;
+
+        const borderClass = isSelected 
+          ? "border-2 border-purple-400 scale-125 ring-2 ring-purple-500/50" 
+          : "border border-black";
+
+        const anomalyIcon = L.divIcon({
+          html: `
+            <div class="relative flex items-center justify-center cursor-pointer font-mono" style="width: 24px; height: 24px;">
+              <span class="absolute inline-flex h-full w-full rounded-full ${pulseColorClass} opacity-20 animate-ping"></span>
+              <span class="relative inline-flex rounded-full h-3.5 w-3.5 ${pulseColorClass} ${borderClass} shadow-[0_0_8px_rgba(0,0,0,0.6)]"></span>
+            </div>
+          `,
+          className: "",
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+        });
+
+        const marker = L.marker([anom.lat, anom.lng], {
+          icon: anomalyIcon,
+          title: `${anom.name} (Heat Zone: ${heatZoneDiameter}ft Diameter)`,
+        });
+
+        marker.on("click", (e) => {
+          L.DomEvent.stopPropagation(e);
+          onSelectAnomaly(anom.id);
+        });
+
+        marker.bindTooltip(`
+          <div style="background-color: #0c100e; color: #A855F7; border: 1px solid #581c87; padding: 5px 9px; font-family: monospace; font-size: 9px; border-radius: 4px; line-height: 1.3;">
+            <b style="color: white; font-size: 10px;">${anom.name}</b><br/>
+            HEAT ZONE: <span style="color: ${colorHex}; font-weight: bold;">${heatZoneDiameter} FT DIA</span><br/>
+            DIST: ${anom.distance.toFixed(1)} FT &bull; SIGN: ${anom.gene}<br/>
+            MIN/MAX CHANCE: Center 100% / Edge 0%
           </div>
-        `,
-        className: "",
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      });
+        `, {
+          direction: "top",
+          offset: [0, -10],
+          opacity: 0.95,
+          className: "cyber-map-tooltip",
+        });
 
-      const marker = L.marker([anom.lat, anom.lng], {
-        icon: anomalyIcon,
-        title: `${anom.name} (Heat Zone: ${heatZoneDiameter}ft Diameter)`,
+        group.addLayer(marker);
       });
-
-      marker.on("click", (e) => {
-        // Stop bubbling and trigger selection
-        L.DomEvent.stopPropagation(e);
-        onSelectAnomaly(anom.id);
-      });
-
-      // Bind tactical information HUD
-      marker.bindTooltip(`
-        <div style="background-color: #0c100e; color: #A855F7; border: 1px solid #581c87; padding: 5px 9px; font-family: monospace; font-size: 9px; border-radius: 4px; line-height: 1.3;">
-          <b style="color: white; font-size: 10px;">${anom.name}</b><br/>
-          HEAT ZONE: <span style="color: ${colorHex}; font-weight: bold;">${heatZoneDiameter} FT DIA</span><br/>
-          DIST: ${anom.distance.toFixed(1)} FT &bull; SIGN: ${anom.gene}<br/>
-          MIN/MAX CHANCE: Center 100% / Edge 0%
-        </div>
-      `, {
-        direction: "top",
-        offset: [0, -10],
-        opacity: 0.95,
-        className: "cyber-map-tooltip",
-      });
-
-      group.addLayer(marker);
     });
 
     // 2. Draw Active Harvesting Creatures with interactive real-time popups
@@ -325,6 +462,28 @@ export const LeafletScannerMap: React.FC<LeafletScannerMapProps> = ({
 
   return (
     <div className="relative w-full h-full rounded border border-purple-950/40 overflow-hidden bg-neutral-950">
+      {/* Global SVG Radial Gradients Defs for hardware-accelerated, completely smooth vector gradients */}
+      <svg style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
+        <defs>
+          <radialGradient id="grad-infection" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#EF4444" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="#EF4444" stopOpacity="0.0" />
+          </radialGradient>
+          <radialGradient id="grad-mech" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#EAB308" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="#EAB308" stopOpacity="0.0" />
+          </radialGradient>
+          <radialGradient id="grad-parasite" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#A855F7" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="#A855F7" stopOpacity="0.0" />
+          </radialGradient>
+          <radialGradient id="grad-containment" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#22D3EE" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="#22D3EE" stopOpacity="0.0" />
+          </radialGradient>
+        </defs>
+      </svg>
+
       {/* Visual cybernetic scanner crosshair overlay on map */}
       <div className="absolute inset-0 pointer-events-none z-[1000] border-2 border-purple-500/10 flex items-center justify-center">
         {/* Radar concentric circular lines */}
