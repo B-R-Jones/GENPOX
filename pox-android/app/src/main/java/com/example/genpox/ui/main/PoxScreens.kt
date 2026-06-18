@@ -30,6 +30,8 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
@@ -40,11 +42,7 @@ import com.example.genpox.data.GeneSequence
 import com.example.genpox.data.HarvestMission
 import com.example.genpox.data.WaveMath
 import com.example.genpox.theme.*
-import com.example.genpox.ui.components.CanvasMetrics
-import com.example.genpox.ui.components.NodeCrystalCanvas
-import com.example.genpox.ui.components.MapStyle
-import com.example.genpox.ui.components.QrCodeImage
-import com.example.genpox.ui.components.DualPaneConsoleFrame
+import com.example.genpox.ui.components.*
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
@@ -7233,6 +7231,8 @@ fun HolographicRadarScanner(
     modifier: Modifier = Modifier
 ) {
     val directionTracker = remember { DirectionTracker() }
+    val activeMissions by viewModel.activeMissions.collectAsState()
+    val geometryCache = remember { mutableMapOf<String, CreatureGeometry>() }
     val density = androidx.compose.ui.platform.LocalDensity.current
     val infiniteTransition = rememberInfiniteTransition(label = "scanline_sweep")
     val scanlineFraction by infiniteTransition.animateFloat(
@@ -7410,11 +7410,10 @@ fun HolographicRadarScanner(
 
                             // Excitation check based on distance from the vertical scanline
                             val midY = (y1 + y2) / 2f
-                            var diffY = scanlineY - midY
-                            if (diffY < 0f) diffY += size.height
+                            val diffY = if (movingUp) midY - scanlineY else scanlineY - midY
 
-                            val intensity = if (diffY < 300f) {
-                                1.0f - (diffY / 300f) * 0.60f
+                            val intensity = if (diffY in 0f..110f) {
+                                1.0f - (diffY / 110f) * 0.60f
                             } else {
                                 0.40f
                             }
@@ -7442,11 +7441,10 @@ fun HolographicRadarScanner(
                             else -> Color.Cyan
                         }
 
-                        var diffY = scanlineY - ay
-                        if (diffY < 0f) diffY += size.height
+                        val diffY = if (movingUp) ay - scanlineY else scanlineY - ay
 
-                        val sweepIntensity = if (diffY < 250f) {
-                            1.0f - (diffY / 250f)
+                        val sweepIntensity = if (diffY in 0f..110f) {
+                            1.0f - (diffY / 110f)
                         } else {
                             0.0f
                         }
@@ -7597,6 +7595,217 @@ fun HolographicRadarScanner(
 
                     // 6. Draw player transceiver beacon center
                     drawCircle(CyberGreen, radius = 3.5f, center = Offset(playerX, playerY))
+
+                    // 6b. Draw miniaturized active harvesting creatures traveling on the map
+                    val activeMissionsList = activeMissions.filter { !it.isReturned }
+                    activeMissionsList.forEach { m ->
+                        // Faction color resolution
+                        val factionColor = when (m.creatureFaction) {
+                            "Infection" -> Color.Red
+                            "Mech" -> Color.Yellow
+                            "Parasite" -> Color(0xFFA855F7)
+                            else -> Color.Cyan
+                        }
+
+                        // Project Epicenter coordinate relative to mapCenter
+                        val dLatAnom = m.lat - localMapCenterLat
+                        val dLngAnom = (m.lng - localMapCenterLng) * cosLat
+                        val anomY = cy - (dLatAnom * scale).toFloat()
+                        val anomX = cx + (dLngAnom * scale).toFloat() + getGlitchOffsetX(anomY)
+
+                        // Calculate landing/boundary point along the line from epicenter to player
+                        val dx = playerX - anomX
+                        val dy = playerY - anomY
+                        val distPx = kotlin.math.sqrt(dx * dx + dy * dy)
+
+                        val rMaxPx = ((m.dispatchDistance) / 111000.0) * scale
+                        val tLanding = if (distPx > 0f) (rMaxPx / distPx).coerceIn(0.0, 1.0) else 0.0
+                        val boundX = (anomX + tLanding * dx).toFloat()
+                        val boundY = (anomY + tLanding * dy).toFloat()
+
+                        // Durations
+                        val dTravel = m.travelDuration.toFloat()
+                        val dDescent = m.descentDuration.toFloat()
+                        val dHarvest = m.harvestDuration.toFloat()
+                        val dAscent = m.ascentDuration.toFloat()
+                        val dReturn = m.transitBackDuration.toFloat()
+
+                        // Calculate real-time smooth elapsed seconds
+                        val elapsedSec = (System.currentTimeMillis() - m.startTime) / 1000f
+
+                        var creatureX = playerX
+                        var creatureY = playerY
+                        var angle = 0.0
+
+                        if (elapsedSec < dTravel) {
+                            val p = elapsedSec / dTravel.coerceAtLeast(1f)
+                            creatureX = playerX + p * (boundX - playerX)
+                            creatureY = playerY + p * (boundY - playerY)
+                            angle = kotlin.math.atan2((boundY - playerY).toDouble(), (boundX - playerX).toDouble())
+                        } else if (elapsedSec < dTravel + dDescent) {
+                            val p = (elapsedSec - dTravel) / dDescent.coerceAtLeast(1f)
+                            creatureX = boundX + p * 0.3f * (anomX - boundX)
+                            creatureY = boundY + p * 0.3f * (anomY - boundY)
+                            angle = kotlin.math.atan2((anomY - boundY).toDouble(), (anomX - boundX).toDouble())
+                        } else if (elapsedSec < dTravel + dDescent + dHarvest) {
+                            creatureX = boundX + 0.3f * (anomX - boundX)
+                            creatureY = boundY + 0.3f * (anomY - boundY)
+                            // subtle vibrating hover effect
+                            val hoverTime = (System.currentTimeMillis() % 1000) * (2.0 * Math.PI / 1000.0)
+                            creatureX += (kotlin.math.sin(hoverTime) * 2f).toFloat()
+                            creatureY += (kotlin.math.cos(hoverTime) * 2f).toFloat()
+                            angle = kotlin.math.atan2((anomY - boundY).toDouble(), (anomX - boundX).toDouble())
+                        } else if (elapsedSec < dTravel + dDescent + dHarvest + dAscent) {
+                            val p = (elapsedSec - dTravel - dDescent - dHarvest) / dAscent.coerceAtLeast(1f)
+                            creatureX = (boundX + 0.3f * (anomX - boundX)) - p * 0.3f * (anomX - boundX)
+                            creatureY = (boundY + 0.3f * (anomY - boundY)) - p * 0.3f * (anomY - boundY)
+                            angle = kotlin.math.atan2((boundY - anomY).toDouble(), (boundX - anomX).toDouble())
+                        } else if (elapsedSec < dTravel + dDescent + dHarvest + dAscent + dReturn) {
+                            val p = (elapsedSec - dTravel - dDescent - dHarvest - dAscent) / dReturn.coerceAtLeast(1f)
+                            creatureX = boundX + p * (playerX - boundX)
+                            creatureY = boundY + p * (playerY - boundY)
+                            angle = kotlin.math.atan2((playerY - boundY).toDouble(), (playerX - boundX).toDouble())
+                        }
+
+                        // Draw trajectory guideline
+                        drawLine(
+                            color = factionColor.copy(alpha = 0.25f),
+                            start = Offset(playerX, playerY),
+                            end = Offset(boundX, boundY),
+                            strokeWidth = 1f,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 5f), 0f)
+                        )
+
+                        // Draw miniature creature 3D wireframe model
+                        val dna = m.originalSequence ?: "AAAAAAAA"
+                        val geometry = geometryCache.getOrPut(dna) { CreatureGeometry(dna) }
+
+                        // Calculate spin angle and breathing phase based on current time
+                        val timeMs = System.currentTimeMillis()
+                        val spinAngle = (timeMs % 6000) * (2.0 * Math.PI / 6000.0) // Spin every 6 seconds
+                        val breathingPhase = (timeMs % 3000) * (2.0 * Math.PI / 3000.0)
+                        val breathScale = 1.0 + geometry.breatheAmp * kotlin.math.sin(breathingPhase * geometry.breatheFreq)
+
+                        // Scale factor for miniature hologram
+                        val minScale = 0.08f // extremely compact
+                        val modelSize = 6.dp.toPx()
+
+                        val tilt = Math.toRadians(18.0) // tilt angle
+                        val cosT = kotlin.math.cos(tilt)
+                        val sinT = kotlin.math.sin(tilt)
+
+                        val cosS = kotlin.math.cos(spinAngle)
+                        val sinS = kotlin.math.sin(spinAngle)
+
+                        val projPoints = mutableListOf<Offset>()
+                        val depthZ = mutableListOf<Double>()
+
+                        for (v in geometry.vertices) {
+                            val bx = v.x * breathScale * minScale
+                            val by = v.y * breathScale * minScale
+                            val bz = v.z * breathScale * minScale
+
+                            val twist = v.y * geometry.twistRate
+                            val cosTw = kotlin.math.cos(twist)
+                            val sinTw = kotlin.math.sin(twist)
+                            val tx = bx * cosTw - bz * sinTw
+                            val tz = bx * sinTw + bz * cosTw
+                            val ty = by
+
+                            val rx = tx * cosS - tz * sinS
+                            val rz = tx * sinS + tz * cosS
+                            val ry = ty
+
+                            val finalX = rx
+                            val finalY = ry * cosT - rz * sinT
+                            val finalZ = ry * sinT + rz * cosT
+
+                            projPoints.add(Offset(creatureX + finalX.toFloat(), creatureY - finalY.toFloat()))
+                            depthZ.add(finalZ)
+                        }
+
+                        val maxRadius = (geometry.baseRadius * breathScale * minScale * 1.4).coerceAtLeast(2.0)
+
+                        for (edge in geometry.edges) {
+                            if (edge.first < projPoints.size && edge.second < projPoints.size) {
+                                val z1 = depthZ[edge.first]
+                                val z2 = depthZ[edge.second]
+                                val avgZ = (z1 + z2) / 2.0
+                                
+                                val depthPct = ((avgZ / maxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                                val alpha = (0.25f + 0.75f * depthPct).toFloat()
+                                val stroke = (0.6f + 0.6f * depthPct).toFloat()
+
+                                drawLine(
+                                    color = factionColor.copy(alpha = alpha),
+                                    start = projPoints[edge.first],
+                                    end = projPoints[edge.second],
+                                    strokeWidth = stroke
+                                )
+                            }
+                        }
+
+                        // Project and draw inner core energy reactor
+                        val coreSpinAngle = spinAngle * 2.5
+                        val cosCs = kotlin.math.cos(coreSpinAngle)
+                        val sinCs = kotlin.math.sin(coreSpinAngle)
+
+                        val projInner = mutableListOf<Offset>()
+                        val depthInnerZ = mutableListOf<Double>()
+
+                        for (v in geometry.innerVertices) {
+                            val vx = v.x * minScale
+                            val vy = v.y * minScale
+                            val vz = v.z * minScale
+
+                            val rx = vx * cosCs - vz * sinCs
+                            val rz = vx * sinCs + vz * cosCs
+                            val ry = vy
+
+                            val finalX = rx
+                            val finalY = ry * cosT - rz * sinT
+                            val finalZ = ry * sinT + rz * cosT
+
+                            projInner.add(Offset(creatureX + finalX.toFloat(), creatureY - finalY.toFloat()))
+                            depthInnerZ.add(finalZ)
+                        }
+
+                        val innerMaxRadius = (geometry.innerVertices.firstOrNull()?.x ?: 2.0) * minScale * 1.2
+                        val innerCoreColor = Color(0xFFFBBF24)
+
+                        for (edge in geometry.innerEdges) {
+                            if (edge.first < projInner.size && edge.second < projInner.size) {
+                                val z1 = depthInnerZ[edge.first]
+                                val z2 = depthInnerZ[edge.second]
+                                val avgZ = (z1 + z2) / 2.0
+                                
+                                val depthPct = ((avgZ / innerMaxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                                val alpha = (0.3f + 0.7f * depthPct).toFloat()
+                                val stroke = (0.4f + 0.4f * depthPct).toFloat()
+
+                                drawLine(
+                                    color = innerCoreColor.copy(alpha = alpha),
+                                    start = projInner[edge.first],
+                                    end = projInner[edge.second],
+                                    strokeWidth = stroke
+                                )
+                            }
+                        }
+
+                        // Draw tiny designation text label
+                        val textPaint = android.graphics.Paint().apply {
+                            color = factionColor.toArgb()
+                            textSize = 7.dp.toPx()
+                            typeface = android.graphics.Typeface.MONOSPACE
+                            textAlign = android.graphics.Paint.Align.CENTER
+                        }
+                        drawContext.canvas.nativeCanvas.drawText(
+                            m.creatureName.uppercase().take(8),
+                            creatureX,
+                            creatureY - modelSize - 4f,
+                            textPaint
+                        )
+                    }
 
                 // 5. Draw bright horizontal scanline sweep ray spanning full width of the container
                 // Outer blooming glow
