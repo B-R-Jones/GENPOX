@@ -82,3 +82,5 @@ val Typography = Typography(
 2. **Numbers & Stat Values**: To align stats properly in listings and bars, represent all numeric attributes (Vitality, Aggression, Defense, Speed, Telomeres) with `Monospace` fonts.
 3. **Buttons, Dialogs & Nav Headers**: Use `Sans-Serif` (Space Grotesk) to improve readability of standard menu commands, button triggers, and dialog overlays. All text inside these components **must** be capitalized completely (rendered in uppercase).
 4. **Logs & Decryption Feeds**: Command terminals, decryption feeds, and siphoning logs **must** use `Monospace`.
+5. **Form & Overlay Headers**: Form headers, panel headers, and popup overlay headers **must** use Sans-Serif (`FontFamily.Default` / Space Grotesk), `9.sp` (or equivalent `text-[9px]`) font size, the tab's secondary dim primary color (e.g., `activeColorDim`, `CyberGreenDim`, or dim purple/red), and be written in uppercase without any enclosing brackets `[` `]` or extraneous characters like leading bullet points (`●`).
+

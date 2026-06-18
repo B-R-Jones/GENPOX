@@ -1166,7 +1166,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "[ G.E.N. P.O.X. TIDE POOL REACTOR V2.4 ]",
+                                text = "G.E.N. P.O.X. TIDE POOL REACTOR V2.4",
                                 color = CyberGreenDim,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
@@ -1476,8 +1476,8 @@ fun CombinatorView(viewModel: MainViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "[ WARNING: UNKNOWN REACTOR ]",
-                                color = Color(0xFFA855F7),
+                                text = "WARNING: UNKNOWN REACTOR",
+                                color = activeColorDim,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Default
@@ -2054,10 +2054,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                     ) {
                         Text(
                             text = "MOLECULAR STEP-SEARCH DIRECTORY",
-                            style = Typography.bodyMedium,
-                            fontFamily = FontFamily.Default,
+                            color = activeColorDim,
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = activeColor
+                            fontFamily = FontFamily.Default
                         )
                         Text(
                             text = "✕ CLOSE",
@@ -2497,25 +2497,13 @@ fun CombinatorView(viewModel: MainViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "●",
-                                color = Color(0xFF00FF41),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "[ GENE SYNTHESIS LOG ]",
-                                color = Color(0xFF00FF41),
-                                style = Typography.bodyMedium,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                        }
+                        Text(
+                            text = "GENE SYNTHESIS LOG",
+                            color = Color(0xFF00FF41).copy(alpha = 0.75f),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Default
+                        )
                         
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -2865,10 +2853,10 @@ fun CombinatorView(viewModel: MainViewModel) {
                     ) {
                         Text(
                             text = "ANOMALY DISCOVERY LOG",
-                            style = Typography.bodyMedium,
-                            fontFamily = FontFamily.Default,
+                            color = Color(0xFFD8B4FE).copy(alpha = 0.75f),
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFD8B4FE)
+                            fontFamily = FontFamily.Default
                         )
                         Text(
                             text = "✕ CLOSE",
