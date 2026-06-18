@@ -23,6 +23,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -52,6 +53,38 @@ import java.util.*
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlinx.coroutines.delay
+
+fun Modifier.cyberglass(
+    borderColor: Color,
+    glowColor: Color = borderColor.copy(alpha = 0.2f),
+    backgroundColor: Color = Color(0xFF0A0A0F).copy(alpha = 0.75f)
+): Modifier = this.then(
+    Modifier
+        .background(backgroundColor, RoundedCornerShape(4.dp))
+        .drawBehind {
+            val w = size.width
+            val h = size.height
+            val tick = 8.dp.toPx()
+            val stroke = 1.dp.toPx()
+            
+            // Top-left
+            drawLine(borderColor, Offset(0f, 0f), Offset(tick, 0f), strokeWidth = stroke * 1.5f)
+            drawLine(borderColor, Offset(0f, 0f), Offset(0f, tick), strokeWidth = stroke * 1.5f)
+            
+            // Top-right
+            drawLine(borderColor, Offset(w, 0f), Offset(w - tick, 0f), strokeWidth = stroke * 1.5f)
+            drawLine(borderColor, Offset(w, 0f), Offset(w, tick), strokeWidth = stroke * 1.5f)
+            
+            // Bottom-left
+            drawLine(borderColor, Offset(0f, h), Offset(tick, h), strokeWidth = stroke * 1.5f)
+            drawLine(borderColor, Offset(0f, h), Offset(0f, h - tick), strokeWidth = stroke * 1.5f)
+            
+            // Bottom-right
+            drawLine(borderColor, Offset(w, h), Offset(w - tick, h), strokeWidth = stroke * 1.5f)
+            drawLine(borderColor, Offset(w, h), Offset(w, h - tick), strokeWidth = stroke * 1.5f)
+        }
+        .border(1.dp, borderColor.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+)
 
 // ==========================================
 // CUSTOM WIREFRAME RETRO ICONS & VISUALS
@@ -613,9 +646,394 @@ fun QrRevealVisual(modifier: Modifier = Modifier) {
     }
 }
 
+@Composable
+fun HolographicHelixReactor(
+    activeColor: Color,
+    isActive: Boolean,
+    isAnomaly: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val transition = rememberInfiniteTransition(label = "helix_rotation")
+    val rotationPhaseState = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (isActive) 4000 else 15000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+    
+    val pulseScaleState = transition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    val glitchProgressState = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "glitch"
+    )
+    
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val cx = w / 2f
+        
+        val rotationPhase = rotationPhaseState.value
+        val pulseScale = pulseScaleState.value
+        val glitchProgress = glitchProgressState.value
+        
+        val isGlitching = isAnomaly && (glitchProgress < 0.15f)
+        val numStrands = 14
+        val helixRadius = w * 0.25f * pulseScale
+        val lineStroke = 1.2.dp.toPx()
+        val glitchCenterY = glitchProgress * h
+        
+        for (i in 0 until numStrands) {
+            val t = i.toFloat() / (numStrands - 1)
+            val cyPos = h * 0.12f + t * h * 0.76f
+            
+            val nodeAngle = t * 3.5f * Math.PI.toFloat() + rotationPhase
+            
+            val x1 = cx + helixRadius * kotlin.math.cos(nodeAngle.toDouble()).toFloat()
+            val z1 = helixRadius * kotlin.math.sin(nodeAngle.toDouble()).toFloat()
+            
+            val x2 = cx + helixRadius * kotlin.math.cos((nodeAngle + Math.PI.toFloat()).toDouble()).toFloat()
+            val z2 = helixRadius * kotlin.math.sin((nodeAngle + Math.PI.toFloat()).toDouble()).toFloat()
+            
+            var gx1 = x1
+            var gx2 = x2
+            if (isGlitching && kotlin.math.abs(cyPos - glitchCenterY) < 35.dp.toPx()) {
+                val offsetVal = (kotlin.math.sin(cyPos * 0.1f) * 10.dp.toPx()).toFloat()
+                gx1 += offsetVal
+                gx2 -= offsetVal
+            }
+            
+            val alpha1 = ((z1 + helixRadius) / (2f * helixRadius) * 0.6f + 0.4f).coerceIn(0.1f, 1.0f)
+            val alpha2 = ((z2 + helixRadius) / (2f * helixRadius) * 0.6f + 0.4f).coerceIn(0.1f, 1.0f)
+            
+            val radius1 = ((z1 + helixRadius) / (2f * helixRadius) * 2.5.dp.toPx() + 1.8.dp.toPx())
+            val radius2 = ((z2 + helixRadius) / (2f * helixRadius) * 2.5.dp.toPx() + 1.8.dp.toPx())
+            
+            val barAlpha = ((alpha1 + alpha2) / 2f * 0.4f).coerceIn(0.1f, 0.7f)
+            drawLine(
+                color = activeColor.copy(alpha = barAlpha),
+                start = Offset(gx1, cyPos),
+                end = Offset(gx2, cyPos),
+                strokeWidth = lineStroke * 0.7f
+            )
+            
+            drawCircle(
+                color = activeColor.copy(alpha = alpha1),
+                radius = radius1,
+                center = Offset(gx1, cyPos)
+            )
+            
+            drawCircle(
+                color = (if (isAnomaly) Color(0xFFC084FC) else activeColor).copy(alpha = alpha2),
+                radius = radius2,
+                center = Offset(gx2, cyPos)
+            )
+        }
+    }
+}
+
+@Composable
+fun GeneticResonanceScope(
+    progress: Float,
+    isActive: Boolean,
+    isAnomaly: Boolean,
+    activeColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "scope_oscillation")
+    val wavePhaseState = infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(2500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+    
+    val ambientNoiseState = infiniteTransition.animateFloat(
+        initialValue = -1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(120, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "noise"
+    )
+
+    // Pre-allocate a remembered Path to prevent garbage collection frame-drop stutters
+    val scopePath = remember { Path() }
+
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val cy = h / 2f
+        
+        // Defer animated state reads to draw phase
+        val wavePhase = wavePhaseState.value
+        val ambientNoise = ambientNoiseState.value
+        
+        val gridStroke = 0.5.dp.toPx()
+        val gridColor = activeColor.copy(alpha = 0.1f)
+        
+        drawLine(gridColor, Offset(0f, h * 0.25f), Offset(w, h * 0.25f), strokeWidth = gridStroke)
+        drawLine(gridColor, Offset(0f, cy), Offset(w, cy), strokeWidth = gridStroke * 1.5f)
+        drawLine(gridColor, Offset(0f, h * 0.75f), Offset(w, h * 0.75f), strokeWidth = gridStroke)
+        
+        val numVerticalLines = 8
+        for (v in 1..numVerticalLines) {
+            val vx = w * (v.toFloat() / (numVerticalLines + 1))
+            drawLine(gridColor, Offset(vx, 0f), Offset(vx, h), strokeWidth = gridStroke)
+        }
+        
+        if (isActive) {
+            scopePath.reset()
+            val segments = 50
+            val amp = h * 0.35f
+            val freq = 3.5f * Math.PI.toFloat() / w
+            
+            for (x in 0..segments) {
+                val px = w * (x.toFloat() / segments)
+                val angle = px * freq - wavePhase
+                var sinVal = kotlin.math.sin(angle.toDouble()).toFloat()
+                
+                // Secondary wave: phase multiplier is integer 2 to wrap cleanly with wavePhase
+                val angle2 = px * freq * 2f - wavePhase * 2f
+                sinVal += 0.25f * kotlin.math.sin(angle2.toDouble()).toFloat()
+                
+                if (isAnomaly) {
+                    val angle3 = angle * 10f
+                    sinVal += 0.12f * ambientNoise * kotlin.math.sin(angle3.toDouble()).toFloat()
+                }
+                
+                val edgeEnvelope = kotlin.math.sin((x.toFloat() / segments * Math.PI.toFloat()).toDouble()).toFloat()
+                val finalY = cy + sinVal * amp * edgeEnvelope
+                
+                if (x == 0) {
+                    scopePath.moveTo(px, finalY)
+                } else {
+                    scopePath.lineTo(px, finalY)
+                }
+            }
+            
+            drawPath(
+                path = scopePath,
+                color = activeColor,
+                style = Stroke(width = 1.8.dp.toPx())
+            )
+            
+            drawPath(
+                path = scopePath,
+                color = activeColor.copy(alpha = 0.2f),
+                style = Stroke(width = 4.dp.toPx())
+            )
+        } else {
+            scopePath.reset()
+            val segments = 30
+            for (x in 0..segments) {
+                val px = w * (x.toFloat() / segments)
+                val jitter = if (isAnomaly) ambientNoise * 1.2.dp.toPx() else 0f
+                if (x == 0) {
+                    scopePath.moveTo(px, cy + jitter)
+                } else {
+                    scopePath.lineTo(px, cy + jitter)
+                }
+            }
+            drawPath(
+                path = scopePath,
+                color = Color.Red.copy(alpha = 0.5f),
+                style = Stroke(width = 1.dp.toPx())
+            )
+        }
+    }
+}
 // ==========================================
-// 1. COMBINATOR VIEW (MAIN SCENE)
+// REACTOR SUB-CHAMBER & TICKER ISOLATORS
 // ==========================================
+
+@Composable
+fun ReactorVisualChamber(
+    metrics: CanvasMetrics,
+    geneSequenceStrings: List<String>,
+    activeColor: Color,
+    isActive: Boolean,
+    isAnomaly: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(130.dp)
+            .cyberglass(borderColor = activeColor, glowColor = activeColor.copy(alpha = 0.15f))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.Black.copy(alpha = 0.3f)),
+            contentAlignment = Alignment.Center
+        ) {
+            NodeCrystalCanvas(
+                metrics = metrics,
+                inventoryStrings = geneSequenceStrings,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .fillMaxHeight(0.8f)
+                .background(activeColor.copy(alpha = 0.3f))
+        )
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.Black.copy(alpha = 0.3f)),
+            contentAlignment = Alignment.Center
+        ) {
+            HolographicHelixReactor(
+                activeColor = activeColor,
+                isActive = isActive,
+                isAnomaly = isAnomaly,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+@Composable
+fun TranscriptionDecoderTicker(
+    displayTextProvider: () -> String,
+    activeColor: Color,
+    activeColorDim: Color,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(28.dp)
+            .cyberglass(borderColor = activeColor.copy(alpha = 0.6f))
+            .padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "TRANSCRIPTION DECODER:",
+            color = activeColorDim,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Default
+        )
+        Text(
+            text = displayTextProvider(),
+            color = activeColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 1.sp
+        )
+    }
+}
+
+@Composable
+fun ResonanceScopeChamber(
+    progressProvider: () -> Float,
+    isActive: Boolean,
+    isAnomaly: Boolean,
+    activeColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(60.dp)
+            .cyberglass(borderColor = activeColor, glowColor = activeColor.copy(alpha = 0.15f))
+            .padding(2.dp)
+    ) {
+        val progress = progressProvider()
+        GeneticResonanceScope(
+            progress = progress,
+            isActive = isActive,
+            isAnomaly = isAnomaly,
+            activeColor = activeColor,
+            modifier = Modifier.fillMaxSize()
+        )
+        
+        Text(
+            text = String.format(Locale.US, "RESONANCE: %d%%", (progress * 100).toInt()),
+            color = activeColor.copy(alpha = 0.7f),
+            style = Typography.labelSmall,
+            fontSize = 7.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+        )
+    }
+}
+
+@Composable
+fun ReactorTimerStatus(
+    statusProvider: () -> String,
+    colorProvider: () -> Color,
+    boostSecondsLeftProvider: () -> Int,
+    activeColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = statusProvider(),
+            color = colorProvider(),
+            fontFamily = FontFamily.Default,
+            fontWeight = FontWeight.Bold,
+            style = Typography.bodySmall
+        )
+
+        val boostSecondsLeft = boostSecondsLeftProvider()
+        if (boostSecondsLeft > 0) {
+            Text(
+                text = String.format(Locale.US, "REACTOR BOOST ACTIVE: %02d:%02d REMAINING", boostSecondsLeft / 60, boostSecondsLeft % 60),
+                color = activeColor,
+                fontWeight = FontWeight.Bold,
+                style = Typography.labelSmall,
+                fontFamily = FontFamily.Default,
+                modifier = Modifier
+                    .background(activeColor.copy(alpha = 0.15f), RoundedCornerShape(2.dp))
+                    .border(1.dp, activeColor.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
+    }
+}
 
 // ==========================================
 // 1. COMBINATOR VIEW (BIO-LAB TAB SCENE)
@@ -633,6 +1051,17 @@ fun CombinatorView(viewModel: MainViewModel) {
     val grandTotalStandardNucleotides by viewModel.grandTotalStandardNucleotides.collectAsState()
     val geneSequences by viewModel.geneSequences.collectAsState()
     val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
+    val inventoryMetrics by viewModel.inventoryMetrics.collectAsState()
+    
+    val uniqueGenesSize = remember(geneSequences) { geneSequences.size }
+    val multiCountGenesSize = remember(geneSequences) { geneSequences.count { it.count > 1 } }
+    val anomalousGenesSize = remember(geneSequences) { geneSequences.count { WaveMath.isAnomalousGene(it.sequence) } }
+    val geneSequenceStrings = remember(geneSequences) { geneSequences.map { it.sequence } }
+    
+    val coupling = remember(grandTotalStandardNucleotides) { WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis()) }
+    val chanceMetrics = remember(grandTotalStandardNucleotides, coupling) {
+        WaveMath.getAnomalyEngineSuccessChance(grandTotalStandardNucleotides, coupling)
+    }
 
     // UI colors and themes based on subtab
     val activeColor = if (bioLabSubTab == "pox") CyberGreen else Color(0xFFA855F7)
@@ -812,7 +1241,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         fontSize = 14.sp
                                     )
                                     Text(
-                                        text = "${geneSequences.size}",
+                                        text = "$uniqueGenesSize",
                                         color = Color.White,
                                         style = Typography.bodyLarge,
                                         fontFamily = FontFamily.Monospace,
@@ -850,7 +1279,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         fontSize = 14.sp
                                     )
                                     Text(
-                                        text = "${geneSequences.filter { it.count > 1 }.size}",
+                                        text = "$multiCountGenesSize",
                                         color = Color.White,
                                         style = Typography.bodyLarge,
                                         fontFamily = FontFamily.Monospace,
@@ -860,191 +1289,6 @@ fun CombinatorView(viewModel: MainViewModel) {
                             }
                         }
 
-                        // Today's base-pair wave card
-                        val todayWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
-                        val tomorrowWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 86400000L)
-                        val dayAfterWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 172800000L)
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(
-                                    1.dp,
-                                    if (todayWave.isSuppressed) Color(0xFF990000).copy(alpha = 0.8f) else CyberGreen,
-                                    RoundedCornerShape(4.dp)
-                                )
-                                .background(if (todayWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.6f))
-                                .padding(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.weight(1f, fill = false)
-                                ) {
-                                    Text(
-                                        text = "~",
-                                        color = if (todayWave.isSuppressed) Color.Red else Color(0xFFFFB300),
-                                        fontSize = 14.sp
-                                    )
-                                    Column {
-                                        Text(
-                                            text = "TODAY'S BASE-PAIR WAVE",
-                                            color = CyberGreenDim,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 8.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = if (todayWave.isSuppressed) "DORMANT (CONGESTED DECAY)" else "ACTIVE: ${todayWave.pair.uppercase()} WAVE",
-                                            color = Color.White,
-                                            style = Typography.bodySmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-
-                                if (!todayWave.isSuppressed) {
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text(
-                                            text = "${todayWave.primary} ➔ ${todayWave.secondary}",
-                                            color = CyberGreen,
-                                            style = Typography.bodySmall,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                        )
-                                        Text(
-                                            text = "1.12X & 1.62X BOOST",
-                                            color = CyberGreenDim,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 7.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                } else {
-                                    Text(
-                                        text = "NULL",
-                                        color = Color.Red,
-                                        style = Typography.labelSmall,
-                                        fontFamily = FontFamily.Default,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier
-                                            .background(Color(0xFF330000), RoundedCornerShape(2.dp))
-                                            .border(1.dp, Color.Red, RoundedCornerShape(2.dp))
-                                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Forecast Grid
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Tomorrow
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .border(
-                                        1.dp,
-                                        if (tomorrowWave.isSuppressed) Color(0xFF990000).copy(alpha = 0.6f) else Color.DarkGray,
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .background(if (tomorrowWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f))
-                                    .padding(6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "TOMORROW BASE-PAIR",
-                                            color = CyberGreenDim,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 7.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = if (tomorrowWave.isSuppressed) "DORMANT" else "${tomorrowWave.pair.uppercase()} WAVE",
-                                            color = Color.White,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    if (!tomorrowWave.isSuppressed) {
-                                        Text(
-                                            text = "${tomorrowWave.primary}➔${tomorrowWave.secondary}",
-                                            color = CyberGreen,
-                                            style = Typography.labelSmall,
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Day After Tomorrow
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .border(
-                                        1.dp,
-                                        if (dayAfterWave.isSuppressed) Color(0xFF990000).copy(alpha = 0.6f) else Color.DarkGray,
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .background(if (dayAfterWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f))
-                                    .padding(6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "DAY AFTER TOMORROW",
-                                            color = CyberGreenDim,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 7.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = if (dayAfterWave.isSuppressed) "DORMANT" else "${dayAfterWave.pair.uppercase()} WAVE",
-                                            color = Color.White,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    if (!dayAfterWave.isSuppressed) {
-                                        Text(
-                                            text = "${dayAfterWave.primary}➔${dayAfterWave.secondary}",
-                                            color = CyberGreen,
-                                            style = Typography.labelSmall,
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                        )
-                                    }
-                                }
-                            }
-                        }
                     } else {
                         // Anomaly tab content
                         Row(
@@ -1132,7 +1376,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         fontSize = 14.sp
                                     )
                                     Text(
-                                        text = "${geneSequences.filter { WaveMath.isAnomalousGene(it.sequence) }.size}",
+                                        text = "$anomalousGenesSize",
                                         color = Color.White,
                                         style = Typography.bodyLarge,
                                         fontFamily = FontFamily.Monospace,
@@ -1170,7 +1414,7 @@ fun CombinatorView(viewModel: MainViewModel) {
                                         fontSize = 14.sp
                                     )
                                     Text(
-                                        text = "${geneSequences.size}",
+                                        text = "$uniqueGenesSize",
                                         color = Color.White,
                                         style = Typography.bodyLarge,
                                         fontFamily = FontFamily.Monospace,
@@ -1249,8 +1493,6 @@ fun CombinatorView(viewModel: MainViewModel) {
                         }
 
                         // Anomaly Forecast Grid
-                        val coupling = WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis())
-                        val chanceMetrics = WaveMath.getAnomalyEngineSuccessChance(grandTotalStandardNucleotides, coupling)
                         val formattedFinalChance = String.format(Locale.US, "%.3f%%", chanceMetrics.finalChance)
                         val formattedModifier = String.format(Locale.US, "%+.3f%%", chanceMetrics.harmonicModifier)
 
@@ -1352,43 +1594,41 @@ fun CombinatorView(viewModel: MainViewModel) {
                         }
                     }
 
-                    // Ticker Box
-                    val displayText = if (bioLabSubTab == "anomaly") {
-                        if (!anomalyEngineActive) {
-                            "--------"
-                        } else {
-                            val syms = "XZYW?!$%&@#"
-                            scrollingGene.mapIndexed { i, char ->
-                                val idx = (char.code + i) % syms.length
-                                syms[idx]
-                            }.joinToString("")
-                        }
-                    } else {
-                        if (!poxReactorActive) {
-                            "--------"
-                        } else {
-                            scrollingGene
-                        }
-                    }
+                    // Responsive split cyberglass visual chamber holding NodeCrystalCanvas and HolographicHelixReactor side-by-side
+                    ReactorVisualChamber(
+                        metrics = metrics,
+                        geneSequenceStrings = geneSequenceStrings,
+                        activeColor = activeColor,
+                        isActive = if (bioLabSubTab == "pox") poxReactorActive else anomalyEngineActive,
+                        isAnomaly = bioLabSubTab == "anomaly",
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .border(2.dp, activeColor, RoundedCornerShape(4.dp))
-                            .background(Color.Black)
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = displayText,
-                            color = activeColor,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            letterSpacing = 2.sp
-                        )
-                    }
+                    // Ticker Row (Streamlined Transcription Deck)
+                    TranscriptionDecoderTicker(
+                        displayTextProvider = {
+                            if (bioLabSubTab == "anomaly") {
+                                if (!anomalyEngineActive) {
+                                    "--------"
+                                } else {
+                                    val syms = "XZYW?!$%&@#"
+                                    scrollingGene.mapIndexed { i, char ->
+                                        val idx = (char.code + i) % syms.length
+                                        syms[idx]
+                                    }.joinToString("")
+                                }
+                            } else {
+                                if (!poxReactorActive) {
+                                    "--------"
+                                } else {
+                                    scrollingGene
+                                }
+                            }
+                        },
+                        activeColor = activeColor,
+                        activeColorDim = activeColorDim,
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
                     // Progress bar
                     val isBoosted = boostSecondsLeft > 0
@@ -1418,144 +1658,47 @@ fun CombinatorView(viewModel: MainViewModel) {
                         label = "reactorProgress"
                     )
 
-                    val progressColor = if (bioLabSubTab == "anomaly") {
-                        if (anomalyEngineActive) Color(0xFFA855F7) else Color.DarkGray
-                    } else {
-                        if (poxReactorActive) CyberGreen else Color.DarkGray
-                    }
-
-                    LinearProgressIndicator(
-                        progress = { animatedProgress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
-                            .clip(RoundedCornerShape(4.dp)),
-                        color = progressColor,
-                        trackColor = Color.Black
+                    // Responsive cyberglass progress oscilloscope wave scope
+                    ResonanceScopeChamber(
+                        progressProvider = { animatedProgress },
+                        isActive = if (bioLabSubTab == "pox") poxReactorActive else anomalyEngineActive,
+                        isAnomaly = bioLabSubTab == "anomaly",
+                        activeColor = activeColor,
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     // Timer text and booster status
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = if (bioLabSubTab == "anomaly") {
+                    ReactorTimerStatus(
+                        statusProvider = {
+                            if (bioLabSubTab == "anomaly") {
                                 if (anomalyEngineActive) "ANOMALOUS CONSOLIDATION IN: ${anomalyIdleTime}S" else "ANOMALOUS CONSOLIDATION: IDLE"
                             } else {
                                 if (poxReactorActive) "GENE ARRAY READY IN: ${poxIdleTime}S" else "GENE ARRAY REACTOR: OFFLINE"
-                            },
-                            color = if (bioLabSubTab == "anomaly") {
+                            }
+                        },
+                        colorProvider = {
+                            if (bioLabSubTab == "anomaly") {
                                 if (anomalyEngineActive) Color(0xFFA855F7) else Color.Gray
                             } else {
                                 if (poxReactorActive) CyberGreenDim else Color.Red
-                            },
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold,
-                            style = Typography.bodySmall
-                        )
+                            }
+                        },
+                        boostSecondsLeftProvider = { if (bioLabSubTab == "pox") boostSecondsLeft else 0 },
+                        activeColor = CyberGreen
+                    )
 
-                        if (boostSecondsLeft > 0 && bioLabSubTab == "pox") {
-                            Text(
-                                text = String.format(Locale.US, "REACTOR BOOST ACTIVE: %02d:%02d REMAINING", boostSecondsLeft / 60, boostSecondsLeft % 60),
-                                color = CyberGreen,
-                                fontWeight = FontWeight.Bold,
-                                style = Typography.labelSmall,
-                                fontFamily = FontFamily.Default,
-                                modifier = Modifier
-                                    .background(CyberGreen.copy(alpha = 0.15f), RoundedCornerShape(2.dp))
-                                    .border(1.dp, CyberGreen.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
 
-                    // 5. ACTION NAVIGATION OVERLAY BUTTONS
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Button(
-                            onClick = { showStepSearchOverlay = true },
-                            modifier = Modifier.fillMaxWidth().height(54.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Black.copy(alpha = 0.4f), contentColor = activeColor),
-                            border = BorderStroke(1.dp, activeBorder),
-                            shape = RoundedCornerShape(2.dp),
-                            contentPadding = PaddingValues(vertical = 0.dp)
-                        ) {
-                            Text(
-                                text = "MOLECULAR STEP-SEARCH",
-                                style = Typography.bodyMedium,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Action buttons
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Button(
-                    onClick = {
-                        viewModel.synthManager.playBeep(650f, 0.05f, "sine")
-                        if (bioLabSubTab == "anomaly") {
-                            showAnomalyVaultOverlay = true
-                        } else {
-                            showPacketLogOverlay = true
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (bioLabSubTab == "anomaly") Color(0xFF701A75).copy(alpha = 0.2f) else Color(0xFF003CFF).copy(alpha = 0.2f),
-                        contentColor = if (bioLabSubTab == "anomaly") Color(0xFFD8B4FE) else Color(0xFF00E1FF)
-                    ),
-                    border = BorderStroke(
-                        1.dp,
-                        if (bioLabSubTab == "anomaly") Color(0xFFA855F7).copy(alpha = 0.5f) else Color(0xFF003CFF).copy(alpha = 0.5f)
-                    ),
-                    shape = RoundedCornerShape(2.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text(
-                        text = if (bioLabSubTab == "anomaly") "VIEW ANOMALY DISCOVERY LOG" else "VIEW GENE SYNTHESIS LOG",
-                        style = Typography.labelSmall,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Button(
-                    onClick = { viewModel.triggerManualAcceleration() },
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (bioLabSubTab == "anomaly") Color(0xFF701A75).copy(alpha = 0.2f) else CyberGreenDim.copy(alpha = 0.2f),
-                        contentColor = Color.White
-                    ),
-                    border = BorderStroke(
-                        1.dp,
-                        if (bioLabSubTab == "anomaly") Color(0xFFA855F7).copy(alpha = 0.8f) else CyberGreen.copy(alpha = 0.8f)
-                    ),
-                    shape = RoundedCornerShape(2.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text(
-                        text = "MANUAL ACCELERATION (-2S)",
-                        style = Typography.labelSmall,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
                 if (devForceAnomaly) {
-                    Spacer(modifier = Modifier.height(4.dp))
                     Button(
                         onClick = { viewModel.addDevGenes() },
                         modifier = Modifier.fillMaxWidth().height(54.dp),
@@ -1576,57 +1719,152 @@ fun CombinatorView(viewModel: MainViewModel) {
                     }
                 }
             }
-        }
-    }
-
-    Spacer(modifier = Modifier.height(4.dp))
-
-    // SUB-TAB SWITCHER (P.O.X. Reactor & Anomaly Engine)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
-            .background(activePanel)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Button(
-            onClick = { viewModel.setBioLabSubTab("pox") },
-            modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (bioLabSubTab == "pox") CyberGreen else Color.Transparent,
-                contentColor = if (bioLabSubTab == "pox") Color.Black else CyberGreenDim
-            ),
-            shape = RoundedCornerShape(4.dp),
-            contentPadding = PaddingValues(vertical = 8.dp)
-        ) {
-            Text(
-                text = "P.O.X. REACTOR",
-                style = Typography.labelSmall,
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Button(
-            onClick = { viewModel.setBioLabSubTab("anomaly") },
-            modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (bioLabSubTab == "anomaly") Color(0xFFA855F7) else Color.Transparent,
-                contentColor = if (bioLabSubTab == "anomaly") Color.White else Color(0xFFA855F7)
-            ),
-            shape = RoundedCornerShape(4.dp),
-            contentPadding = PaddingValues(vertical = 8.dp)
-        ) {
-            Text(
-                text = "ANOMALY ENGINE",
-                style = Typography.labelSmall,
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Bold
-            )
+            Spacer(modifier = Modifier.height(72.dp))
         }
     }
 }
+
+        // Floating Action Buttons in bottom-right corner (Step Search, Synthesis/Anomaly Log, & Sub-Tab Toggle)
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 16.dp, end = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Step Search Button (styled holographic square)
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .cyberglass(borderColor = activeColor, glowColor = activeColor.copy(alpha = 0.15f))
+                    .clickable {
+                        viewModel.synthManager.playBeep(600f, 0.05f, "sine")
+                        showStepSearchOverlay = true
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "STEP",
+                        color = activeColor,
+                        fontSize = 6.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "SRCH",
+                        color = activeColor,
+                        fontSize = 6.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "DIAG",
+                        color = activeColor,
+                        fontSize = 6.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            if (bioLabSubTab == "pox") {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .cyberglass(borderColor = Color(0xFF00E1FF), glowColor = Color(0xFF00E1FF).copy(alpha = 0.15f))
+                        .clickable {
+                            viewModel.synthManager.playBeep(650f, 0.05f, "sine")
+                            showPacketLogOverlay = true
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "ATCGGCTA",
+                            color = Color(0xFF00E1FF),
+                            fontSize = 6.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "GCTAATCG",
+                            color = Color(0xFF00E1FF),
+                            fontSize = 6.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "CGATTAGC",
+                            color = Color(0xFF00E1FF),
+                            fontSize = 6.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .cyberglass(borderColor = Color(0xFFA855F7), glowColor = Color(0xFFA855F7).copy(alpha = 0.15f))
+                        .clickable {
+                            viewModel.synthManager.playBeep(650f, 0.05f, "sine")
+                            showAnomalyVaultOverlay = true
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "XYZW!?$%",
+                            color = Color(0xFFD8B4FE),
+                            fontSize = 6.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "&@#GCTAA",
+                            color = Color(0xFFD8B4FE),
+                            fontSize = 6.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "ANOM.LOG",
+                            color = Color(0xFFD8B4FE),
+                            fontSize = 6.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .cyberglass(borderColor = activeColor, glowColor = activeColor.copy(alpha = 0.15f))
+                    .clickable {
+                        viewModel.synthManager.playBeep(600f, 0.08f, "sine")
+                        viewModel.setBioLabSubTab(if (bioLabSubTab == "pox") "anomaly" else "pox")
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                WireframeDna(
+                    color = activeColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
 
         // ==========================================
         // OVERLAY 1: MOLECULAR STEP-SEARCH
@@ -3111,25 +3349,51 @@ fun SplicerLeftPanel(
                 )
             )
 
+            val backbonePath1 = remember { Path() }
+            val backbonePath2 = remember { Path() }
+
             // Custom rotating Canvas double helix DNA animation
             Canvas(modifier = Modifier.size(130.dp).rotate(rotation)) {
                 val w = size.width
                 val h = size.height
-                val points = 8
                 val amplitude = 36f
-                for (i in 0..points) {
-                    val t = i.toFloat() / points
+
+                // Re-evaluate paths smoothly using 60 step segments
+                backbonePath1.reset()
+                backbonePath2.reset()
+                val smoothSteps = 60
+                for (i in 0..smoothSteps) {
+                    val t = i.toFloat() / smoothSteps
+                    val y = t * h
+                    val angle = t * 2 * Math.PI.toFloat()
+                    val x1 = w / 2 + amplitude * sin(angle)
+                    val x2 = w / 2 - amplitude * sin(angle)
+                    if (i == 0) {
+                        backbonePath1.moveTo(x1, y)
+                        backbonePath2.moveTo(x2, y)
+                    } else {
+                        backbonePath1.lineTo(x1, y)
+                        backbonePath2.lineTo(x2, y)
+                    }
+                }
+                drawPath(backbonePath1, color = Color(0xFFF97316), style = Stroke(width = 2.dp.toPx()))
+                drawPath(backbonePath2, color = Color(0xFFF97316), style = Stroke(width = 2.dp.toPx()))
+
+                // Draw 4 base-pair connecting rungs (cyan) with node circles
+                val rungs = 4
+                for (i in 0..rungs) {
+                    val t = i.toFloat() / rungs
                     val y = t * h
                     val angle = t * 2 * Math.PI.toFloat()
                     val x1 = w / 2 + amplitude * sin(angle)
                     val x2 = w / 2 - amplitude * sin(angle)
 
-                    val slotIdx = if (i == points) points - 1 else i
-                    val segmentProgressThreshold = (slotIdx + 1) * 12.5f
+                    val slotIdx = if (i == rungs) rungs - 1 else i
+                    val segmentProgressThreshold = (slotIdx + 1) * 25f
                     val isSegmentLoaded = splicingProgress >= segmentProgressThreshold
 
-                    val targetSeg = if (slotIdx * 8 + 8 <= targetSequence.length) {
-                        targetSequence.substring(slotIdx * 8, slotIdx * 8 + 8)
+                    val targetSeg = if (slotIdx * 16 + 16 <= targetSequence.length) {
+                        targetSequence.substring(slotIdx * 16, slotIdx * 16 + 16)
                     } else {
                         "--------"
                     }
@@ -3138,12 +3402,7 @@ fun SplicerLeftPanel(
                     val segmentColor = if (isAnom) {
                         Color(0xFFA855F7)
                     } else {
-                        when (slotIdx % 4) {
-                            0 -> CyberGreen
-                            1 -> Color(0xFFFBBF24)
-                            2 -> Color(0xFF60A5FA)
-                            else -> Color(0xFFC084FC)
-                        }
+                        Color(0xFF22D3EE)
                     }
 
                     val colorNode1 = if (isSegmentLoaded) {
@@ -3159,16 +3418,16 @@ fun SplicerLeftPanel(
                     }
 
                     val lineColor = if (isSegmentLoaded) {
-                        segmentColor.copy(alpha = 0.4f)
+                        segmentColor.copy(alpha = 0.8f)
                     } else {
-                        Color.DarkGray.copy(alpha = 0.2f)
+                        Color.DarkGray.copy(alpha = 0.3f)
                     }
 
                     drawLine(
                         color = lineColor,
                         start = Offset(x1, y),
                         end = Offset(x2, y),
-                        strokeWidth = 1.5.dp.toPx()
+                        strokeWidth = 2.dp.toPx()
                     )
                     drawCircle(color = colorNode1, radius = 5.dp.toPx(), center = Offset(x1, y))
                     drawCircle(color = colorNode2, radius = 5.dp.toPx(), center = Offset(x2, y))

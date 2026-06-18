@@ -113,6 +113,14 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     private val _bioLabSubTab = MutableStateFlow("pox")
     val bioLabSubTab: StateFlow<String> = _bioLabSubTab.asStateFlow()
 
+    // Scanner Subtab Hoisted Navigation State
+    private val _scannerSubTab = MutableStateFlow("list")
+    val scannerSubTab: StateFlow<String> = _scannerSubTab.asStateFlow()
+
+    fun setScannerSubTab(subTab: String) {
+        _scannerSubTab.value = subTab
+    }
+
     // P.O.X. Reactor active state
     private val _poxReactorActive = MutableStateFlow(true)
     val poxReactorActive: StateFlow<Boolean> = _poxReactorActive.asStateFlow()
@@ -210,53 +218,105 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         }
     }
 
-    // Grand total nucleotide stockpile derived dynamically from standard genes in inventory (unique only)
-    val grandTotalStandardNucleotides: StateFlow<Long> = geneSequences
+    // Unified metrics model to compute inventory statistics in a single pass on a background thread
+    data class GeneInventoryMetrics(
+        val geneSequenceStrings: List<String> = emptyList(),
+        val uniqueGenesSize: Int = 0,
+        val multiCountGenesSize: Int = 0,
+        val anomalousGenesList: List<GeneSequence> = emptyList(),
+        val grandTotalStandardNucleotides: Long = 0L,
+        val countA: Int = 0,
+        val countG: Int = 0,
+        val countT: Int = 0,
+        val countC: Int = 0
+    )
+
+    val inventoryMetrics: StateFlow<GeneInventoryMetrics> = geneSequences
         .map { list ->
-            var total = 0L
-            list.forEach { gene ->
-                if (!WaveMath.isAnomalousGene(gene.sequence) && gene.count > 0) {
-                    total += gene.sequence.length
+            var countA = 0
+            var countG = 0
+            var countT = 0
+            var countC = 0
+            var grandTotal = 0L
+            var multiCount = 0
+            val strings = ArrayList<String>(list.size)
+            val anomalousList = ArrayList<GeneSequence>()
+
+            for (i in 0 until list.size) {
+                val gene = list[i]
+                val seq = gene.sequence
+                strings.add(seq)
+                if (gene.count > 1) {
+                    multiCount++
+                }
+
+                val isAnomalous = WaveMath.isAnomalousGene(seq)
+                if (isAnomalous) {
+                    anomalousList.add(gene)
+                } else {
+                    if (gene.count > 0) {
+                        grandTotal += seq.length
+                        for (cIdx in 0 until seq.length) {
+                            when (seq[cIdx]) {
+                                'A', 'a' -> countA += gene.count
+                                'G', 'g' -> countG += gene.count
+                                'T', 't' -> countT += gene.count
+                                'C', 'c' -> countC += gene.count
+                            }
+                        }
+                    }
                 }
             }
-            total
+
+            GeneInventoryMetrics(
+                geneSequenceStrings = strings,
+                uniqueGenesSize = list.size,
+                multiCountGenesSize = multiCount,
+                anomalousGenesList = anomalousList,
+                grandTotalStandardNucleotides = grandTotal,
+                countA = countA,
+                countG = countG,
+                countT = countT,
+                countC = countC
+            )
         }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GeneInventoryMetrics())
+
+    val grandTotalStandardNucleotides: StateFlow<Long> = inventoryMetrics
+        .map { it.grandTotalStandardNucleotides }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-    val countA: StateFlow<Int> = geneSequences
-        .map { list ->
-            list.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
-                gene.sequence.count { it == 'A' || it == 'a' } * gene.count
-            }
-        }
-        .flowOn(Dispatchers.Default)
+    val geneSequenceStrings: StateFlow<List<String>> = inventoryMetrics
+        .map { it.geneSequenceStrings }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val uniqueGenesSize: StateFlow<Int> = inventoryMetrics
+        .map { it.uniqueGenesSize }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    val countG: StateFlow<Int> = geneSequences
-        .map { list ->
-            list.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
-                gene.sequence.count { it == 'G' || it == 'g' } * gene.count
-            }
-        }
-        .flowOn(Dispatchers.Default)
+    val multiCountGenesSize: StateFlow<Int> = inventoryMetrics
+        .map { it.multiCountGenesSize }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    val countT: StateFlow<Int> = geneSequences
-        .map { list ->
-            list.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
-                gene.sequence.count { it == 'T' || it == 't' } * gene.count
-            }
-        }
-        .flowOn(Dispatchers.Default)
+    val anomalousGenesList: StateFlow<List<GeneSequence>> = inventoryMetrics
+        .map { it.anomalousGenesList }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val countA: StateFlow<Int> = inventoryMetrics
+        .map { it.countA }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    val countC: StateFlow<Int> = geneSequences
-        .map { list ->
-            list.filter { !WaveMath.isAnomalousGene(it.sequence) }.sumOf { gene ->
-                gene.sequence.count { it == 'C' || it == 'c' } * gene.count
-            }
-        }
-        .flowOn(Dispatchers.Default)
+    val countG: StateFlow<Int> = inventoryMetrics
+        .map { it.countG }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val countT: StateFlow<Int> = inventoryMetrics
+        .map { it.countT }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val countC: StateFlow<Int> = inventoryMetrics
+        .map { it.countC }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     // Map location and anomalies
@@ -772,8 +832,8 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     }
 
     fun addLog(log: String) {
-        val time = System.currentTimeMillis() % 1000000
-        _terminalLogs.value = (_terminalLogs.value + "[$time] $log").takeLast(30)
+        val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+        _terminalLogs.value = (_terminalLogs.value + "[$timeStr] $log").takeLast(30)
     }
 
     fun setMute(mute: Boolean) {
@@ -1676,6 +1736,30 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         }
     }
 
+    fun recallAllActiveMissions() {
+        viewModelScope.launch {
+            try {
+                val active = repository.activeMissions.first()
+                val ongoing = active.filter { !it.isReturned }
+                if (ongoing.isEmpty()) {
+                    addLog("DEV: No active harvesters found to recall.")
+                    return@launch
+                }
+                ongoing.forEach { m ->
+                    val updated = m.copy(
+                        isCompleted = true,
+                        phase = "COMPLETED",
+                        currentPhaseElapsed = 0L
+                    )
+                    recallMission(updated)
+                }
+                addLog("DEV: Recalled ${ongoing.size} active harvesters.")
+            } catch (e: Exception) {
+                addLog("DEV ERROR: Failed to recall harvesters: ${e.message}")
+            }
+        }
+    }
+
     fun toggleScanner(show: Boolean) {
         _showScanner.value = show
         synthManager.playCombinatorTick()
@@ -2372,7 +2456,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                     val resetVal = if (isBoostActive) 8 else 16
                     
                     // 1. Tick P.O.X. Reactor if active (paused for testing)
-                    if (false && _poxReactorActive.value) {
+                    if (_poxReactorActive.value) {
                         val currentPoxIdle = _poxIdleTime.value
                         var nextPoxVal = currentPoxIdle - 1
                         if (isBoostActive && currentPoxIdle > 8) {
@@ -2387,7 +2471,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                     }
                     
                     // 2. Tick Anomaly Engine if active (paused for testing)
-                    if (false && _anomalyEngineActive.value) {
+                    if (_anomalyEngineActive.value) {
                         val currentAnomalyIdle = _anomalyIdleTime.value
                         var nextAnomalyVal = currentAnomalyIdle - 1
                         if (isBoostActive && currentAnomalyIdle > 8) {
@@ -2507,7 +2591,11 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                                     phase = nextPhase,
                                     currentPhaseElapsed = nextPhaseElapsed
                                 )
-                                repository.insertMission(updatedMission)
+                                if (isCompleted) {
+                                    recallMission(updatedMission)
+                                } else {
+                                    repository.insertMission(updatedMission)
+                                }
                             }
                         }
                     }

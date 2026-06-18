@@ -352,19 +352,8 @@ fun MainScreen(
                 }
             }
 
-            // 3. RETRO TERMINAL PRINT LOGS SCREEN (Global Footer Ticker)
-            val discoveredPacketsLog by viewModel.discoveredPacketsLog.collectAsState()
-            val bottomLogText = remember(discoveredPacketsLog) {
-                if (discoveredPacketsLog.isNotEmpty()) {
-                    val packet = discoveredPacketsLog.last()
-                    val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(packet.timestamp))
-                    val count = packet.genes.size
-                    val packetTypeStr = if (packet.isAnomalous) "ANOMALOUS FUSION" else "GENE SYNTHESIS"
-                    val packetDetailStr = if (packet.isAnomalous) "ANOMALOUS GENE DETECTED" else "$count NEW GENES"
-                    "[$timeStr] ${packetTypeStr.uppercase()} COMPLETE: PACKET READY ($packetDetailStr)"
-                } else {
-                    "[18:55:21] GENE SYNTHESIS COMPLETE: PACKET READY (5 NEW GENES)"
-                }
+            val bottomLogText = remember(logs) {
+                logs.lastOrNull() ?: "GENPOX COMPILER SYSTEM v2.0 READY."
             }
             Box(
                 modifier = Modifier

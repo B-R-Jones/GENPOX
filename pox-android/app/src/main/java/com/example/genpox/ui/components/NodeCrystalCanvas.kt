@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
@@ -41,6 +42,46 @@ fun NodeCrystalCanvas(
     inventoryStrings: List<String>,
     modifier: Modifier = Modifier
 ) {
+    val wavePath = remember { Path() }
+    val clipPath = remember { Path() }
+
+    val dailyResonancePair = remember {
+        val calendar = Calendar.getInstance()
+        val year = calendar.get(Calendar.YEAR)
+        val month = calendar.get(Calendar.MONTH) + 1
+        val day = calendar.get(Calendar.DAY_OF_MONTH)
+        val dateSeed = year * 10000 + month * 100 + day
+        val dinucleotides = listOf(
+            "GG", "GA", "GT", "GC",
+            "AG", "AA", "AT", "AC",
+            "TG", "TA", "TT", "TC",
+            "CG", "CA", "CT", "CC"
+        )
+        dinucleotides[(dateSeed % 16).toInt()]
+    }
+
+    val resonanceIntensity = remember(inventoryStrings, dailyResonancePair) {
+        var pairCount = 0
+        inventoryStrings.forEach { seq ->
+            for (i in 0 until seq.length - 1) {
+                if (seq.substring(i, i + 2) == dailyResonancePair) {
+                    pairCount++
+                }
+            }
+        }
+        min(1.0f, pairCount / 8.0f)
+    }
+
+    val lunarPhase = remember {
+        val currentTimeSeconds = System.currentTimeMillis() / 1000.0
+        val knownNewMoon = 1704974220.0 // Known New Moon epoch
+        val synodicMonth = 2551443.0 // 29.53059 days in seconds
+        val diff = currentTimeSeconds - knownNewMoon
+        val rawPhase = (diff / synodicMonth) % 1.0
+        val phaseFraction = if (rawPhase < 0) rawPhase + 1.0 else rawPhase
+        0.5 - abs(phaseFraction - 0.5) // 0.0 (New Moon) to 0.5 (Full Moon)
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "crystal_anim")
     val animTime by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -54,48 +95,14 @@ fun NodeCrystalCanvas(
 
     Box(
         modifier = modifier
-            .size(180.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(Color(0xFF030A04).copy(alpha = 0.8f))
             .border(1.dp, Color(0xFF08220C), RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(180.dp)) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
             val cx = size.width / 2
             val cy = size.height / 2
-
-            // 1. Environmental & Data-Driven Modifiers:
-            val currentTimeSeconds = System.currentTimeMillis() / 1000.0
-            val knownNewMoon = 1704974220.0 // Known New Moon epoch
-            val synodicMonth = 2551443.0 // 29.53059 days in seconds
-            val diff = currentTimeSeconds - knownNewMoon
-            val rawPhase = (diff / synodicMonth) % 1.0
-            val phaseFraction = if (rawPhase < 0) rawPhase + 1.0 else rawPhase
-            val lunarPhase = 0.5 - abs(phaseFraction - 0.5) // 0.0 (New Moon) to 0.5 (Full Moon)
-
-            // Dinucleotide Resonance
-            val calendar = Calendar.getInstance()
-            val year = calendar.get(Calendar.YEAR)
-            val month = calendar.get(Calendar.MONTH) + 1
-            val day = calendar.get(Calendar.DAY_OF_MONTH)
-            val dateSeed = year * 10000 + month * 100 + day
-            val dinucleotides = listOf(
-                "GG", "GA", "GT", "GC",
-                "AG", "AA", "AT", "AC",
-                "TG", "TA", "TT", "TC",
-                "CG", "CA", "CT", "CC"
-            )
-            val dailyResonancePair = dinucleotides[(dateSeed % 16).toInt()]
-
-            var pairCount = 0
-            inventoryStrings.forEach { seq ->
-                for (i in 0 until seq.length - 1) {
-                    if (seq.substring(i, i + 2) == dailyResonancePair) {
-                        pairCount++
-                    }
-                }
-            }
-            val resonanceIntensity = min(1.0f, pairCount / 8.0f)
 
             // Baseline radius R structural modification from Lunar Phase
             val lunarBaselineMod = 1.0f + lunarPhase.toFloat() * 0.15f // full moon expands radius up to 15%
@@ -128,15 +135,14 @@ fun NodeCrystalCanvas(
 
             // Draw Background grid
             val steps = listOf(0.25f, 0.5f, 0.75f, 1.0f)
+            val gridColor = Color(0xFF00FF41).copy(alpha = 0.05f)
             steps.forEach { step ->
-                val path = Path().apply {
-                    moveTo(cx, cy - R * step)
-                    lineTo(cx + R * step, cy)
-                    lineTo(cx, cy + R * step)
-                    lineTo(cx - R * step, cy)
-                    close()
-                }
-                drawPath(path, Color(0xFF00FF41).copy(alpha = 0.05f), style = Stroke(width = 1f))
+                // Avoid path object allocations per frame by drawing line segments
+                drawLine(gridColor, Offset(cx, cy - R * step), Offset(cx + R * step, cy), strokeWidth = 1f)
+                drawLine(gridColor, Offset(cx + R * step, cy), Offset(cx, cy + R * step), strokeWidth = 1f)
+                drawLine(gridColor, Offset(cx, cy + R * step), Offset(cx - R * step, cy), strokeWidth = 1f)
+                drawLine(gridColor, Offset(cx - R * step, cy), Offset(cx, cy - R * step), strokeWidth = 1f)
+
                 drawCircle(
                     color = Color(0xFF00FF41).copy(alpha = 0.05f),
                     radius = R * step,
@@ -182,7 +188,7 @@ fun NodeCrystalCanvas(
             val glitchMultiplier = if (isCrossesResonance) (1.0f + resonanceIntensity * 0.15f) else 1.0f
 
             // Inner Fills and Geometric Harmonics
-            val numHarmonics = 3
+            val numHarmonics = 2
             val alphaG = depthG * (if (lunarPhase < 0.1) 0f else 0.62f) + (if (depthG > 0) 0.08f else 0f)
             val alphaT = depthT * (if (lunarPhase < 0.1) 0f else 0.62f) + (if (depthT > 0) 0.08f else 0f)
             val alphaC = depthC * (if (lunarPhase < 0.1) 0f else 0.62f) + (if (depthC > 0) 0.08f else 0f)
@@ -200,7 +206,7 @@ fun NodeCrystalCanvas(
                 val dy = pEnd.y - pStart.y
                 val len = hypot(dx, dy)
                 val angle = atan2(dy, dx)
-                val segments = 20
+                val segments = 12
                 val amp = waveAmplitude * scale
                 val freq = waveFrequency
                 val brush = Brush.linearGradient(
@@ -209,24 +215,23 @@ fun NodeCrystalCanvas(
                     end = pEnd
                 )
 
-                val path = Path().apply {
-                    moveTo(pStart.x, pStart.y)
-                    for (i in 1..segments) {
-                        val t = i.toFloat() / segments
-                        val px = pStart.x + dx * t
-                        val py = pStart.y + dy * t
+                wavePath.reset()
+                wavePath.moveTo(pStart.x, pStart.y)
+                for (i in 1..segments) {
+                    val t = i.toFloat() / segments
+                    val px = pStart.x + dx * t
+                    val py = pStart.y + dy * t
 
-                        val envelope = sin(t * Math.PI.toFloat())
-                        val waveOffset = amp * sin(t * len * freq + scale * 10f) * envelope
+                    val envelope = sin(t * Math.PI.toFloat())
+                    val waveOffset = amp * sin(t * len * freq + scale * 10f) * envelope
 
-                        val perpX = -sin(angle) * waveOffset
-                        val perpY = cos(angle) * waveOffset
+                    val perpX = -sin(angle) * waveOffset
+                    val perpY = cos(angle) * waveOffset
 
-                        lineTo(px + perpX, py + perpY)
-                    }
+                    wavePath.lineTo(px + perpX, py + perpY)
                 }
                 drawPath(
-                    path,
+                    wavePath,
                     brush = brush,
                     style = Stroke(
                         width = (0.7f + (totDepth / 4f) * 0.8f) * (scale + 0.1f) * glitchMultiplier
@@ -242,13 +247,13 @@ fun NodeCrystalCanvas(
 
                 // Draw solid inner clip gradient if not New Moon
                 if (lunarPhase >= 0.05) {
-                    val clipPath = Path().apply {
-                        moveTo(hG.x, hG.y)
-                        lineTo(hT.x, hT.y)
-                        lineTo(hC.x, hC.y)
-                        lineTo(hA.x, hA.y)
-                        close()
-                    }
+                    clipPath.reset()
+                    clipPath.moveTo(hG.x, hG.y)
+                    clipPath.lineTo(hT.x, hT.y)
+                    clipPath.lineTo(hC.x, hC.y)
+                    clipPath.lineTo(hA.x, hA.y)
+                    clipPath.close()
+                    
                     clipPath(clipPath) {
                         drawCircle(
                             brush = Brush.radialGradient(
@@ -289,12 +294,42 @@ fun NodeCrystalCanvas(
                     }
                 }
 
-                // Draw standard colored outlines
-                drawWaveEdge(hG, hT, Color(0xFFEF4444).copy(alpha = alphaG * alphaMod + 0.1f), Color(0xFF3B82F6).copy(alpha = alphaT * alphaMod + 0.1f), scale)
-                drawWaveEdge(hT, hC, Color(0xFF3B82F6).copy(alpha = alphaT * alphaMod + 0.1f), Color(0xFFEAB308).copy(alpha = alphaC * alphaMod + 0.1f), scale)
-                drawWaveEdge(hC, hA, Color(0xFFEAB308).copy(alpha = alphaC * alphaMod + 0.1f), Color(0xFF22C55E).copy(alpha = alphaA * alphaMod + 0.1f), scale)
-                drawWaveEdge(hA, hG, Color(0xFF22C55E).copy(alpha = alphaA * alphaMod + 0.1f), Color(0xFFEF4444).copy(alpha = alphaG * alphaMod + 0.1f), scale)
+                // Draw outlines (wavy for outer shell, straight vector outlines for inner harmonics)
+                if (scale == 1.0f) {
+                    drawWaveEdge(hG, hT, Color(0xFFEF4444).copy(alpha = alphaG * alphaMod + 0.1f), Color(0xFF3B82F6).copy(alpha = alphaT * alphaMod + 0.1f), scale)
+                    drawWaveEdge(hT, hC, Color(0xFF3B82F6).copy(alpha = alphaT * alphaMod + 0.1f), Color(0xFFEAB308).copy(alpha = alphaC * alphaMod + 0.1f), scale)
+                    drawWaveEdge(hC, hA, Color(0xFFEAB308).copy(alpha = alphaC * alphaMod + 0.1f), Color(0xFF22C55E).copy(alpha = alphaA * alphaMod + 0.1f), scale)
+                    drawWaveEdge(hA, hG, Color(0xFF22C55E).copy(alpha = alphaA * alphaMod + 0.1f), Color(0xFFEF4444).copy(alpha = alphaG * alphaMod + 0.1f), scale)
+                } else {
+                    val strokeW = (0.7f + (totDepth / 4f) * 0.8f) * (scale + 0.1f) * glitchMultiplier
+                    drawLine(
+                        brush = Brush.linearGradient(colors = listOf(Color(0xFFEF4444).copy(alpha = alphaG * alphaMod + 0.1f), Color(0xFF3B82F6).copy(alpha = alphaT * alphaMod + 0.1f)), start = hG, end = hT),
+                        start = hG,
+                        end = hT,
+                        strokeWidth = strokeW
+                    )
+                    drawLine(
+                        brush = Brush.linearGradient(colors = listOf(Color(0xFF3B82F6).copy(alpha = alphaT * alphaMod + 0.1f), Color(0xFFEAB308).copy(alpha = alphaC * alphaMod + 0.1f)), start = hT, end = hC),
+                        start = hT,
+                        end = hC,
+                        strokeWidth = strokeW
+                    )
+                    drawLine(
+                        brush = Brush.linearGradient(colors = listOf(Color(0xFFEAB308).copy(alpha = alphaC * alphaMod + 0.1f), Color(0xFF22C55E).copy(alpha = alphaA * alphaMod + 0.1f)), start = hC, end = hA),
+                        start = hC,
+                        end = hA,
+                        strokeWidth = strokeW
+                    )
+                    drawLine(
+                        brush = Brush.linearGradient(colors = listOf(Color(0xFF22C55E).copy(alpha = alphaA * alphaMod + 0.1f), Color(0xFFEF4444).copy(alpha = alphaG * alphaMod + 0.1f)), start = hA, end = hG),
+                        start = hA,
+                        end = hG,
+                        strokeWidth = strokeW
+                    )
+                }
             }
+
+
 
             // Draw outer shell (scale = 1.0f)
             drawShellLayer(1.0f, 1.0f)

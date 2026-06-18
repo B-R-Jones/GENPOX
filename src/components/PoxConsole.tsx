@@ -5964,34 +5964,7 @@ export default function PoxConsole({
                       </div>
 
                       <div className="space-y-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            sound.playBeep(650, 0.05, "sine");
-                            setIsGeneLogPopupOpen(true);
-                          }}
-                          className={`w-full py-3 border font-mono font-bold uppercase text-[10px] rounded-sm cursor-pointer transition-all flex items-center justify-center gap-1.5 active:scale-[0.99] ${
-                            bioLabSubTab === 'anomaly'
-                              ? "bg-purple-950/40 hover:bg-purple-900/60 border-purple-500/50 text-purple-300"
-                              : "bg-blue-950/40 hover:bg-blue-900/60 border-blue-500/50 text-[#00E1FF]"
-                          }`}
-                        >
-                          <Terminal className={`w-3.5 h-3.5 stroke-[2.5] ${bioLabSubTab === 'anomaly' ? "text-purple-300" : "text-[#00E1FF]"}`} />
-                          <span>{bioLabSubTab === 'anomaly' ? "View Anomaly Discovery Log" : "View Gene Synthesis Log"}</span>
-                        </button>
-
-                        <button 
-                          onClick={handleManualCombinatorClick}
-                          className={`w-full py-3 border text-white font-bold uppercase text-xs transition-all cursor-pointer rounded-sm active:scale-[0.99] ${
-                            bioLabSubTab === 'anomaly'
-                              ? "bg-purple-900/40 border-purple-500/80 hover:bg-purple-900"
-                              : "bg-green-900/40 border-green-500/80 hover:bg-green-900"
-                          }`}
-                        >
-                          Manual Acceleration (-2s)
-                        </button>
-
-                        <div className="flex border-t border-green-900/40 pt-2 gap-2 select-none font-mono">
+                        <div className="flex border-t border-green-900/40 pt-2 gap-2 select-none font-mono items-center">
                           <button
                             type="button"
                             onClick={() => {
@@ -6020,6 +5993,56 @@ export default function PoxConsole({
                           >
                             {bioLabSubTab === 'anomaly' ? <FlickeringPurpleText text="Anomaly Engine" /> : "Anomaly Engine"}
                           </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sound.playBeep(600, 0.05, "sine");
+                              setDiscoverySearchPrefix("");
+                              setDiscoverySearchStep(0);
+                              setIsGeneLedgerExpanded(true);
+                            }}
+                            className={`w-[32px] h-[32px] border rounded transition-all flex flex-col items-center justify-center gap-0.5 leading-none cursor-pointer flex-shrink-0 ${
+                              bioLabSubTab === 'anomaly'
+                                ? "border-purple-500/80 text-purple-300 bg-purple-950/20 hover:bg-purple-900/60 shadow-[0_0_8px_rgba(168,85,247,0.15)]"
+                                : "border-green-500/80 text-green-300 bg-green-950/20 hover:bg-green-900/60 shadow-[0_0_8px_rgba(34,197,94,0.15)]"
+                            }`}
+                            title="Run Pair-Based Step-Search"
+                          >
+                            <div className="text-[5px] font-bold">STEP</div>
+                            <div className="text-[5px] font-bold">SRCH</div>
+                            <div className="text-[5px] font-bold">DIAG</div>
+                          </button>
+
+                          {bioLabSubTab === 'anomaly' ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sound.playBeep(650, 0.05, "sine");
+                                setIsGeneLogPopupOpen(true);
+                              }}
+                              className="w-[32px] h-[32px] border border-purple-500/80 text-purple-300 bg-purple-950/20 hover:bg-purple-900/60 shadow-[0_0_8px_rgba(168,85,247,0.15)] rounded transition-all flex flex-col items-center justify-center gap-0.5 leading-none cursor-pointer flex-shrink-0"
+                              title="View Anomaly Discovery Log"
+                            >
+                              <div className="text-[5px] font-bold">XYZW!?$%</div>
+                              <div className="text-[5px] font-bold">&@#GCTAA</div>
+                              <div className="text-[5px] font-bold">ANOM.LOG</div>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sound.playBeep(650, 0.05, "sine");
+                                setIsGeneLogPopupOpen(true);
+                              }}
+                              className="w-[32px] h-[32px] border border-[#00E1FF]/80 text-[#00E1FF] bg-blue-950/20 hover:bg-blue-900/60 shadow-[0_0_8px_rgba(0,225,255,0.15)] rounded transition-all flex flex-col items-center justify-center gap-0.5 leading-none cursor-pointer flex-shrink-0 font-mono"
+                              title="View Gene Synthesis Log"
+                            >
+                              <div className="pl-[0.1em] text-[5px] font-bold">ATCGGCTA</div>
+                              <div className="pl-[0.1em] text-[5px] font-bold">GCTAATCG</div>
+                              <div className="pl-[0.1em] text-[5px] font-bold">CGATTAGC</div>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </ConsolePanel>
@@ -6045,26 +6068,7 @@ export default function PoxConsole({
 
                       {/* Display Buttons and Stockpile Panels inside Default View */}
                       <div className="flex-1 flex flex-col justify-center min-h-[140px] min-h-0 space-y-3.5">
-                        {/* pair-based array search button */}
-                        {bioLabSubTab === 'pox' && (
-                          <button 
-                            onClick={() => { 
-                              sound.playBeep(600,0.05,"sine"); 
-                              setDiscoverySearchPrefix("");
-                              setDiscoverySearchStep(0);
-                              setIsGeneLedgerExpanded(true); 
-                            }}
-                            className="w-full py-3 px-4 bg-black/60 border border-green-955 hover:border-[#00FF41] hover:bg-green-955/20 text-[#00FF41] rounded flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group text-center shadow-[0_0_15px_rgba(0,255,65,0.05)]"
-                          >
-                            <span className="text-sm font-bold tracking-wider text-white font-mono uppercase group-hover:text-[#00FF41] transition-colors flex items-center justify-center gap-1.5">
-                              <Search className="w-4 h-4 text-[#00FF41] animate-pulse" />
-                              PAIR-BASED STEP-SEARCH
-                            </span>
-                            <span className="text-[8.5px] font-mono text-green-500 uppercase tracking-widest bg-green-950/30 px-2 py-0.5 border border-green-500/20 rounded">
-                              [ Run Hierarchical Query ▼ ]
-                            </span>
-                          </button>
-                        )}
+
 
                         {/* G.E.N. Gene Stockpile Panel for P.O.X. Reactor Sub-Tab as a beautiful matching info panel display */}
                         {bioLabSubTab === 'pox' && (() => {
