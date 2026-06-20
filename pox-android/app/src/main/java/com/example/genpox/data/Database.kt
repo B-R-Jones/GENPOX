@@ -83,9 +83,25 @@ interface PoxDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCachedRoadCell(cell: CachedRoadCell)
+
+    @Query("DELETE FROM cached_road_cells")
+    suspend fun clearCachedRoadCells()
+
+    // Cached Building Cells
+    @Query("SELECT * FROM cached_building_cells WHERE cellKey = :cellKey LIMIT 1")
+    suspend fun getCachedBuildingCell(cellKey: String): CachedBuildingCell?
+
+    @Query("SELECT * FROM cached_building_cells")
+    suspend fun getAllCachedBuildingCells(): List<CachedBuildingCell>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCachedBuildingCell(cell: CachedBuildingCell)
+
+    @Query("DELETE FROM cached_building_cells")
+    suspend fun clearCachedBuildingCells()
 }
 
-@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class, CachedRoadCell::class], version = 6, exportSchema = false)
+@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class, CachedRoadCell::class, CachedBuildingCell::class], version = 10, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class PoxDatabase : RoomDatabase() {
     abstract fun poxDao(): PoxDao

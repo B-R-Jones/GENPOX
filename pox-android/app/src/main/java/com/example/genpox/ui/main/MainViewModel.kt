@@ -18,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.json.*
 import kotlinx.serialization.encodeToString
 import java.util.UUID
+import java.util.Locale
 import kotlin.math.sin
 
 class MainViewModel(private val repository: DataRepository) : ViewModel() {
@@ -75,6 +76,11 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
     fun setTrackedMissionId(id: String?) {
         _trackedMissionId.value = id
+        if (id != null) {
+            _scannerSubTab.value = "radar"
+            _selectedAnomalyId.value = null
+            selectTab("scanner")
+        }
     }
 
     // UI Local State Flow
@@ -140,6 +146,10 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     // Anomaly engine unstable fusion state switch
     private val _anomalyEngineActive = MutableStateFlow(false)
     val anomalyEngineActive: StateFlow<Boolean> = _anomalyEngineActive.asStateFlow()
+
+    // Cumulative standard nucleotides consumed during the current active anomaly run
+    private val _anomalyConsumedBases = MutableStateFlow(0L)
+    val anomalyConsumedBases: StateFlow<Long> = _anomalyConsumedBases.asStateFlow()
 
     // Chronological log of past synthesized gene packets
     private val _discoveredPacketsLog = MutableStateFlow<List<GenePacket>>(emptyList())
@@ -328,6 +338,9 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
     private val _roads = MutableStateFlow<List<List<Pair<Double, Double>>>>(emptyList())
     val roads: StateFlow<List<List<Pair<Double, Double>>>> = _roads.asStateFlow()
+
+    private val _buildings = MutableStateFlow<List<BuildingStructure>>(emptyList())
+    val buildings: StateFlow<List<BuildingStructure>> = _buildings.asStateFlow()
 
     private val _cachedCells = MutableStateFlow<List<String>>(emptyList())
     val cachedCells: StateFlow<List<String>> = _cachedCells.asStateFlow()
@@ -865,6 +878,13 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         }
     }
 
+    fun refreshMap() {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.clearMapCache()
+            fetchRoads(_latitude.value, _longitude.value)
+        }
+    }
+
     private fun getCellKey(lat: Double, lng: Double): String {
         val cellX = Math.floor(lat / 0.015).toInt()
         val cellY = Math.floor(lng / 0.015).toInt()
@@ -957,6 +977,38 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         return result
     }
 
+    private fun generateFallbackBuildings(lat: Double, lng: Double): List<List<RoadPoint>> {
+        val result = mutableListOf<List<RoadPoint>>()
+        val random = java.util.Random((lat.hashCode() + lng.hashCode()).toLong())
+        val latStep = 0.00135
+        val lngStep = 0.00135 / kotlin.math.cos(Math.toRadians(lat))
+        
+        val startLat = Math.floor(lat / latStep) * latStep - 15.0 * latStep
+        val startLng = Math.floor(lng / lngStep) * lngStep - 15.0 * lngStep
+        
+        for (i in 0..30 step 2) {
+            for (j in 0..30 step 2) {
+                if (random.nextFloat() < 0.4f) { // 40% chance of building at intersection cell
+                    val bLat = startLat + i * latStep + 0.0003
+                    val bLng = startLng + j * lngStep + 0.0003
+                    
+                    val w = 0.0002
+                    val h = 0.0002 / kotlin.math.cos(Math.toRadians(lat))
+                    
+                    val polygon = listOf(
+                        RoadPoint(bLat, bLng),
+                        RoadPoint(bLat + w, bLng),
+                        RoadPoint(bLat + w, bLng + h),
+                        RoadPoint(bLat, bLng + h),
+                        RoadPoint(bLat, bLng) // close polygon
+                    )
+                    result.add(polygon)
+                }
+            }
+        }
+        return result
+    }
+
     private fun fetchRoads(lat: Double, lng: Double) {
         android.util.Log.d("PoxRadar", "fetchRoads called for lat=$lat lng=$lng")
         val oldJob = fetchRoadsJob
@@ -975,7 +1027,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             val cellY = Math.floor(lng / 0.015).toInt()
 
             val zoom = _zoomMultiplier.value
-            val radius = kotlin.math.ceil((0.009 * zoom) / 0.015).toInt().coerceIn(1, 3)
+            val radius = 3
 
             val cellsToQuery = mutableListOf<String>()
             for (dx in -radius..radius) {
@@ -984,43 +1036,62 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 }
             }
 
-            val cachedCellsFromDb = mutableListOf<CachedRoadCell>()
+            val cachedRoadCells = mutableListOf<CachedRoadCell>()
+            val cachedBuildingCells = mutableListOf<CachedBuildingCell>()
             val now = System.currentTimeMillis()
             var allCachedAndValid = true
 
             for (key in cellsToQuery) {
-                val dbCell = repository.getCachedRoadCell(key)
-                if (dbCell != null && (now - dbCell.fetchedAt) < 24 * 60 * 60 * 1000L) { // 24 hours
-                    cachedCellsFromDb.add(dbCell)
+                val dbRoadCell = repository.getCachedRoadCell(key)
+                val dbBuildingCell = repository.getCachedBuildingCell(key)
+                if (dbRoadCell != null && dbBuildingCell != null && 
+                    (now - dbRoadCell.fetchedAt) < 24 * 60 * 60 * 1000L && 
+                    (now - dbBuildingCell.fetchedAt) < 24 * 60 * 60 * 1000L) {
+                    cachedRoadCells.add(dbRoadCell)
+                    cachedBuildingCells.add(dbBuildingCell)
                 } else {
                     allCachedAndValid = false
                 }
             }
 
             if (allCachedAndValid) {
-                android.util.Log.d("PoxRadar", "Active neighborhood cells valid. Populating max 7x7 map grid from DB cache.")
+                android.util.Log.d("PoxRadar", "Active neighborhood cells valid. Populating map from DB cache.")
                 addLog("SYS: Loaded map grid from local cache.")
                 val maxCellsToLoad = mutableListOf<String>()
-                for (dx in -3..3) {
-                    for (dy in -3..3) {
+                for (dx in -radius..radius) {
+                    for (dy in -radius..radius) {
                         maxCellsToLoad.add("${cellX + dx},${cellY + dy}")
                     }
                 }
                 val allRoads = mutableListOf<List<Pair<Double, Double>>>()
+                val allBuildings = mutableListOf<BuildingStructure>()
                 maxCellsToLoad.forEach { key ->
-                    val cell = repository.getCachedRoadCell(key)
-                    if (cell != null && (now - cell.fetchedAt) < 24 * 60 * 60 * 1000L) {
+                    val roadCell = repository.getCachedRoadCell(key)
+                    val buildingCell = repository.getCachedBuildingCell(key)
+                    if (roadCell != null && (now - roadCell.fetchedAt) < 24 * 60 * 60 * 1000L) {
                         try {
-                            val roadsList = Json.decodeFromString<List<List<RoadPoint>>>(cell.roadsJson)
+                            val roadsList = Json.decodeFromString<List<List<RoadPoint>>>(roadCell.roadsJson)
                             roadsList.forEach { road ->
                                 allRoads.add(road.map { Pair(it.lat, it.lng) })
                             }
-                        } catch (e: Exception) {
-                            // Ignore decode exceptions
-                        }
+                        } catch (e: Exception) {}
+                    }
+                    if (buildingCell != null && (now - buildingCell.fetchedAt) < 24 * 60 * 60 * 1000L) {
+                        try {
+                            val buildingsList = Json.decodeFromString<List<BuildingStructure>>(buildingCell.buildingsJson)
+                            allBuildings.addAll(buildingsList)
+                        } catch (e: Exception) {}
                     }
                 }
-                _roads.value = allRoads
+                _roads.value = allRoads.distinct()
+                if (allRoads.isNotEmpty() && allBuildings.isEmpty()) {
+                    android.util.Log.d("PoxRadar", "DB cache valid but buildings are empty. Generating fallback buildings.")
+                    val fallback = generateFallbackBuildings(lat, lng)
+                    val fallbackStructures = fallback.map { BuildingStructure(points = it, isFallback = true) }
+                    _buildings.value = fallbackStructures.distinct()
+                } else {
+                    _buildings.value = allBuildings.distinct()
+                }
                 return@launch
             }
 
@@ -1039,8 +1110,91 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             )
             
             var success = false
-            val query = "[out:json];way($minLat,$minLng,$maxLat,$maxLng)[highway~\"motorway|trunk|primary|secondary|tertiary|unclassified|residential\"];out geom;"
+            // Always query both roads and buildings to ensure the local cache is fully populated for zooming
+            val query = "[out:json];(way($minLat,$minLng,$maxLat,$maxLng)[highway~\"motorway|trunk|primary|secondary|tertiary|unclassified|residential\"];way($minLat,$minLng,$maxLat,$maxLng)[building];);out geom;"
             var fetchedRoads: List<List<RoadPoint>> = emptyList()
+            var fetchedBuildings: List<BuildingStructure> = emptyList()
+            var femaBuildings: List<BuildingStructure> = emptyList()
+            var usgsBuildings: List<BuildingStructure> = emptyList()
+
+            // 1. Query FEMA USA Structures REST API first as the primary building footprints source
+            if (isActive) {
+                try {
+                    android.util.Log.d("PoxRadar", "Querying FEMA USA Structures as primary...")
+                    addLog("SYS: Querying FEMA USA Structures (Primary)...")
+                    val femaUrl = "https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/USA_Structures_View/FeatureServer/0/query" +
+                            "?geometry=$minLng,$minLat,$maxLng,$maxLat" +
+                            "&geometryType=esriGeometryEnvelope" +
+                            "&spatialRel=esriSpatialRelIntersects" +
+                            "&inSR=4326" +
+                            "&outSR=4326" +
+                            "&returnGeometry=true" +
+                            "&outFields=OBJECTID" +
+                            "&f=json"
+                    
+                    val url = java.net.URL(femaUrl)
+                    val connection = url.openConnection() as java.net.HttpURLConnection
+                    connection.requestMethod = "GET"
+                    connection.setRequestProperty("User-Agent", "GenPoxRadar/1.0 (brent@example.com)")
+                    connection.connectTimeout = 10000
+                    connection.readTimeout = 10000
+                    
+                    val responseCode = connection.responseCode
+                    if (responseCode == 200) {
+                        val text = connection.inputStream.bufferedReader().use { it.readText() }
+                        femaBuildings = parseArcgisJson(text)
+                        android.util.Log.d("PoxRadar", "FEMA primary returned ${femaBuildings.size} buildings.")
+                        addLog("SYS: Loaded ${femaBuildings.size} buildings from FEMA.")
+                    } else {
+                        android.util.Log.w("PoxRadar", "FEMA endpoint returned HTTP $responseCode")
+                        addLog("SYS: FEMA query failed: HTTP $responseCode")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("PoxRadar", "FEMA query failed", e)
+                    addLog("SYS: FEMA query error: ${e.message}")
+                }
+            }
+
+            // 1b. Query USGS National Structures REST API as the secondary building footprints source
+            if (isActive) {
+                try {
+                    android.util.Log.d("PoxRadar", "Querying USGS National Structures...")
+                    addLog("SYS: Querying USGS Structures (Secondary)...")
+                    val usgsUrl = "https://carto.nationalmap.gov/arcgis/rest/services/structures/FeatureServer/0/query" +
+                            "?geometry=$minLng,$minLat,$maxLng,$maxLat" +
+                            "&geometryType=esriGeometryEnvelope" +
+                            "&spatialRel=esriSpatialRelIntersects" +
+                            "&inSR=4326" +
+                            "&outSR=4326" +
+                            "&returnGeometry=true" +
+                            "&outFields=OBJECTID" +
+                            "&f=json"
+                    
+                    val url = java.net.URL(usgsUrl)
+                    val connection = url.openConnection() as java.net.HttpURLConnection
+                    connection.requestMethod = "GET"
+                    connection.setRequestProperty("User-Agent", "GenPoxRadar/1.0 (brent@example.com)")
+                    connection.connectTimeout = 10000
+                    connection.readTimeout = 10000
+                    
+                    val responseCode = connection.responseCode
+                    if (responseCode == 200) {
+                        val text = connection.inputStream.bufferedReader().use { it.readText() }
+                        usgsBuildings = parseArcgisJson(text)
+                        android.util.Log.d("PoxRadar", "USGS returned ${usgsBuildings.size} buildings.")
+                        addLog("SYS: Loaded ${usgsBuildings.size} buildings from USGS.")
+                    } else {
+                        android.util.Log.w("PoxRadar", "USGS endpoint returned HTTP $responseCode")
+                        addLog("SYS: USGS query failed: HTTP $responseCode")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("PoxRadar", "USGS query failed", e)
+                    addLog("SYS: USGS query error: ${e.message}")
+                }
+            }
+
+            // 2. Query OSM for Roads and secondary Buildings
+            var osmBuildings: List<BuildingStructure> = emptyList()
 
             for (baseUrl in endpoints) {
                 if (!isActive) return@launch
@@ -1069,14 +1223,17 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                         val text = connection.inputStream.bufferedReader().use { it.readText() }
                         if (!isActive) return@launch
                         
-                        fetchedRoads = parseOverpassJson(text)
-                        if (fetchedRoads.isNotEmpty()) {
-                            android.util.Log.d("PoxRadar", "Loaded ${fetchedRoads.size} road segments from $baseUrl.")
-                            addLog("SYS: Loaded ${fetchedRoads.size} road segments from $baseUrl.")
+                        fetchedRoads = parseOverpassJson(text, "highway")
+                        val rawBuildings = parseOverpassJson(text, "building")
+                        osmBuildings = rawBuildings.map { BuildingStructure(points = it, isFallback = false) }
+                        
+                        if (fetchedRoads.isNotEmpty() || osmBuildings.isNotEmpty()) {
+                            android.util.Log.d("PoxRadar", "Loaded map segments from $baseUrl.")
+                            addLog("SYS: Loaded map data from $baseUrl.")
                             success = true
                             break
                         } else {
-                            android.util.Log.w("PoxRadar", "Parsed 0 roads from $baseUrl response.")
+                            android.util.Log.w("PoxRadar", "Parsed 0 map features from $baseUrl response.")
                         }
                     } else {
                         android.util.Log.w("PoxRadar", "Endpoint $baseUrl returned HTTP $responseCode")
@@ -1088,48 +1245,133 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                     addLog("SYS: Endpoint $baseUrl error: ${e.message}")
                 }
             }
+
+            // 3. Method C: Merge FEMA (primary), USGS (secondary), and OSM (tertiary) buildings (avoiding duplicates)
+            // 3. Method C: Merge FEMA (primary), USGS (secondary), and OSM (tertiary) buildings (avoiding duplicates)
+            if (isActive) {
+                fun getBBox(building: BuildingStructure): BuildingBBox {
+                    var minL = Double.MAX_VALUE
+                    var maxL = -Double.MAX_VALUE
+                    var minLn = Double.MAX_VALUE
+                    var maxLn = -Double.MAX_VALUE
+                    building.points.forEach { pt ->
+                        if (pt.lat < minL) minL = pt.lat
+                        if (pt.lat > maxL) maxL = pt.lat
+                        if (pt.lng < minLn) minLn = pt.lng
+                        if (pt.lng > maxLn) maxLn = pt.lng
+                    }
+                    return BuildingBBox(minL, maxL, minLn, maxLn)
+                }
+
+                val mergedBuildings = femaBuildings.toMutableList()
+                val mergedBoxes = mutableListOf<BuildingBBox>()
+
+                femaBuildings.forEach { b ->
+                    val box = getBBox(b)
+                    val dLat = box.maxLat - box.minLat
+                    val dLng = box.maxLng - box.minLng
+                    if (dLat in 0.0..0.005 && dLng in 0.0..0.005) {
+                        mergedBoxes.add(box)
+                    } else {
+                        android.util.Log.w("PoxRadar", "FEMA building filtered from merge check (too large/corrupt): dLat=$dLat, dLng=$dLng")
+                    }
+                }
+
+                // Add USGS buildings if they don't overlap with already merged buildings
+                usgsBuildings.forEach { usgs ->
+                    val usgsBox = getBBox(usgs)
+                    val dLat = usgsBox.maxLat - usgsBox.minLat
+                    val dLng = usgsBox.maxLng - usgsBox.minLng
+                    val intersects = mergedBoxes.any { box -> usgsBox.intersects(box) }
+                    if (!intersects) {
+                        mergedBuildings.add(usgs)
+                        if (dLat in 0.0..0.005 && dLng in 0.0..0.005) {
+                            mergedBoxes.add(usgsBox)
+                        } else {
+                            android.util.Log.w("PoxRadar", "USGS building filtered from merge check (too large/corrupt): dLat=$dLat, dLng=$dLng")
+                        }
+                    }
+                }
+
+                // Add OSM buildings if they don't overlap with already merged buildings
+                var loggedIntersections = 0
+                if (success && osmBuildings.isNotEmpty()) {
+                    osmBuildings.forEach { osm ->
+                        val osmBox = getBBox(osm)
+                        val dLat = osmBox.maxLat - osmBox.minLat
+                        val dLng = osmBox.maxLng - osmBox.minLng
+                        val intersectingBox = mergedBoxes.find { box -> osmBox.intersects(box) }
+                        if (intersectingBox == null) {
+                            mergedBuildings.add(osm)
+                            if (dLat in 0.0..0.005 && dLng in 0.0..0.005) {
+                                mergedBoxes.add(osmBox)
+                            }
+                        } else {
+                            if (loggedIntersections < 5) {
+                                android.util.Log.d("PoxRadar", "Intersection Found! OSM Box: minLat=${osmBox.minLat}, maxLat=${osmBox.maxLat}, minLng=${osmBox.minLng}, maxLng=${osmBox.maxLng} overlapped with FEMA Box: minLat=${intersectingBox.minLat}, maxLat=${intersectingBox.maxLat}, minLng=${intersectingBox.minLng}, maxLng=${intersectingBox.maxLng}")
+                                loggedIntersections++
+                            }
+                        }
+                    }
+                }
+                fetchedBuildings = mergedBuildings
+                android.util.Log.d("PoxRadar", "Sequential Merge: FEMA count=${femaBuildings.size}, USGS count=${usgsBuildings.size}, OSM count=${osmBuildings.size}, Merged total=${fetchedBuildings.size}")
+            }
             
             if (!success && isActive) {
                 android.util.Log.w("PoxRadar", "All OSM endpoints failed/empty. Generating fallback grid.")
                 addLog("SYS: All OpenStreetMap endpoints failed. Generating fallback grid.")
                 fetchedRoads = generateFallbackRoads(lat, lng)
+                if (fetchedBuildings.isEmpty()) {
+                    fetchedBuildings = generateFallbackBuildings(lat, lng).map { BuildingStructure(points = it, isFallback = true) }
+                }
+            }
+
+            if (success && fetchedBuildings.isEmpty() && isActive) {
+                android.util.Log.d("PoxRadar", "OSM, FEMA, and USGS returned 0 buildings. Generating fallback structures.")
+                fetchedBuildings = generateFallbackBuildings(lat, lng).map { BuildingStructure(points = it, isFallback = true) }
             }
 
             if (isActive) {
-                // Distribute fetched roads into the 9 cells
+                // Distribute fetched roads into the cells
                 val cellRoadsMap = mutableMapOf<String, MutableList<List<RoadPoint>>>()
+                val cellBuildingsMap = mutableMapOf<String, MutableList<BuildingStructure>>()
                 cellsToQuery.forEach { key ->
                     cellRoadsMap[key] = mutableListOf()
+                    cellBuildingsMap[key] = mutableListOf()
                 }
 
+                // Caching whole roads in cells they touch to prevent segment cutoffs at boundary edges
                 fetchedRoads.forEach { way ->
                     if (way.size >= 2) {
-                        cellsToQuery.forEach { cellKey ->
-                            val parts = cellKey.split(",")
-                            val cx = parts[0].toInt()
-                            val cy = parts[1].toInt()
-
-                            val currentSubPath = mutableListOf<RoadPoint>()
-                            way.forEachIndexed { i, pt ->
-                                val ptCellX = Math.floor(pt.lat / 0.015).toInt()
-                                val ptCellY = Math.floor(pt.lng / 0.015).toInt()
-
-                                val isSelfInCell = (ptCellX == cx && ptCellY == cy)
-                                val isPrevInCell = i > 0 && Math.floor(way[i - 1].lat / 0.015).toInt() == cx && Math.floor(way[i - 1].lng / 0.015).toInt() == cy
-                                val isNextInCell = i < way.size - 1 && Math.floor(way[i + 1].lat / 0.015).toInt() == cx && Math.floor(way[i + 1].lng / 0.015).toInt() == cy
-
-                                if (isSelfInCell || isPrevInCell || isNextInCell) {
-                                    currentSubPath.add(pt)
-                                } else {
-                                    if (currentSubPath.size >= 2) {
-                                        cellRoadsMap[cellKey]?.add(currentSubPath.toList())
-                                    }
-                                    currentSubPath.clear()
-                                }
+                        val cellsForThisRoad = mutableSetOf<String>()
+                        way.forEach { pt ->
+                            val cx = Math.floor(pt.lat / 0.015).toInt()
+                            val cy = Math.floor(pt.lng / 0.015).toInt()
+                            val key = "$cx,$cy"
+                            if (cellsToQuery.contains(key)) {
+                                cellsForThisRoad.add(key)
                             }
-                            if (currentSubPath.size >= 2) {
-                                cellRoadsMap[cellKey]?.add(currentSubPath.toList())
+                        }
+                        cellsForThisRoad.forEach { key ->
+                            cellRoadsMap[key]?.add(way)
+                        }
+                    }
+                }
+
+                fetchedBuildings.forEach { way ->
+                    if (way.points.size >= 2) {
+                        val cellsForThisBuilding = mutableSetOf<String>()
+                        way.points.forEach { pt ->
+                            val cx = Math.floor(pt.lat / 0.015).toInt()
+                            val cy = Math.floor(pt.lng / 0.015).toInt()
+                            val key = "$cx,$cy"
+                            if (cellsToQuery.contains(key)) {
+                                cellsForThisBuilding.add(key)
                             }
+                        }
+                        cellsForThisBuilding.forEach { key ->
+                            cellBuildingsMap[key]?.add(way)
                         }
                     }
                 }
@@ -1146,39 +1388,63 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                     addCachedCellToState(key)
                 }
 
-                // Expose all valid cells from the 7x7 neighborhood to the UI flow
+                for ((key, buildingsList) in cellBuildingsMap) {
+                    val buildingsJson = Json.encodeToString(buildingsList)
+                    val cachedCell = CachedBuildingCell(
+                        cellKey = key,
+                        buildingsJson = buildingsJson,
+                        fetchedAt = now
+                    )
+                    repository.insertCachedBuildingCell(cachedCell)
+                }
+
+                // Expose all valid cells from the neighborhood to the UI flow
                 val maxCellsToLoad = mutableListOf<String>()
-                for (dx in -3..3) {
-                    for (dy in -3..3) {
+                for (dx in -radius..radius) {
+                    for (dy in -radius..radius) {
                         maxCellsToLoad.add("${cellX + dx},${cellY + dy}")
                     }
                 }
                 val allRoads = mutableListOf<List<Pair<Double, Double>>>()
+                val allBuildings = mutableListOf<BuildingStructure>()
                 maxCellsToLoad.forEach { key ->
-                    val cell = repository.getCachedRoadCell(key)
-                    if (cell != null && (now - cell.fetchedAt) < 24 * 60 * 60 * 1000L) {
+                    val roadCell = repository.getCachedRoadCell(key)
+                    val buildingCell = repository.getCachedBuildingCell(key)
+                    if (roadCell != null && (now - roadCell.fetchedAt) < 24 * 60 * 60 * 1000L) {
                         try {
-                            val roadsList = Json.decodeFromString<List<List<RoadPoint>>>(cell.roadsJson)
+                            val roadsList = Json.decodeFromString<List<List<RoadPoint>>>(roadCell.roadsJson)
                             roadsList.forEach { road ->
                                 allRoads.add(road.map { Pair(it.lat, it.lng) })
                             }
-                        } catch (e: Exception) {
-                            // Ignore decode exceptions
-                        }
+                        } catch (e: Exception) {}
+                    }
+                    if (buildingCell != null && (now - buildingCell.fetchedAt) < 24 * 60 * 60 * 1000L) {
+                        try {
+                            val buildingsList = Json.decodeFromString<List<BuildingStructure>>(buildingCell.buildingsJson)
+                            allBuildings.addAll(buildingsList)
+                        } catch (e: Exception) {}
                     }
                 }
-                _roads.value = allRoads
+                _roads.value = allRoads.distinct()
+                _buildings.value = allBuildings.distinct()
             }
         }
     }
 
-    private fun parseOverpassJson(jsonStr: String): List<List<RoadPoint>> {
+    private fun parseOverpassJson(jsonStr: String, type: String): List<List<RoadPoint>> {
         val result = mutableListOf<List<RoadPoint>>()
         try {
             val root = org.json.JSONObject(jsonStr)
             val elements = root.optJSONArray("elements") ?: return emptyList()
             for (i in 0 until elements.length()) {
                 val element = elements.getJSONObject(i)
+                val tags = element.optJSONObject("tags")
+                val isBuilding = tags?.has("building") == true
+                val isHighway = tags?.has("highway") == true
+                
+                val matches = if (type == "building") isBuilding else isHighway
+                if (!matches) continue
+                
                 val geometry = element.optJSONArray("geometry") ?: continue
                 val path = mutableListOf<RoadPoint>()
                 for (j in 0 until geometry.length()) {
@@ -1189,6 +1455,35 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 }
                 if (path.size >= 2) {
                     result.add(path)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return result
+    }
+
+    private fun parseArcgisJson(jsonStr: String): List<BuildingStructure> {
+        val result = mutableListOf<BuildingStructure>()
+        try {
+            val root = org.json.JSONObject(jsonStr)
+            val features = root.optJSONArray("features") ?: return emptyList()
+            for (i in 0 until features.length()) {
+                val feature = features.getJSONObject(i)
+                val geometry = feature.optJSONObject("geometry") ?: continue
+                val rings = geometry.optJSONArray("rings") ?: continue
+                if (rings.length() > 0) {
+                    val ring = rings.getJSONArray(0)
+                    val points = mutableListOf<RoadPoint>()
+                    for (j in 0 until ring.length()) {
+                        val pt = ring.getJSONArray(j)
+                        val lng = pt.getDouble(0)
+                        val lat = pt.getDouble(1)
+                        points.add(RoadPoint(lat, lng))
+                    }
+                    if (points.size >= 2) {
+                        result.add(BuildingStructure(points = points, isFallback = false))
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -1600,7 +1895,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             
             val hasCoherenceShield = hasCoherenceShield(creature)
             val finalDensity = if (hasCoherenceShield && effectiveDensity > 0.0) 0.0 else effectiveDensity
-            val V_descent = V_travel * (1.0 - finalDensity)
+            val V_descent = V_travel * (1.0 - 2.0 * finalDensity).coerceAtLeast(0.1) * 0.024
             
             val descentDuration = if (V_descent > 0.0) {
                 Math.round(descentDistance / V_descent).coerceAtLeast(1L)
@@ -1653,6 +1948,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 currentPhaseElapsed = 0L
             )
             repository.insertMission(mission)
+            setTrackedMissionId(mission.id)
             addLog("DSP: Dispatched \"${creature.name}\" to harvest spot [${anomaly.gene}]")
             synthManager.playBeep(520f, 0.3f, "triangle")
         }
@@ -1887,10 +2183,12 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             }
             _anomalyEngineActive.value = true
             _poxReactorActive.value = false
+            _anomalyConsumedBases.value = 0L // Reset cumulative run counter on start
             addLog("ANOMALY ENGINE ENGAGED! Cosmic gene hunting activated!")
             synthManager.playBeep(120f, 0.6f, "sawtooth")
         } else {
             _anomalyEngineActive.value = false
+            _anomalyConsumedBases.value = 0L // Clear cumulative run counter
             addLog("Anomaly Engine disengaged. Reactor power normalized. Standard Bio-Lab Reactor active.")
             synthManager.playBeep(350f, 0.15f, "sine")
         }
@@ -2479,11 +2777,12 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                         }
                         
                         if (nextAnomalyVal <= 0) {
-                            if (grandTotalStandardNucleotides.value >= 250000L) {
+                            if (grandTotalStandardNucleotides.value >= 10000L) {
                                 triggerAnomalousSynthesis()
                             } else {
                                 _anomalyEngineActive.value = false
-                                addLog("ANOMALY ENGINE SHUT DOWN: Nucleotide reserves fell below minimum 250k threshold.")
+                                _anomalyConsumedBases.value = 0L
+                                addLog("ANOMALY ENGINE SHUT DOWN: Out of standard nucleotides (under 10k minimum loop cost) to sustain fusion.")
                             }
                             nextAnomalyVal = resetVal
                         }
@@ -2664,16 +2963,20 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
     private suspend fun triggerAnomalousSynthesis() {
         val isDevMode = _devForceAnomaly.value
+        var rollChance = 0.0
         val isSuccess = if (isDevMode) {
             true
         } else {
-            val grandTotal = grandTotalStandardNucleotides.value
+            // Consume standard nucleotides first
+            consumeNucleotides(10000)
+            _anomalyConsumedBases.value += 10000L // Increment the consumed bases in this run
+
             val coupling = WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis())
-            val chanceMetrics = WaveMath.getAnomalyEngineSuccessChance(grandTotal, coupling)
+            // Calculate success chance based on cumulative bases consumed during this active run
+            val chanceMetrics = WaveMath.getAnomalyEngineSuccessChance(_anomalyConsumedBases.value, coupling)
+            rollChance = chanceMetrics.finalChance
             val roll = java.util.Random().nextDouble() * 100.0
 
-            // Consume standard nucleotides
-            consumeNucleotides(10000)
             roll <= chanceMetrics.finalChance
         }
 
@@ -2707,11 +3010,19 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             if (isDevMode) {
                 addLog("[DEV MODE FUSION] Force-triggered successfully (Zero resources consumed). Generated anomalous block $generated.")
             } else {
-                addLog("[ANOMALY ENGINE] Unstable Fusion Success! Formed anomalous block $generated.")
+                addLog("[ANOMALY ENGINE] Unstable Fusion Success! Formed anomalous block $generated after consuming ${_anomalyConsumedBases.value} bases.")
             }
             synthManager.playSynthesisSuccess()
+            _anomalyConsumedBases.value = 0L // Reset cumulative run counter on success
+
+            // Auto-shutoff if remaining bases are below 250k activation threshold (active run is finished)
+            if (grandTotalStandardNucleotides.value < 250000L) {
+                _anomalyEngineActive.value = false
+                addLog("[ANOMALY ENGINE] Engine disengaged: Success achieved. Nucleotide reserves are below 250k threshold for starting a new run.")
+            }
         } else {
-            addLog("[ANOMALY ENGINE] Fusion decay: 10,000 standard nucleotides decomposed in buffer.")
+            val formattedChance = String.format(Locale.US, "%.2f%%", rollChance)
+            addLog("[ANOMALY ENGINE] Fusion decay: 10,000 standard nucleotides decomposed in buffer (Success Chance: $formattedChance, Total Consumed: ${_anomalyConsumedBases.value} bases).")
             synthManager.playBeep(220f, 0.35f, "sawtooth")
         }
     }
@@ -2830,3 +3141,10 @@ data class DisintegratedModalData(
     val returnedBlocks: List<String>,
     val destroyedBlocks: List<String>
 )
+
+data class BuildingBBox(val minLat: Double, val maxLat: Double, val minLng: Double, val maxLng: Double) {
+    fun intersects(other: BuildingBBox): Boolean {
+        return minLat <= other.maxLat && maxLat >= other.minLat &&
+               minLng <= other.maxLng && maxLng >= other.minLng
+    }
+}

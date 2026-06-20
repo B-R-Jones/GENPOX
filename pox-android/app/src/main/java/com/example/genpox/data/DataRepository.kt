@@ -29,6 +29,13 @@ interface DataRepository {
     suspend fun getAllCachedRoadCells(): List<CachedRoadCell>
     suspend fun insertCachedRoadCell(cell: CachedRoadCell)
 
+    // Cached building cells
+    suspend fun getCachedBuildingCell(cellKey: String): CachedBuildingCell?
+    suspend fun getAllCachedBuildingCells(): List<CachedBuildingCell>
+    suspend fun insertCachedBuildingCell(cell: CachedBuildingCell)
+
+    suspend fun clearMapCache()
+
     // Settings access
     val geminiApiKey: Flow<String>
     val muteSound: Flow<Boolean>
@@ -93,6 +100,17 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
     override suspend fun getAllCachedRoadCells(): List<CachedRoadCell> = poxDao.getAllCachedRoadCells()
 
     override suspend fun insertCachedRoadCell(cell: CachedRoadCell) = poxDao.insertCachedRoadCell(cell)
+
+    override suspend fun getCachedBuildingCell(cellKey: String): CachedBuildingCell? = poxDao.getCachedBuildingCell(cellKey)
+
+    override suspend fun getAllCachedBuildingCells(): List<CachedBuildingCell> = poxDao.getAllCachedBuildingCells()
+
+    override suspend fun insertCachedBuildingCell(cell: CachedBuildingCell) = poxDao.insertCachedBuildingCell(cell)
+
+    override suspend fun clearMapCache() {
+        poxDao.clearCachedRoadCells()
+        poxDao.clearCachedBuildingCells()
+    }
 
     // Settings access overrides
     override val geminiApiKey: Flow<String>

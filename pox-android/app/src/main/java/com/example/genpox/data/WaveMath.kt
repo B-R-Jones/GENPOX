@@ -106,10 +106,18 @@ object WaveMath {
         val secondary = bases[secondaryIdx]
         val pair = primary + secondary
 
-        // Suppression on Week 3 (calendar day 15 to 21)
+        // Suppression on a deterministic random week of the calendar month (Week 1, 2, 3, or 4)
         val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = dateMs }
         val dayOfMonth = cal.get(Calendar.DAY_OF_MONTH)
-        val isSuppressed = if (dayOfMonth in 15..21) {
+        val year = cal.get(Calendar.YEAR)
+        val month = cal.get(Calendar.MONTH) // 0-indexed
+        
+        val monthStr = String.format(Locale.US, "%04d-%02d", year, month + 1)
+        val monthHash = getDeterministicHash(monthStr)
+        val suppressionWeek = (monthHash % 4).toInt() // Selects Week 0, 1, 2, or 3
+        val currentWeek = (dayOfMonth - 1) / 7 // Current day's week index (0 to 4)
+        
+        val isSuppressed = if (currentWeek == suppressionWeek && dayOfMonth <= 28) {
             (hash % 100) < 50
         } else {
             false

@@ -71,7 +71,7 @@ fun DualPaneConsoleFrame(
 
 ## 3. Typography Hierarchy in Content Block Slots
 
-When writing custom views passed into `primaryContent` or `secondaryContent`, enforce these fonts from [fonts_standardization.md](file:///c:/Users/brent/Antigravity/GENPOX/fonts_standardization.md):
+When writing custom views passed into `primaryContent` or `secondaryContent`, enforce these fonts from [master_design_standards.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/master_design_standards.md):
 
 1. **Standard Interface Labels & Instructions**:
    - Use default sans-serif font family (`FontFamily.Default`) and uppercase styling.

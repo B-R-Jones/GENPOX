@@ -84,5 +84,20 @@ data class CachedRoadCell(
     val fetchedAt: Long              // Timestamp in ms
 )
 
+@Entity(tableName = "cached_building_cells")
+@Serializable
+data class CachedBuildingCell(
+    @PrimaryKey val cellKey: String, // "cellX,cellY"
+    val buildingsJson: String,       // JSON representation of List<BuildingStructure>
+    val fetchedAt: Long              // Timestamp in ms
+)
+
+@Serializable
+data class BuildingStructure(
+    val points: List<RoadPoint>,
+    val isFallback: Boolean = false
+)
+
 @Serializable
 data class RoadPoint(val lat: Double, val lng: Double)
+

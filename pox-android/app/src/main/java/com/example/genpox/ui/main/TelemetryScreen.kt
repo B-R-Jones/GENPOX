@@ -107,15 +107,15 @@ fun TelemetryView(viewModel: MainViewModel) {
                     "Triggers temporal combat benefits when coupling exceeds 82%."
                 )
             ),
-            TelemetryMetric(
+             TelemetryMetric(
                 id = "logarithmic_success",
                 title = "LOGARITHMIC SUCCESS CHANCE",
                 category = "REACTOR & ANOMALY PHYSICS",
-                summary = "Calculates the dispatch success rate of the anomaly engine well.",
-                formula = "t = (ln(Total) - ln(10000)) / (ln(250000) - ln(10000))\nBaseChance = 1.0 + 99.0 * t\nPeakBoost = 6.5 * exp(- (dist / 1.8)^2)\nHarmonicMod = (Coupling - 80) * 0.25\nFinalChance = (BaseChance + PeakBoost + HarmonicMod)",
-                description = "Anomaly engine well activation probability scales logarithmically with the total volume of synthesized genes, featuring local resonance peaks near multiples of 14% and harmonic coupling modifiers.",
+                summary = "Calculates the fusion success rate of the anomaly engine based on cumulative consumed bases.",
+                formula = "t = (ln(Consumed) - ln(10000)) / (ln(250000) - ln(10000))\nBaseChance = 1.0 + 99.0 * t\nPeakBoost = 6.5 * exp(- (dist / 1.8)^2)\nHarmonicMod = (Coupling - 80) * 0.25\nFinalChance = (BaseChance + PeakBoost + HarmonicMod)",
+                description = "Anomaly engine fusion success probability scales logarithmically with the cumulative standard nucleotides consumed during the active run (minimum 250k stockpile required to activate), featuring local resonance peaks near multiples of 14% and harmonic coupling modifiers.",
                 effects = listOf(
-                    "Determines anomaly engine well dispatch success rate.",
+                    "Determines anomaly engine unstable fusion success rate.",
                     "Adds Gaussian bumps near resonance frequencies."
                 )
             ),
@@ -157,11 +157,11 @@ fun TelemetryView(viewModel: MainViewModel) {
                 .background(Color.Black)
         ) {
             if (selectedItem == null) {
-                // Title Header (Sans-Serif, Uppercase)
+                // Title Header (Sans-Serif, Uppercase, standardized)
                 Text(
-                    text = "[ TELEMETRY METRIC LIBRARY ]",
-                    color = CyberGreen,
-                    fontSize = 11.sp,
+                    text = "TELEMETRY METRIC LIBRARY",
+                    color = CyberGreenDim,
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Default,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -921,9 +921,9 @@ fun LogarithmicSuccessGraph() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = "TOTAL SYNTHESIZED GENES:", color = Color.White, fontSize = 8.sp, fontFamily = FontFamily.Default)
+            Text(text = "CUMULATIVE CONSUMED BASES:", color = Color.White, fontSize = 8.sp, fontFamily = FontFamily.Default)
             Text(
-                text = "${totalGenes.toInt()} GENES",
+                text = "${totalGenes.toInt()} BASES",
                 color = CyberGreen,
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
