@@ -354,8 +354,21 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     private val _zoomMultiplier = MutableStateFlow(1.0f)
     val zoomMultiplier: StateFlow<Float> = _zoomMultiplier.asStateFlow()
 
+    private val _isProfilerEnabled = MutableStateFlow(false)
+    val isProfilerEnabled: StateFlow<Boolean> = _isProfilerEnabled.asStateFlow()
+
+    val profilerState = com.example.genpox.ui.components.MapProfilerState()
+
+    fun toggleProfiler() {
+        _isProfilerEnabled.value = !_isProfilerEnabled.value
+        if (_isProfilerEnabled.value) {
+            synthManager.playBeep(520f, 0.1f, "square")
+        } else {
+            synthManager.playBeep(330f, 0.1f, "sine")
+        }
+    }
+
     private var lastCheckedCellKey: String? = null
-    private var lastFetchedCellRadius: Int = 1
     private var fetchRoadsJob: kotlinx.coroutines.Job? = null
 
 
@@ -937,11 +950,8 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
     private fun fetchRoadsIfNeeded(lat: Double, lng: Double) {
         val cellKey = getCellKey(lat, lng)
-        val zoom = _zoomMultiplier.value
-        val requiredRadius = kotlin.math.ceil((0.009 * zoom) / 0.015).toInt().coerceIn(1, 3)
-        if (cellKey != lastCheckedCellKey || requiredRadius != lastFetchedCellRadius) {
+        if (cellKey != lastCheckedCellKey) {
             lastCheckedCellKey = cellKey
-            lastFetchedCellRadius = requiredRadius
             fetchRoads(lat, lng)
         }
     }
@@ -1856,19 +1866,6 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             // Scaled mutation interval on mobile by dividing by 16
             val mutationInterval = Math.round((480.0 * Math.pow(2.0, -stalledDepth / 25.0)) / lunarMutationMod / 16.0).coerceAtLeast(1L)
 
-            // Speed-based calculations (scaled up by a speedFactor of 1350.0 so speed=1 takes ~16 min at max distance)
-            val travelTimeComponent = 32.0
-            val travelDistanceComponent = 16.0
-            val speedFactor = 1350.0
-            val V_travel = (((creature.speed.toDouble() / 50.0) * travelDistanceComponent) / travelTimeComponent) * speedFactor
-            
-            val travelDistance = maxOf(0.0, anomaly.distance - boundaryRadius)
-            val travelDuration = if (V_travel > 0.0) {
-                Math.round(travelDistance / V_travel).coerceAtLeast(1L)
-            } else {
-                32L
-            }
-
             // Calculate precise touchdown coordinate along the vector from player to epicenter
             val t = if (anomaly.distance > 0.0) (dispatchDistance / anomaly.distance).coerceIn(0.0, 1.0) else 0.0
             val landingLat = anomaly.lat + t * (_latitude.value - anomaly.lat)
@@ -1895,7 +1892,23 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             
             val hasCoherenceShield = hasCoherenceShield(creature)
             val finalDensity = if (hasCoherenceShield && effectiveDensity > 0.0) 0.0 else effectiveDensity
-            val V_descent = V_travel * (1.0 - 2.0 * finalDensity).coerceAtLeast(0.1) * 0.024
+
+            // Speed-based calculations (scaled up by a speedFactor of 1350.0 so speed=1 takes ~16 min at max distance)
+            val travelTimeComponent = 32.0
+            val travelDistanceComponent = 16.0
+            val speedFactor = 1350.0
+            val V_travel_base = (((creature.speed.toDouble() / 50.0) * travelDistanceComponent) / travelTimeComponent) * speedFactor
+            
+            val V_travel = V_travel_base * (1.0 - finalDensity).coerceAtLeast(0.1)
+            
+            val travelDistance = maxOf(0.0, anomaly.distance - boundaryRadius)
+            val travelDuration = if (V_travel > 0.0) {
+                Math.round(travelDistance / V_travel).coerceAtLeast(1L)
+            } else {
+                32L
+            }
+
+            val V_descent = V_travel_base * (1.0 - 2.0 * finalDensity).coerceAtLeast(0.1) * 0.024
             
             val descentDuration = if (V_descent > 0.0) {
                 Math.round(descentDistance / V_descent).coerceAtLeast(1L)

@@ -323,13 +323,21 @@ fun MainScreen(
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                     )
                 }
+                var tapCount by remember { mutableStateOf(0) }
                 Text(
                     text = "• GEN ACTIVE",
                     color = CyberGreenDim,
                     style = Typography.labelSmall,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    modifier = Modifier.clickable {
+                        tapCount++
+                        if (tapCount >= 5) {
+                            tapCount = 0
+                            viewModel.toggleProfiler()
+                        }
+                    }
                 )
             }
 

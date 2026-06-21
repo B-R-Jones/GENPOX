@@ -30,8 +30,10 @@ import androidx.compose.ui.draw.drawBehind
 
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -7890,18 +7892,44 @@ fun ScannerView(viewModel: MainViewModel) {
     }
 }
 
-private data class ProjectedAnomaly(
+private data class ProjectedAnomalyCached(
+    val id: String,
     val ax: Float,
     val ay: Float,
     val rMax: Float,
     val factionColor: Color,
-    val contourAlpha: Float,
-    val path: androidx.compose.ui.graphics.Path,
-    val r0Pixels: Double,
-    val epsilon: Double,
+    val r0Pixels: Float,
+    val epsilon: Float,
     val k: Int,
-    val phi: Double
+    val phi: Double,
+    val vertices: Array<Offset>
 )
+
+private data class ProjectedBuildingCached(
+    val projectedPoints: Array<Offset>,
+    val minX: Float,
+    val maxX: Float,
+    val minY: Float,
+    val maxY: Float,
+    val isFallback: Boolean,
+    val heightLevel: Int
+)
+
+private class ProjectedAnomaly {
+    var ax: Float = 0f
+    var ay: Float = 0f
+    var rMax: Float = 0f
+    var factionColor: Color = Color.Cyan
+    var contourAlpha: Float = 0f
+    val path: androidx.compose.ui.graphics.Path = androidx.compose.ui.graphics.Path()
+    var r0Pixels: Double = 0.0
+    var epsilon: Double = 0.0
+    var k: Int = 0
+    var phi: Double = 0.0
+    val verticesX = FloatArray(37)
+    val verticesY = FloatArray(37)
+    var numVertices: Int = 0
+}
 
 class DirectionTracker {
     var lastValue: Float = 0f
@@ -7993,6 +8021,383 @@ private fun drawClippedLine(
     }
 }
 
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGroupContoursClipped(
+    group: List<ProjectedAnomaly>,
+    groupColor: androidx.compose.ui.graphics.Color,
+    groupAlpha: Float,
+    alphaFactor: Float,
+    groupStartPathIndex: Int,
+    contourPathPool: List<androidx.compose.ui.graphics.Path>,
+    index: Int,
+    clipIdx: Int
+) {
+    if (clipIdx >= group.size) {
+        val pathIdx = groupStartPathIndex + index
+        val path = if (pathIdx < contourPathPool.size) contourPathPool[pathIdx] else null
+        if (path != null) {
+            drawPath(
+                path = path,
+                color = groupColor.copy(alpha = groupAlpha * alphaFactor * 0.8f),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2f)
+            )
+        }
+        return
+    }
+    if (clipIdx == index) {
+        drawGroupContoursClipped(
+            group, groupColor, groupAlpha, alphaFactor,
+            groupStartPathIndex, contourPathPool, index, clipIdx + 1
+        )
+    } else {
+        val clipPath = group[clipIdx].path
+        clipPath(clipPath, clipOp = androidx.compose.ui.graphics.ClipOp.Difference) {
+            drawGroupContoursClipped(
+                group, groupColor, groupAlpha, alphaFactor,
+                groupStartPathIndex, contourPathPool, index, clipIdx + 1
+            )
+        }
+    }
+}
+
+@Immutable
+class StableRoads(val list: List<List<Pair<Double, Double>>>)
+
+@Immutable
+class StableBuildings(val list: List<BuildingStructure>)
+
+private class PrecomputedMissionState(
+    val mission: HarvestMission,
+    val hasShield: Boolean,
+    val combinedDensity: Double,
+    val boundLat: Double,
+    val boundLng: Double,
+    val startLat: Double,
+    val startLng: Double
+)
+
+@Composable
+private fun StaticMapLayer(
+    roads: StableRoads,
+    sortedBuildings: StableBuildings,
+    localMapCenterLat: Double,
+    localMapCenterLng: Double,
+    mathZoom: Float,
+    tiltZoomFactor: Float,
+    tiltProgress: Float,
+    tiltYScale: Float,
+    playerXUn: Float,
+    playerYUn: Float,
+    scale: Double,
+    cosLat: Double,
+    cxPx: Float,
+    cyPx: Float,
+    cosRot: Float,
+    sinRot: Float,
+    isProfilerEnabled: Boolean,
+    profilerState: MapProfilerState,
+    timeProvider: () -> Long
+) {
+    val staticBuildingPath = remember { Path() }
+    val projectedXBuffer = remember { FloatArray(256) }
+    val projectedYBuffer = remember { FloatArray(256) }
+
+    fun projectX(lat: Double, lng: Double): Float {
+        val dLng = (lng - localMapCenterLng) * cosLat
+        val xUn = cxPx + (dLng * scale).toFloat()
+        val dLat = lat - localMapCenterLat
+        val yUn = cyPx - (dLat * scale).toFloat()
+        val dx = xUn - playerXUn
+        val dy = yUn - playerYUn
+        return playerXUn + dx * cosRot - dy * sinRot
+    }
+
+    fun projectY(lat: Double, lng: Double): Float {
+        val dLng = (lng - localMapCenterLng) * cosLat
+        val xUn = cxPx + (dLng * scale).toFloat()
+        val dLat = lat - localMapCenterLat
+        val yUn = cyPx - (dLat * scale).toFloat()
+        val dx = xUn - playerXUn
+        val dy = yUn - playerYUn
+        val rotY = playerYUn + dx * sinRot + dy * cosRot
+        return cyPx - (cyPx - rotY) * tiltYScale
+    }
+
+    SideEffect { if (isProfilerEnabled) profilerState.staticRecomps++ }
+    ProfilingCanvas(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                val time = timeProvider()
+                val glitchActive = (time % 1600 < 160)
+                translationX = if (glitchActive) {
+                    (kotlin.math.sin(time * 0.05f) * 4f).toFloat()
+                } else {
+                    0f
+                }
+            },
+        isProfilerEnabled = isProfilerEnabled,
+        profilerState = profilerState
+    ) {
+        val maxUnTiltedDist = kotlin.math.sqrt((cxPx * cxPx + (cyPx / tiltYScale.coerceAtLeast(0.01f)) * (cyPx / tiltYScale.coerceAtLeast(0.01f))).toDouble())
+        val maxGeoDist = 1.5 * maxUnTiltedDist / scale
+        val latMin = localMapCenterLat - maxGeoDist
+        val latMax = localMapCenterLat + maxGeoDist
+        val lngMin = localMapCenterLng - (maxGeoDist / cosLat)
+        val lngMax = localMapCenterLng + (maxGeoDist / cosLat)
+
+        // Draw Vector Roads
+        val roadList = roads.list
+        val roadsSize = roadList.size
+        for (i in 0 until roadsSize) {
+            val road = roadList[i]
+            val roadSize = road.size
+            for (j in 0 until roadSize - 1) {
+                val pt1 = road[j]
+                val pt2 = road[j + 1]
+
+                // Geographic bounding box culling for the segment
+                val segMinLat = if (pt1.first < pt2.first) pt1.first else pt2.first
+                val segMaxLat = if (pt1.first > pt2.first) pt1.first else pt2.first
+                val segMinLng = if (pt1.second < pt2.second) pt1.second else pt2.second
+                val segMaxLng = if (pt1.second > pt2.second) pt1.second else pt2.second
+
+                if (segMaxLat < latMin || segMinLat > latMax || segMinLng < lngMin || segMinLng > lngMax) {
+                    continue
+                }
+
+                val p1x = projectX(pt1.first, pt1.second)
+                val p1y = projectY(pt1.first, pt1.second)
+                val p2x = projectX(pt2.first, pt2.second)
+                val p2y = projectY(pt2.first, pt2.second)
+
+                drawClippedLine(
+                    canvasDrawScope = this,
+                    x1 = p1x, y1 = p1y, x2 = p2x, y2 = p2y,
+                    minX = -100f, minY = -100f,
+                    maxX = size.width + 100f, maxY = size.height + 100f,
+                    color = Color(0xFFFFB300).copy(alpha = 0.34f),
+                    strokeWidth = 2.0f
+                )
+            }
+        }
+
+        // Draw Vector Buildings
+        val zoomFade = (1.0f - ((mathZoom - 1.5f) / 2.0f)).coerceIn(0.0f, 1.0f)
+        val buildingList = sortedBuildings.list
+        val buildingsSize = buildingList.size
+
+        for (bIdx in 0 until buildingsSize) {
+            val building = buildingList[bIdx]
+            val points = building.points
+            val numPts = points.size.coerceAtMost(256)
+            if (numPts < 2) continue
+
+            // Geographic bounding box culling for the building
+            var bMinLat = Double.MAX_VALUE
+            var bMaxLat = -Double.MAX_VALUE
+            var bMinLng = Double.MAX_VALUE
+            var bMaxLng = -Double.MAX_VALUE
+            for (i in 0 until numPts) {
+                val pt = points[i]
+                if (pt.lat < bMinLat) bMinLat = pt.lat
+                if (pt.lat > bMaxLat) bMaxLat = pt.lat
+                if (pt.lng < bMinLng) bMinLng = pt.lng
+                if (pt.lng > bMaxLng) bMaxLng = pt.lng
+            }
+
+            if (bMaxLat < latMin || bMinLat > latMax || bMaxLng < lngMin || bMinLng > lngMax) {
+                continue
+            }
+
+            var minX = Float.MAX_VALUE
+            var maxX = -Float.MAX_VALUE
+            var minY = Float.MAX_VALUE
+            var maxY = -Float.MAX_VALUE
+
+            for (i in 0 until numPts) {
+                val pt = points[i]
+                val px = projectX(pt.lat, pt.lng)
+                val py = projectY(pt.lat, pt.lng)
+                projectedXBuffer[i] = px
+                projectedYBuffer[i] = py
+
+                if (px < minX) minX = px
+                if (px > maxX) maxX = px
+                if (py < minY) minY = py
+                if (py > maxY) maxY = py
+            }
+
+            val widthPx = maxX - minX
+            val heightPx = maxY - minY
+            val maxDim = maxOf(widthPx, heightPx)
+
+            // LOD Culling & Fade-out
+            val lodFade = if (mathZoom >= 1.0f) {
+                if (maxDim < 4.5f) continue
+                ((maxDim - 4.5f) / 4.5f).coerceIn(0.0f, 1.0f)
+            } else {
+                if (maxDim < 2.0f) continue
+                ((maxDim - 2.0f) / 3.0f).coerceIn(0.0f, 1.0f)
+            }
+
+            val baseHash = points[0].lat.hashCode() + points[0].lng.hashCode()
+            val heightLevel = 1 + (kotlin.math.abs(baseHash) % 4)
+            
+            val extX = 0f
+            val extY = (-2.0f * heightLevel).dp.toPx() * (1.0f / mathZoom.coerceAtLeast(0.1f))
+            
+            val maxExt = 30.dp.toPx()
+            val finalExtX = extX.coerceIn(-maxExt, maxExt) * tiltProgress
+            val finalExtY = extY.coerceIn(-maxExt, maxExt) * tiltProgress
+
+            val minXWithExt = minOf(minX, minX + finalExtX)
+            val maxXWithExt = maxOf(maxX, maxX + finalExtX)
+            val minYWithExt = minOf(minY, minY + finalExtY)
+            val maxYWithExt = maxOf(maxY, maxY + finalExtY)
+
+            val margin = 50f
+            if (maxXWithExt < -margin || minXWithExt > size.width + margin ||
+                maxYWithExt < -margin || minYWithExt > size.height + margin) {
+                continue
+            }
+
+            val buildingColor = if (building.isFallback) Color(0xFFFF00FF) else CyberGreen
+            val finalAlphaMultiplier = zoomFade * lodFade
+
+            if (finalExtX == 0f && finalExtY == 0f || maxDim < 12.dp.toPx()) {
+                // Simplified 2D flat building rendering (highly optimized for flat zoom levels / small dimensions)
+                staticBuildingPath.reset()
+                staticBuildingPath.moveTo(projectedXBuffer[0], projectedYBuffer[0])
+                for (i in 1 until numPts) {
+                    staticBuildingPath.lineTo(projectedXBuffer[i], projectedYBuffer[i])
+                }
+                staticBuildingPath.close()
+                drawPath(path = staticBuildingPath, color = Color.Black, style = Fill)
+                drawPath(
+                    path = staticBuildingPath,
+                    color = buildingColor.copy(alpha = 0.12f * finalAlphaMultiplier),
+                    style = Fill
+                )
+                drawPath(
+                    path = staticBuildingPath,
+                    color = buildingColor.copy(alpha = 0.5f * finalAlphaMultiplier),
+                    style = Stroke(width = 1f)
+                )
+            } else {
+                // Full 3D holographic building rendering
+                // 1. Draw solid black mask
+                staticBuildingPath.reset()
+                staticBuildingPath.moveTo(projectedXBuffer[0], projectedYBuffer[0])
+                for (i in 1 until numPts) {
+                    staticBuildingPath.lineTo(projectedXBuffer[i], projectedYBuffer[i])
+                }
+                staticBuildingPath.close()
+                drawPath(path = staticBuildingPath, color = Color.Black, style = Fill)
+
+                for (i in 0 until numPts - 1) {
+                    val ax = projectedXBuffer[i]
+                    val ay = projectedYBuffer[i]
+                    val bx = projectedXBuffer[i + 1]
+                    val by = projectedYBuffer[i + 1]
+                    val axTop = ax + finalExtX
+                    val ayTop = ay + finalExtY
+                    val bxTop = bx + finalExtX
+                    val byTop = by + finalExtY
+                    staticBuildingPath.reset()
+                    staticBuildingPath.moveTo(ax, ay)
+                    staticBuildingPath.lineTo(bx, by)
+                    staticBuildingPath.lineTo(bxTop, byTop)
+                    staticBuildingPath.lineTo(axTop, ayTop)
+                    staticBuildingPath.close()
+                    drawPath(path = staticBuildingPath, color = Color.Black, style = Fill)
+                }
+
+                staticBuildingPath.reset()
+                val mRx0 = projectedXBuffer[0] + finalExtX
+                val mRy0 = projectedYBuffer[0] + finalExtY
+                staticBuildingPath.moveTo(mRx0, mRy0)
+                for (i in 1 until numPts) {
+                    staticBuildingPath.lineTo(projectedXBuffer[i] + finalExtX, projectedYBuffer[i] + finalExtY)
+                }
+                staticBuildingPath.close()
+                drawPath(path = staticBuildingPath, color = Color.Black, style = Fill)
+
+                // 2. Draw standard translucent holographic fills & outlines
+                // A. Draw base fill & outline
+                staticBuildingPath.reset()
+                staticBuildingPath.moveTo(projectedXBuffer[0], projectedYBuffer[0])
+                for (i in 1 until numPts) {
+                    staticBuildingPath.lineTo(projectedXBuffer[i], projectedYBuffer[i])
+                }
+                staticBuildingPath.close()
+
+                drawPath(
+                    path = staticBuildingPath,
+                    color = buildingColor.copy(alpha = 0.04f * finalAlphaMultiplier),
+                    style = Fill
+                )
+                drawPath(
+                    path = staticBuildingPath,
+                    color = buildingColor.copy(alpha = 0.15f * finalAlphaMultiplier),
+                    style = Stroke(width = 0.75f)
+                )
+
+                // B. Draw side walls
+                for (i in 0 until numPts - 1) {
+                    val ax = projectedXBuffer[i]
+                    val ay = projectedYBuffer[i]
+                    val bx = projectedXBuffer[i + 1]
+                    val by = projectedYBuffer[i + 1]
+                    
+                    val axTop = ax + finalExtX
+                    val ayTop = ay + finalExtY
+                    val bxTop = bx + finalExtX
+                    val byTop = by + finalExtY
+
+                    staticBuildingPath.reset()
+                    staticBuildingPath.moveTo(ax, ay)
+                    staticBuildingPath.lineTo(bx, by)
+                    staticBuildingPath.lineTo(bxTop, byTop)
+                    staticBuildingPath.lineTo(axTop, ayTop)
+                    staticBuildingPath.close()
+
+                    drawPath(
+                        path = staticBuildingPath,
+                        color = buildingColor.copy(alpha = 0.03f * finalAlphaMultiplier),
+                        style = Fill
+                    )
+                    drawPath(
+                        path = staticBuildingPath,
+                        color = buildingColor.copy(alpha = 0.20f * finalAlphaMultiplier),
+                        style = Stroke(width = 0.75f)
+                    )
+                }
+
+                // C. Draw top roof fill & outline
+                staticBuildingPath.reset()
+                val rx0 = projectedXBuffer[0] + finalExtX
+                val ry0 = projectedYBuffer[0] + finalExtY
+                staticBuildingPath.moveTo(rx0, ry0)
+                for (i in 1 until numPts) {
+                    staticBuildingPath.lineTo(projectedXBuffer[i] + finalExtX, projectedYBuffer[i] + finalExtY)
+                }
+                staticBuildingPath.close()
+
+                drawPath(
+                    path = staticBuildingPath,
+                    color = buildingColor.copy(alpha = 0.10f * finalAlphaMultiplier),
+                    style = Fill
+                )
+                drawPath(
+                    path = staticBuildingPath,
+                    color = buildingColor.copy(alpha = 0.45f * finalAlphaMultiplier),
+                    style = Stroke(width = 1f)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun HolographicRadarScanner(
     viewModel: MainViewModel,
@@ -8008,6 +8413,11 @@ fun HolographicRadarScanner(
     zoomExpanded: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val isProfilerEnabled by viewModel.isProfilerEnabled.collectAsState()
+    val profilerState = viewModel.profilerState
+    FrameTimeMonitor(state = profilerState, enabled = isProfilerEnabled)
+    SideEffect { if (isProfilerEnabled) profilerState.hudRecomps++ }
+
     val mathZoom = zoomMultiplier * 0.625f
     val tiltProgress = ((0.35f - zoomMultiplier) / (0.35f - 0.26f)).coerceIn(0.0f, 1.0f)
     val tiltYScale = 1.0f - 0.90f * tiltProgress
@@ -8050,10 +8460,144 @@ fun HolographicRadarScanner(
         label = "contour_flow"
     )
 
+    val activeMissionsList = remember(activeMissions) { activeMissions.filter { !it.isReturned } }
+    val creaturesState by viewModel.creatures.collectAsState()
+
+    // Precompute active mission parameters at recomposition boundaries using remember
+    val precomputedMissions = remember(activeMissionsList, anomalies, creaturesState) {
+        val list = ArrayList<PrecomputedMissionState>(activeMissionsList.size)
+        val activeSize = activeMissionsList.size
+        val anomaliesSize = anomalies.size
+        for (i in 0 until activeSize) {
+            val m = activeMissionsList[i]
+            
+            // Find matched anomaly using flat loop
+            var matchedAnomaly: PoxAnomaly? = null
+            for (j in 0 until anomaliesSize) {
+                val anom = anomalies[j]
+                if (Math.abs(anom.lat - m.lat) < 0.0001 && Math.abs(anom.lng - m.lng) < 0.0001) {
+                    matchedAnomaly = anom
+                    break
+                }
+            }
+            
+            // Geographic boundary and start coordinates calculation
+            val dLatAnom = userLat - m.lat
+            val cosLatAnom = kotlin.math.cos(Math.toRadians(userLat))
+            val distGeo = kotlin.math.sqrt(dLatAnom * dLatAnom + (userLng - m.lng) * cosLatAnom * (userLng - m.lng) * cosLatAnom)
+            val rMaxGeo = m.dispatchDistance / 111000.0
+            val tGeo = if (distGeo > 0.0) (rMaxGeo / distGeo).coerceIn(0.0, 1.0) else 0.0
+            val boundLat = m.lat + tGeo * (userLat - m.lat)
+            val boundLng = m.lng + tGeo * (userLng - m.lng)
+
+            val startLat = boundLat + 0.3 * (m.lat - boundLat)
+            val startLng = boundLng + 0.3 * (m.lng - boundLng)
+
+            // Combined density calculations
+            val combinedDensity = if (matchedAnomaly != null) {
+                var densitySum = 0.0
+                for (j in 0 until anomaliesSize) {
+                    val anom = anomalies[j]
+                    val distFromAnom = calculateDistanceInFeet(boundLat, boundLng, anom.lat, anom.lng)
+                    val boundRad = anom.getBoundaryRadiusForPlayer(boundLat, boundLng)
+                    if (distFromAnom <= boundRad) {
+                        val seed = anom.id.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
+                        val phi = (seed % 360) * (Math.PI / 180.0)
+                        val omega = 0.02
+                        val alpha = 0.002
+                        val waveTerm = kotlin.math.cos(omega * distFromAnom + phi) * kotlin.math.exp(-alpha * distFromAnom)
+                        densitySum += anom.density * waveTerm
+                    }
+                }
+                densitySum
+            } else {
+                0.0
+            }
+
+            // Creature coherence shield verification
+            var creature: Creature? = null
+            for (cIdx in 0 until creaturesState.size) {
+                val c = creaturesState[cIdx]
+                if (c.id == m.creatureId) {
+                    creature = c
+                    break
+                }
+            }
+            val hasShield = hasCoherenceShield(creature, m.originalSequence)
+
+            list.add(
+                PrecomputedMissionState(
+                    mission = m,
+                    hasShield = hasShield,
+                    combinedDensity = combinedDensity,
+                    boundLat = boundLat,
+                    boundLng = boundLng,
+                    startLat = startLat,
+                    startLng = startLng
+                )
+            )
+        }
+        list
+    }
+    
+    // Reusable Float/Double array buffers for 3D coordinate projection
+    val maxVertices = 256
+    val projectedXBuffer = remember { FloatArray(maxVertices) }
+    val projectedYBuffer = remember { FloatArray(maxVertices) }
+    val depthZBuffer = remember { DoubleArray(maxVertices) }
+
+    val projectedInnerXBuffer = remember { FloatArray(maxVertices) }
+    val projectedInnerYBuffer = remember { FloatArray(maxVertices) }
+    val depthInnerZBuffer = remember { DoubleArray(maxVertices) }
+
+    // Pre-allocated Paint objects to avoid JNI and heap allocations inside DrawScope
+    val textSizePx = with(density) { 7.dp.toPx() }
+    val textPaints = remember(density) {
+        val colors = mapOf(
+            "Infection" to Color.Red.toArgb(),
+            "Mech" to Color.Yellow.toArgb(),
+            "Parasite" to Color(0xFFA855F7).toArgb(),
+            "Default" to Color.Cyan.toArgb()
+        )
+        colors.mapValues { (_, argb) ->
+            android.graphics.Paint().apply {
+                color = argb
+                textSize = textSizePx
+                typeface = android.graphics.Typeface.MONOSPACE
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+        }
+    }
+
+    val shadowTextPaint = remember(density) {
+        android.graphics.Paint().apply {
+            color = Color.Black.copy(alpha = 0.8f).toArgb()
+            textSize = textSizePx
+            typeface = android.graphics.Typeface.MONOSPACE
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+    }
+
+    val timeState = remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(activeMissionsList.isNotEmpty()) {
+        if (activeMissionsList.isNotEmpty()) {
+            while (true) {
+                withFrameMillis {
+                    timeState.value = System.currentTimeMillis()
+                }
+            }
+        }
+    }
+
+    // Stable time provider lambda to avoid recomposing the parent body on every frame tick
+    val timeProvider = remember { { timeState.value } }
+
     var localMapCenterLat = userLat
     var localMapCenterLng = userLng
 
     if (trackedMission != null) {
+        // Read timeState.value directly to force parent recomposition ONLY during active target tracking
+        val currentTimeMs = timeState.value
         val tm = trackedMission
         val dLatAnom = userLat - tm.lat
         val dLngAnom = (userLng - tm.lng) * Math.cos(Math.toRadians(userLat))
@@ -8069,16 +8613,48 @@ fun HolographicRadarScanner(
         val dAscent = tm.ascentDuration.toFloat()
         val dReturn = tm.transitBackDuration.toFloat()
 
-        val elapsedSec = (System.currentTimeMillis() - tm.startTime) / 1000f
+        val tmMatchedAnomaly = anomalies.find { Math.abs(it.lat - tm.lat) < 0.0001 && Math.abs(it.lng - tm.lng) < 0.0001 }
+        val tmCombinedDensity = if (tmMatchedAnomaly != null) {
+            var densitySum = 0.0
+            anomalies.forEach { anom ->
+                val distFromAnom = calculateDistanceInFeet(boundLat, boundLng, anom.lat, anom.lng)
+                val boundRad = anom.getBoundaryRadiusForPlayer(boundLat, boundLng)
+                if (distFromAnom <= boundRad) {
+                    val seed = anom.id.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
+                    val phi = (seed % 360) * (Math.PI / 180.0)
+                    val omega = 0.02
+                    val alpha = 0.002
+                    val waveTerm = kotlin.math.cos(omega * distFromAnom + phi) * kotlin.math.exp(-alpha * distFromAnom)
+                    densitySum += anom.density * waveTerm
+                }
+            }
+            densitySum
+        } else {
+            0.0
+        }
+
+        val tmWave = WaveMath.getDailyWaveConfig(currentTimeMs)
+        val tmPhaseFraction = tmWave.lunarAge / WaveMath.LUNAR_MONTH_DAYS
+        val tmLunarPhaseScale = (1.0 - kotlin.math.cos(tmPhaseFraction * 2.0 * Math.PI)) / 2.0
+        val tmDensityShift = 0.2 * (tmLunarPhaseScale - 0.5)
+        val tmEffectiveDensity = (tmCombinedDensity + tmDensityShift).coerceIn(-0.33, 0.33)
+
+        val tmCreature = viewModel.creatures.value.find { it.id == tm.creatureId }
+        val tmHasShield = hasCoherenceShield(tmCreature, tm.originalSequence)
+        val tmFinalDensity = if (tmHasShield && tmEffectiveDensity > 0.0) 0.0 else tmEffectiveDensity
+
+        val elapsedSec = (currentTimeMs - tm.startTime) / 1000f
 
         if (elapsedSec < dTravel) {
-            val p = (elapsedSec / dTravel.coerceAtLeast(1f)).toDouble()
-            localMapCenterLat = userLat + p * (boundLat - userLat)
-            localMapCenterLng = userLng + p * (boundLng - userLng)
+            val p = (elapsedSec / dTravel.coerceAtLeast(1f))
+            val pWarped = warpProgress(p, tmFinalDensity.toFloat()).toDouble()
+            localMapCenterLat = userLat + pWarped * (boundLat - userLat)
+            localMapCenterLng = userLng + pWarped * (boundLng - userLng)
         } else if (elapsedSec < dTravel + dDescent) {
-            val p = ((elapsedSec - dTravel) / dDescent.coerceAtLeast(1f)).toDouble()
-            localMapCenterLat = boundLat + p * 0.3 * (tm.lat - boundLat)
-            localMapCenterLng = boundLng + p * 0.3 * (tm.lng - boundLng)
+            val p = ((elapsedSec - dTravel) / dDescent.coerceAtLeast(1f))
+            val pWarped = warpProgress(p, tmFinalDensity.toFloat()).toDouble()
+            localMapCenterLat = boundLat + pWarped * 0.3 * (tm.lat - boundLat)
+            localMapCenterLng = boundLng + pWarped * 0.3 * (tm.lng - boundLng)
         } else if (elapsedSec < dTravel + dDescent + dHarvest) {
             localMapCenterLat = boundLat + 0.3 * (tm.lat - boundLat)
             localMapCenterLng = boundLng + 0.3 * (tm.lng - boundLng)
@@ -8089,9 +8665,10 @@ fun HolographicRadarScanner(
             localMapCenterLat = startLat + p * (boundLat - startLat)
             localMapCenterLng = startLng + p * (boundLng - startLng)
         } else if (elapsedSec < dTravel + dDescent + dHarvest + dAscent + dReturn) {
-            val p = ((elapsedSec - dTravel - dDescent - dHarvest - dAscent) / dReturn.coerceAtLeast(1f)).toDouble()
-            localMapCenterLat = boundLat + p * (userLat - boundLat)
-            localMapCenterLng = boundLng + p * (userLng - boundLng)
+            val p = ((elapsedSec - dTravel - dDescent - dHarvest - dAscent) / dReturn.coerceAtLeast(1f))
+            val pWarped = warpProgress(p, -tmFinalDensity.toFloat()).toDouble()
+            localMapCenterLat = boundLat + pWarped * (userLat - boundLat)
+            localMapCenterLng = boundLng + pWarped * (userLng - boundLng)
         }
     }
 
@@ -8120,6 +8697,7 @@ fun HolographicRadarScanner(
 
         val maxRangeLat = 0.009 * mathZoom
         val scale = (maxRPx.toDouble() / maxRangeLat) * tiltZoomFactor
+        val densityVal = density.density
         val cosLat = Math.cos(Math.toRadians(localMapCenterLat))
 
         val dLatPlayer = userLat - localMapCenterLat
@@ -8147,14 +8725,32 @@ fun HolographicRadarScanner(
             return Offset(rotX, finalY)
         }
 
-        // Dynamic Analog CRT static aberrations & horizontal tears
-        val timeMs = System.currentTimeMillis()
-        val isGlitching = (timeMs % 1600 < 160) // Glitch for 160ms every 1.6s
-        val glitchCenterY = ((timeMs / 10) % heightPx.toInt()).toFloat()
-        val glitchHeight = 90f
+        fun projectX(lat: Double, lng: Double): Float {
+            val dLng = (lng - localMapCenterLng) * cosLat
+            val xUn = cxPx + (dLng * scale).toFloat()
+            val dLat = lat - localMapCenterLat
+            val yUn = cyPx - (dLat * scale).toFloat()
+            val dx = xUn - playerXUn
+            val dy = yUn - playerYUn
+            return playerXUn + dx * cosRot - dy * sinRot
+        }
 
-        fun getGlitchOffsetX(y: Float): Float {
+        fun projectY(lat: Double, lng: Double): Float {
+            val dLng = (lng - localMapCenterLng) * cosLat
+            val xUn = cxPx + (dLng * scale).toFloat()
+            val dLat = lat - localMapCenterLat
+            val yUn = cyPx - (dLat * scale).toFloat()
+            val dx = xUn - playerXUn
+            val dy = yUn - playerYUn
+            val rotY = playerYUn + dx * sinRot + dy * cosRot
+            return cyPx - (cyPx - rotY) * tiltYScale
+        }
+
+        fun getGlitchOffsetX(y: Float, timeMs: Long): Float {
+            val isGlitching = (timeMs % 1600 < 160)
             if (!isGlitching) return 0f
+            val glitchCenterY = ((timeMs / 10) % heightPx.toInt()).toFloat()
+            val glitchHeight = 90f
             val dy = kotlin.math.abs(y - glitchCenterY)
             if (dy < glitchHeight) {
                 val factor = 1.0f - (dy / glitchHeight)
@@ -8230,7 +8826,49 @@ fun HolographicRadarScanner(
                     }
                 }
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            val anomalyPathPool = remember { List(40) { Path() } }
+            val contourPathPool = remember { List(256) { Path() } }
+            val mergedAnomalyPathPool = remember { List(40) { Path() } }
+            val anomalyPool = remember { List(40) { ProjectedAnomaly() } }
+            val visitedBuffer = remember { BooleanArray(40) }
+            val groups = remember { List(40) { mutableListOf<ProjectedAnomaly>() } }
+
+            // 1. Static map elements (Vector Roads and Vector Buildings) cached in a hardware graphics layer
+            StaticMapLayer(
+                roads = remember(roads) { StableRoads(roads) },
+                sortedBuildings = remember(sortedBuildings) { StableBuildings(sortedBuildings) },
+                localMapCenterLat = localMapCenterLat,
+                localMapCenterLng = localMapCenterLng,
+                mathZoom = mathZoom,
+                tiltZoomFactor = tiltZoomFactor,
+                tiltProgress = tiltProgress,
+                tiltYScale = tiltYScale,
+                playerXUn = playerXUn,
+                playerYUn = playerYUn,
+                scale = scale,
+                cosLat = cosLat,
+                cxPx = cxPx,
+                cyPx = cyPx,
+                cosRot = cosRot,
+                sinRot = sinRot,
+                isProfilerEnabled = isProfilerEnabled,
+                profilerState = profilerState,
+                timeProvider = timeProvider
+            )
+
+            // 2. Dynamic map elements (crosshair, anomalies, player, creatures, scanlines)
+            SideEffect { if (isProfilerEnabled) profilerState.dynamicRecomps++ }
+            ProfilingCanvas(
+                modifier = Modifier.fillMaxSize(),
+                isProfilerEnabled = isProfilerEnabled,
+                profilerState = profilerState
+            ) {
+                if (isProfilerEnabled) {
+                    profilerState.resetFrameDrawCounters()
+                }
+                val timeMs = timeProvider()
+                val time = timeMs
+                val isGlitching = (timeMs % 1600 < 160)
                 val cx = cxPx
                 val cy = cyPx
                 val maxR = maxRPx
@@ -8241,342 +8879,131 @@ fun HolographicRadarScanner(
                 val scanlineY = size.height * scanlineFraction
                 val movingUp = directionTracker.update(scanlineY)
 
-                // 1. Draw concentric scope rings centered on player position
-                drawCircle(Color(0xFF00FF41).copy(alpha = 0.15f), radius = maxR, center = Offset(playerX, playerY), style = Stroke(width = 1f))
-                drawCircle(Color(0xFF00FF41).copy(alpha = 0.08f), radius = maxR * 0.6f, center = Offset(playerX, playerY), style = Stroke(width = 0.5f))
-                drawCircle(Color(0xFF00FF41).copy(alpha = 0.04f), radius = maxR * 0.3f, center = Offset(playerX, playerY), style = Stroke(width = 0.5f))
-
                 // 2. Draw crosshair scope lines centered on player position
                 drawLine(Color(0xFF00FF41).copy(alpha = 0.15f), Offset(playerX - maxR, playerY), Offset(playerX + maxR, playerY), strokeWidth = 0.5f)
                 drawLine(Color(0xFF00FF41).copy(alpha = 0.15f), Offset(playerX, playerY - maxR), Offset(playerX, playerY + maxR), strokeWidth = 0.5f)
 
-
-                // 4. Draw Vector Roads with map center offset, horizontal sync tear, and scanline excitation
-                roads.forEach { road ->
-                    for (j in 0 until road.size - 1) {
-                        val pt1 = road[j]
-                        val pt2 = road[j + 1]
-
-                        val p1 = projectPoint(pt1.first, pt1.second)
-                        val y1 = p1.y
-                        val x1 = p1.x + getGlitchOffsetX(y1)
-
-                        val p2 = projectPoint(pt2.first, pt2.second)
-                        val y2 = p2.y
-                        val x2 = p2.x + getGlitchOffsetX(y2)
-
-                        // Excitation check based on distance from the vertical scanline
-                        val midY = (y1 + y2) / 2f
-                        val diffY = if (movingUp) midY - scanlineY else scanlineY - midY
-
-                        val intensity = if (diffY in 0f..110f) {
-                            1.0f - (diffY / 110f) * 0.60f
-                        } else {
-                            0.40f
-                        }
-
-                        drawClippedLine(
-                            canvasDrawScope = this,
-                            x1 = x1, y1 = y1, x2 = x2, y2 = y2,
-                            minX = -100f, minY = -100f,
-                            maxX = size.width + 100f, maxY = size.height + 100f,
-                            color = Color(0xFFFFB300).copy(alpha = intensity * 0.85f),
-                            strokeWidth = 2.0f
-                        )
-                    }
+                // 5b. Draw Volumetric Irregular Heatmaps (Outer Boundary static outline ONLY, glowing when swept) using cached projection
+                visitedBuffer.fill(false)
+                for (gIdx in 0 until 40) {
+                    groups[gIdx].clear()
                 }
-
-                // 5. Draw Vector Buildings with viewport culling & dynamic LOD to prevent zoom lag
-                val zoomFade = (1.0f - ((mathZoom - 1.5f) / 2.0f)).coerceIn(0.0f, 1.0f)
-
-                sortedBuildings.forEach { building ->
-                    if (building.points.size < 2) return@forEach
-
-                    // Compute screen coordinates and screen bounding box
-                    var minX = Float.MAX_VALUE
-                    var maxX = -Float.MAX_VALUE
-                    var minY = Float.MAX_VALUE
-                    var maxY = -Float.MAX_VALUE
-
-                    val projectedPoints = Array(building.points.size) { i ->
-                        val pt = building.points[i]
-                        val p = projectPoint(pt.lat, pt.lng)
-                        if (p.x < minX) minX = p.x
-                        if (p.x > maxX) maxX = p.x
-                        if (p.y < minY) minY = p.y
-                        if (p.y > maxY) maxY = p.y
-                        p
-                    }
-
-                    val widthPx = maxX - minX
-                    val heightPx = maxY - minY
-                    val maxDim = maxOf(widthPx, heightPx)
-
-                    // LOD Culling & Fade-out
-                    val lodFade = if (mathZoom >= 1.0f) {
-                        if (maxDim < 4.5f) return@forEach
-                        ((maxDim - 4.5f) / 4.5f).coerceIn(0.0f, 1.0f)
-                    } else {
-                        if (maxDim < 2.0f) return@forEach
-                        ((maxDim - 2.0f) / 3.0f).coerceIn(0.0f, 1.0f)
-                    }
-
-                    val baseHash = building.points[0].lat.hashCode() + building.points[0].lng.hashCode()
-                    val heightLevel = 1 + (kotlin.math.abs(baseHash) % 4)
+                
+                val activeAnomaliesCount = anomalies.size.coerceAtMost(40)
+                for (i in 0 until activeAnomaliesCount) {
+                    val anomaly = anomalies[i]
+                    val item = anomalyPool[i]
                     
-                    val extX = 0f
-                    val extY = (-2.0f * heightLevel).dp.toPx() * (1.0f / mathZoom.coerceAtLeast(0.1f))
+                    val ay = projectY(anomaly.lat, anomaly.lng)
+                    val ax = projectX(anomaly.lat, anomaly.lng) + getGlitchOffsetX(ay, timeMs)
                     
-                    val maxExt = 30.dp.toPx()
-                    val finalExtX = extX.coerceIn(-maxExt, maxExt) * tiltProgress
-                    val finalExtY = extY.coerceIn(-maxExt, maxExt) * tiltProgress
-
-                    val minXWithExt = minOf(minX, minX + finalExtX)
-                    val maxXWithExt = maxOf(maxX, maxX + finalExtX)
-                    val minYWithExt = minOf(minY, minY + finalExtY)
-                    val maxYWithExt = maxOf(maxY, maxY + finalExtY)
-
-                    val margin = 50f
-                    if (maxXWithExt < -margin || minXWithExt > size.width + margin ||
-                        maxYWithExt < -margin || minYWithExt > size.height + margin) {
-                        return@forEach
-                    }
-
-                    val buildingColor = if (building.isFallback) Color(0xFFFF00FF) else CyberGreen
-                    val finalAlphaMultiplier = zoomFade * lodFade
-
-                    // 1. Draw solid black mask
-                    buildingPath.reset()
-                    val mPt0 = projectedPoints[0]
-                    val mX0 = mPt0.x + getGlitchOffsetX(mPt0.y)
-                    val mY0 = mPt0.y
-                    buildingPath.moveTo(mX0, mY0)
-                    for (i in 1 until projectedPoints.size) {
-                        val pt = projectedPoints[i]
-                        val x = pt.x + getGlitchOffsetX(pt.y)
-                        val y = pt.y
-                        buildingPath.lineTo(x, y)
-                    }
-                    buildingPath.close()
-                    drawPath(path = buildingPath, color = Color.Black, style = Fill)
-
-                    for (i in 0 until projectedPoints.size - 1) {
-                        val ptA = projectedPoints[i]
-                        val ptB = projectedPoints[i + 1]
-                        val ax = ptA.x + getGlitchOffsetX(ptA.y)
-                        val ay = ptA.y
-                        val bx = ptB.x + getGlitchOffsetX(ptB.y)
-                        val by = ptB.y
-                        val axTop = ax + finalExtX
-                        val ayTop = ay + finalExtY
-                        val bxTop = bx + finalExtX
-                        val byTop = by + finalExtY
-                        buildingPath.reset()
-                        buildingPath.moveTo(ax, ay)
-                        buildingPath.lineTo(bx, by)
-                        buildingPath.lineTo(bxTop, byTop)
-                        buildingPath.lineTo(axTop, ayTop)
-                        buildingPath.close()
-                        drawPath(path = buildingPath, color = Color.Black, style = Fill)
-                    }
-
-                    buildingPath.reset()
-                    val mR0 = projectedPoints[0]
-                    val mRx0 = mR0.x + getGlitchOffsetX(mR0.y) + finalExtX
-                    val mRy0 = mR0.y + finalExtY
-                    buildingPath.moveTo(mRx0, mRy0)
-                    for (i in 1 until projectedPoints.size) {
-                        val pt = projectedPoints[i]
-                        val rx = pt.x + getGlitchOffsetX(pt.y) + finalExtX
-                        val ry = pt.y + finalExtY
-                        buildingPath.lineTo(rx, ry)
-                    }
-                    buildingPath.close()
-                    drawPath(path = buildingPath, color = Color.Black, style = Fill)
-
-                    // 2. Draw standard translucent holographic fills & outlines
-                    // A. Draw base fill & outline
-                    buildingPath.reset()
-                    val pt0 = projectedPoints[0]
-                    val x0 = pt0.x + getGlitchOffsetX(pt0.y)
-                    val y0 = pt0.y
-                    buildingPath.moveTo(x0, y0)
-                    for (i in 1 until projectedPoints.size) {
-                        val pt = projectedPoints[i]
-                        val x = pt.x + getGlitchOffsetX(pt.y)
-                        val y = pt.y
-                        buildingPath.lineTo(x, y)
-                    }
-                    buildingPath.close()
-
-                    drawPath(
-                        path = buildingPath,
-                        color = buildingColor.copy(alpha = 0.04f * finalAlphaMultiplier),
-                        style = Fill
-                    )
-                    drawPath(
-                        path = buildingPath,
-                        color = buildingColor.copy(alpha = 0.15f * finalAlphaMultiplier),
-                        style = Stroke(width = 0.75f)
-                    )
-
-                    // B. Draw side walls
-                    for (i in 0 until projectedPoints.size - 1) {
-                        val ptA = projectedPoints[i]
-                        val ptB = projectedPoints[i + 1]
-                        
-                        val ax = ptA.x + getGlitchOffsetX(ptA.y)
-                        val ay = ptA.y
-                        val bx = ptB.x + getGlitchOffsetX(ptB.y)
-                        val by = ptB.y
-                        
-                        val axTop = ax + finalExtX
-                        val ayTop = ay + finalExtY
-                        val bxTop = bx + finalExtX
-                        val byTop = by + finalExtY
-
-                        buildingPath.reset()
-                        buildingPath.moveTo(ax, ay)
-                        buildingPath.lineTo(bx, by)
-                        buildingPath.lineTo(bxTop, byTop)
-                        buildingPath.lineTo(axTop, ayTop)
-                        buildingPath.close()
-
-                        drawPath(
-                            path = buildingPath,
-                            color = buildingColor.copy(alpha = 0.03f * finalAlphaMultiplier),
-                            style = Fill
-                        )
-                        drawPath(
-                            path = buildingPath,
-                            color = buildingColor.copy(alpha = 0.20f * finalAlphaMultiplier),
-                            style = Stroke(width = 0.75f)
-                        )
-                    }
-
-                    // C. Draw top roof fill & outline
-                    buildingPath.reset()
-                    val r0 = projectedPoints[0]
-                    val rx0 = r0.x + getGlitchOffsetX(r0.y) + finalExtX
-                    val ry0 = r0.y + finalExtY
-                    buildingPath.moveTo(rx0, ry0)
-                    for (i in 1 until projectedPoints.size) {
-                        val pt = projectedPoints[i]
-                        val rx = pt.x + getGlitchOffsetX(pt.y) + finalExtX
-                        val ry = pt.y + finalExtY
-                        buildingPath.lineTo(rx, ry)
-                    }
-                    buildingPath.close()
-
-                    drawPath(
-                        path = buildingPath,
-                        color = buildingColor.copy(alpha = 0.10f * finalAlphaMultiplier),
-                        style = Fill
-                    )
-                    drawPath(
-                        path = buildingPath,
-                        color = buildingColor.copy(alpha = 0.45f * finalAlphaMultiplier),
-                        style = Stroke(width = 1f)
-                    )
-                }
-                // 5b. Draw Volumetric Irregular Heatmaps (Outer Boundary static outline ONLY, glowing when swept)
-                val projected = anomalies.map { anomaly ->
-                    val epicenter = projectPoint(anomaly.lat, anomaly.lng)
-                    val ay = epicenter.y
-                    val ax = epicenter.x + getGlitchOffsetX(ay)
-
-                    val factionColor = when (anomaly.faction) {
-                        "Infection" -> Color.Red
-                        "Mech" -> Color.Yellow
-                        "Parasite" -> Color(0xFFA855F7)
-                        else -> Color.Cyan
-                    }
-
-                    val diffY = if (movingUp) ay - scanlineY else scanlineY - ay
-
-                    val sweepIntensity = if (diffY in 0f..110f) {
-                        1.0f - (diffY / 110f)
-                    } else {
-                        0.0f
-                    }
-
-                    val contourAlpha = 0.5f + 0.45f * sweepIntensity
-
+                    item.ax = ax
+                    item.ay = ay
+                    
                     val r0Pixels = (((anomaly.heatZoneDiameter / 2.0) / 111000.0) * scale).toFloat()
                     val seed = anomaly.id.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
                     val epsilon = 0.15f + (seed % 3) * 0.05f
                     val k = 3 + (seed % 3)
                     val phi = (seed % 360) * (Math.PI / 180.0)
                     val rMax = r0Pixels * (1.0f + epsilon)
-
-                    val path = androidx.compose.ui.graphics.Path()
+                    
+                    item.rMax = rMax
+                    item.r0Pixels = r0Pixels.toDouble()
+                    item.epsilon = epsilon.toDouble()
+                    item.k = k
+                    item.phi = phi
+                    item.factionColor = when (anomaly.faction) {
+                        "Infection" -> Color.Red
+                        "Mech" -> Color.Yellow
+                        "Parasite" -> Color(0xFFA855F7)
+                        else -> Color.Cyan
+                    }
+                    
+                    val diffY = if (movingUp) ay - scanlineY else scanlineY - ay
+                    val sweepIntensity = if (diffY in 0f..110f) {
+                        1.0f - (diffY / 110f)
+                    } else {
+                        0.0f
+                    }
+                    item.contourAlpha = 0.5f + 0.45f * sweepIntensity
+                    
+                    // Build path with dynamic glitch and store vertices
+                    item.path.reset()
                     val steps = 36
+                    item.numVertices = steps + 1
                     for (step in 0..steps) {
                         val theta = (step * 2.0 * Math.PI) / steps
                         val rBase = r0Pixels * (1.0f + epsilon * kotlin.math.cos(k * theta + phi).toFloat())
-                        
-                        // Rotate angle by rotRad
                         val thetaRotated = theta + rotRad
                         val py = (ay + rBase * kotlin.math.sin(thetaRotated) * tiltYScale).toFloat()
-                        val px = (ax + rBase * kotlin.math.cos(thetaRotated) + getGlitchOffsetX(py)).toFloat()
+                        val px = (ax + rBase * kotlin.math.cos(thetaRotated)).toFloat()
+                        
+                        item.verticesX[step] = px
+                        item.verticesY[step] = py
+                        
+                        val pxGlitched = px + getGlitchOffsetX(py, timeMs)
                         if (step == 0) {
-                            path.moveTo(px, py)
+                            item.path.moveTo(pxGlitched, py)
                         } else {
-                            path.lineTo(px, py)
+                            item.path.lineTo(pxGlitched, py)
                         }
                     }
-                    path.close()
-
-                    ProjectedAnomaly(ax, ay, rMax, factionColor, contourAlpha, path, r0Pixels.toDouble(), epsilon.toDouble(), k, phi)
+                    item.path.close()
                 }
 
-                // Group overlapping anomalies
-                val visited = BooleanArray(projected.size)
-                val groups = mutableListOf<List<ProjectedAnomaly>>()
+                // Group overlapping anomalies in primitive queue
+                var numGroups = 0
+                val queue = IntArray(40)
 
-                for (i in projected.indices) {
-                    if (!visited[i]) {
-                        val currentGroup = mutableListOf<ProjectedAnomaly>()
-                        val queue = mutableListOf<Int>()
-                        queue.add(i)
-                        visited[i] = true
+                for (i in 0 until activeAnomaliesCount) {
+                    if (!visitedBuffer[i]) {
+                        val currentGroup = groups[numGroups]
+                        numGroups++
+                        
+                        var head = 0
+                        var tail = 0
+                        queue[tail++] = i
+                        visitedBuffer[i] = true
 
-                        while (queue.isNotEmpty()) {
-                            val curr = queue.removeAt(0)
-                            currentGroup.add(projected[curr])
+                        while (head < tail) {
+                            val curr = queue[head++]
+                            currentGroup.add(anomalyPool[curr])
 
-                            for (j in projected.indices) {
-                                if (!visited[j]) {
-                                    val dx = projected[curr].ax - projected[j].ax
-                                    val dy = projected[curr].ay - projected[j].ay
+                            for (j in 0 until activeAnomaliesCount) {
+                                if (!visitedBuffer[j]) {
+                                    val dx = anomalyPool[curr].ax - anomalyPool[j].ax
+                                    val dy = anomalyPool[curr].ay - anomalyPool[j].ay
                                     val dist = kotlin.math.sqrt(dx * dx + dy * dy)
-                                    if (dist < (projected[curr].rMax + projected[j].rMax)) {
-                                        visited[j] = true
-                                        queue.add(j)
+                                    if (dist < (anomalyPool[curr].rMax + anomalyPool[j].rMax)) {
+                                        visitedBuffer[j] = true
+                                        queue[tail++] = j
                                     }
                                 }
                             }
                         }
-                        groups.add(currentGroup)
                     }
                 }
 
                 // Render groups
-                groups.forEach { group ->
-                    if (group.isNotEmpty()) {
-                        // Compute unified merged path for clipping
-                        var mergedPath = group.first().path
-                        for (mIdx in 1 until group.size) {
-                            mergedPath = androidx.compose.ui.graphics.Path.combine(
-                                androidx.compose.ui.graphics.PathOperation.Union,
-                                mergedPath,
-                                group[mIdx].path
-                            )
+                var contourPathIndex = 0
+                var mergedAnomalyPathIndex = 0
+                for (g in 0 until numGroups) {
+                    val group = groups[g]
+                    val groupSize = group.size
+                    if (groupSize > 0) {
+                        // Compute unified merged path for clipping using addPath instead of Path.combine
+                        val mergedPath = mergedAnomalyPathPool.getOrNull(mergedAnomalyPathIndex) ?: Path()
+                        mergedAnomalyPathIndex++
+                        mergedPath.reset()
+                        
+                        for (i in 0 until groupSize) {
+                            mergedPath.addPath(group[i].path)
                         }
 
                         // Draw radial gradient fills for each anomaly, clipped to the UNIFIED merged path.
                         clipPath(mergedPath) {
-                            group.forEach { item ->
+                            for (i in 0 until groupSize) {
+                                val item = group[i]
                                 scale(scaleX = 1f, scaleY = tiltYScale, pivot = Offset(item.ax, item.ay)) {
                                     drawCircle(
                                         brush = Brush.radialGradient(
@@ -8597,50 +9024,58 @@ fun HolographicRadarScanner(
                             val scaleVal = (c.toFloat() - 1f + contourFlowProgress) / numContours
                             if (scaleVal < 0.02f) continue
                             
-                            var mergedContourPath: androidx.compose.ui.graphics.Path? = null
+                            val groupStartPathIndex = contourPathIndex
                             
-                            group.forEach { item ->
-                                val contourPath = androidx.compose.ui.graphics.Path()
-                                val steps = 36
-                                for (step in 0..steps) {
-                                    val theta = (step * 2.0 * Math.PI) / steps
-                                    val rBase = item.r0Pixels * (1.0f + item.epsilon * kotlin.math.cos(item.k * theta + item.phi).toFloat()) * scaleVal
-                                    val thetaRotated = theta + rotRad
-                                    val py = (item.ay + rBase * kotlin.math.sin(thetaRotated) * tiltYScale).toFloat()
-                                    val px = (item.ax + rBase * kotlin.math.cos(thetaRotated) + getGlitchOffsetX(py)).toFloat()
-                                    if (step == 0) {
-                                        contourPath.moveTo(px, py)
-                                    } else {
-                                        contourPath.lineTo(px, py)
+                            for (i in 0 until groupSize) {
+                                val item = group[i]
+                                val contourPath = contourPathPool.getOrNull(contourPathIndex) ?: Path()
+                                contourPathIndex++
+                                contourPath.reset()
+
+                                val numVerts = item.numVertices
+                                if (numVerts > 0) {
+                                    // Scale vertices around epicenter (item.ax, item.ay) in screen space
+                                    val vx0 = item.verticesX[0]
+                                    val vy0 = item.verticesY[0]
+                                    val px0 = item.ax + (vx0 - item.ax) * scaleVal
+                                    val py0 = item.ay + (vy0 - item.ay) * scaleVal
+                                    contourPath.moveTo(px0 + getGlitchOffsetX(py0, timeMs), py0)
+
+                                    for (vi in 1 until numVerts) {
+                                        val vx = item.verticesX[vi]
+                                        val vy = item.verticesY[vi]
+                                        val px = item.ax + (vx - item.ax) * scaleVal
+                                        val py = item.ay + (vy - item.ay) * scaleVal
+                                        contourPath.lineTo(px + getGlitchOffsetX(py, timeMs), py)
                                     }
                                 }
                                 contourPath.close()
-                                
-                                if (mergedContourPath == null) {
-                                    mergedContourPath = contourPath
-                                } else {
-                                    mergedContourPath = androidx.compose.ui.graphics.Path.combine(
-                                        androidx.compose.ui.graphics.PathOperation.Union,
-                                        mergedContourPath,
-                                        contourPath
-                                    )
-                                }
                             }
                             
-                            if (mergedContourPath != null) {
-                                val groupColor = group.first().factionColor
-                                val groupAlpha = group.maxOf { it.contourAlpha }
-                                val alphaFactor = (4.0f * scaleVal * (1.0f - scaleVal)).coerceIn(0.0f, 1.0f)
-                                
-                                 drawPath(
-                                    path = mergedContourPath,
-                                    color = groupColor.copy(alpha = groupAlpha * alphaFactor * 0.8f),
-                                    style = Stroke(width = 1.2f)
+                            val groupColor = group[0].factionColor
+                            var maxAlpha = 0f
+                            for (i in 0 until groupSize) {
+                                if (group[i].contourAlpha > maxAlpha) maxAlpha = group[i].contourAlpha
+                            }
+                            val groupAlpha = maxAlpha
+                            val alphaFactor = (4.0f * scaleVal * (1.0f - scaleVal)).coerceIn(0.0f, 1.0f)
+                            
+                            for (i in 0 until groupSize) {
+                                drawGroupContoursClipped(
+                                    group = group,
+                                    groupColor = groupColor,
+                                    groupAlpha = groupAlpha,
+                                    alphaFactor = alphaFactor,
+                                    groupStartPathIndex = groupStartPathIndex,
+                                    contourPathPool = contourPathPool,
+                                    index = i,
+                                    clipIdx = 0
                                 )
                             }
                         }
                         
-                        group.forEach { item ->
+                        for (i in 0 until groupSize) {
+                            val item = group[i]
                             drawCircle(item.factionColor, radius = 3.5f, center = Offset(item.ax, item.ay))
                             drawCircle(Color.White, radius = 1.2f, center = Offset(item.ax, item.ay))
                         }
@@ -8651,8 +9086,10 @@ fun HolographicRadarScanner(
                 drawCircle(CyberGreen, radius = 3.5f, center = Offset(playerX, playerY))
 
                 // 6b. Draw miniaturized active harvesting creatures traveling on the map
-                val activeMissionsList = activeMissions.filter { !it.isReturned }
-                activeMissionsList.forEach { m ->
+                val precomputedMissionsSize = precomputedMissions.size
+                for (mIdx in 0 until precomputedMissionsSize) {
+                    val state = precomputedMissions[mIdx]
+                    val m = state.mission
                     val factionColor = when (m.creatureFaction) {
                         "Infection" -> Color.Red
                         "Mech" -> Color.Yellow
@@ -8660,20 +9097,15 @@ fun HolographicRadarScanner(
                         else -> Color.Cyan
                     }
 
-                    // Project Epicenter coordinate relative to mapCenter
-                    val epicenter = projectPoint(m.lat, m.lng)
-                    val anomY = epicenter.y
-                    val anomX = epicenter.x + getGlitchOffsetX(anomY)
+                    // Project coordinates to screen space using precomputed coordinates
+                    val boundX = projectX(state.boundLat, state.boundLng)
+                    val boundY = projectY(state.boundLat, state.boundLng)
 
-                    // Calculate landing/boundary point along the line from epicenter to player
-                    val dx = playerX - anomX
-                    val dy = playerY - anomY
-                    val distPx = kotlin.math.sqrt(dx * dx + dy * dy)
+                    val anomX = projectX(m.lat, m.lng)
+                    val anomY = projectY(m.lat, m.lng)
 
-                    val rMaxPx = (((m.dispatchDistance) / 111000.0) * scale).toFloat()
-                    val tLanding = if (distPx > 0f) (rMaxPx / distPx).coerceIn(0.0f, 1.0f) else 0.0f
-                    val boundX = anomX + tLanding * dx
-                    val boundY = anomY + tLanding * dy
+                    val startX = projectX(state.startLat, state.startLng)
+                    val startY = projectY(state.startLat, state.startLng)
 
                     // Durations
                     val dTravel = m.travelDuration.toFloat()
@@ -8682,47 +9114,62 @@ fun HolographicRadarScanner(
                     val dAscent = m.ascentDuration.toFloat()
                     val dReturn = m.transitBackDuration.toFloat()
 
-                    // Calculate real-time smooth elapsed seconds
-                    val elapsedSec = (System.currentTimeMillis() - m.startTime) / 1000f
+                    val wave = WaveMath.getDailyWaveConfig(timeMs)
+                    val phaseFraction = wave.lunarAge / WaveMath.LUNAR_MONTH_DAYS
+                    val lunarPhaseScale = (1.0 - kotlin.math.cos(phaseFraction * 2.0 * Math.PI)) / 2.0
+                    val densityShift = 0.2 * (lunarPhaseScale - 0.5)
+                    val effectiveDensity = (state.combinedDensity + densityShift).coerceIn(-0.33, 0.33)
 
-                    var creatureX = playerX
+                    val finalAnomalyDensity = if (state.hasShield && effectiveDensity > 0.0) 0.0 else effectiveDensity
+
+                    // Calculate real-time smooth elapsed seconds
+                    val elapsedSec = (timeMs - m.startTime) / 1000f
+
+                    var creatureXUnglitched = playerX
                     var creatureY = playerY
-                    var angle = 0.0
+                    var stateText = "RETURN"
 
                     if (elapsedSec < dTravel) {
-                        val p = elapsedSec / dTravel.coerceAtLeast(1f)
-                        creatureX = playerX + p * (boundX - playerX)
-                        creatureY = playerY + p * (boundY - playerY)
-                        angle = kotlin.math.atan2((boundY - playerY).toDouble(), (boundX - playerX).toDouble())
+                        val p = (elapsedSec / dTravel.coerceAtLeast(1f))
+                        val pWarped = warpProgress(p, finalAnomalyDensity.toFloat())
+                        creatureXUnglitched = playerX + pWarped * (boundX - playerX)
+                        creatureY = playerY + pWarped * (boundY - playerY)
+                        stateText = "TRAVEL"
                     } else if (elapsedSec < dTravel + dDescent) {
-                        val p = (elapsedSec - dTravel) / dDescent.coerceAtLeast(1f)
-                        creatureX = boundX + p * 0.3f * (anomX - boundX)
-                        creatureY = boundY + p * 0.3f * (anomY - boundY)
-                        angle = kotlin.math.atan2((anomY - boundY).toDouble(), (anomX - boundX).toDouble())
+                        val p = ((elapsedSec - dTravel) / dDescent.coerceAtLeast(1f))
+                        val pWarped = warpProgress(p, finalAnomalyDensity.toFloat())
+                        creatureXUnglitched = boundX + pWarped * (startX - boundX)
+                        creatureY = boundY + pWarped * (startY - boundY)
+                        stateText = "DESCEND"
                     } else if (elapsedSec < dTravel + dDescent + dHarvest) {
-                        creatureX = boundX + 0.3f * (anomX - boundX)
-                        creatureY = boundY + 0.3f * (anomY - boundY)
-                        val hoverTime = (System.currentTimeMillis() % 1000) * (2.0 * Math.PI / 1000.0)
-                        creatureX += (kotlin.math.sin(hoverTime) * 2f).toFloat()
-                        creatureY += (kotlin.math.cos(hoverTime) * 2f).toFloat()
-                        angle = kotlin.math.atan2((anomY - boundY).toDouble(), (anomX - boundX).toDouble())
+                        val hoverTime = (timeMs % 1000) * (2.0 * Math.PI / 1000.0)
+                        creatureXUnglitched = startX + (kotlin.math.sin(hoverTime) * 2f * densityVal).toFloat()
+                        creatureY = startY + (kotlin.math.cos(hoverTime) * 2f * densityVal).toFloat()
+                        stateText = "HARVEST"
                     } else if (elapsedSec < dTravel + dDescent + dHarvest + dAscent) {
-                        val p = (elapsedSec - dTravel - dDescent - dHarvest) / dAscent.coerceAtLeast(1f)
-                        creatureX = (boundX + 0.3f * (anomX - boundX)) - p * 0.3f * (anomX - boundX)
-                        creatureY = (boundY + 0.3f * (anomY - boundY)) - p * 0.3f * (anomY - boundY)
-                        angle = kotlin.math.atan2((boundY - anomY).toDouble(), (boundX - anomX).toDouble())
+                        val p = ((elapsedSec - dTravel - dDescent - dHarvest) / dAscent.coerceAtLeast(1f))
+                        creatureXUnglitched = startX + p * (boundX - startX)
+                        creatureY = startY + p * (boundY - startY)
+                        stateText = "ASCEND"
                     } else if (elapsedSec < dTravel + dDescent + dHarvest + dAscent + dReturn) {
-                        val p = (elapsedSec - dTravel - dDescent - dHarvest - dAscent) / dReturn.coerceAtLeast(1f)
-                        creatureX = boundX + p * (playerX - boundX)
-                        creatureY = boundY + p * (playerY - boundY)
-                        angle = kotlin.math.atan2((playerY - boundY).toDouble(), (playerX - boundX).toDouble())
+                        val p = ((elapsedSec - dTravel - dDescent - dHarvest - dAscent) / dReturn.coerceAtLeast(1f))
+                        val pWarped = warpProgress(p, -finalAnomalyDensity.toFloat())
+                        creatureXUnglitched = boundX + pWarped * (playerX - boundX)
+                        creatureY = boundY + pWarped * (playerY - boundY)
+                        stateText = "RETURN"
                     }
+
+                    // Apply horizontal screen tear glitch offset to the coordinate positions
+                    val creatureYGlitch = getGlitchOffsetX(creatureY, timeMs)
+                    val creatureX = creatureXUnglitched + creatureYGlitch
+
+                    val boundXGlitched = boundX + getGlitchOffsetX(boundY, timeMs)
 
                     // Draw trajectory guideline
                     drawLine(
                         color = factionColor.copy(alpha = 0.25f),
                         start = Offset(playerX, playerY),
-                        end = Offset(boundX, boundY),
+                        end = Offset(boundXGlitched, boundY),
                         strokeWidth = 1f,
                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 5f), 0f)
                     )
@@ -8731,138 +9178,260 @@ fun HolographicRadarScanner(
                     val dna = m.originalSequence ?: "AAAAAAAA"
                     val geometry = geometryCache.getOrPut(dna) { CreatureGeometry(dna) }
 
-                    val timeMs = System.currentTimeMillis()
                     val spinAngle = (timeMs % 6000) * (2.0 * Math.PI / 6000.0)
                     val breathingPhase = (timeMs % 3000) * (2.0 * Math.PI / 3000.0)
                     val breathScale = 1.0 + geometry.breatheAmp * kotlin.math.sin(breathingPhase * geometry.breatheFreq)
 
-                    val minScale = 0.14f
-                    val modelSize = 10.dp.toPx()
+                    val dynamicScale = 0.22f / mathZoom.coerceAtLeast(0.1f)
+                    val modelSize = (25.dp.toPx() * (dynamicScale / 0.35f)).coerceIn(10.dp.toPx(), 45.dp.toPx())
+                    val densityVal = density.density
 
-                    val tilt = Math.toRadians(18.0)
-                    val cosT = kotlin.math.cos(tilt)
-                    val sinT = kotlin.math.sin(tilt)
+                    if (dynamicScale < 0.3f) {
+                        // LOD Tier 3: Draw a single glowing contact dot
+                        drawCircle(
+                            color = factionColor,
+                            radius = 3f * densityVal,
+                            center = Offset(creatureX, creatureY)
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 1.2f * densityVal,
+                            center = Offset(creatureX, creatureY)
+                        )
+                    } else {
+                        val tilt = Math.toRadians(18.0)
+                        val cosT = kotlin.math.cos(tilt)
+                        val sinT = kotlin.math.sin(tilt)
 
-                    val cosS = kotlin.math.cos(spinAngle)
-                    val sinS = kotlin.math.sin(spinAngle)
+                        val cosS = kotlin.math.cos(spinAngle)
+                        val sinS = kotlin.math.sin(spinAngle)
 
-                    val projPoints = mutableListOf<Offset>()
-                    val depthZ = mutableListOf<Double>()
+                        val verticesList = geometry.vertices
+                        val verticesSize = verticesList.size
+                        var vertIdx = 0
+                        for (vIdx in 0 until verticesSize) {
+                            if (vertIdx >= maxVertices) break
+                            val v = verticesList[vIdx]
+                            val bx = v.x * breathScale * dynamicScale
+                            val by = v.y * breathScale * dynamicScale
+                            val bz = v.z * breathScale * dynamicScale
 
-                    for (v in geometry.vertices) {
-                        val bx = v.x * breathScale * minScale
-                        val by = v.y * breathScale * minScale
-                        val bz = v.z * breathScale * minScale
+                            val twist = v.y * geometry.twistRate
+                            val cosTw = kotlin.math.cos(twist)
+                            val sinTw = kotlin.math.sin(twist)
+                            val tx = bx * cosTw - bz * sinTw
+                            val tz = bx * sinTw + bz * cosTw
+                            val ty = by
 
-                        val twist = v.y * geometry.twistRate
-                        val cosTw = kotlin.math.cos(twist)
-                        val sinTw = kotlin.math.sin(twist)
-                        val tx = bx * cosTw - bz * sinTw
-                        val tz = bx * sinTw + bz * cosTw
-                        val ty = by
+                            val rx = tx * cosS - tz * sinS
+                            val rz = tx * sinS + tz * cosS
+                            val ry = ty
 
-                        val rx = tx * cosS - tz * sinS
-                        val rz = tx * sinS + tz * cosS
-                        val ry = ty
+                            val finalX = rx
+                            val finalY = ry * cosT - rz * sinT
+                            val finalZ = ry * sinT + rz * cosT
 
-                        val finalX = rx
-                        val finalY = ry * cosT - rz * sinT
-                        val finalZ = ry * sinT + rz * cosT
+                            projectedXBuffer[vertIdx] = creatureX + finalX.toFloat()
+                            projectedYBuffer[vertIdx] = creatureY - finalY.toFloat()
+                            depthZBuffer[vertIdx] = finalZ
+                            vertIdx++
+                        }
 
-                        projPoints.add(Offset(creatureX + finalX.toFloat(), creatureY - finalY.toFloat()))
-                        depthZ.add(finalZ)
-                    }
+                        val maxRadius = (geometry.baseRadius * breathScale * dynamicScale * 1.4).coerceAtLeast(2.0)
 
-                    val maxRadius = (geometry.baseRadius * breathScale * minScale * 1.4).coerceAtLeast(2.0)
+                        val edgesList = geometry.edges
+                        val edgesSize = edgesList.size
 
-                    for (edge in geometry.edges) {
-                        if (edge.first < projPoints.size && edge.second < projPoints.size) {
-                            val z1 = depthZ[edge.first]
-                            val z2 = depthZ[edge.second]
-                            val avgZ = (z1 + z2) / 2.0
-                            
-                            val depthPct = ((avgZ / maxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
-                            val alpha = (0.25f + 0.75f * depthPct).toFloat()
-                            val stroke = (0.6f + 0.6f * depthPct).toFloat()
+                        // Draw outer model drop shadows (LOD Tier 1 only: dynamicScale > 0.8f)
+                        if (dynamicScale > 0.8f) {
+                            for (eIdx in 0 until edgesSize) {
+                                val edge = edgesList[eIdx]
+                                if (edge.first < vertIdx && edge.second < vertIdx) {
+                                    val z1 = depthZBuffer[edge.first]
+                                    val z2 = depthZBuffer[edge.second]
+                                    val avgZ = (z1 + z2) / 2.0
+                                    val depthPct = ((avgZ / maxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                                    val alpha = (0.25f + 0.75f * depthPct).toFloat()
+                                    val stroke = (0.8f + 0.8f * depthPct).toFloat()
 
-                            drawLine(
-                                color = factionColor.copy(alpha = alpha),
-                                start = projPoints[edge.first],
-                                end = projPoints[edge.second],
-                                strokeWidth = stroke
-                            )
+                                    drawLine(
+                                        color = Color.Black.copy(alpha = alpha * 0.8f),
+                                        start = Offset(projectedXBuffer[edge.first], projectedYBuffer[edge.first]) + Offset(1.5f * densityVal, 1.5f * densityVal),
+                                        end = Offset(projectedXBuffer[edge.second], projectedYBuffer[edge.second]) + Offset(1.5f * densityVal, 1.5f * densityVal),
+                                        strokeWidth = stroke
+                                    )
+                                }
+                            }
+                        }
+
+                        // Draw outer model main lines (LOD Tier 1 and 2: dynamicScale >= 0.3f)
+                        for (eIdx in 0 until edgesSize) {
+                            val edge = edgesList[eIdx]
+                            if (edge.first < vertIdx && edge.second < vertIdx) {
+                                val z1 = depthZBuffer[edge.first]
+                                val z2 = depthZBuffer[edge.second]
+                                val avgZ = (z1 + z2) / 2.0
+                                
+                                val depthPct = ((avgZ / maxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                                val alpha = (0.25f + 0.75f * depthPct).toFloat()
+                                val stroke = (0.8f + 0.8f * depthPct).toFloat()
+
+                                drawLine(
+                                    color = factionColor.copy(alpha = alpha),
+                                    start = Offset(projectedXBuffer[edge.first], projectedYBuffer[edge.first]),
+                                    end = Offset(projectedXBuffer[edge.second], projectedYBuffer[edge.second]),
+                                    strokeWidth = stroke
+                                )
+                            }
+                        }
+
+                        // Project and draw inner core energy reactor (LOD Tier 1 only: dynamicScale > 0.8f)
+                        if (dynamicScale > 0.8f) {
+                            val coreSpinAngle = spinAngle * 2.5
+                            val cosCs = kotlin.math.cos(coreSpinAngle)
+                            val sinCs = kotlin.math.sin(coreSpinAngle)
+
+                            val innerVerticesList = geometry.innerVertices
+                            val innerVerticesSize = innerVerticesList.size
+                            var innerVertIdx = 0
+                            for (vIdx in 0 until innerVerticesSize) {
+                                if (innerVertIdx >= maxVertices) break
+                                val v = innerVerticesList[vIdx]
+                                val vx = v.x * dynamicScale
+                                val vy = v.y * dynamicScale
+                                val vz = v.z * dynamicScale
+
+                                val rx = vx * cosCs - vz * sinCs
+                                val rz = vx * sinCs + vz * cosCs
+                                val ry = vy
+
+                                val finalX = rx
+                                val finalY = ry * cosT - rz * sinT
+                                val finalZ = ry * sinT + rz * cosT
+
+                                projectedInnerXBuffer[innerVertIdx] = creatureX + finalX.toFloat()
+                                projectedInnerYBuffer[innerVertIdx] = creatureY - finalY.toFloat()
+                                depthInnerZBuffer[innerVertIdx] = finalZ
+                                innerVertIdx++
+                            }
+
+                            val innerMaxRadius = (geometry.innerVertices.firstOrNull()?.x ?: 2.0) * dynamicScale * 1.2
+                            val innerCoreColor = Color(0xFFFBBF24)
+
+                            val innerEdgesList = geometry.innerEdges
+                            val innerEdgesSize = innerEdgesList.size
+
+                            // Draw inner core drop shadows
+                            for (eIdx in 0 until innerEdgesSize) {
+                                val edge = innerEdgesList[eIdx]
+                                if (edge.first < innerVertIdx && edge.second < innerVertIdx) {
+                                    val z1 = depthInnerZBuffer[edge.first]
+                                    val z2 = depthInnerZBuffer[edge.second]
+                                    val avgZ = (z1 + z2) / 2.0
+                                    val depthPct = ((avgZ / innerMaxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                                    val alpha = (0.3f + 0.7f * depthPct).toFloat()
+                                    val stroke = (0.6f + 0.6f * depthPct).toFloat()
+
+                                    drawLine(
+                                        color = Color.Black.copy(alpha = alpha * 0.8f),
+                                        start = Offset(projectedInnerXBuffer[edge.first], projectedInnerYBuffer[edge.first]) + Offset(1.5f * densityVal, 1.5f * densityVal),
+                                        end = Offset(projectedInnerXBuffer[edge.second], projectedInnerYBuffer[edge.second]) + Offset(1.5f * densityVal, 1.5f * densityVal),
+                                        strokeWidth = stroke
+                                    )
+                                }
+                            }
+
+                            // Draw inner core main lines
+                            for (eIdx in 0 until innerEdgesSize) {
+                                val edge = innerEdgesList[eIdx]
+                                if (edge.first < innerVertIdx && edge.second < innerVertIdx) {
+                                    val z1 = depthInnerZBuffer[edge.first]
+                                    val z2 = depthInnerZBuffer[edge.second]
+                                    val avgZ = (z1 + z2) / 2.0
+                                    
+                                    val depthPct = ((avgZ / innerMaxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                                    val alpha = (0.3f + 0.7f * depthPct).toFloat()
+                                    val stroke = (0.6f + 0.6f * depthPct).toFloat()
+
+                                    drawLine(
+                                        color = innerCoreColor.copy(alpha = alpha),
+                                        start = Offset(projectedInnerXBuffer[edge.first], projectedInnerYBuffer[edge.first]),
+                                        end = Offset(projectedInnerXBuffer[edge.second], projectedInnerYBuffer[edge.second]),
+                                        strokeWidth = stroke
+                                    )
+                                }
+                            }
                         }
                     }
 
-                    // Project and draw inner core energy reactor
-                    val coreSpinAngle = spinAngle * 2.5
-                    val cosCs = kotlin.math.cos(coreSpinAngle)
-                    val sinCs = kotlin.math.sin(coreSpinAngle)
+                    val lockSize = 35.dp.toPx()
+                    val isTracked = m.id == trackedMissionId
 
-                    val projInner = mutableListOf<Offset>()
-                    val depthInnerZ = mutableListOf<Double>()
-
-                    for (v in geometry.innerVertices) {
-                        val vx = v.x * minScale
-                        val vy = v.y * minScale
-                        val vz = v.z * minScale
-
-                        val rx = vx * cosCs - vz * sinCs
-                        val rz = vx * sinCs + vz * cosCs
-                        val ry = vy
-
-                        val finalX = rx
-                        val finalY = ry * cosT - rz * sinT
-                        val finalZ = ry * sinT + rz * cosT
-
-                        projInner.add(Offset(creatureX + finalX.toFloat(), creatureY - finalY.toFloat()))
-                        depthInnerZ.add(finalZ)
+                    val rawName = m.creatureName.uppercase()
+                    val displayName = if (rawName.length > 8) {
+                        val paddedName = rawName + "    "
+                        val cycleLen = paddedName.length
+                        val scrollIndex = ((timeMs / 250) % cycleLen).toInt()
+                        val doublePadded = paddedName + paddedName
+                        doublePadded.substring(scrollIndex, scrollIndex + 8)
+                    } else {
+                        rawName
+                    }
+                    
+                    val nameY = if (isTracked) {
+                        creatureY - lockSize - 6f
+                    } else {
+                        creatureY - modelSize - 4f
                     }
 
-                    val innerMaxRadius = (geometry.innerVertices.firstOrNull()?.x ?: 2.0) * minScale * 1.2
-                    val innerCoreColor = Color(0xFFFBBF24)
+                    // Look up pre-cached paints to avoid JNI/heap allocations
+                    val factionPaintKey = if (textPaints.containsKey(m.creatureFaction)) m.creatureFaction else "Default"
+                    val textPaint = textPaints[factionPaintKey]!!
 
-                    for (edge in geometry.innerEdges) {
-                        if (edge.first < projInner.size && edge.second < projInner.size) {
-                            val z1 = depthInnerZ[edge.first]
-                            val z2 = depthInnerZ[edge.second]
-                            val avgZ = (z1 + z2) / 2.0
-                            
-                            val depthPct = ((avgZ / innerMaxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
-                            val alpha = (0.3f + 0.7f * depthPct).toFloat()
-                            val stroke = (0.4f + 0.4f * depthPct).toFloat()
-
-                            drawLine(
-                                color = innerCoreColor.copy(alpha = alpha),
-                                start = projInner[edge.first],
-                                end = projInner[edge.second],
-                                strokeWidth = stroke
-                            )
-                        }
-                    }
-
-                    // Draw tiny designation text label
-                    val textPaint = android.graphics.Paint().apply {
-                        color = factionColor.toArgb()
-                        textSize = 7.dp.toPx()
-                        typeface = android.graphics.Typeface.MONOSPACE
-                        textAlign = android.graphics.Paint.Align.CENTER
+                    // Draw shadow
+                    if (isProfilerEnabled) {
+                        profilerState.drawTextCount += 2
                     }
                     drawContext.canvas.nativeCanvas.drawText(
-                        m.creatureName.uppercase().take(8),
+                        displayName,
+                        creatureX + 1.5f * densityVal,
+                        nameY + 1.5f * densityVal,
+                        shadowTextPaint
+                    )
+                    // Draw original
+                    drawContext.canvas.nativeCanvas.drawText(
+                        displayName,
                         creatureX,
-                        creatureY - modelSize - 4f,
+                        nameY,
                         textPaint
                     )
 
                     // Draw a target lock indicator around the tracked creature
-                    val isTracked = m.id == trackedMissionId
                     if (isTracked) {
-                        val lockSize = 14.dp.toPx()
-                        val tickLen = 4.dp.toPx()
+                        val tickLen = 10.dp.toPx()
                         val lockColor = factionColor.copy(alpha = 0.8f)
+                        val shadowColor = Color.Black.copy(alpha = 0.8f)
                         val strokeW = 1.5f
+                        val offset = Offset(1.5f * densityVal, 1.5f * densityVal)
 
+                        // 1. Draw lock-on shadows
+                        // Top-left corner
+                        drawLine(shadowColor, Offset(creatureX - lockSize, creatureY - lockSize) + offset, Offset(creatureX - lockSize + tickLen, creatureY - lockSize) + offset, strokeWidth = strokeW)
+                        drawLine(shadowColor, Offset(creatureX - lockSize, creatureY - lockSize) + offset, Offset(creatureX - lockSize, creatureY - lockSize + tickLen) + offset, strokeWidth = strokeW)
+
+                        // Top-right corner
+                        drawLine(shadowColor, Offset(creatureX + lockSize, creatureY - lockSize) + offset, Offset(creatureX + lockSize - tickLen, creatureY - lockSize) + offset, strokeWidth = strokeW)
+                        drawLine(shadowColor, Offset(creatureX + lockSize, creatureY - lockSize) + offset, Offset(creatureX + lockSize, creatureY - lockSize + tickLen) + offset, strokeWidth = strokeW)
+
+                        // Bottom-left corner
+                        drawLine(shadowColor, Offset(creatureX - lockSize, creatureY + lockSize) + offset, Offset(creatureX - lockSize + tickLen, creatureY + lockSize) + offset, strokeWidth = strokeW)
+                        drawLine(shadowColor, Offset(creatureX - lockSize, creatureY + lockSize) + offset, Offset(creatureX - lockSize, creatureY + lockSize - tickLen) + offset, strokeWidth = strokeW)
+
+                        // Bottom-right corner
+                        drawLine(shadowColor, Offset(creatureX + lockSize, creatureY + lockSize) + offset, Offset(creatureX + lockSize - tickLen, creatureY + lockSize) + offset, strokeWidth = strokeW)
+                        drawLine(shadowColor, Offset(creatureX + lockSize, creatureY + lockSize) + offset, Offset(creatureX + lockSize, creatureY + lockSize - tickLen) + offset, strokeWidth = strokeW)
+
+                        // 2. Draw lock-on original lines
                         // Top-left corner
                         drawLine(lockColor, Offset(creatureX - lockSize, creatureY - lockSize), Offset(creatureX - lockSize + tickLen, creatureY - lockSize), strokeWidth = strokeW)
                         drawLine(lockColor, Offset(creatureX - lockSize, creatureY - lockSize), Offset(creatureX - lockSize, creatureY - lockSize + tickLen), strokeWidth = strokeW)
@@ -8879,21 +9448,24 @@ fun HolographicRadarScanner(
                         drawLine(lockColor, Offset(creatureX + lockSize, creatureY + lockSize), Offset(creatureX + lockSize - tickLen, creatureY + lockSize), strokeWidth = strokeW)
                         drawLine(lockColor, Offset(creatureX + lockSize, creatureY + lockSize), Offset(creatureX + lockSize, creatureY + lockSize - tickLen), strokeWidth = strokeW)
 
-                        // Small flashing indicator text
-                        if ((System.currentTimeMillis() / 400) % 2 == 0L) {
-                            val lockPaint = android.graphics.Paint().apply {
-                                color = factionColor.toArgb()
-                                textSize = 7.dp.toPx()
-                                typeface = android.graphics.Typeface.MONOSPACE
-                                textAlign = android.graphics.Paint.Align.CENTER
-                            }
-                            drawContext.canvas.nativeCanvas.drawText(
-                                "TRK_LOCK",
-                                creatureX,
-                                creatureY + lockSize + 10f,
-                                lockPaint
-                            )
+                        // Draw stateText (solid, below the lower boundaries of the lock-on)
+                        val stateY = creatureY + lockSize + 12f
+                        
+                        if (isProfilerEnabled) {
+                            profilerState.drawTextCount += 2
                         }
+                        drawContext.canvas.nativeCanvas.drawText(
+                            stateText,
+                            creatureX + 1.5f * densityVal,
+                            stateY + 1.5f * densityVal,
+                            shadowTextPaint
+                        )
+                        drawContext.canvas.nativeCanvas.drawText(
+                            stateText,
+                            creatureX,
+                            stateY,
+                            textPaint
+                        )
                     }
                 }
 
@@ -9002,47 +9574,59 @@ fun HolographicRadarScanner(
                     .fillMaxSize()
                     .clipToBounds()
             ) {
-                anomalies.forEach { anomaly ->
-                    val epicenter = projectPoint(anomaly.lat, anomaly.lng)
-                    val yPx = epicenter.y
-                    val glitchOffsetPx = getGlitchOffsetX(yPx)
-                    val xPx = epicenter.x + glitchOffsetPx
-
-                    val x = with(density) { xPx.toDp() }
-                    val y = with(density) { yPx.toDp() }
-
+                val anomaliesSize = anomalies.size
+                for (aIdx in 0 until anomaliesSize) {
+                    val anomaly = anomalies[aIdx]
                     val factionColor = when (anomaly.faction) {
                         "Infection" -> Color.Red
                         "Mech" -> Color.Yellow
                         "Parasite" -> Color(0xFFA855F7)
                         else -> Color.Cyan
                     }
+                    Box(
+                        modifier = Modifier
+                            .graphicsLayer {
+                                val epicenter = projectPoint(anomaly.lat, anomaly.lng)
+                                val yPx = epicenter.y
+                                val tMs = timeProvider()
+                                val glitchOffsetPx = getGlitchOffsetX(yPx, tMs)
+                                val xPx = epicenter.x + glitchOffsetPx
 
-                    // Verify if epicenter is inside the rectangular scanner viewport
-                    if (x >= 0.dp && x <= width && y >= 0.dp && y <= height) {
-                        Box(
-                            modifier = Modifier
-                                .offset(x = x - 35.dp, y = y - 22.dp)
-                                .width(70.dp)
-                                .border(0.5.dp, factionColor.copy(alpha = 0.7f), RoundedCornerShape(2.dp))
-                                .background(Color.Transparent)
-                                .padding(vertical = 2.dp, horizontal = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = anomaly.name.uppercase(),
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontSize = 6.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                maxLines = 1
-                            )
-                        }
+                                val widthPx = width.toPx()
+                                val heightPx = height.toPx()
+
+                                val isInside = xPx >= 0f && xPx <= widthPx && yPx >= 0f && yPx <= heightPx
+                                alpha = if (isInside) 0.9f else 0.0f
+
+                                translationX = xPx - 35.dp.toPx()
+                                translationY = yPx - 22.dp.toPx()
+                            }
+                            .width(70.dp)
+                            .border(0.5.dp, factionColor.copy(alpha = 0.7f), RoundedCornerShape(2.dp))
+                            .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(2.dp))
+                            .padding(vertical = 2.dp, horizontal = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = anomaly.name.uppercase(),
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 6.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1
+                        )
                     }
                 }
             }
         }
-
+        if (isProfilerEnabled) {
+            ProfilerHUDOverlay(
+                state = profilerState,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 90.dp)
+            )
+        }
     }
 }
 
@@ -9914,3 +10498,40 @@ fun SplicerTestView(viewModel: MainViewModel) {
         )
     }
 }
+
+private fun calculateDistanceInFeet(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+    val dx = (lng2 - lng1) * 111000.0 * kotlin.math.cos(Math.toRadians(lat1))
+    val dy = (lat2 - lat1) * 111000.0
+    val distMeters = kotlin.math.sqrt(dx * dx + dy * dy)
+    return distMeters * 3.28084
+}
+
+private fun warpProgress(pLin: Float, density: Float): Float {
+    val d = density.coerceIn(-0.9f, 0.9f)
+    if (kotlin.math.abs(d) < 0.001f) {
+        return pLin
+    }
+    return ((1.0 - Math.pow((1.0 - d).toDouble(), pLin.toDouble())) / d).toFloat().coerceIn(0f, 1f)
+}
+
+private fun hasCoherenceShield(creature: Creature?, originalSequence: String?): Boolean {
+    if (creature != null) {
+        if (WaveMath.getAnomalousBenefits(creature.sequence).any { it.id == "COHERENCE_SHIELD" }) {
+            return true
+        }
+        creature.appendedGenes.forEach { gene ->
+            if (WaveMath.isAnomalousGene(gene) && WaveMath.getBenefitForAnomalousGene(gene).id == "COHERENCE_SHIELD") {
+                return true
+            }
+        }
+        return false
+    }
+    if (originalSequence != null) {
+        if (WaveMath.getAnomalousBenefits(originalSequence).any { it.id == "COHERENCE_SHIELD" }) {
+            return true
+        }
+    }
+    return false
+}
+
+

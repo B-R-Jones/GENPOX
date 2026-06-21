@@ -22,12 +22,11 @@ Lists the five closest anomalies with metadata rows containing their faction typ
 
 ### Tactical Radar View
 An interactive, animated coordinate workspace rendered inside a custom cyberglass deck:
-*   **Concentric Scope Rings**: Three concentric circular lines centered on the player’s geographic transceiver beacon:
-    *   Outer perimeter ring: $\text{Radius} = R_{\text{max}}$
-    *   Mid-perimeter ring: $\text{Radius} = 0.6 \times R_{\text{max}}$
-    *   Inner-perimeter ring: $\text{Radius} = 0.3 \times R_{\text{max}}$
+*   **Concentric Scope Rings (Deprecated)**: The three concentric scope rings have been deprecated and removed to avoid visual distortion under 2.5D camera tilt/rotation and to optimize drawing performance by eliminating redundant `drawCircle` rasterization calls.
 *   **CRT Glitch Simulation**: Renders random tracking glitch bars, horizontal line tears, and phosphor noise snow.
-*   **Frustum Culling**: Viewport rendering limits vector road segments and coordinates to a defined boundary box to maximize drawing performance.
+*   **Geographic Frustum Culling & LOD**:
+    *   *Geographic Culling*: Before projection, road segments and building polygons are geographically checked against a rotation-invariant culling circle centered at `localMapCenterLat/localMapCenterLng`. To handle 2.5D perspective angling/tilting (where the Y-axis is squashed by `tiltYScale` down to `0.10f`), the culling radius expands along the tilt dimension by dividing the screen bounds radius by `tiltYScale`. This prevents distant buildings/roads from disappearing while culling over 80% of off-screen elements.
+    *   *Simplified LOD rendering*: When the camera is angled down (no 3D height extrusion, i.e., `finalExtX == 0f && finalExtY == 0f`) or a building's screen footprint is small (`maxDim < 12 dp`), the renderer bypasses the heavy 3D walls/roof loops. It falls back to a flat 2D rendering path, reducing GPU draw calls from ~20+ down to 3 per building (1 mask fill, 1 holographic fill, 1 stroke outline).
 *   **HUD Zoom Controller**: A vertical slider along the right side of the screen allows scaling the range:
     $$\text{Zoom Multiplier} \in \{4.00x, 2.00x, 1.00x, 0.50x, 0.25x\}$$
 

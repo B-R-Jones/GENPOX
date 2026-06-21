@@ -359,105 +359,160 @@ fun CreatureWireframeView(
         val sinS = sin(spinAngle.toDouble())
 
         val breathScale = 1.0 + geometry.breatheAmp * sin(breathingPhase.toDouble() * geometry.breatheFreq)
-        
-        val projectedPoints = mutableListOf<Offset>()
-        val depthZ = mutableListOf<Double>()
+        val finalScale = visualScale
 
-        // 1. Project primary creature vertices (Body, limbs, armor)
-        for (v in geometry.vertices) {
-            // Apply breathing scale
-            val bx = v.x * breathScale * visualScale
-            val by = v.y * breathScale * visualScale
-            val bz = v.z * breathScale * visualScale
+        if (finalScale < 0.3f) {
+            // LOD Tier 3: Draw a single glowing contact dot
+            drawCircle(
+                color = factionColor,
+                radius = 4f * densityVal,
+                center = Offset(centerX, centerY)
+            )
+        } else {
+            val projectedPoints = mutableListOf<Offset>()
+            val depthZ = mutableListOf<Double>()
 
-            // Apply helical twist
-            val twist = v.y * geometry.twistRate
-            val cosTw = cos(twist)
-            val sinTw = sin(twist)
-            val tx = bx * cosTw - bz * sinTw
-            val tz = bx * sinTw + bz * cosTw
-            val ty = by
+            // 1. Project primary creature vertices (Body, limbs, armor)
+            for (v in geometry.vertices) {
+                // Apply breathing scale
+                val bx = v.x * breathScale * finalScale
+                val by = v.y * breathScale * finalScale
+                val bz = v.z * breathScale * finalScale
 
-            // Apply global spin (rotation around Y-axis)
-            val rx = tx * cosS - tz * sinS
-            val rz = tx * sinS + tz * cosS
-            val ry = ty
+                // Apply helical twist
+                val twist = v.y * geometry.twistRate
+                val cosTw = cos(twist)
+                val sinTw = sin(twist)
+                val tx = bx * cosTw - bz * sinTw
+                val tz = bx * sinTw + bz * cosTw
+                val ty = by
 
-            // Apply global tilt (rotation around X-axis)
-            val finalX = rx
-            val finalY = ry * cosT - rz * sinT
-            val finalZ = ry * sinT + rz * cosT
+                // Apply global spin (rotation around Y-axis)
+                val rx = tx * cosS - tz * sinS
+                val rz = tx * sinS + tz * cosS
+                val ry = ty
 
-            projectedPoints.add(Offset((centerX + finalX).toFloat(), (centerY - finalY).toFloat()))
-            depthZ.add(finalZ)
-        }
+                // Apply global tilt (rotation around X-axis)
+                val finalX = rx
+                val finalY = ry * cosT - rz * sinT
+                val finalZ = ry * sinT + rz * cosT
 
-        // 2. Draw creature outer edges with smooth depth gradient fade
-        val maxRadius = (geometry.baseRadius * breathScale * visualScale * 1.4).coerceAtLeast(10.0)
-
-        for (edge in geometry.edges) {
-            if (edge.first < projectedPoints.size && edge.second < projectedPoints.size) {
-                val z1 = depthZ[edge.first]
-                val z2 = depthZ[edge.second]
-                val avgZ = (z1 + z2) / 2.0
-                
-                val depthPct = ((avgZ / maxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
-                val alpha = (0.18f + 0.82f * depthPct).toFloat()
-                val stroke = (0.8f + 1.2f * depthPct).toFloat() * densityVal
-
-                drawLine(
-                    color = factionColor.copy(alpha = alpha),
-                    start = projectedPoints[edge.first],
-                    end = projectedPoints[edge.second],
-                    strokeWidth = stroke
-                )
+                projectedPoints.add(Offset((centerX + finalX).toFloat(), (centerY - finalY).toFloat()))
+                depthZ.add(finalZ)
             }
-        }
 
-        // 3. Project and draw inner core energy reactor (independently spinning)
-        val coreSpinAngle = spinAngle * 3.5 // spins faster
-        val cosCs = cos(coreSpinAngle.toDouble())
-        val sinCs = sin(coreSpinAngle.toDouble())
+            val maxRadius = (geometry.baseRadius * breathScale * finalScale * 1.4).coerceAtLeast(10.0)
 
-        val projectedInner = mutableListOf<Offset>()
-        val depthInnerZ = mutableListOf<Double>()
+            // 2. Draw outer model drop shadows (LOD Tier 1: finalScale > 0.8f)
+            if (finalScale > 0.8f) {
+                for (edge in geometry.edges) {
+                    if (edge.first < projectedPoints.size && edge.second < projectedPoints.size) {
+                        val z1 = depthZ[edge.first]
+                        val z2 = depthZ[edge.second]
+                        val avgZ = (z1 + z2) / 2.0
+                        
+                        val depthPct = ((avgZ / maxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                        val alpha = (0.18f + 0.82f * depthPct).toFloat()
+                        val stroke = (0.8f + 1.2f * depthPct).toFloat() * densityVal
 
-        for (v in geometry.innerVertices) {
-            val vx = v.x * visualScale
-            val vy = v.y * visualScale
-            val vz = v.z * visualScale
+                        drawLine(
+                            color = Color.Black.copy(alpha = alpha * 0.8f),
+                            start = projectedPoints[edge.first] + Offset(1.5f * densityVal, 1.5f * densityVal),
+                            end = projectedPoints[edge.second] + Offset(1.5f * densityVal, 1.5f * densityVal),
+                            strokeWidth = stroke
+                        )
+                    }
+                }
+            }
 
-            // Spin core around both Y and Z axis for a gyroscope visual
-            val rx = vx * cosCs - vz * sinCs
-            val rz = vx * sinCs + vz * cosCs
-            val ry = vy
+            // 3. Draw outer model main lines
+            for (edge in geometry.edges) {
+                if (edge.first < projectedPoints.size && edge.second < projectedPoints.size) {
+                    val z1 = depthZ[edge.first]
+                    val z2 = depthZ[edge.second]
+                    val avgZ = (z1 + z2) / 2.0
+                    
+                    val depthPct = ((avgZ / maxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                    val alpha = (0.18f + 0.82f * depthPct).toFloat()
+                    val stroke = (0.8f + 1.2f * depthPct).toFloat() * densityVal
 
-            val finalX = rx
-            val finalY = ry * cosT - rz * sinT
-            val finalZ = ry * sinT + rz * cosT
+                    drawLine(
+                        color = factionColor.copy(alpha = alpha),
+                        start = projectedPoints[edge.first],
+                        end = projectedPoints[edge.second],
+                        strokeWidth = stroke
+                    )
+                }
+            }
 
-            projectedInner.add(Offset((centerX + finalX).toFloat(), (centerY - finalY).toFloat()))
-            depthInnerZ.add(finalZ)
-        }
+            // 4. Project and draw inner core energy reactor (LOD Tier 1: finalScale > 0.8f)
+            if (finalScale > 0.8f) {
+                val coreSpinAngle = spinAngle * 3.5 // spins faster
+                val cosCs = cos(coreSpinAngle.toDouble())
+                val sinCs = sin(coreSpinAngle.toDouble())
 
-        val innerMaxRadius = (geometry.innerVertices.firstOrNull()?.x ?: 10.0) * visualScale * 1.2
+                val projectedInner = mutableListOf<Offset>()
+                val depthInnerZ = mutableListOf<Double>()
 
-        for (edge in geometry.innerEdges) {
-            if (edge.first < projectedInner.size && edge.second < projectedInner.size) {
-                val z1 = depthInnerZ[edge.first]
-                val z2 = depthInnerZ[edge.second]
-                val avgZ = (z1 + z2) / 2.0
-                
-                val depthPct = ((avgZ / innerMaxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
-                val alpha = (0.2f + 0.8f * depthPct).toFloat()
-                val stroke = (0.6f + 0.8f * depthPct).toFloat() * densityVal
+                for (v in geometry.innerVertices) {
+                    val vx = v.x * finalScale
+                    val vy = v.y * finalScale
+                    val vz = v.z * finalScale
 
-                drawLine(
-                    color = innerCoreColor.copy(alpha = alpha),
-                    start = projectedInner[edge.first],
-                    end = projectedInner[edge.second],
-                    strokeWidth = stroke
-                )
+                    // Spin core around both Y and Z axis for a gyroscope visual
+                    val rx = vx * cosCs - vz * sinCs
+                    val rz = vx * sinCs + vz * cosCs
+                    val ry = vy
+
+                    val finalX = rx
+                    val finalY = ry * cosT - rz * sinT
+                    val finalZ = ry * sinT + rz * cosT
+
+                    projectedInner.add(Offset((centerX + finalX).toFloat(), (centerY - finalY).toFloat()))
+                    depthInnerZ.add(finalZ)
+                }
+
+                val innerMaxRadius = (geometry.innerVertices.firstOrNull()?.x ?: 10.0) * finalScale * 1.2
+
+                // Inner core shadows
+                for (edge in geometry.innerEdges) {
+                    if (edge.first < projectedInner.size && edge.second < projectedInner.size) {
+                        val z1 = depthInnerZ[edge.first]
+                        val z2 = depthInnerZ[edge.second]
+                        val avgZ = (z1 + z2) / 2.0
+                        
+                        val depthPct = ((avgZ / innerMaxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                        val alpha = (0.2f + 0.8f * depthPct).toFloat()
+                        val stroke = (0.6f + 0.8f * depthPct).toFloat() * densityVal
+
+                        drawLine(
+                            color = Color.Black.copy(alpha = alpha * 0.8f),
+                            start = projectedInner[edge.first] + Offset(1.5f * densityVal, 1.5f * densityVal),
+                            end = projectedInner[edge.second] + Offset(1.5f * densityVal, 1.5f * densityVal),
+                            strokeWidth = stroke
+                        )
+                    }
+                }
+
+                // Inner core lines
+                for (edge in geometry.innerEdges) {
+                    if (edge.first < projectedInner.size && edge.second < projectedInner.size) {
+                        val z1 = depthInnerZ[edge.first]
+                        val z2 = depthInnerZ[edge.second]
+                        val avgZ = (z1 + z2) / 2.0
+                        
+                        val depthPct = ((avgZ / innerMaxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                        val alpha = (0.2f + 0.8f * depthPct).toFloat()
+                        val stroke = (0.6f + 0.8f * depthPct).toFloat() * densityVal
+
+                        drawLine(
+                            color = innerCoreColor.copy(alpha = alpha),
+                            start = projectedInner[edge.first],
+                            end = projectedInner[edge.second],
+                            strokeWidth = stroke
+                        )
+                    }
+                }
             }
         }
 
