@@ -122,6 +122,15 @@ Standard controls must use custom double-layered cyberglass box structures (inst
     *   **Border & Glow**: Styled using `.cyberglass(...)` modifier. Mapped to active color when selected (e.g. `CyberGreen`, purple, or cyan), and dimmed secondary color when inactive (e.g. `CyberGreenDim.copy(alpha = 0.4f)`). Thin glow (`glowColor = borderColor.copy(alpha = 0.15f)`) is active only when selected.
     *   **Content**: Contains either a 24.dp custom wireframe Canvas vector icon (such as a target reticle) or exactly three horizontal lines of question marks/symbols/text stacked vertically in `FontFamily.Monospace`, 7.sp, bold, uppercase.
     *   **Feedback**: Trigger arcade chime sound beep upon click.
+5.  **Layered Holo-Nav Stack (Z-Depth Gestures)**:
+    *   **Structure**: Group two rows of holo-nav buttons (such as Manual Row A and Auto Row B) into an overlapping Z-depth stack (`Box`) to conserve screen space.
+    *   **Layer Styling**:
+        *   *Front Row*: Full scale (`1.0f`), fully opaque (`alpha = 1.0f`), higher shadow elevation (`8.dp`), and active/interactive (clickable).
+        *   *Back Row*: Scaled down (`0.85f`), semi-transparent (`alpha = 0.6f`), lower shadow elevation (`2.dp`), offset vertically by `-24.dp` (peeking from behind), and non-interactive.
+    *   **Interaction Rule**: Interactive clicks must be completely disabled/ignored for the back row to prevent accidental triggers. The back row is brought to the front solely via gestural cycling or swipe.
+    *   **Swipe-to-Cycle Gesture**: Swiping either UP or DOWN anywhere on the stack container toggles which row is active in front. Drag gestures must cross a threshold (e.g., `50` pixels) to prevent jitter.
+    *   **Idle Attraction Bounce**: To emphasize visual depth, the row currently in the *back* must perform a gentle periodic vertical bounce animation (rising by `-8.dp` and settling back with low stiffness spring return) every 6 seconds. The front row remains completely stable.
+    *   **Feedback**: Trigger combinator click/tick sounds on gesture toggle.
 
 ---
 

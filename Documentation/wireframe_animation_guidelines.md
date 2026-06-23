@@ -62,3 +62,12 @@ Use Compose `rememberInfiniteTransition` to animate rotations, breathing loops, 
 To make wireframe structures look alive and premium:
 *   Add a secondary internal element (e.g., core energy reactor) rotating around multiple axes (Y and Z) at a faster speed than the outer skeleton.
 *   This layered movement gives depth and premium mechanical weight with extremely low CPU/GPU cost.
+
+---
+
+## 7. UI Gesture-Driven Layer Swap Animations
+For interactive z-layered layouts (such as the overlapping holo-nav stack), combine pointer input detection with spring-based scale, opacity, and offset transitions to simulate tactile physical depth:
+*   **Swipe-to-Cycle Detection**: Track vertical drag displacements using Compose `pointerInput(Unit) { detectDragGestures(...) }`. Toggling the layer state requires exceeding a threshold (e.g., `50` pixels) in either vertical direction (up or down).
+*   **Tactile Spring Physics**: Animate depth shifts (Scale `1.0f` to `0.85f`, Alpha `1.0f` to `0.6f`, and vertical translation from `0.dp` to `-24.dp`) using a spring transition with `DampingRatioLowBouncy` and `StiffnessLow`.
+*   **Idle Attractor Bounce**: To signal layered depth without user interaction, run a periodic `LaunchedEffect` that executes a subtle vertical bounce (e.g., `-8.dp` offset with a medium spring return) on the **back row only** every 6 seconds.
+

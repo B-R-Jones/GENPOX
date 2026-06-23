@@ -2,6 +2,7 @@ package com.example.genpox.ui.main
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -18,6 +19,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -413,6 +416,213 @@ fun WireframeMutated(color: Color, modifier: Modifier = Modifier) {
         drawLine(color, Offset(w * 0.55f, h * 0.55f), Offset(w * 0.8f, h * 0.8f), strokeWidth = stroke)
         drawLine(color, Offset(w * 0.8f, h * 0.2f), Offset(w * 0.2f, h * 0.8f), strokeWidth = stroke)
         drawLine(color, Offset(w * 0.35f, h * 0.35f), Offset(w * 0.65f, h * 0.35f), strokeWidth = 0.8.dp.toPx())
+    }
+}
+
+@Composable
+fun HoloDnaSlotIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val strokeW = 1.2.dp.toPx()
+        
+        // Draw the outer square box
+        drawRect(
+            color = color,
+            topLeft = Offset(0f, 0f),
+            size = Size(w, h),
+            style = Stroke(width = strokeW)
+        )
+        
+        // Draw the vertical DNA strand inside the box
+        val cx = w / 2f
+        val amplitude = w * 0.2f
+        val steps = 12
+        val wave1 = mutableListOf<Offset>()
+        val wave2 = mutableListOf<Offset>()
+        for (i in 0..steps) {
+            val y = h * 0.15f + (h * 0.7f) * (i.toFloat() / steps)
+            val angle = (i.toFloat() / steps) * 2.2 * Math.PI
+            val xOffset = amplitude * sin(angle).toFloat()
+            wave1.add(Offset(cx + xOffset, y))
+            wave2.add(Offset(cx - xOffset, y))
+        }
+        
+        for (i in 0 until steps) {
+            drawLine(color, wave1[i], wave1[i+1], strokeWidth = strokeW)
+            drawLine(color, wave2[i], wave2[i+1], strokeWidth = strokeW)
+        }
+        
+        for (i in listOf(2, 6, 10)) {
+            drawLine(color, wave1[i], wave2[i], strokeWidth = strokeW * 0.7f)
+        }
+    }
+}
+
+@Composable
+fun HoloDnaForceIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val strokeW = 1.2.dp.toPx()
+        val cx = w / 2f
+        
+        // Draw the vertical DNA strand in the center
+        val amplitude = w * 0.15f
+        val steps = 12
+        val wave1 = mutableListOf<Offset>()
+        val wave2 = mutableListOf<Offset>()
+        for (i in 0..steps) {
+            val y = h * 0.15f + (h * 0.7f) * (i.toFloat() / steps)
+            val angle = (i.toFloat() / steps) * 2.2 * Math.PI
+            val xOffset = amplitude * sin(angle).toFloat()
+            wave1.add(Offset(cx + xOffset, y))
+            wave2.add(Offset(cx - xOffset, y))
+        }
+        
+        for (i in 0 until steps) {
+            drawLine(color, wave1[i], wave1[i+1], strokeWidth = strokeW)
+            drawLine(color, wave2[i], wave2[i+1], strokeWidth = strokeW)
+        }
+        for (i in listOf(2, 6, 10)) {
+            drawLine(color, wave1[i], wave2[i], strokeWidth = strokeW * 0.7f)
+        }
+        
+        // Draw two inward facing chevrons on the left and right sides
+        val leftPath = Path().apply {
+            moveTo(w * 0.1f, h * 0.35f)
+            lineTo(w * 0.25f, h * 0.5f)
+            lineTo(w * 0.1f, h * 0.65f)
+        }
+        val rightPath = Path().apply {
+            moveTo(w * 0.9f, h * 0.35f)
+            lineTo(w * 0.75f, h * 0.5f)
+            lineTo(w * 0.9f, h * 0.65f)
+        }
+        
+        drawPath(leftPath, color, style = Stroke(width = strokeW))
+        drawPath(rightPath, color, style = Stroke(width = strokeW))
+    }
+}
+
+@Composable
+fun HoloDnaAutoLoopIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val strokeW = 1.2.dp.toPx()
+        val cx = w / 2f
+        val cy = h / 2f
+        
+        // Draw the vertical DNA strand in the center (scaled down slightly to fit loop arrows)
+        val amplitude = w * 0.11f
+        val steps = 10
+        val wave1 = mutableListOf<Offset>()
+        val wave2 = mutableListOf<Offset>()
+        for (i in 0..steps) {
+            val y = h * 0.22f + (h * 0.56f) * (i.toFloat() / steps)
+            val angle = (i.toFloat() / steps) * 2.0 * Math.PI
+            val xOffset = amplitude * sin(angle).toFloat()
+            wave1.add(Offset(cx + xOffset, y))
+            wave2.add(Offset(cx - xOffset, y))
+        }
+        
+        for (i in 0 until steps) {
+            drawLine(color, wave1[i], wave1[i+1], strokeWidth = strokeW)
+            drawLine(color, wave2[i], wave2[i+1], strokeWidth = strokeW)
+        }
+        for (i in listOf(2, 5, 8)) {
+            drawLine(color, wave1[i], wave2[i], strokeWidth = strokeW * 0.7f)
+        }
+        
+        // Draw two inward facing chevrons on the left and right sides (scaled down to fit)
+        val leftPath = Path().apply {
+            moveTo(w * 0.22f, h * 0.38f)
+            lineTo(w * 0.32f, h * 0.5f)
+            lineTo(w * 0.22f, h * 0.62f)
+        }
+        val rightPath = Path().apply {
+            moveTo(w * 0.78f, h * 0.38f)
+            lineTo(w * 0.68f, h * 0.5f)
+            lineTo(w * 0.78f, h * 0.62f)
+        }
+        
+        drawPath(leftPath, color, style = Stroke(width = strokeW))
+        drawPath(rightPath, color, style = Stroke(width = strokeW))
+
+        // Draw two semi-circular loop arrows
+        val arcPadding = 2.dp.toPx()
+        val arcSize = Size(w - arcPadding * 2, h - arcPadding * 2)
+        val arcTopLeft = Offset(arcPadding, arcPadding)
+        val rx = (w - arcPadding * 2) / 2f
+        
+        // Left arc: starts at 100 degrees, sweeps 170 degrees (clockwise to 270 degrees)
+        drawArc(
+            color = color,
+            startAngle = 100f,
+            sweepAngle = 170f,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = Stroke(width = strokeW, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        )
+        
+        // Right arc: starts at 280 degrees, sweeps 170 degrees (clockwise to 90 degrees)
+        drawArc(
+            color = color,
+            startAngle = 280f,
+            sweepAngle = 170f,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = Stroke(width = strokeW, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        )
+
+        // Arrowheads:
+        // Top arrowhead at 270 degrees (pointing right)
+        val topArrowPath = Path().apply {
+            moveTo(cx - 3.5.dp.toPx(), cy - rx - 2.dp.toPx())
+            lineTo(cx, cy - rx)
+            lineTo(cx - 3.5.dp.toPx(), cy - rx + 2.dp.toPx())
+        }
+        // Bottom arrowhead at 90 degrees (pointing left)
+        val bottomArrowPath = Path().apply {
+            moveTo(cx + 3.5.dp.toPx(), cy + rx - 2.dp.toPx())
+            lineTo(cx, cy + rx)
+            lineTo(cx + 3.5.dp.toPx(), cy + rx + 2.dp.toPx())
+        }
+
+        drawPath(topArrowPath, color, style = Stroke(width = strokeW, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+        drawPath(bottomArrowPath, color, style = Stroke(width = strokeW, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+    }
+}
+
+@Composable
+fun HoloDnaAutoSlotIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val strokeW = 1.2.dp.toPx()
+        
+        // Draw the slot box (U-shape container)
+        val boxPath = Path().apply {
+            moveTo(w * 0.25f, h * 0.45f)
+            lineTo(w * 0.25f, h * 0.8f)
+            lineTo(w * 0.75f, h * 0.8f)
+            lineTo(w * 0.75f, h * 0.45f)
+        }
+        drawPath(boxPath, color, style = Stroke(width = strokeW))
+        
+        // Draw the down-pointing arrow
+        val arrowPath = Path().apply {
+            moveTo(w * 0.5f, h * 0.15f)
+            lineTo(w * 0.5f, h * 0.6f)
+            // Arrowhead at the end pointing down
+            moveTo(w * 0.38f, h * 0.48f)
+            lineTo(w * 0.5f, h * 0.6f)
+            lineTo(w * 0.62f, h * 0.48f)
+        }
+        drawPath(arrowPath, color, style = Stroke(width = strokeW, cap = androidx.compose.ui.graphics.StrokeCap.Round))
     }
 }
 
@@ -2047,6 +2257,12 @@ fun CombinatorView(viewModel: MainViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .cyberglass(borderColor = activeColor, backgroundColor = Color.Black)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        // Prevent click-through to underlying dashboard components
+                    }
                     .padding(8.dp)
             ) {
                 Column(
@@ -2066,19 +2282,27 @@ fun CombinatorView(viewModel: MainViewModel) {
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Default
                         )
-                        Text(
-                            text = "✕ CLOSE",
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Red,
-                            modifier = Modifier.clickable {
-                                showStepSearchOverlay = false
-                                stepSearchPrefix = ""
-                                viewStepSearchMatchesOnly = false
-                                stepSearchSelectedGene = null
-                            }
-                        )
+                        Box(
+                            modifier = Modifier
+                                .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                                .clickable {
+                                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                    showStepSearchOverlay = false
+                                    stepSearchPrefix = ""
+                                    viewStepSearchMatchesOnly = false
+                                    stepSearchSelectedGene = null
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "✕ CLOSE",
+                                color = Color.Red,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Default,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     // Progress indicators (1-2bp, 3-4bp, 5-6bp, 7-8bp or character-by-character)
@@ -2178,32 +2402,51 @@ fun CombinatorView(viewModel: MainViewModel) {
                                 }
                             }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 if (activeStep > 0) {
-                                    Text(
-                                        text = "UNDO",
-                                        style = Typography.labelSmall,
-                                        fontFamily = FontFamily.Default,
-                                        color = Color.Yellow,
-                                        modifier = Modifier.clickable {
-                                            stepSearchPrefix = stepSearchPrefix.dropLast(stepSize)
+                                    Box(
+                                        modifier = Modifier
+                                            .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
+                                            .clickable {
+                                                stepSearchPrefix = stepSearchPrefix.dropLast(stepSize)
+                                                viewStepSearchMatchesOnly = false
+                                                viewModel.synthManager.playCombinatorTick()
+                                            }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "↶ UNDO",
+                                            color = Color.Yellow,
+                                            fontSize = 8.sp,
+                                            fontFamily = FontFamily.Default,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
+                                        .clickable {
+                                            stepSearchPrefix = ""
                                             viewStepSearchMatchesOnly = false
-                                            viewModel.synthManager.playCombinatorTick()
+                                            stepSearchSelectedGene = null
+                                            viewModel.synthManager.playReject()
                                         }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "✕ RESET",
+                                        color = Color.Yellow,
+                                        fontSize = 8.sp,
+                                        fontFamily = FontFamily.Default,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
-                                Text(
-                                    text = "RESET",
-                                    style = Typography.labelSmall,
-                                    fontFamily = FontFamily.Default,
-                                    color = Color.Yellow,
-                                    modifier = Modifier.clickable {
-                                        stepSearchPrefix = ""
-                                        viewStepSearchMatchesOnly = false
-                                        stepSearchSelectedGene = null
-                                        viewModel.synthManager.playReject()
-                                    }
-                                )
                             }
                         }
                     }
@@ -2227,13 +2470,24 @@ fun CombinatorView(viewModel: MainViewModel) {
                                     color = activeColorDim
                                 )
                                 if (!isDone) {
-                                    Text(
-                                        text = "BACK TO GRID",
-                                        style = Typography.labelSmall,
-                                        fontFamily = FontFamily.Default,
-                                        color = activeColor,
-                                        modifier = Modifier.clickable { viewStepSearchMatchesOnly = false }
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
+                                            .clickable {
+                                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                                viewStepSearchMatchesOnly = false
+                                            }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "✕ BACK",
+                                            color = Color.Yellow,
+                                            fontSize = 8.sp,
+                                            fontFamily = FontFamily.Default,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                             
@@ -2492,6 +2746,12 @@ fun CombinatorView(viewModel: MainViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .cyberglass(borderColor = Color(0xFF00FF41), backgroundColor = Color(0xFF020D04))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        // Prevent click-through to underlying dashboard components
+                    }
                     .padding(12.dp)
             ) {
                 Column(
@@ -2846,6 +3106,12 @@ fun CombinatorView(viewModel: MainViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .cyberglass(borderColor = Color(0xFFA855F7), backgroundColor = Color.Black)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        // Prevent click-through to underlying dashboard components
+                    }
                     .padding(8.dp)
             ) {
                 Column(
@@ -2865,17 +3131,25 @@ fun CombinatorView(viewModel: MainViewModel) {
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Default
                         )
-                        Text(
-                            text = "✕ CLOSE",
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Red,
-                            modifier = Modifier.clickable {
-                                showAnomalyVaultOverlay = false
-                                selectedAnomalousGene = null
-                            }
-                        )
+                        Box(
+                            modifier = Modifier
+                                .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                                .clickable {
+                                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                    showAnomalyVaultOverlay = false
+                                    selectedAnomalousGene = null
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "✕ CLOSE",
+                                color = Color.Red,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Default,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     // Get all anomalous genes
@@ -3062,19 +3336,19 @@ fun CombinatorView(viewModel: MainViewModel) {
                 confirmButton = {
                     Box(
                         modifier = Modifier
-                            .cyberglass(
-                                borderColor = if (isAnom) Color(0xFFA855F7) else activeColor,
-                                backgroundColor = if (isAnom) Color(0xFFA855F7).copy(alpha = 0.15f) else activeColor.copy(alpha = 0.15f)
-                            )
-                            .clickable { selectedPacketByGene = null }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                            .clickable {
+                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                selectedPacketByGene = null
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "CLOSE DIAGNOSTIC",
-                            style = Typography.labelSmall,
+                            text = "✕ CLOSE",
+                            color = Color.Red,
+                            fontSize = 8.sp,
                             fontFamily = FontFamily.Default,
-                            color = if (isAnom) Color(0xFFD8B4FE) else activeColor,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -3167,19 +3441,19 @@ fun CombinatorView(viewModel: MainViewModel) {
                 confirmButton = {
                     Box(
                         modifier = Modifier
-                            .cyberglass(
-                                borderColor = if (isAnom) Color(0xFFA855F7) else activeColor,
-                                backgroundColor = if (isAnom) Color(0xFFA855F7).copy(alpha = 0.15f) else activeColor.copy(alpha = 0.15f)
-                            )
-                            .clickable { stepSearchSelectedGene = null }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                            .clickable {
+                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                stepSearchSelectedGene = null
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "DISMISS",
-                            style = Typography.labelSmall,
+                            text = "✕ CLOSE",
+                            color = Color.Red,
+                            fontSize = 8.sp,
                             fontFamily = FontFamily.Default,
-                            color = if (isAnom) Color(0xFFD8B4FE) else activeColor,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -3252,19 +3526,19 @@ fun CombinatorView(viewModel: MainViewModel) {
                 confirmButton = {
                     Box(
                         modifier = Modifier
-                            .cyberglass(
-                                borderColor = Color(0xFFA855F7),
-                                backgroundColor = Color(0xFFA855F7).copy(alpha = 0.15f)
-                            )
-                            .clickable { selectedAnomalousGene = null }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                            .clickable {
+                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                selectedAnomalousGene = null
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "DISMISS",
-                            style = Typography.labelSmall,
+                            text = "✕ CLOSE",
+                            color = Color.Red,
+                            fontSize = 8.sp,
                             fontFamily = FontFamily.Default,
-                            color = Color(0xFFD8B4FE),
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -3292,7 +3566,8 @@ fun SplicerView(viewModel: MainViewModel) {
     val splicingProgress by viewModel.splicingProgress.collectAsState()
     val inventoryGenes by viewModel.geneSequences.collectAsState()
 
-    if (isForcedConstructionActive || isSplicing) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Main view content: SplicerLeftPanel is always rendered full size!
         SplicerLeftPanel(
             viewModel = viewModel,
             targetSequence = targetSequence,
@@ -3307,77 +3582,233 @@ fun SplicerView(viewModel: MainViewModel) {
             splicingProgress = splicingProgress,
             modifier = Modifier.fillMaxSize()
         )
-    } else {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val isWide = maxWidth > 600.dp
-            if (isWide) {
+
+        // Floating action buttons (Layered Stack)
+        if (!isForcedConstructionActive && !isSplicing) {
+            var showAutoRowInFront by remember { mutableStateOf(false) }
+
+            val autoRowInFront = showAutoRowInFront
+
+            val autoRowScale by animateFloatAsState(
+                targetValue = if (autoRowInFront) 1.0f else 0.85f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
+            )
+            val autoRowAlpha by animateFloatAsState(
+                targetValue = if (autoRowInFront) 1.0f else 0.6f,
+                animationSpec = tween(durationMillis = 350)
+            )
+            val autoRowOffsetY by animateDpAsState(
+                targetValue = if (autoRowInFront) 0.dp else (-24).dp,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
+            )
+            val autoRowElevation by animateDpAsState(
+                targetValue = if (autoRowInFront) 8.dp else 2.dp,
+                animationSpec = tween(durationMillis = 300)
+            )
+            val autoRowZIndex = if (autoRowInFront) 1f else 0f
+
+            val manualRowScale by animateFloatAsState(
+                targetValue = if (autoRowInFront) 0.85f else 1.0f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
+            )
+            val manualRowAlpha by animateFloatAsState(
+                targetValue = if (autoRowInFront) 0.6f else 1.0f,
+                animationSpec = tween(durationMillis = 350)
+            )
+            val manualRowOffsetY by animateDpAsState(
+                targetValue = if (autoRowInFront) (-24).dp else 0.dp,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
+            )
+            val manualRowElevation by animateDpAsState(
+                targetValue = if (autoRowInFront) 2.dp else 8.dp,
+                animationSpec = tween(durationMillis = 300)
+            )
+            val manualRowZIndex = if (autoRowInFront) 0f else 1f
+
+            val bounceAnimatable = remember { Animatable(0f) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(6000L)
+                    bounceAnimatable.animateTo(
+                        targetValue = -8f,
+                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                    )
+                    bounceAnimatable.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    )
+                }
+            }
+            val bounceOffset = bounceAnimatable.value.dp
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 16.dp, end = 16.dp)
+                    .pointerInput(Unit) {
+                        var totalDragY = 0f
+                        detectDragGestures(
+                            onDragStart = { totalDragY = 0f },
+                            onDragEnd = {
+                                if (kotlin.math.abs(totalDragY) > 50f) {
+                                    viewModel.synthManager.playCombinatorTick()
+                                    showAutoRowInFront = !showAutoRowInFront
+                                }
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                totalDragY += dragAmount.y
+                            }
+                        )
+                    }
+            ) {
+                // Auto Row (Row B)
                 Row(
                     modifier = Modifier
-                        .fillMaxSize(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        .zIndex(autoRowZIndex)
+                        .offset(y = autoRowOffsetY + (if (!autoRowInFront) bounceOffset else 0.dp))
+                        .graphicsLayer {
+                            alpha = autoRowAlpha
+                            scaleX = autoRowScale
+                            scaleY = autoRowScale
+                        }
+                        .shadow(elevation = autoRowElevation, shape = RoundedCornerShape(4.dp))
+                        .background(Color.Transparent),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.weight(1.2f).fillMaxHeight()) {
-                        SplicerLeftPanel(
-                            viewModel = viewModel,
-                            targetSequence = targetSequence,
-                            splicerSlots = splicerSlots,
-                            activeSlotSelection = activeSlotSelection,
-                            isReactorFrozen = isReactorFrozen,
-                            reactorFreezeTimeLeft = reactorFreezeTimeLeft,
-                            isForcedConstructionActive = isForcedConstructionActive,
-                            isForcedLoopActive = isForcedLoopActive,
-                            forcedConstructionLogs = forcedConstructionLogs,
-                            isSplicing = isSplicing,
-                            splicingProgress = splicingProgress,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                    // AUTO-LOOP button
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .cyberglass(
+                                borderColor = Color(0xFFEF4444),
+                                glowColor = Color(0xFFEF4444).copy(alpha = 0.15f),
+                                backgroundColor = Color(0xFF0A0A0F).copy(alpha = 0.75f)
+                            )
+                            .clickable(enabled = autoRowInFront) {
+                                viewModel.synthManager.playCombinatorTick()
+                                viewModel.setIsForcedLoopActive(true)
+                                viewModel.startForcedConstruction()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        HoloDnaAutoLoopIcon(color = Color(0xFFEF4444))
                     }
-                    Box(modifier = Modifier.weight(0.8f).fillMaxHeight()) {
-                        SplicerRightPanel(
-                            viewModel = viewModel,
-                            activeSlotSelection = activeSlotSelection,
-                            targetSequence = targetSequence,
-                            slotSequenceFilter = slotSequenceFilter,
-                            inventoryGenes = inventoryGenes,
-                            isWide = isWide
-                        )
+
+                    // AUTO-SLOT button
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .cyberglass(
+                                borderColor = CyberGreen,
+                                glowColor = CyberGreen.copy(alpha = 0.15f),
+                                backgroundColor = Color(0xFF0A0A0F).copy(alpha = 0.75f)
+                            )
+                            .clickable(enabled = autoRowInFront) {
+                                viewModel.synthManager.playCombinatorTick()
+                                viewModel.autofillSplicerSlots()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        HoloDnaAutoSlotIcon(color = CyberGreen)
                     }
                 }
-            } else {
-                val rightPanelHeight = if (activeSlotSelection != null) 140.dp else 75.dp
-                Column(
+
+                // Manual Row (Row A)
+                Row(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .zIndex(manualRowZIndex)
+                        .offset(y = manualRowOffsetY + (if (autoRowInFront) bounceOffset else 0.dp))
+                        .graphicsLayer {
+                            alpha = manualRowAlpha
+                            scaleX = manualRowScale
+                            scaleY = manualRowScale
+                        }
+                        .shadow(elevation = manualRowElevation, shape = RoundedCornerShape(4.dp))
+                        .background(Color.Transparent),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.fillMaxWidth().wrapContentHeight()) {
-                        SplicerLeftPanel(
-                            viewModel = viewModel,
-                            targetSequence = targetSequence,
-                            splicerSlots = splicerSlots,
-                            activeSlotSelection = activeSlotSelection,
-                            isReactorFrozen = isReactorFrozen,
-                            reactorFreezeTimeLeft = reactorFreezeTimeLeft,
-                            isForcedConstructionActive = isForcedConstructionActive,
-                            isForcedLoopActive = isForcedLoopActive,
-                            forcedConstructionLogs = forcedConstructionLogs,
-                            isSplicing = isSplicing,
-                            splicingProgress = splicingProgress,
-                            modifier = Modifier.fillMaxWidth().wrapContentHeight()
-                        )
+                    // FORCE button
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .cyberglass(
+                                borderColor = Color(0xFFEF4444),
+                                glowColor = Color(0xFFEF4444).copy(alpha = 0.15f),
+                                backgroundColor = Color(0xFF0A0A0F).copy(alpha = 0.75f)
+                            )
+                            .clickable(enabled = !autoRowInFront) {
+                                viewModel.synthManager.playCombinatorTick()
+                                viewModel.startForcedConstruction()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        HoloDnaForceIcon(color = Color(0xFFEF4444))
                     }
-                    Box(modifier = Modifier.fillMaxWidth().height(rightPanelHeight)) {
-                        SplicerRightPanel(
-                            viewModel = viewModel,
-                            activeSlotSelection = activeSlotSelection,
-                            targetSequence = targetSequence,
-                            slotSequenceFilter = slotSequenceFilter,
-                            inventoryGenes = inventoryGenes,
-                            isWide = isWide
-                        )
+
+                    // SLOT compilation button
+                    val hasEmpty = splicerSlots.contains(null)
+                    val slotBorderColor = if (hasEmpty) CyberGreenDim.copy(alpha = 0.4f) else CyberGreen
+                    val slotGlowColor = if (hasEmpty) Color.Transparent else CyberGreen.copy(alpha = 0.15f)
+                    val slotBgColor = if (hasEmpty) Color.Transparent else Color(0xFF0A0A0F).copy(alpha = 0.75f)
+                    
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .cyberglass(
+                                borderColor = slotBorderColor,
+                                glowColor = slotGlowColor,
+                                backgroundColor = slotBgColor
+                            )
+                            .clickable(enabled = !autoRowInFront && !hasEmpty) {
+                                viewModel.synthManager.playCombinatorTick()
+                                viewModel.constructSplicedCreature()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        HoloDnaSlotIcon(color = slotBorderColor)
                     }
                 }
+            }
+        }
+
+        // Slotting UI Floating Panel (holographic popup overlay)
+        if (activeSlotSelection != null && !isForcedConstructionActive && !isSplicing) {
+            // Translucent dim backdrop to focus user attention
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable { viewModel.selectSplicerSlot(null) }
+            )
+
+            // Centered overlay card
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .widthIn(max = 380.dp)
+                    .fillMaxWidth(0.9f)
+                    .clickable(enabled = false) {} // block clicks to background
+                    .cyberglass(
+                        borderColor = CyberGreen,
+                        glowColor = CyberGreen.copy(alpha = 0.15f),
+                        backgroundColor = Color(0xFF060B07).copy(alpha = 0.95f)
+                    )
+                    .padding(16.dp)
+            ) {
+                SplicerRightPanel(
+                    viewModel = viewModel,
+                    activeSlotSelection = activeSlotSelection,
+                    targetSequence = targetSequence,
+                    slotSequenceFilter = slotSequenceFilter,
+                    inventoryGenes = inventoryGenes,
+                    isWide = false
+                )
             }
         }
     }
@@ -3402,8 +3833,7 @@ fun SplicerLeftPanel(
         // Emergency Forced Compile Terminal Screen
         Column(
             modifier = modifier
-                .border(1.dp, Color(0xFF991B1B), RoundedCornerShape(4.dp))
-                .background(Color.Black)
+                .cyberglass(borderColor = Color(0xFFEF4444), backgroundColor = Color.Black)
                 .padding(12.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -3414,9 +3844,9 @@ fun SplicerLeftPanel(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "[ FORCED SEQUENCING ACTIVE ]",
-                        color = Color.Red,
-                        style = Typography.labelSmall,
+                        text = "FORCED SEQUENCING ACTIVE",
+                        color = Color(0xFFEF4444),
+                        fontSize = 9.sp,
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight.Bold
                     )
@@ -3463,7 +3893,7 @@ fun SplicerLeftPanel(
                         .fillMaxWidth()
                         .weight(1f)
                         .background(Color(0xFF050505))
-                        .border(1.dp, Color(0xFF2D0A0A), RoundedCornerShape(2.dp))
+                        .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                         .padding(6.dp),
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -3489,7 +3919,7 @@ fun SplicerLeftPanel(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(Color(0x20EF4444))
-                            .border(1.dp, Color(0x50EF4444), RoundedCornerShape(2.dp))
+                            .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                             .padding(6.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
@@ -3505,7 +3935,7 @@ fun SplicerLeftPanel(
                             text = "P.O.X. REACTOR FROZEN: ${reactorFreezeTimeLeft}s REMAINING",
                             color = Color(0xFFFCA5A5),
                             style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
+                            fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )
@@ -3513,16 +3943,17 @@ fun SplicerLeftPanel(
                 }
 
                 if (isForcedLoopActive) {
-                    Button(
-                        onClick = { viewModel.setIsForcedLoopActive(false) },
-                        modifier = Modifier.fillMaxWidth().height(32.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x30B91C1C), contentColor = Color.White),
-                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                        shape = RoundedCornerShape(2.dp),
-                        contentPadding = PaddingValues(0.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(32.dp)
+                            .cyberglass(borderColor = Color(0xFFEF4444), backgroundColor = Color(0x30B91C1C))
+                            .clickable { viewModel.setIsForcedLoopActive(false) },
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "✕ EXIT AUTO-SYNTHESIS LOOP CASCADE",
+                            color = Color.White,
                             style = Typography.bodySmall,
                             fontFamily = FontFamily.Default,
                             fontWeight = FontWeight.Bold,
@@ -3536,8 +3967,7 @@ fun SplicerLeftPanel(
         // Splicing Morphogenesis Screen
         Column(
             modifier = modifier
-                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                .background(CyberPanel)
+                .cyberglass(borderColor = CyberBorder, backgroundColor = CyberPanel)
                 .padding(12.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
@@ -3672,9 +4102,8 @@ fun SplicerLeftPanel(
                 Text(
                     text = "SYNTHESIS ASSEMBLY MATRIX",
                     color = CyberGreenDim,
-                    style = Typography.labelSmall,
+                    fontSize = 9.sp,
                     fontFamily = FontFamily.Default,
-                    fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
@@ -3748,16 +4177,16 @@ fun SplicerLeftPanel(
             Text(
                 text = "SPLICING PACKETS BUFFER: $splicingProgress%",
                 color = CyberGreenDim,
-                fontFamily = FontFamily.Default,
-                style = Typography.labelSmall
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
             )
         }
     } else {
         // Standard Re-sequencing grid layout panel
         Column(
             modifier = modifier
-                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                .background(CyberPanel)
+                .cyberglass(borderColor = CyberBorder, backgroundColor = CyberPanel)
                 .padding(12.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -3768,7 +4197,7 @@ fun SplicerLeftPanel(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "[ G.E.N. P.O.X. E-MERGE SEQUENCER V1.7 ]",
+                        text = "G.E.N. P.O.X. E-MERGE SEQUENCER V1.7",
                         color = CyberGreenDim,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
@@ -3855,7 +4284,7 @@ fun SplicerLeftPanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color(0xFF050C06))
-                        .border(1.dp, Color(0x4000FF41), RoundedCornerShape(4.dp))
+                        .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                         .padding(6.dp)
                 ) {
                     Row(
@@ -3864,9 +4293,9 @@ fun SplicerLeftPanel(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "[ REQUIRED TARGET SEQUENCE ]",
-                            color = CyberGreen,
-                            style = Typography.labelSmall,
+                            text = "REQUIRED TARGET SEQUENCE",
+                            color = CyberGreenDim,
+                            fontSize = 9.sp,
                             fontFamily = FontFamily.Default,
                             fontWeight = FontWeight.Bold
                         )
@@ -3911,12 +4340,12 @@ fun SplicerLeftPanel(
                                             .weight(1f)
                                             .background(
                                                 color = if (isAnom) Color(0x20A855F7) else Color.Transparent,
-                                                shape = RoundedCornerShape(2.dp)
+                                                shape = RoundedCornerShape(4.dp)
                                             )
                                             .border(
                                                 width = if (isAnom) 1.dp else 0.dp,
                                                 color = if (isAnom) Color(0x30A855F7) else Color.Transparent,
-                                                shape = RoundedCornerShape(2.dp)
+                                                shape = RoundedCornerShape(4.dp)
                                             )
                                             .padding(horizontal = 4.dp, vertical = 2.dp),
                                         contentAlignment = Alignment.Center
@@ -3943,13 +4372,13 @@ fun SplicerLeftPanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color(0xFF050C06))
-                        .border(1.dp, Color(0x4000FF41), RoundedCornerShape(4.dp))
+                        .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                         .padding(6.dp)
                 ) {
                     Text(
-                        text = "[ CURRENT SPLICED SEQUENCE ]",
-                        color = CyberGreen,
-                        style = Typography.labelSmall,
+                        text = "CURRENT SPLICED SEQUENCE",
+                        color = CyberGreenDim,
+                        fontSize = 9.sp,
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight.Bold
                     )
@@ -3992,12 +4421,12 @@ fun SplicerLeftPanel(
                                             .weight(1f)
                                             .background(
                                                 color = if (isAnom) Color(0x20A855F7) else Color.Transparent,
-                                                shape = RoundedCornerShape(2.dp)
+                                                shape = RoundedCornerShape(4.dp)
                                             )
                                             .border(
                                                 width = if (isAnom) 1.dp else 0.dp,
                                                 color = if (isAnom) Color(0x30A855F7) else Color.Transparent,
-                                                shape = RoundedCornerShape(2.dp)
+                                                shape = RoundedCornerShape(4.dp)
                                             )
                                             .padding(horizontal = 4.dp, vertical = 2.dp),
                                         contentAlignment = Alignment.Center
@@ -4024,101 +4453,23 @@ fun SplicerLeftPanel(
 
             // Synthesizer Actions and Forced Emergency Overrides
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = { viewModel.autofillSplicerSlots() },
-                        modifier = Modifier.height(54.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White),
-                        border = BorderStroke(1.dp, Color(0x8000FF41)),
-                        shape = RoundedCornerShape(2.dp)
-                    ) {
-                        Text(text = "AUTO SLOT", style = Typography.bodySmall, fontFamily = FontFamily.Default, fontWeight = FontWeight.Bold)
-                    }
 
-                    val hasEmpty = splicerSlots.contains(null)
-                    Button(
-                        onClick = { viewModel.constructSplicedCreature() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(54.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (hasEmpty) Color(0x1000FF41) else CyberGreen,
-                            contentColor = if (hasEmpty) CyberGreenDim else Color.Black
-                        ),
-                        border = BorderStroke(1.dp, if (hasEmpty) Color(0x3000FF41) else CyberBorder),
-                        shape = RoundedCornerShape(2.dp),
-                        enabled = !hasEmpty
-                    ) {
-                        Text(
-                            text = if (hasEmpty) "FILL EMPTY SLOTS OR FORCE" else "SEQUENCE P.O.X. GENOME",
-                            style = Typography.bodySmall,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Button(
-                        onClick = { viewModel.startForcedConstruction() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(54.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x20B91C1C), contentColor = Color(0xFFEF4444)),
-                        border = BorderStroke(1.dp, Color(0xFF7F1D1D)),
-                        shape = RoundedCornerShape(2.dp),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text(text = "FORCE SINGLE", style = Typography.bodySmall, fontFamily = FontFamily.Default, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                    Button(
-                        onClick = { viewModel.setIsForcedLoopActive(true); viewModel.startForcedConstruction() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(54.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x30B91C1C), contentColor = Color(0xFFFCA5A5)),
-                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                        shape = RoundedCornerShape(2.dp),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text(text = "FORCE AUTO-LOOP", style = Typography.bodySmall, fontFamily = FontFamily.Default, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
-
-                Text(
-                    text = "WARNING: FREEZES BIO-LAB REACTOR FOR 8S; GENE BLOCK ATTRITION IS 37.5%",
-                    color = Color(0xFFFCA5A5),
-                    style = Typography.bodySmall,
-                    fontFamily = FontFamily.Default,
-                    fontSize = 8.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
 
                 val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
                 if (devForceAnomaly) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Button(
-                        onClick = { viewModel.devInjectMissingTargetGenes() },
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(32.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0x20A855F7),
-                            contentColor = Color(0xFFD8B4FE)
-                        ),
-                        border = BorderStroke(1.dp, Color(0x80A855F7)),
-                        shape = RoundedCornerShape(2.dp),
-                        contentPadding = PaddingValues(0.dp)
+                            .height(32.dp)
+                            .cyberglass(borderColor = Color(0x80A855F7), backgroundColor = Color(0x20A855F7))
+                            .clickable { viewModel.devInjectMissingTargetGenes() },
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "DEV: INJECT MISSING GENES",
+                            color = Color(0xFFD8B4FE),
                             style = Typography.bodySmall,
                             fontFamily = FontFamily.Default,
                             fontWeight = FontWeight.Bold,
@@ -4142,9 +4493,10 @@ fun SplicerSlotCell(
     val isAnom = slot?.let { WaveMath.isAnomalousGene(it) } ?: false
     val borderStroke = when {
         isSelected -> BorderStroke(1.5.dp, if (isAnom) Color(0xFFA855F7) else CyberGreen)
-        slot != null -> BorderStroke(1.dp, if (isAnom) Color(0xFF701A75) else Color(0xFF064E3B))
-        else -> BorderStroke(1.dp, Color(0x3000FF41))
+        slot != null -> BorderStroke(1.dp, if (isAnom) Color(0xFF701A75) else CyberGreenDim.copy(alpha = 0.5f))
+        else -> BorderStroke(1.dp, CyberBorder)
     }
+
 
     Box(
         modifier = Modifier
@@ -4165,7 +4517,7 @@ fun SplicerSlotCell(
             text = "#${idx + 1}",
             color = if (isAnom) Color(0xFFC084FC) else CyberGreenDim,
             style = Typography.bodySmall,
-            fontFamily = FontFamily.Default,
+            fontFamily = FontFamily.Monospace,
             fontSize = 8.sp,
             modifier = Modifier.align(Alignment.TopStart)
         )
@@ -4180,6 +4532,7 @@ fun SplicerSlotCell(
                     text = slot.take(4),
                     color = if (isAnom) Color(0xFFD8B4FE) else CyberGreen,
                     style = Typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.sp,
                     letterSpacing = 1.sp
@@ -4188,6 +4541,7 @@ fun SplicerSlotCell(
                     text = slot.substring(4),
                     color = if (isAnom) Color(0xFFA855F7) else CyberGreenDim,
                     style = Typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
                     fontSize = 8.sp,
                     letterSpacing = 1.sp
                 )
@@ -4229,206 +4583,176 @@ fun SplicerRightPanel(
     inventoryGenes: List<GeneSequence>,
     isWide: Boolean
 ) {
-    if (activeSlotSelection != null) {
-        val expected = targetSequence.substring(activeSlotSelection * 8, (activeSlotSelection + 1) * 8)
+    if (activeSlotSelection == null) return
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                .background(CyberPanel)
-                .padding(12.dp)
+    val expected = targetSequence.substring(activeSlotSelection * 8, (activeSlotSelection + 1) * 8)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentHeight(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Text(
+                text = "ASSIGN GENE BLOCK TO SLOT #${activeSlotSelection + 1}",
+                color = CyberGreenDim,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Bold
+            )
+            Box(
+                modifier = Modifier
+                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                    .clickable { viewModel.selectSplicerSlot(null) }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "ASSIGN GENE BLOCK TO SLOT #${activeSlotSelection + 1}",
-                    color = CyberGreen,
-                    style = Typography.labelSmall,
+                    text = "✕ CLOSE",
+                    color = Color.Red,
+                    fontSize = 8.sp,
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    text = "[ CANCEL ]",
-                    color = Color.Red,
-                    style = Typography.labelSmall,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { viewModel.selectSplicerSlot(null) }
-                )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+        }
 
-            // Expected gene info block
+        // Expected gene info block
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(CyberGreen.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                .padding(6.dp)
+        ) {
+            Text(
+                text = "REQUIRED SEGMENT FOR SLOT #${activeSlotSelection + 1}",
+                color = CyberGreenDim,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = expected,
+                color = Color(0xFF22D3EE),
+                style = Typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                letterSpacing = 1.sp
+            )
+        }
+
+        val matchingGene = inventoryGenes.find { it.sequence == expected && it.count > 0 }
+
+        if (matchingGene != null) {
+            // Stock panel matching Required Segment block style
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0x2000FF41))
-                    .border(1.dp, Color(0x5000FF41), RoundedCornerShape(2.dp))
-                    .padding(4.dp)
+                    .background(CyberGreen.copy(alpha = 0.05f), RoundedCornerShape(4.dp))
+                    .border(1.dp, CyberGreenDim.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                    .padding(6.dp)
             ) {
-                Text(
-                    text = "[ REQUIRED SEGMENT FOR SLOT #${activeSlotSelection + 1} ]",
-                    color = CyberGreen,
-                    style = Typography.labelSmall,
-                    fontFamily = FontFamily.Default,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = expected,
-                    color = Color(0xFF22D3EE),
-                    style = Typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    letterSpacing = 1.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            val matchingGene = inventoryGenes.find { it.sequence == expected && it.count > 0 }
-
-            if (matchingGene != null) {
-                // Stock panel matching Required Segment block style
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0x1010B981))
-                        .border(1.dp, Color(0xFF059669), RoundedCornerShape(2.dp))
-                        .padding(6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "[ AVAILABLE STOCK ]",
-                            color = Color(0xFF34D399),
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "MUTATE READY",
-                            color = Color(0xFF34D399),
-                            style = Typography.bodySmall,
-                            fontFamily = FontFamily.Default,
-                            fontSize = 7.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = matchingGene.sequence,
-                            color = CyberGreen,
-                            style = Typography.bodyMedium,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "x${matchingGene.count}",
-                            color = CyberGreen,
-                            style = Typography.bodySmall,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Button(
-                    onClick = { viewModel.assignGeneToSlot(matchingGene.sequence) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(30.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = Color.Black),
-                    shape = RoundedCornerShape(2.dp),
-                    contentPadding = PaddingValues(0.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "LOAD GENE BLOCK",
-                        style = Typography.bodySmall,
+                        text = "AVAILABLE STOCK",
+                        color = CyberGreenDim,
+                        fontSize = 9.sp,
                         fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 9.sp
-                    )
-                }
-            } else {
-                // No stock panel matching Required Segment block style
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0x15EF4444))
-                        .border(1.dp, Color(0x50EF4444), RoundedCornerShape(2.dp))
-                        .padding(6.dp)
-                ) {
-                    Text(
-                        text = "[ AVAILABLE STOCK ]",
-                        color = Color(0xFFFCA5A5),
-                        style = Typography.labelSmall,
-                        fontFamily = FontFamily.Default,
-                        fontSize = 8.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "NO COMPATIBLE SEGMENT FOUND",
-                        color = Color.Red,
-                        style = Typography.bodyMedium,
+                        text = "MUTATE READY",
+                        color = Color(0xFF34D399),
+                        style = Typography.bodySmall,
                         fontFamily = FontFamily.Default,
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = matchingGene.sequence,
+                        color = CyberGreen,
+                        style = Typography.bodyMedium,
+                        fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "x${matchingGene.count}",
+                        color = CyberGreen,
+                        style = Typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
                         fontSize = 9.sp,
-                        letterSpacing = 0.5.sp
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
-        }
-    } else {
-        // Empty State Panel
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                .background(CyberPanel)
-                .padding(12.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Folder representation
-            Text(
-                text = "[ NO ACTIVE CONSTRUCTOR SLOT SELECTION ]",
-                color = CyberGreen,
-                style = Typography.bodySmall,
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                fontSize = 10.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = if (isWide) "CHOOSE A GENE SLOT ON THE LEFT PANEL TO DISPLAY COMPATIBLE GENES"
-                       else "CHOOSE A GENE SLOT ABOVE TO DISPLAY COMPATIBLE GENES",
-                color = CyberGreenDim,
-                style = Typography.bodySmall,
-                fontFamily = FontFamily.Default,
-                fontSize = 9.sp,
-                textAlign = TextAlign.Center
-            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(32.dp)
+                    .cyberglass(borderColor = CyberGreen, backgroundColor = CyberGreen)
+                    .clickable { viewModel.assignGeneToSlot(matchingGene.sequence) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "LOAD GENE BLOCK",
+                    color = Color.Black,
+                    style = Typography.bodySmall,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 9.sp
+                )
+            }
+        } else {
+            // No stock panel matching Required Segment block style
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0x15EF4444), RoundedCornerShape(4.dp))
+                    .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+                    .padding(6.dp)
+            ) {
+                Text(
+                    text = "AVAILABLE STOCK",
+                    color = Color(0xFFEF4444).copy(alpha = 0.8f),
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "NO COMPATIBLE SEGMENT FOUND",
+                    color = Color.Red,
+                    style = Typography.bodyMedium,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 9.sp,
+                    letterSpacing = 0.5.sp
+                )
+            }
         }
     }
 }
@@ -4448,7 +4772,7 @@ fun VaultView(viewModel: MainViewModel) {
     val harvestingCreatureIds by viewModel.harvestingCreatureIds.collectAsState()
 
     // Local UI states
-    var applyLibFilters by remember { mutableStateOf(false) }
+    var applyLibFilters by remember { mutableStateOf(true) }
     var isFilterPanelExpanded by remember { mutableStateOf(false) }
     var viewingArchiveSearch by remember { mutableStateOf(false) }
     var libSortBy by remember { mutableStateOf("name-asc") }
@@ -4529,7 +4853,7 @@ fun VaultView(viewModel: MainViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "[ G.E.N. P.O.X. SEABED VAULT V0.4 ]",
+                            text = "G.E.N. P.O.X. SEABED VAULT V0.4",
                             color = CyberGreenDim,
                             fontSize = 9.sp,
                             fontFamily = FontFamily.Default,
@@ -4572,43 +4896,13 @@ fun VaultView(viewModel: MainViewModel) {
                         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .border(1.dp, if (applyLibFilters) CyberGreen else Color.DarkGray, RoundedCornerShape(2.dp))
-                                .background(if (applyLibFilters) Color(0xFF00FF41).copy(alpha = 0.15f) else Color.Black)
-                                .clickable {
-                                    viewModel.synthManager.playBeep(480f, 0.05f, "sine")
-                                    applyLibFilters = !applyLibFilters
-                                }
-                                .padding(horizontal = 6.dp, vertical = 3.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(5.dp)
-                                        .clip(RoundedCornerShape(2.5.dp))
-                                        .background(if (applyLibFilters) CyberGreen else Color.DarkGray)
-                                )
-                                Text(
-                                    text = if (applyLibFilters) "FILTERS ACTIVE" else "FILTERS BYPASSED",
-                                    color = if (applyLibFilters) CyberGreen else Color.Gray,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
- 
                         val activeFiltersCount = (if (libFilterFaction != "ALL") 1 else 0) +
                                 (if (libFilterType != "ALL") 1 else 0) +
                                 (if (libFilterTag != "ALL") 1 else 0)
                         val exploreText = if (activeFiltersCount > 0) {
-                            "◆ EXPLORE FILTERS ($activeFiltersCount)"
+                            "EXPLORE FILTERS ($activeFiltersCount)"
                         } else {
-                            "◆ EXPLORE FILTERS"
+                            "EXPLORE FILTERS"
                         }
  
                         Box(
@@ -4622,7 +4916,7 @@ fun VaultView(viewModel: MainViewModel) {
                                 .padding(horizontal = 6.dp, vertical = 3.dp)
                         ) {
                             Text(
-                                text = if (isFilterPanelExpanded) "◆ COLLAPSE FILTERS" else exploreText,
+                                text = if (isFilterPanelExpanded) "COLLAPSE FILTERS" else exploreText,
                                 color = CyberGreen,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                 fontSize = 8.sp,
@@ -5177,7 +5471,7 @@ fun CreatureDetailCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "[ G.E.N. P.O.X. SEABED VAULT v0.4 ]",
+                text = "G.E.N. P.O.X. SEABED VAULT v0.4",
                 color = CyberGreenDim,
                 fontSize = 9.sp,
                 fontFamily = FontFamily.Default,
@@ -7253,8 +7547,27 @@ fun LockedAnomalyDetails(
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(text = "EST. ACCURACY:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                    val boundaryRadius = anomaly.getBoundaryRadiusForPlayer(userLat, userLng)
-                    val yieldChance = Math.max(0, Math.round(100.0 - (anomaly.distance / boundaryRadius) * 100.0))
+                    val activeCreature by viewModel.activeCreature.collectAsState()
+                    val creaturesList by viewModel.creatures.collectAsState()
+                    val selectedCreature = activeCreature ?: creaturesList.maxByOrNull { it.defense }
+                    
+                    val yieldChance = if (selectedCreature != null) {
+                        val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
+                        val phaseFraction = wave.lunarAge / WaveMath.LUNAR_MONTH_DAYS
+                        val lunarPhaseScale = (1.0 - kotlin.math.cos(phaseFraction * 2.0 * Math.PI)) / 2.0
+                        val lunarResistanceMod = 0.7 + 0.6 * lunarPhaseScale
+
+                        val boundaryRadius = anomaly.getBoundaryRadiusForPlayer(userLat, userLng)
+                        val R_base = boundaryRadius * 0.1
+                        val R_anom = R_base * lunarResistanceMod
+
+                        val resonanceMod = viewModel.getSynodicResonanceMod(selectedCreature.faction, wave.phaseName)
+                        val effectiveDefense = selectedCreature.defense + resonanceMod
+
+                        Math.round((effectiveDefense.toDouble() / R_anom) * 100.0).toInt().coerceIn(0, 100)
+                    } else {
+                        100
+                    }
                     Text(text = "$yieldChance% EXTRACT", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 }
             }
@@ -7558,7 +7871,7 @@ fun ScannerView(viewModel: MainViewModel) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "[ G.E.N. P.O.X. ANOMALY LOG V1.2 ]",
+                                    text = "G.E.N. P.O.X. ANOMALY LOG V1.2",
                                     color = CyberGreenDim,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
@@ -8106,9 +8419,9 @@ private fun StaticMapLayer(
         val xUn = cxPx + (dLng * scale).toFloat()
         val dLat = lat - localMapCenterLat
         val yUn = cyPx - (dLat * scale).toFloat()
-        val dx = xUn - playerXUn
-        val dy = yUn - playerYUn
-        return playerXUn + dx * cosRot - dy * sinRot
+        val dx = xUn - cxPx
+        val dy = yUn - cyPx
+        return cxPx + dx * cosRot - dy * sinRot
     }
 
     fun projectY(lat: Double, lng: Double): Float {
@@ -8116,9 +8429,9 @@ private fun StaticMapLayer(
         val xUn = cxPx + (dLng * scale).toFloat()
         val dLat = lat - localMapCenterLat
         val yUn = cyPx - (dLat * scale).toFloat()
-        val dx = xUn - playerXUn
-        val dy = yUn - playerYUn
-        val rotY = playerYUn + dx * sinRot + dy * cosRot
+        val dx = xUn - cxPx
+        val dy = yUn - cyPx
+        val rotY = cyPx + dx * sinRot + dy * cosRot
         return cyPx - (cyPx - rotY) * tiltYScale
     }
 
@@ -8485,13 +8798,18 @@ fun HolographicRadarScanner(
             val dLatAnom = userLat - m.lat
             val cosLatAnom = kotlin.math.cos(Math.toRadians(userLat))
             val distGeo = kotlin.math.sqrt(dLatAnom * dLatAnom + (userLng - m.lng) * cosLatAnom * (userLng - m.lng) * cosLatAnom)
-            val rMaxGeo = m.dispatchDistance / 111000.0
-            val tGeo = if (distGeo > 0.0) (rMaxGeo / distGeo).coerceIn(0.0, 1.0) else 0.0
+            
+            val boundaryRadius = matchedAnomaly?.getBoundaryRadiusForPlayer(userLat, userLng)
+                ?: (m.dispatchDistance / (1.0 - m.stalledDepth / 100.0).coerceAtLeast(0.01))
+
+            val rBoundGeo = boundaryRadius / 111000.0
+            val tGeo = if (distGeo > 0.0) (rBoundGeo / distGeo).coerceIn(0.0, 1.0) else 0.0
             val boundLat = m.lat + tGeo * (userLat - m.lat)
             val boundLng = m.lng + tGeo * (userLng - m.lng)
 
-            val startLat = boundLat + 0.3 * (m.lat - boundLat)
-            val startLng = boundLng + 0.3 * (m.lng - boundLng)
+            val tStall = m.stalledDepth / 100.0
+            val startLat = boundLat + tStall * (m.lat - boundLat)
+            val startLng = boundLng + tStall * (m.lng - boundLng)
 
             // Combined density calculations
             val combinedDensity = if (matchedAnomaly != null) {
@@ -8595,6 +8913,8 @@ fun HolographicRadarScanner(
     var localMapCenterLat = userLat
     var localMapCenterLng = userLng
 
+    val selectedAnomaly = anomalies.find { it.id == selectedAnomalyId }
+
     if (trackedMission != null) {
         // Read timeState.value directly to force parent recomposition ONLY during active target tracking
         val currentTimeMs = timeState.value
@@ -8602,10 +8922,19 @@ fun HolographicRadarScanner(
         val dLatAnom = userLat - tm.lat
         val dLngAnom = (userLng - tm.lng) * Math.cos(Math.toRadians(userLat))
         val distGeo = kotlin.math.sqrt(dLatAnom * dLatAnom + dLngAnom * dLngAnom)
-        val rMaxGeo = tm.dispatchDistance / 111000.0
-        val tGeo = if (distGeo > 0.0) (rMaxGeo / distGeo).coerceIn(0.0, 1.0) else 0.0
+
+        val tmMatchedAnomaly = anomalies.find { Math.abs(it.lat - tm.lat) < 0.0001 && Math.abs(it.lng - tm.lng) < 0.0001 }
+        val boundaryRadius = tmMatchedAnomaly?.getBoundaryRadiusForPlayer(userLat, userLng)
+            ?: (tm.dispatchDistance / (1.0 - tm.stalledDepth / 100.0).coerceAtLeast(0.01))
+
+        val rBoundGeo = boundaryRadius / 111000.0
+        val tGeo = if (distGeo > 0.0) (rBoundGeo / distGeo).coerceIn(0.0, 1.0) else 0.0
         val boundLat = tm.lat + tGeo * (userLat - tm.lat)
         val boundLng = tm.lng + tGeo * (userLng - tm.lng)
+
+        val tStall = (tm.stalledDepth / 100.0).toDouble()
+        val startLat = boundLat + tStall * (tm.lat - boundLat)
+        val startLng = boundLng + tStall * (tm.lng - boundLng)
 
         val dTravel = tm.travelDuration.toFloat()
         val dDescent = tm.descentDuration.toFloat()
@@ -8613,7 +8942,6 @@ fun HolographicRadarScanner(
         val dAscent = tm.ascentDuration.toFloat()
         val dReturn = tm.transitBackDuration.toFloat()
 
-        val tmMatchedAnomaly = anomalies.find { Math.abs(it.lat - tm.lat) < 0.0001 && Math.abs(it.lng - tm.lng) < 0.0001 }
         val tmCombinedDensity = if (tmMatchedAnomaly != null) {
             var densitySum = 0.0
             anomalies.forEach { anom ->
@@ -8641,41 +8969,45 @@ fun HolographicRadarScanner(
 
         val tmCreature = viewModel.creatures.value.find { it.id == tm.creatureId }
         val tmHasShield = hasCoherenceShield(tmCreature, tm.originalSequence)
-        val tmFinalDensity = if (tmHasShield && tmEffectiveDensity > 0.0) 0.0 else tmEffectiveDensity
+        val finalAnomalyDensity = if (tmHasShield && tmEffectiveDensity > 0.0) 0.0 else tmEffectiveDensity
 
         val elapsedSec = (currentTimeMs - tm.startTime) / 1000f
 
         if (elapsedSec < dTravel) {
             val p = (elapsedSec / dTravel.coerceAtLeast(1f))
-            val pWarped = warpProgress(p, tmFinalDensity.toFloat()).toDouble()
+            val pWarped = p.toDouble()
             localMapCenterLat = userLat + pWarped * (boundLat - userLat)
             localMapCenterLng = userLng + pWarped * (boundLng - userLng)
         } else if (elapsedSec < dTravel + dDescent) {
             val p = ((elapsedSec - dTravel) / dDescent.coerceAtLeast(1f))
-            val pWarped = warpProgress(p, tmFinalDensity.toFloat()).toDouble()
-            localMapCenterLat = boundLat + pWarped * 0.3 * (tm.lat - boundLat)
-            localMapCenterLng = boundLng + pWarped * 0.3 * (tm.lng - boundLng)
+            val pWarped = warpProgress(p, finalAnomalyDensity.toFloat()).toDouble()
+            localMapCenterLat = boundLat + pWarped * (startLat - boundLat)
+            localMapCenterLng = boundLng + pWarped * (startLng - boundLng)
         } else if (elapsedSec < dTravel + dDescent + dHarvest) {
-            localMapCenterLat = boundLat + 0.3 * (tm.lat - boundLat)
-            localMapCenterLng = boundLng + 0.3 * (tm.lng - boundLng)
+            localMapCenterLat = startLat
+            localMapCenterLng = startLng
         } else if (elapsedSec < dTravel + dDescent + dHarvest + dAscent) {
-            val p = ((elapsedSec - dTravel - dDescent - dHarvest) / dAscent.coerceAtLeast(1f)).toDouble()
-            val startLat = boundLat + 0.3 * (tm.lat - boundLat)
-            val startLng = boundLng + 0.3 * (tm.lng - boundLng)
-            localMapCenterLat = startLat + p * (boundLat - startLat)
-            localMapCenterLng = startLng + p * (boundLng - startLng)
+            val p = ((elapsedSec - dTravel - dDescent - dHarvest) / dAscent.coerceAtLeast(1f))
+            val pWarped = warpProgress(p, -finalAnomalyDensity.toFloat()).toDouble()
+            localMapCenterLat = startLat + pWarped * (boundLat - startLat)
+            localMapCenterLng = startLng + pWarped * (boundLng - startLng)
         } else if (elapsedSec < dTravel + dDescent + dHarvest + dAscent + dReturn) {
             val p = ((elapsedSec - dTravel - dDescent - dHarvest - dAscent) / dReturn.coerceAtLeast(1f))
-            val pWarped = warpProgress(p, -tmFinalDensity.toFloat()).toDouble()
+            val pWarped = p.toDouble()
             localMapCenterLat = boundLat + pWarped * (userLat - boundLat)
             localMapCenterLng = boundLng + pWarped * (userLng - boundLng)
         }
+    } else if (selectedAnomaly != null) {
+        localMapCenterLat = selectedAnomaly.lat
+        localMapCenterLng = selectedAnomaly.lng
     }
 
     val rawMapCenterLat = localMapCenterLat
     val rawMapCenterLng = localMapCenterLng
-    localMapCenterLat = rawMapCenterLat + (userLat - rawMapCenterLat) * tiltProgress.toDouble()
-    localMapCenterLng = rawMapCenterLng + (userLng - rawMapCenterLng) * tiltProgress.toDouble()
+    if (trackedMission == null && selectedAnomaly == null) {
+        localMapCenterLat = rawMapCenterLat + (userLat - rawMapCenterLat) * tiltProgress.toDouble()
+        localMapCenterLng = rawMapCenterLng + (userLng - rawMapCenterLng) * tiltProgress.toDouble()
+    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -8705,20 +9037,17 @@ fun HolographicRadarScanner(
         val playerXUn = cxPx + (dLngPlayer * scale).toFloat()
         val playerYUn = cyPx - (dLatPlayer * scale).toFloat()
 
-        val playerX = playerXUn
-        val playerY = cyPx - (cyPx - playerYUn) * tiltYScale
-
         fun projectPoint(lat: Double, lng: Double): Offset {
             val dLat = lat - localMapCenterLat
             val dLng = (lng - localMapCenterLng) * cosLat
             val xUn = cxPx + (dLng * scale).toFloat()
             val yUn = cyPx - (dLat * scale).toFloat()
 
-            // Rotate around player position
-            val dx = xUn - playerXUn
-            val dy = yUn - playerYUn
-            val rotX = playerXUn + dx * cosRot - dy * sinRot
-            val rotY = playerYUn + dx * sinRot + dy * cosRot
+            // Rotate around target position (screen center cxPx, cyPx)
+            val dx = xUn - cxPx
+            val dy = yUn - cyPx
+            val rotX = cxPx + dx * cosRot - dy * sinRot
+            val rotY = cyPx + dx * sinRot + dy * cosRot
 
             // Tilt-squash Y relative to cyPx
             val finalY = cyPx - (cyPx - rotY) * tiltYScale
@@ -8730,9 +9059,9 @@ fun HolographicRadarScanner(
             val xUn = cxPx + (dLng * scale).toFloat()
             val dLat = lat - localMapCenterLat
             val yUn = cyPx - (dLat * scale).toFloat()
-            val dx = xUn - playerXUn
-            val dy = yUn - playerYUn
-            return playerXUn + dx * cosRot - dy * sinRot
+            val dx = xUn - cxPx
+            val dy = yUn - cyPx
+            return cxPx + dx * cosRot - dy * sinRot
         }
 
         fun projectY(lat: Double, lng: Double): Float {
@@ -8740,11 +9069,15 @@ fun HolographicRadarScanner(
             val xUn = cxPx + (dLng * scale).toFloat()
             val dLat = lat - localMapCenterLat
             val yUn = cyPx - (dLat * scale).toFloat()
-            val dx = xUn - playerXUn
-            val dy = yUn - playerYUn
-            val rotY = playerYUn + dx * sinRot + dy * cosRot
+            val dx = xUn - cxPx
+            val dy = yUn - cyPx
+            val rotY = cyPx + dx * sinRot + dy * cosRot
             return cyPx - (cyPx - rotY) * tiltYScale
         }
+
+        val playerOffset = projectPoint(userLat, userLng)
+        val playerX = playerOffset.x
+        val playerY = playerOffset.y
 
         fun getGlitchOffsetX(y: Float, timeMs: Long): Float {
             val isGlitching = (timeMs % 1600 < 160)
@@ -8776,9 +9109,9 @@ fun HolographicRadarScanner(
                             val axUn = cxPx + (dLng * scale).toFloat()
                             val ayUn = cyPx - (dLat * scale).toFloat()
 
-                            // Project tap offset relative to player screen coordinates
-                            val dx = tapOffset.x - playerX
-                            val dy = tapOffset.y - playerY
+                            // Project tap offset relative to screen center coordinates
+                            val dx = tapOffset.x - cxPx
+                            val dy = tapOffset.y - cyPx
 
                             // Unsquash Y coordinate
                             val dyUn = dy / tiltYScale.coerceAtLeast(0.01f)
@@ -8789,9 +9122,9 @@ fun HolographicRadarScanner(
                             val dxGround = dx * cosRotNeg - dyUn * sinRotNeg
                             val dyGround = dx * sinRotNeg + dyUn * cosRotNeg
 
-                            // Tap coordinates on unrotated ground plane
-                            val tapXGround = playerXUn + dxGround
-                            val tapYGround = playerYUn + dyGround
+                            // Tap coordinates on unrotated ground plane relative to screen center
+                            val tapXGround = cxPx + dxGround
+                            val tapYGround = cyPx + dyGround
 
                             // Distance and angle on the unrotated ground plane relative to epicenter
                             val adx = tapXGround - axUn
@@ -8934,8 +9267,8 @@ fun HolographicRadarScanner(
                     for (step in 0..steps) {
                         val theta = (step * 2.0 * Math.PI) / steps
                         val rBase = r0Pixels * (1.0f + epsilon * kotlin.math.cos(k * theta + phi).toFloat())
-                        val thetaRotated = theta + rotRad
-                        val py = (ay + rBase * kotlin.math.sin(thetaRotated) * tiltYScale).toFloat()
+                        val thetaRotated = theta - rotRad
+                        val py = (ay - rBase * kotlin.math.sin(thetaRotated) * tiltYScale).toFloat()
                         val px = (ax + rBase * kotlin.math.cos(thetaRotated)).toFloat()
                         
                         item.verticesX[step] = px
@@ -9131,7 +9464,7 @@ fun HolographicRadarScanner(
 
                     if (elapsedSec < dTravel) {
                         val p = (elapsedSec / dTravel.coerceAtLeast(1f))
-                        val pWarped = warpProgress(p, finalAnomalyDensity.toFloat())
+                        val pWarped = p
                         creatureXUnglitched = playerX + pWarped * (boundX - playerX)
                         creatureY = playerY + pWarped * (boundY - playerY)
                         stateText = "TRAVEL"
@@ -9148,12 +9481,13 @@ fun HolographicRadarScanner(
                         stateText = "HARVEST"
                     } else if (elapsedSec < dTravel + dDescent + dHarvest + dAscent) {
                         val p = ((elapsedSec - dTravel - dDescent - dHarvest) / dAscent.coerceAtLeast(1f))
-                        creatureXUnglitched = startX + p * (boundX - startX)
-                        creatureY = startY + p * (boundY - startY)
+                        val pWarped = warpProgress(p, -finalAnomalyDensity.toFloat())
+                        creatureXUnglitched = startX + pWarped * (boundX - startX)
+                        creatureY = startY + pWarped * (boundY - startY)
                         stateText = "ASCEND"
                     } else if (elapsedSec < dTravel + dDescent + dHarvest + dAscent + dReturn) {
                         val p = ((elapsedSec - dTravel - dDescent - dHarvest - dAscent) / dReturn.coerceAtLeast(1f))
-                        val pWarped = warpProgress(p, -finalAnomalyDensity.toFloat())
+                        val pWarped = p
                         creatureXUnglitched = boundX + pWarped * (playerX - boundX)
                         creatureY = boundY + pWarped * (playerY - boundY)
                         stateText = "RETURN"
@@ -10184,88 +10518,138 @@ fun InventoryView(viewModel: MainViewModel) {
 // ==========================================
 @Composable
 fun SettingsView(viewModel: MainViewModel) {
-    val apiKey by viewModel.geminiApiKey.collectAsState()
-    val mute by viewModel.muteSound.collectAsState()
-    val textState = remember { mutableStateOf("") }
-
-    LaunchedEffect(apiKey) {
-        textState.value = apiKey
-    }
+    var subTab by remember { mutableStateOf("general") }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(text = "SYSTEM CONFIGURATION", style = Typography.titleMedium, color = CyberGreen)
-
-        // API Key Settings Box
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                .background(CyberPanel)
-                .padding(10.dp)
+        // Subtab Selection Bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(text = "GEMINI API CREDENTIALS", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberGreen)
-                Text(text = "Paste your Google AI Studio API Key to unlock high-fidelity creature compiling.", style = Typography.bodySmall, color = CyberGreenDim)
-
-                TextField(
-                    value = textState.value,
-                    onValueChange = { textState.value = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = CyberGreen,
-                        unfocusedTextColor = CyberGreen,
-                        focusedBorderColor = CyberGreen,
-                        unfocusedBorderColor = CyberBorder,
-                        focusedContainerColor = Color.Black,
-                        unfocusedContainerColor = Color.Black
-                    ),
-                    placeholder = { Text("Paste AIStudio API Key...", color = CyberGreenDim, style = Typography.bodySmall) }
-                )
-
+            listOf(
+                Pair("general", "GENERAL"),
+                Pair("telemetry", "TELEMETRY")
+            ).forEach { tab ->
+                val isActive = subTab == tab.first
                 Button(
-                    onClick = { viewModel.saveApiKey(textState.value) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = Color.Black),
-                    shape = RoundedCornerShape(4.dp)
+                    onClick = {
+                        viewModel.synthManager.playCombinatorTick()
+                        subTab = tab.first
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isActive) CyberGreen else CyberPanel,
+                        contentColor = if (isActive) Color.Black else CyberGreenDim
+                    ),
+                    shape = RoundedCornerShape(4.dp),
+                    border = BorderStroke(1.dp, CyberBorder),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
-                    Text("SAVE KEY TO DATASTORE", style = Typography.labelSmall)
+                    Text(
+                        text = tab.second,
+                        style = Typography.labelSmall,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
 
-        // General settings
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                .background(CyberPanel)
-                .padding(10.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(text = "SOUND MANAGEMENT", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberGreen)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+        Spacer(modifier = Modifier.height(4.dp))
+
+        if (subTab == "general") {
+            val apiKey by viewModel.geminiApiKey.collectAsState()
+            val mute by viewModel.muteSound.collectAsState()
+            val textState = remember { mutableStateOf("") }
+
+            LaunchedEffect(apiKey) {
+                textState.value = apiKey
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(text = "SYSTEM CONFIGURATION", style = Typography.titleMedium, color = CyberGreen)
+
+                // API Key Settings Box
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                        .background(CyberPanel)
+                        .padding(10.dp)
                 ) {
-                    Text(text = "MUTE retro synthesis chimes:", style = Typography.bodySmall, color = CyberGreenDim)
-                    Switch(
-                        checked = mute,
-                        onCheckedChange = { viewModel.setMute(it) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.Black,
-                            checkedTrackColor = CyberGreen,
-                            uncheckedThumbColor = CyberGreenDim,
-                            uncheckedTrackColor = Color.Black
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(text = "GEMINI API CREDENTIALS", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberGreen)
+                        Text(text = "Paste your Google AI Studio API Key to unlock high-fidelity creature compiling.", style = Typography.bodySmall, color = CyberGreenDim)
+
+                        TextField(
+                            value = textState.value,
+                            onValueChange = { textState.value = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = CyberGreen,
+                                unfocusedTextColor = CyberGreen,
+                                focusedBorderColor = CyberGreen,
+                                unfocusedBorderColor = CyberBorder,
+                                focusedContainerColor = Color.Black,
+                                unfocusedContainerColor = Color.Black
+                            ),
+                            placeholder = { Text("Paste AIStudio API Key...", color = CyberGreenDim, style = Typography.bodySmall) }
                         )
-                    )
+
+                        Button(
+                            onClick = { viewModel.saveApiKey(textState.value) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = Color.Black),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text("SAVE KEY TO DATASTORE", style = Typography.labelSmall)
+                        }
+                    }
+                }
+
+                // General settings
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                        .background(CyberPanel)
+                        .padding(10.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(text = "SOUND MANAGEMENT", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberGreen)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "MUTE retro synthesis chimes:", style = Typography.bodySmall, color = CyberGreenDim)
+                            Switch(
+                                checked = mute,
+                                onCheckedChange = { viewModel.setMute(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.Black,
+                                    checkedTrackColor = CyberGreen,
+                                    uncheckedThumbColor = CyberGreenDim,
+                                    uncheckedTrackColor = Color.Black
+                                )
+                            )
+                        }
+                    }
                 }
             }
+        } else {
+            TelemetryView(viewModel)
         }
     }
 }

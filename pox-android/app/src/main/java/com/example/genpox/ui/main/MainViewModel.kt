@@ -1899,7 +1899,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             val speedFactor = 1350.0
             val V_travel_base = (((creature.speed.toDouble() / 50.0) * travelDistanceComponent) / travelTimeComponent) * speedFactor
             
-            val V_travel = V_travel_base * (1.0 - finalDensity).coerceAtLeast(0.1)
+            val V_travel = V_travel_base
             
             val travelDistance = maxOf(0.0, anomaly.distance - boundaryRadius)
             val travelDuration = if (V_travel > 0.0) {

@@ -355,7 +355,7 @@ fun MainScreen(
                     "splicer" -> SplicerView(viewModel)
                     "vault" -> VaultView(viewModel)
                     "scanner" -> ScannerView(viewModel)
-                    "telemetry" -> TelemetryView(viewModel)
+                    "network" -> NetworkView(viewModel)
                     "settings" -> SettingsView(viewModel)
                 }
             }
@@ -424,7 +424,7 @@ fun MainScreen(
                 ) {
                     listOf(
                         Pair("scanner", "SCANNER"),
-                        Pair("telemetry", "TELEMETRY"),
+                        Pair("network", "NETWORK"),
                         Pair("settings", "SETTINGS")
                     ).forEach { tab ->
                         Button(

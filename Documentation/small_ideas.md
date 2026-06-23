@@ -37,3 +37,10 @@ The rotating double-helix DNA graphic (rendered dynamically using trigonometric 
     - Query the static archive directly from the Android game client using HTTP Range Requests (fetching only the precise bytes for the active grid coordinate), executing spatial calculations on-device.
     - Eliminates server maintenance, scaling limitations, and network API fees.
 
+---
+
+## 4. UI Style Standardizations & Cyberglass Highlights
+*   **Solid Cyber-Color Backgrounds for Active Button States**:
+    *   *Idea*: Expand the styling used on the active Network holo-nav buttons (applying a filled solid cyber-color background with a contrasting dark icon/text) to other navigation deck keys and subtab toggle states across the application (e.g. Splicer slot activations, Bio-Lab subtabs, or Scanner modes). This provides higher contrast and a more tactile, premium interactive feel.
+
+

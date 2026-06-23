@@ -115,6 +115,23 @@ class MainScreenViewModelTest {
             targetSequenceFlow.value = seq
         }
 
+        val cachedRoadCells = mutableListOf<CachedRoadCell>()
+        val cachedBuildingCells = mutableListOf<CachedBuildingCell>()
+
+        override suspend fun getCachedRoadCell(cellKey: String): CachedRoadCell? = cachedRoadCells.find { it.cellKey == cellKey }
+        override suspend fun getAllCachedRoadCells(): List<CachedRoadCell> = cachedRoadCells
+        override suspend fun insertCachedRoadCell(cell: CachedRoadCell) {
+            cachedRoadCells.add(cell)
+        }
+        override suspend fun getCachedBuildingCell(cellKey: String): CachedBuildingCell? = cachedBuildingCells.find { it.cellKey == cellKey }
+        override suspend fun getAllCachedBuildingCells(): List<CachedBuildingCell> = cachedBuildingCells
+        override suspend fun insertCachedBuildingCell(cell: CachedBuildingCell) {
+            cachedBuildingCells.add(cell)
+        }
+        override suspend fun clearMapCache() {
+            cachedRoadCells.clear()
+            cachedBuildingCells.clear()
+        }
     }
 
     @Test
