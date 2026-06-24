@@ -49,31 +49,33 @@ When players lack the exact matching gene blocks to fill the 8 slots, they can r
 *   **Forced Loop**: The compile runs on an **8-second sequence loop** (each second corresponds to compiling one of the 8 slots).
 
 ### Forced Splicing Math & Probability
-The baseline success of fusing a nucleotide in the compiler is modulated by orbital gravity and local compiler calibration.
+The baseline success of fusing a nucleotide in the compiler is modulated by orbital gravity, secondary structure folding stability, and compiler calibration.
 
 #### 1. Baseline Failure Chance ($F$)
 *   **Standard Base Failure**: $F = 37.5\%$
 *   **Lunar Orbit Influence**:
     *   *New Moon*: Adds a $+3.75\%$ failure debuff ($F = 41.25\%$)
     *   *Full Moon*: Subtracts a $-3.75\%$ failure buff ($F = 33.75\%$)
+*   **Secondary Structure Fold Stalling**:
+    *   If the target segment has highly negative folding energy (MFE $< -12.0\text{ kcal/mol}$), it forms rigid hairpin loops that stall compilation. This adds a **$+10.0\%$ fold stalling penalty** to the failure chance ($F_{\text{effective}} = F + 10\%$).
 
 #### 2. Slot Scaffold Resolution Rules
 For each slot $i$ (from 0 to 7), the compiler checks the slot's scaffold alignment:
-1.  **Pre-Aligned Manual Gene**: If a matching gene was manually aligned in the slot by the player, the compiler utilizes it directly. Success is guaranteed ($100\%$ chance, cost: $0$ extra genes).
-2.  **Match Stock Recruited**: If the player does not have a gene aligned but a perfect matching block exists in inventory, the compiler recruits and deletes it. Success is guaranteed ($100\%$ chance, cost: $1$ matching gene).
-3.  **Unstable Base Recruited**: If no perfect match exists, the compiler recruits any standard gene block from inventory. Success is probabilistic (cost: $1$ standard gene).
-4.  **Void Scaffold**: If stockpile is completely empty, the compiler operates on a blank grid. Success is probabilistic (cost: $0$ genes).
+1.  **Pre-Aligned Manual Gene**: If a matching gene was manually aligned in the slot by the player, the compiler utilizes it directly. Success is guaranteed ($100\%$ chance, cost: $0$ raw bases).
+2.  **Match Stock Recruited**: If the player does not have a gene aligned but a perfect matching block exists in inventory, the compiler recruits and deletes it. Success is guaranteed ($100\%$ chance, cost: $0$ raw bases).
+3.  **Unstable Scaffold Recruited**: If no perfect match exists, the compiler recruits any standard gene block from inventory. Success is probabilistic (cost: $0$ extra genes).
+4.  **Void Scaffold**: If the stockpile is completely empty, the compiler operates on a blank grid. Success is probabilistic (cost: $0$ genes).
 
 #### 3. Base-Pair Synthesis & Sacrifice Loop
 For each character index $j$ (from 0 to 7) in slot $i$'s segment, the compiler attempts to fuse the expected base:
-*   A random roll (0-100) is compared against the active $FailureChance$ ($F$):
-    *   **Successful Fusion**: If the scaffold character matches the expected character *or* the random $roll \ge F$, the base is successfully bound.
-    *   **Failed Fusion (Sacrifice)**: If the roll fails, the compiler attempts to stabilize the base-pair by consuming backup material from inventory:
-        1.  *Targeted Sacrifice*: Search the stockpile for any gene containing the expected character at position $j$, delete it, and force the replacement.
-        2.  *Backup Sacrifice*: If no targeted gene exists, delete any random standard gene from stockpile to override the failure.
-        3.  *Calibration Step*: Every sacrifice recalibrates the compiler, reducing the failure chance for subsequent attempts:
+*   A random roll (0-100) is compared against the active effective failure chance ($F_{\text{effective}}$):
+    *   **Successful Fusion**: If the scaffold character matches the expected character *or* the random $roll \ge F_{\text{effective}}$, the base is successfully bound.
+    *   **Failed Fusion (Sacrifice)**: If the roll fails, the compiler attempts to stabilize the base-pair by consuming raw feedstock material:
+        1.  *Targeted Sacrifice*: Consumes exactly $1$ raw base of the expected character (A, G, T, or C) from the raw stockpile to override the mismatch.
+        2.  *Transmutation Sacrifice*: If the raw stock of the expected base is empty, the compiler attempts to transmute other material by consuming any $2$ other standard raw bases.
+        3.  *Calibration Step*: Every sacrifice recalibrates the compiler, reducing the failure chance for subsequent attempts in the loop:
             $$F_{\text{new}} = \max(0.0, F_{\text{old}} - 3.25\%)$$
-        4.  *Depletion Failure*: If a sacrifice is required but the stockpile is completely empty, the splicing protocol aborts immediately with a **depleted stockpile error**.
+        4.  *Depletion Failure*: If a sacrifice is required but the raw stockpile contains insufficient bases, the splicing protocol aborts immediately with a **depleted stockpile error**.
 
 ### Compilation Resolution
 *   **Successful forced compilation** produces a creature with name suffix `[FORCED]`, origin `"Forced Synthesis"`, and `coherenceType = "Forced"`.

@@ -16,13 +16,31 @@ These systems are supported by a suite of retro-sci-fi visual diagnostics, inclu
 
 ## 2. The Tide Pool Reactor (Standard Synthesis)
 
-The Tide Pool Reactor is an automated single-node cybernetic synthesizer. It compiles standard nucleotides (`A`, `G`, `T`, `C`) into sequences of 8 base-pairs to expand the player's stock.
+The Tide Pool Reactor is an automated single-node cybernetic biophysical synthesizer. It compiles raw nucleotides (`A`, `G`, `T`, `C`) from the player's raw stockpile into sequences of 8 base-pairs to expand the player's stock.
 
-### Synthesis Cycle Timers
-The reactor operates on a continuous background tick (the emulator's "heartbeat"):
-*   **Standard Cycle**: A full synthesis run requires **16 seconds**.
-*   **Boosted Cycle**: When a **Reactor Booster** is active, the cycle duration is halved to **8 seconds**.
-*   *At the end of each cycle*, a batch of **8 standard gene blocks** is compiled, added to the stockpile, logged as a telemetry packet, and the cycle timer resets.
+### Reactor Feedstock Requirement
+Unlike previous passive configurations, standard synthesis is resource-dependent. Compiling an 8-character block consumes the corresponding quantity of raw Adenine (`A`), Guanine (`G`), Thymine (`T`), and Cytosine (`C`) bases from the raw stockpile. 
+*   **Acquiring Feedstocks**: Players acquire new gene blocks through mission payouts or scanner battle drops. Unwanted standard or anomalous blocks can be deconstructed (recycled) in the Vault to extract their raw A, G, T, C bases.
+*   **Depletion Substitution**: If a cycle completes but the raw stock for a required base is depleted, the reactor automatically substitutes a random available base. This increases the mutation rate and lowers the sequence's Phred Quality Score ($Q$).
+
+### Biophysical Synthesis Variables & Tuning
+Players can optimize the synthesis yield and sequence characteristics by adjusting the reactor's environment parameters:
+*   **Temperature ($T_{\text{react}}$)**:
+    *   *High Temperature ($> 75^\circ\text{C}$)*: GC-rich sequences survive. AT-rich denature and fail unless stabilized by **Netropsin**.
+    *   *Low Temperature ($15^\circ\text{C} - 30^\circ\text{C}$)*: AT-rich sequences survive. GC-rich templates form rigid internal hairpins (thermodynamic trapping) and stall unless stabilized by **DMSO / Formamide**.
+*   **Salt Concentration ($[Na^+]$)**: Ranges from $10\text{ mM}$ to $500\text{ mM}$. Modulates the melting temperature $T_m$ and shifts wave frequencies.
+*   **Enzyme Selection**:
+    *   *Taq Polymerase*: Fast standard cycle (**8 seconds**). Low fidelity ($Q$-scores of $15-25$, high mutation rate).
+    *   *Pfu Polymerase*: Slow standard cycle (**24 seconds**). Proofreading active, high fidelity ($Q$-scores of $35-40$, perfect copy rate).
+    *   *Tth Polymerase*: Standard cycle (**16 seconds**). Highly heat-resistant.
+*   **Inlet Feed Ratios**: Players adjust channels to feed excess bases into the reactor, skewing wave transition probabilities to target specific sequences.
+
+### Synthesis Yield Math
+The yield coefficient ($\eta$) maps the temperature tolerance curve around a block's melting temperature ($T_m$):
+$$\eta = \exp\left( - \frac{(T_{\text{react}} - T_m)^2}{2 \sigma^2} \right)$$
+Where $T_m$ is salt-corrected:
+$$T_m = 2 \cdot (N_A + N_T) + 4 \cdot (N_G + N_C) - 16.6 \log_{10}([Na^+]) - \frac{675}{\text{Length}}$$
+And $\sigma$ is the thermal tolerance of the active polymerase. If yield $\eta < 0.5$, synthesis fails or mutates heavily.
 
 ### Daily Base-Pair Waves
 Synthesis rates are not uniform; they fluctuate according to daily environmental frequencies synchronized with the synodic lunar cycle. Each UTC calendar day features an active **Base-Pair Wave** composed of a **Primary** and a **Secondary** nucleotide (e.g., an `AG` wave).
@@ -75,11 +93,10 @@ When compiling an 8-character block under an active wave (with Primary base $B_1
 The Genetic Anomaly Harmonizer is an unstable fusion chamber. Instead of harvesting standard genes, it attempts to synthesize highly volatile **Anomalous Genes** containing non-standard, alien characters: `XZYW?!$%&@#`.
 
 ### Resource Cost & Consumption Mechanics
-Unlike the Tide Pool Reactor which is resource-free, the Anomaly Engine requires massive genetic material to stabilize its energy field:
-*   **Synthesis Loop**: Ticks every **16 seconds** (or **8 seconds** if boosted).
-*   **Material Cost**: Consumes exactly **10,000 standard nucleotides** per loop.
-*   **Threshold Shutdown**: The engine requires a minimum reserve of **250,000 standard nucleotides** to operate. If standard inventory falls below this limit, the engine automatically shuts down.
-*   **Nucleotide Conversion**: Standard gene blocks consist of 8 nucleotides. Therefore, the consumption of 10,000 nucleotides results in the decomposition of exactly $1,250$ standard genes from inventory (deleting fully consumed blocks or decrementing multi-count blocks).
+The Anomaly Engine requires massive genetic feedstock to stabilize its energy field:
+*   **Synthesis Loop**: Ticks every **16 seconds** (or **8 seconds** if boosted, modulated by polymerase selection).
+*   **Material Cost**: Consumes exactly **10,000 raw nucleotides** per loop. This cost is split evenly ($2,500$ of each base: A, G, T, C) or adjusted dynamically based on the composition of the target anomalous sequence.
+*   **Threshold Shutdown**: The engine requires a minimum reserve of **250,000 raw nucleotides** (total across all bases) to operate. If raw stocks fall below this limit, the engine automatically shuts down.
 
 ### Fusion Success Probability Math
 The probability of a fusion resolving successfully ($FinalChance$) is mathematically scaled based on the player's nucleotide stockpile, temporal fluctuations, and natural resonance peaks.
