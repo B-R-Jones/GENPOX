@@ -166,6 +166,44 @@ A core part of the gameplay loop involves creatures traversing anomalies in the 
 *   **Room Database**: Native SQLite integration for efficient inventory management and transaction safety.
 *   **DataStore Preferences**: Fast, async storage for application state.
 
+
+---
+
+## 🧠 Gemini Compilation & Offline Fallback Engine
+
+When compiling a raw 64-character DNA sequence into a biological specimen, the game evaluates the sequence to generate its attributes, name, type, and sci-fi lore. This is done via two pathways:
+
+### 1. Google Gemini AI Compiler (Online)
+If a Gemini API key is configured, the app uses the `google-generativeai` SDK to call the `gemini-3.5-flash` model. 
+*   **Purpose**: The AI model dynamically compiles the DNA sequence into creative sci-fi creature lore, descriptive profiles, unique classification types, and immersive creature names matching the sequence's base frequencies.
+*   **Configuration**: The API key is entered directly in the app's settings dashboard UI and stored securely on-device using Jetpack DataStore Preferences. It does *not* need to be hardcoded in `local.properties`.
+
+### 2. On-Board Deterministic Compiler (Offline Fallback)
+If the Gemini API key is missing or the device is offline/receives an API error, the game automatically falls back to an on-board compiler.
+*   **Faction Resolution**: Determined by counting the most frequent base in the first 64 characters:
+    $$\text{Faction} = \operatorname{argmax}(A_{\text{count}}, G_{\text{count}}, T_{\text{count}}, C_{\text{count}})$$
+*   **Procedural Attribute Scaling**: Base stats are calculated deterministically:
+    *   **Vitality**: $100 + A_{\text{count}} \times 5$
+    *   **Attack (Aggression)**: $20 + G_{\text{count}} \times 2$
+    *   **Defense (Block Shells)**: $20 + C_{\text{count}} \times 2$
+    *   **Speed (Speed Rate)**: $20 + T_{\text{count}} \times 2$
+*   **Procedural Naming**: Seeding `java.util.Random` with the hash code of the sequence (`sequence.uppercase().hashCode()`) to generate faction-specific names (e.g. `Toxipod-XX` or `Chitin-Shell-XX`). Procedural wireframe vector graphics and colors are resolved dynamically based on these values.
+
+---
+
+## 💾 Data Persistence & Database Schema
+
+GENPOX uses a SQLite database abstraction layer via **Jetpack Room** to handle persistent local game state, inventory, and telemetry logs:
+
+1.  **`creatures` Table**:
+    *   Stores compiled specimens, sequences, custom names, factions, scaled base attributes (HP, Attack, Defense, Speed), telomere status ($0-100\%$), coherence indicators, and locked/favorite flags.
+2.  **`gene_sequences` Table**:
+    *   Inventory of 8-character standard nucleotide blocks (composed of `A`, `G`, `T`, `C`) and rare anomalous blocks containing alien character variations (`XZYW?!$%&@#`) used for splicing and reactor runs.
+3.  **`active_missions` Table**:
+    *   Active dispatch state for harvesters. Stores coordinates, transit phases (`TRAVEL`, `DESCENT`, `HARVEST`, `ASCENT`, `RETURN`), remaining time, stalled depth, and current in-transit mutations.
+4.  **`telemetry_logs` Table**:
+    *   Historical logger of events received during anomaly traversals and reactor runs, styled in terminal alert overlays.
+
 ---
 
 ## 📂 Repository Structure
