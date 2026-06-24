@@ -17,7 +17,8 @@ AI use in software development is a hot button issue. AI use in pretty much anyt
 > The world is changing all around us, and none of us can stop it. What we can do is ride the wave and bend it, break it, make it work for us, even if it - and they - don't want to.
 >
 > **Get splicing, Agent.**
-
+>
+> P.S. No AI had any part in the statement above.
 ---
 ## 🔁 Core Gameplay Loops
 
