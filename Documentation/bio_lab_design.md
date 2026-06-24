@@ -20,7 +20,8 @@ The Tide Pool Reactor is an automated single-node cybernetic biophysical synthes
 
 ### Reactor Feedstock Requirement
 Unlike previous passive configurations, standard synthesis is resource-dependent. Compiling an 8-character block consumes the corresponding quantity of raw Adenine (`A`), Guanine (`G`), Thymine (`T`), and Cytosine (`C`) bases from the raw stockpile. 
-*   **Acquiring Feedstocks**: Players acquire new gene blocks through mission payouts or scanner battle drops. Unwanted standard or anomalous blocks can be deconstructed (recycled) in the Vault to extract their raw A, G, T, C bases.
+*   **Passive Nutrient Siphoning**: To prevent a starting-state lock (having 0 creatures, 0 genes, and 0 bases), the reactor automatically harvests raw nucleotides ($A, G, T, C$) in the background. The harvesting rate (e.g. $10$ bases per second) is modulated by the daily base-pair wave and moon phase, giving players a baseline stream of raw materials while idle.
+*   **Acquiring Feedstocks & Active Speed-Up**: Players acquire new gene blocks through mission payouts or scanner battle drops. Unwanted standard or anomalous blocks can be deconstructed (recycled) in the Vault to extract their raw A, G, T, C bases, significantly accelerating raw base stock accumulation.
 *   **Depletion Substitution**: If a cycle completes but the raw stock for a required base is depleted, the reactor automatically substitutes a random available base. This increases the mutation rate and lowers the sequence's Phred Quality Score ($Q$).
 
 ### Biophysical Synthesis Variables & Tuning
