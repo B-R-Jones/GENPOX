@@ -204,6 +204,34 @@ GENPOX uses a SQLite database abstraction layer via **Jetpack Room** to handle p
 4.  **`telemetry_logs` Table**:
     *   Historical logger of events received during anomaly traversals and reactor runs, styled in terminal alert overlays.
 
+
+---
+
+## 🛠️ Prototyping & Development Workflow
+
+GENPOX is built using a dual-stage development loop, splitting experimental algorithmic research from strict native Android implementation:
+
+```mermaid
+graph LR
+    A[12-Year Genetic GA Codebase] --> B(Google AI Studio Sandbox)
+    B -->|Conceptual Prototypes & Raw Logic| C(Antigravity IDE Agentic Loop)
+    C -->|Native Code, DB, Compose & Styling| D[Production Android App]
+```
+
+### 1. The Prototyping Sandbox (Google AI Studio)
+The foundation of GENPOX is built on over 12 years of legacy Genetic Algorithm (GA) codebase files. To push these algorithms deeper, ideas are first spun up and iterated within Google AI Studio:
+*   **Purpose**: Rapid, high-level prototyping, payload structures exploration, and core mathematical model validation.
+*   **Focus**: Purely technical. Conceptual under-the-hood mechanics are tested here in a "messy" sandbox, completely decoupled from Android framework constraints and styling rules. This allows for deep algorithmic discovery without the friction of compiling the full application.
+
+### 2. Production Engineering (Antigravity IDE & Agentic AI)
+Once a mechanic is mathematically validated, the code is ported to the **Antigravity IDE** to be recreated and hardened into the production Android application:
+*   **Agentic Pairing**: Transitioning prototypes is coordinated through an Agentic AI pairing loop inside the workspace. The AI agent acts as a co-developer, translating raw algorithmic scripts into structured, Kotlin-native code.
+*   **Android Constraints & Refinement**: The agentic environment enforces strict design parameters:
+    *   Implementing persistence structures with Jetpack Room schemas.
+    *   Drawing vector lines, HUD components, and tilt matrices inside Jetpack Compose `Canvas` layers.
+    *   Structuring view states, audio track oscillators, and background WorkManager routines.
+*   **Clean Implementation**: The separation of concerns keeps the production codebase clean, leaving the prototyping "mess" behind in AI Studio while ensuring the Android app remains stylized, modular, and performant.
+
 ---
 
 ## 📂 Repository Structure
