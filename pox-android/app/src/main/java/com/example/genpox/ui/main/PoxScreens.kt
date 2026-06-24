@@ -1,5 +1,6 @@
 package com.example.genpox.ui.main
 
+import android.content.Context
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -15,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.drawscope.scale
@@ -1253,7 +1255,1847 @@ fun ReactorTimerStatus(
 }
 
 // ==========================================
-// 1. COMBINATOR VIEW (BIO-LAB TAB SCENE)
+// REACTOR DASHBOARD VIEW
+// ==========================================
+@Composable
+fun ReactorDashboardView(
+    viewModel: MainViewModel,
+    activeBorder: Color,
+    activePanel: Color
+) {
+    val poxReactorActive by viewModel.poxReactorActive.collectAsState()
+    val geneSequences by viewModel.geneSequences.collectAsState()
+    val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
+    
+    val uniqueGenesSize = remember(geneSequences) { geneSequences.size }
+    val multiCountGenesSize = remember(geneSequences) { geneSequences.count { it.count > 1 } }
+    
+    val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
+    val todayWave = wave
+    val tomorrowWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 86400000L)
+    val dayAfterWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 172800000L)
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Counts section
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
+                .padding(vertical = 10.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "UNIQUE GENE IDS",
+                    color = CyberGreenDim,
+                    style = Typography.labelSmall,
+                    fontFamily = FontFamily.Default,
+                    fontSize = 9.sp
+                )
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "⬢ ", color = CyberGreen, fontSize = 14.sp)
+                    Text(
+                        text = "$uniqueGenesSize",
+                        color = Color.White,
+                        style = Typography.bodyLarge,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(35.dp)
+                    .background(CyberBorder)
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
+            ) {
+                Text(
+                    text = "MULTI-COUNT GENE IDS",
+                    color = CyberGreenDim,
+                    style = Typography.labelSmall,
+                    fontFamily = FontFamily.Default,
+                    fontSize = 9.sp
+                )
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "⬢ ", color = CyberGreen, fontSize = 14.sp)
+                    Text(
+                        text = "$multiCountGenesSize",
+                        color = Color.White,
+                        style = Typography.bodyLarge,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // Today's base-pair wave card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .cyberglass(
+                    borderColor = if (todayWave.isSuppressed) Color(0xFF990000) else CyberGreen,
+                    backgroundColor = if (todayWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.6f)
+                )
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Text(
+                        text = "⚡",
+                        color = if (todayWave.isSuppressed) Color.Red else Color(0xFFFFB300),
+                        fontSize = 14.sp
+                    )
+                    Column {
+                        Text(
+                            text = "TODAY'S BASE-PAIR WAVE",
+                            color = CyberGreenDim,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (todayWave.isSuppressed) "DORMANT (CONGESTED DECAY)" else "ACTIVE: ${todayWave.pair} WAVE",
+                            color = Color.White,
+                            style = Typography.bodySmall,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                if (!todayWave.isSuppressed) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "${todayWave.primary} ➔ ${todayWave.secondary}",
+                            color = CyberGreen,
+                            style = Typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "1.12x & 1.62x BOOST",
+                            color = CyberGreenDim,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "NULL",
+                        color = Color.Red,
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .background(Color(0xFF330000), RoundedCornerShape(2.dp))
+                            .border(1.dp, Color.Red, RoundedCornerShape(2.dp))
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        }
+
+        // Forecast Grid
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Tomorrow
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .cyberglass(
+                        borderColor = if (tomorrowWave.isSuppressed) Color(0xFF990000) else Color.DarkGray,
+                        backgroundColor = if (tomorrowWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f)
+                    )
+                    .padding(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "TOMORROW BASE-PAIR",
+                            color = CyberGreenDim,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (tomorrowWave.isSuppressed) "DORMANT" else "${tomorrowWave.pair} WAVE",
+                            color = Color.White,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (!tomorrowWave.isSuppressed) {
+                        Text(
+                            text = "${tomorrowWave.primary}➔${tomorrowWave.secondary}",
+                            color = CyberGreen,
+                            style = Typography.labelSmall,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+
+            // Day After Tomorrow
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .cyberglass(
+                        borderColor = if (dayAfterWave.isSuppressed) Color(0xFF990000) else Color.DarkGray,
+                        backgroundColor = if (dayAfterWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f)
+                    )
+                    .padding(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "DAY AFTER TOMORROW",
+                            color = CyberGreenDim,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (dayAfterWave.isSuppressed) "DORMANT" else "${dayAfterWave.pair} WAVE",
+                            color = Color.White,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (!dayAfterWave.isSuppressed) {
+                        Text(
+                            text = "${dayAfterWave.primary}➔${dayAfterWave.secondary}",
+                            color = CyberGreen,
+                            style = Typography.labelSmall,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+
+        if (devForceAnomaly) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Button(
+                onClick = { viewModel.addDevGenes() },
+                modifier = Modifier.fillMaxWidth().height(40.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0x30F97316),
+                    contentColor = Color(0xFFF97316)
+                ),
+                border = BorderStroke(1.dp, Color(0xFFF97316)),
+                shape = RoundedCornerShape(2.dp),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(
+                    text = "DEV: INJECT 10K GENES",
+                    style = Typography.labelSmall,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+// ==========================================
+// ANOMALY DASHBOARD VIEW
+// ==========================================
+@Composable
+fun AnomalyDashboardView(
+    viewModel: MainViewModel,
+    onAnomalyLogClick: () -> Unit
+) {
+    val anomalyEngineActive by viewModel.anomalyEngineActive.collectAsState()
+    val grandTotalStandardNucleotides by viewModel.grandTotalStandardNucleotides.collectAsState()
+    val geneSequences by viewModel.geneSequences.collectAsState()
+    
+    val anomalousGenesSize = remember(geneSequences) { geneSequences.count { WaveMath.isAnomalousGene(it.sequence) } }
+    val multiCountAnomalousGenesSize = remember(geneSequences) { geneSequences.count { WaveMath.isAnomalousGene(it.sequence) && it.count > 1 } }
+    
+    val coupling = remember(grandTotalStandardNucleotides) { WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis()) }
+    val chanceMetrics = remember(grandTotalStandardNucleotides, coupling) {
+        WaveMath.getAnomalyEngineSuccessChance(grandTotalStandardNucleotides, coupling)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Top-Level Counts section for Anomaly tab (standardized padding & layout matching Reactor)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .cyberglass(borderColor = CyberTheme.purpleBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
+                .padding(vertical = 10.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onAnomalyLogClick() }
+            ) {
+                Text(
+                    text = "UNIQUE ANOMALOUS GENE IDS",
+                    color = CyberTheme.purpleDim,
+                    style = Typography.labelSmall,
+                    fontFamily = FontFamily.Default,
+                    fontSize = 9.sp
+                )
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "⬢ ", color = CyberTheme.purple, fontSize = 14.sp)
+                    Text(
+                        text = "$anomalousGenesSize",
+                        color = Color.White,
+                        style = Typography.bodyLarge,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(35.dp)
+                    .background(CyberTheme.purpleBorder)
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
+            ) {
+                Text(
+                    text = "MULTI-COUNT ANOMALOUS GENE IDS",
+                    color = CyberTheme.purpleDim,
+                    style = Typography.labelSmall,
+                    fontFamily = FontFamily.Default,
+                    fontSize = 9.sp
+                )
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "⬢ ", color = CyberTheme.purple, fontSize = 14.sp)
+                    Text(
+                        text = "$multiCountAnomalousGenesSize",
+                        color = Color.White,
+                        style = Typography.bodyLarge,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // Compact Info panel
+        val meetsRequirement = grandTotalStandardNucleotides >= 250000L
+        val formattedCount = String.format(Locale.US, "%,d", grandTotalStandardNucleotides)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .cyberglass(
+                    borderColor = if (meetsRequirement) Color(0xFFA855F7) else Color(0xFF4A125E),
+                    backgroundColor = Color.Black.copy(alpha = 0.6f)
+                )
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Text(
+                        text = "~",
+                        color = Color(0xFFA855F7),
+                        fontSize = 14.sp
+                    )
+                    Column {
+                        Text(
+                            text = "ANOMALOUS RESOURCE & LOAD",
+                            color = Color(0xFFD8B4FE),
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "$formattedCount / 250,000 NUCLEOTIDES",
+                            color = Color.White,
+                            style = Typography.bodySmall,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "RATE: -10K/LOOP",
+                        color = Color(0xFFA855F7),
+                        style = Typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "RESETS STABILITY",
+                        color = Color(0xFFD8B4FE),
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // Anomaly Consolidation and Spectrum Coupling Panel
+        val formattedFinalChance = String.format(Locale.US, "%.3f%%", chanceMetrics.finalChance)
+        val formattedModifier = String.format(Locale.US, "%+.3f%%", chanceMetrics.harmonicModifier)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Left: Consolidation Chance
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color.Black.copy(alpha = 0.45f))
+                    .padding(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "CONSOLIDATION CHANCE",
+                            color = Color(0xFFD8B4FE),
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "SUCCESS PROB",
+                            color = Color.White,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = formattedFinalChance,
+                        color = Color(0xFFA855F7),
+                        style = Typography.labelSmall,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            // Right: Spectrum Coupling
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color.Black.copy(alpha = 0.45f))
+                    .padding(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "SPECTRUM COUPLING",
+                            color = Color(0xFFD8B4FE),
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "HARMONIC MODIFIER",
+                            color = Color.White,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = formattedModifier,
+                        color = Color(0xFFA855F7),
+                        style = Typography.labelSmall,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// STEP SEARCH VIEW
+// ==========================================
+@Composable
+fun StepSearchView(
+    viewModel: MainViewModel,
+    activeColor: Color,
+    activeColorDim: Color,
+    activeBorder: Color,
+    activePanel: Color,
+    isAnomaly: Boolean,
+    onSelectGene: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    val geneSequences by viewModel.geneSequences.collectAsState()
+    
+    var stepSearchPrefix by remember { mutableStateOf("") }
+    var viewStepSearchMatchesOnly by remember { mutableStateOf(false) }
+
+    val stepSize = if (isAnomaly) 1 else 2
+    val maxSteps = if (isAnomaly) 8 else 4
+    val activeStep = stepSearchPrefix.length / stepSize
+    val stepLabels = if (isAnomaly) {
+        listOf("1bp", "2bp", "3bp", "4bp", "5bp", "6bp", "7bp", "8bp")
+    } else {
+        listOf("1-2bp", "3-4bp", "5-6bp", "7-8bp")
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "MOLECULAR STEP-SEARCH DIRECTORY",
+                color = activeColorDim,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Default
+            )
+            Box(
+                modifier = Modifier
+                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                    .clickable {
+                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                        stepSearchPrefix = ""
+                        viewStepSearchMatchesOnly = false
+                        onClose()
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "✕ CLOSE",
+                    color = Color.Red,
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Progress indicators
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            stepLabels.forEachIndexed { idx, stepLabel ->
+                val isCompleted = activeStep > idx
+                val isActive = activeStep == idx
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .cyberglass(
+                            borderColor = if (isActive) activeColor else if (isCompleted) activeColorDim.copy(alpha = 0.5f) else Color.DarkGray,
+                            backgroundColor = if (isActive) activeColor.copy(alpha = 0.15f) else Color.Transparent
+                        )
+                        .padding(vertical = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stepLabel,
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        color = if (isActive || isCompleted) activeColor else Color.Gray,
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = if (isAnomaly) 7.5.sp else 9.sp
+                    )
+                }
+            }
+        }
+
+        // Query & Controls
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .cyberglass(borderColor = activeBorder, backgroundColor = activePanel)
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "PREFIX: ",
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        color = activeColorDim
+                    )
+                    if (isAnomaly) {
+                        for (i in 0 until 8) {
+                            val charStr = if (stepSearchPrefix.length > i) {
+                                stepSearchPrefix[i].toString()
+                            } else {
+                                "•"
+                            }
+                            val isCurrent = activeStep == i
+                            Text(
+                                text = charStr,
+                                style = Typography.bodyMedium,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isCurrent) Color.White else if (charStr != "•") activeColor else Color.DarkGray
+                            )
+                        }
+                    } else {
+                        for (i in 0 until 4) {
+                            val block = if (stepSearchPrefix.length >= (i + 1) * 2) {
+                                stepSearchPrefix.substring(i * 2, (i + 1) * 2)
+                            } else {
+                                "••"
+                            }
+                            val isCurrent = activeStep == i
+                            Text(
+                                text = block,
+                                style = Typography.bodyMedium,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isCurrent) Color.White else if (block != "••") activeColor else Color.DarkGray
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (activeStep > 0) {
+                        Box(
+                            modifier = Modifier
+                                .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
+                                .clickable {
+                                    stepSearchPrefix = stepSearchPrefix.dropLast(stepSize)
+                                    viewStepSearchMatchesOnly = false
+                                    viewModel.synthManager.playCombinatorTick()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "↶ UNDO",
+                                color = Color.Yellow,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Default,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
+                            .clickable {
+                                stepSearchPrefix = ""
+                                viewStepSearchMatchesOnly = false
+                                viewModel.synthManager.playReject()
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "✕ RESET",
+                            color = Color.Yellow,
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // Main display area: Grid or list of matches
+        val allInventoryGenes = remember(geneSequences) { geneSequences.map { it.sequence } }
+        val isDone = activeStep == maxSteps
+
+        if (isDone || viewStepSearchMatchesOnly) {
+            // Matches View
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "RESOLVED STOCK MATCHES:",
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        color = activeColorDim
+                    )
+                    if (!isDone) {
+                        Box(
+                            modifier = Modifier
+                                .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
+                                .clickable {
+                                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                    viewStepSearchMatchesOnly = false
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "✕ BACK",
+                                color = Color.Yellow,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Default,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                
+                val matches = remember(allInventoryGenes, stepSearchPrefix) {
+                    allInventoryGenes.filter { it.startsWith(stepSearchPrefix) }
+                }
+                
+                if (matches.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "NO MATCHING STANDARD OR ANOMALOUS GENES FOUND.",
+                            color = activeColorDim,
+                            style = Typography.bodySmall,
+                            fontFamily = FontFamily.Default
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().padding(top = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(matches) { matchSeq ->
+                            val count = geneSequences.find { it.sequence == matchSeq }?.count ?: 0
+                            val isAnom = WaveMath.isAnomalousGene(matchSeq)
+                            
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .cyberglass(
+                                        borderColor = if (isAnom) Color(0xFFA855F7).copy(alpha = 0.5f) else activeBorder,
+                                        backgroundColor = if (isAnom) Color(0xFF1E0B36) else activePanel
+                                    )
+                                    .clickable {
+                                        onSelectGene(matchSeq)
+                                    }
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = matchSeq,
+                                        style = Typography.bodyMedium,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isAnom) Color(0xFFD8B4FE) else activeColor
+                                    )
+                                    Text(
+                                        text = if (isAnom) "ANOMALY SECTOR" else "STANDARD GENE",
+                                        style = Typography.labelSmall,
+                                        fontFamily = FontFamily.Default,
+                                        color = if (isAnom) Color(0xFFA855F7) else activeColorDim
+                                    )
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "QTY: ",
+                                        style = Typography.bodyMedium,
+                                        fontFamily = FontFamily.Default,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isAnom) Color(0xFFD8B4FE) else activeColor
+                                    )
+                                    Text(
+                                        text = "x$count",
+                                        style = Typography.bodyMedium,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isAnom) Color(0xFFD8B4FE) else activeColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Grid View (Select Couple or Base)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isAnomaly) "SELECT ANOMALY BASE TO FILTER:" else "SELECT SEQUENCE COUPLE TO FILTER:",
+                    style = Typography.labelSmall,
+                    fontFamily = FontFamily.Default,
+                    color = activeColorDim,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+
+                if (isAnomaly) {
+                    val options = listOf("X", "Z", "Y", "W", "?", "!", "$", "%", "&", "@", "#")
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(options) { base ->
+                            val tentative = stepSearchPrefix + base
+                            val matchCount = allInventoryGenes.count { it.startsWith(tentative) }
+                            val isEnabled = matchCount > 0
+                            
+                            Box(
+                                modifier = Modifier
+                                    .cyberglass(
+                                        borderColor = if (isEnabled) activeColor else Color.DarkGray.copy(alpha = 0.2f),
+                                        backgroundColor = if (isEnabled) activePanel else Color.Transparent
+                                    )
+                                    .clickable(enabled = isEnabled) {
+                                        stepSearchPrefix = tentative
+                                        viewModel.synthManager.playCombinatorTick()
+                                    }
+                                    .padding(6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = base,
+                                        style = Typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isEnabled) Color.White else Color.Gray.copy(alpha = 0.3f),
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    if (isEnabled) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = "x",
+                                                style = Typography.labelSmall,
+                                                fontFamily = FontFamily.Default,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = activeColor
+                                            )
+                                            Text(
+                                                text = "$matchCount",
+                                                style = Typography.labelSmall,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = activeColor
+                                            )
+                                            Text(
+                                                text = " TYPES",
+                                                style = Typography.labelSmall,
+                                                fontFamily = FontFamily.Default,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = activeColor
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    val couples = listOf("AA", "AC", "AG", "AT", "CA", "CC", "CG", "CT", "GA", "GC", "GG", "GT", "TA", "TC", "TG", "TT")
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(couples) { couple ->
+                            val tentative = stepSearchPrefix + couple
+                            val matchCount = allInventoryGenes.count { it.startsWith(tentative) }
+                            val isEnabled = matchCount > 0
+                            
+                            Box(
+                                modifier = Modifier
+                                    .cyberglass(
+                                        borderColor = if (isEnabled) activeColor else Color.DarkGray.copy(alpha = 0.2f),
+                                        backgroundColor = if (isEnabled) activePanel else Color.Transparent
+                                    )
+                                    .clickable(enabled = isEnabled) {
+                                        stepSearchPrefix = tentative
+                                        viewModel.synthManager.playCombinatorTick()
+                                    }
+                                    .padding(6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = couple,
+                                        style = Typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isEnabled) Color.White else Color.Gray.copy(alpha = 0.3f),
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    if (isEnabled) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = "x",
+                                                style = Typography.labelSmall,
+                                                fontFamily = FontFamily.Default,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = activeColor
+                                            )
+                                            Text(
+                                                text = "$matchCount",
+                                                style = Typography.labelSmall,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = activeColor
+                                            )
+                                            Text(
+                                                text = " TYPES",
+                                                style = Typography.labelSmall,
+                                                fontFamily = FontFamily.Default,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = activeColor
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Intermediate matches shortcut button
+        if (!isDone && stepSearchPrefix.isNotEmpty() && !viewStepSearchMatchesOnly) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .cyberglass(
+                        borderColor = activeColorDim.copy(alpha = 0.5f),
+                        backgroundColor = activeColorDim.copy(alpha = 0.15f)
+                    )
+                    .clickable {
+                        viewStepSearchMatchesOnly = true
+                        viewModel.synthManager.playCombinatorTick()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "VIEW INTERMEDIATE MATCHES",
+                    style = Typography.labelSmall,
+                    color = activeColor,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+// ==========================================
+// BATCH PACKET LOG VIEW
+// ==========================================
+@Composable
+fun BatchPacketLogView(
+    viewModel: MainViewModel,
+    onSelectGene: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    val discoveredPacketsLog by viewModel.discoveredPacketsLog.collectAsState()
+    
+    var packetLogQuery by remember { mutableStateOf("") }
+    
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Header / Title bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "GENE SYNTHESIS LOG",
+                color = Color(0xFF00FF41).copy(alpha = 0.75f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Default
+            )
+            
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // CLEAR ALL Button
+                Box(
+                    modifier = Modifier
+                        .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
+                        .clickable {
+                            viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                            viewModel.clearDiscoveredPacketsLog()
+                        }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "✕ CLEAR ALL",
+                        color = Color.Yellow,
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                // CLOSE Button
+                Box(
+                    modifier = Modifier
+                        .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                        .clickable {
+                            viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                            packetLogQuery = ""
+                            onClose()
+                        }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "✕ CLOSE",
+                        color = Color.Red,
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // Info Bar
+        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+        val alpha by infiniteTransition.animateFloat(
+            initialValue = 0.2f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(800, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "alpha"
+        )
+        
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .cyberglass(borderColor = Color(0xFF00FF41), backgroundColor = Color.Transparent)
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color(0xFF00FF41).copy(alpha = alpha))
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "SELECT ANY GENE BLOCK TO LOAD DETAILED ANALYSIS",
+                color = Color(0xFF00FF41),
+                fontSize = 8.5.sp,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        // Logs List
+        val filteredPackets = remember(discoveredPacketsLog, packetLogQuery) {
+            discoveredPacketsLog.filter { packet ->
+                packetLogQuery.isEmpty() || packet.genes.any { it.contains(packetLogQuery.uppercase()) }
+            }
+        }
+
+        if (filteredPackets.isEmpty()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "NO SYNTHESIS PACKETS RECORDED IN THIS SECTOR.",
+                    color = Color(0xFF00FF41).copy(alpha = 0.5f),
+                    style = Typography.bodySmall,
+                    fontFamily = FontFamily.Default,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                itemsIndexed(filteredPackets) { pIdx, packet ->
+                    val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(packet.timestamp))
+                    val uniqueCount = packet.newGenes.size
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .cyberglass(
+                                borderColor = Color(0xFF00FF41).copy(alpha = 0.25f),
+                                backgroundColor = Color.Black.copy(alpha = 0.4f)
+                            )
+                            .padding(8.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            // Packet Header
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "#",
+                                        style = Typography.labelSmall,
+                                        fontFamily = FontFamily.Default,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF00FF41)
+                                    )
+                                    Text(
+                                        text = "${discoveredPacketsLog.size - pIdx}",
+                                        style = Typography.labelSmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF00FF41)
+                                    )
+                                    Text(
+                                        text = " PACKET SPLICED",
+                                        style = Typography.labelSmall,
+                                        fontFamily = FontFamily.Default,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF00FF41)
+                                    )
+                                }
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "$uniqueCount",
+                                            style = Typography.labelSmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF22D3EE)
+                                        )
+                                        Text(
+                                            text = " NEW GENES",
+                                            style = Typography.labelSmall,
+                                            fontFamily = FontFamily.Default,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF22D3EE)
+                                        )
+                                    }
+                                    Text(
+                                        text = timeStr,
+                                        style = Typography.labelSmall,
+                                        color = Color.Gray,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+
+                            // Genes display
+                            if (packet.isAnomalous) {
+                                val anomalousGene = packet.genes.firstOrNull() ?: "DECAYED!"
+                                val isDecayed = anomalousGene == "DECAYED!"
+                                val isNew = packet.newGenes.contains(anomalousGene)
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .then(
+                                            if (isNew) {
+                                                Modifier.cyberglass(
+                                                    borderColor = Color(0xFFA855F7).copy(alpha = alpha),
+                                                    backgroundColor = Color.Transparent
+                                                )
+                                            } else {
+                                                Modifier
+                                            }
+                                        )
+                                        .clickable(enabled = !isDecayed) {
+                                            onSelectGene(anomalousGene)
+                                            viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                        }
+                                        .padding(12.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = anomalousGene,
+                                            style = Typography.bodyMedium,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDecayed) Color.Red else Color(0xFFA855F7).copy(alpha = if (isNew) alpha else 1f)
+                                        )
+                                        if (!isDecayed) {
+                                            Text(
+                                                text = "SECURED [DIAGNOSE]",
+                                                style = Typography.labelSmall,
+                                                fontFamily = FontFamily.Default,
+                                                fontSize = 7.5.sp,
+                                                color = Color(0xFFD8B4FE)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "DECOMPOSED",
+                                                style = Typography.labelSmall,
+                                                fontFamily = FontFamily.Default,
+                                                fontSize = 7.5.sp,
+                                                color = Color.Red
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    for (row in 0 until 2) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            for (col in 0 until 4) {
+                                                val idx = row * 4 + col
+                                                val gene = packet.genes.getOrNull(idx)
+                                                if (gene != null) {
+                                                    val isNew = packet.newGenes.contains(gene)
+                                                    
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .then(
+                                                                if (isNew) {
+                                                                    Modifier.cyberglass(
+                                                                        borderColor = Color(0xFF22D3EE).copy(alpha = alpha),
+                                                                        backgroundColor = Color.Transparent
+                                                                    )
+                                                                } else {
+                                                                    Modifier
+                                                                }
+                                                            )
+                                                            .clickable {
+                                                                onSelectGene(gene)
+                                                                viewModel.synthManager.playBeep(330f, 0.04f, "sine")
+                                                            }
+                                                            .padding(vertical = 12.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = gene,
+                                                            style = Typography.labelSmall,
+                                                            fontSize = 7.5.sp,
+                                                            color = if (isNew) Color(0xFF22D3EE).copy(alpha = alpha) else Color(0xFF00FF41),
+                                                            fontFamily = FontFamily.Monospace,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                } else {
+                                                    Spacer(modifier = Modifier.weight(1f))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Footer
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color(0xFF00FF41).copy(alpha = alpha))
+                )
+                Text(
+                    text = "STANDARD GENE SEARCH ACTIVE",
+                    color = Color(0xFF00FF41).copy(alpha = 0.8f),
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Text(
+                text = "SECURE CONNECTION: AIS-DEV-ENV",
+                color = Color(0xFF005511),
+                fontSize = 7.5.sp,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+// ==========================================
+// ANOMALY VAULT VIEW
+// ==========================================
+@Composable
+fun AnomalyVaultView(
+    viewModel: MainViewModel,
+    onSelectGene: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    val geneSequences by viewModel.geneSequences.collectAsState()
+    
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "ANOMALY DISCOVERY LOG",
+                color = Color(0xFFD8B4FE).copy(alpha = 0.75f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Default
+            )
+            Box(
+                modifier = Modifier
+                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                    .clickable {
+                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                        onClose()
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "✕ CLOSE",
+                    color = Color.Red,
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Get all anomalous genes
+        val anomalousGenes = remember(geneSequences) {
+            geneSequences.filter { WaveMath.isAnomalousGene(it.sequence) }
+        }
+
+        if (anomalousGenes.isEmpty()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "ANOMALY DISCOVERY LOG EMPTY.\nENGAGE ANOMALY ENGINE TO ATTAIN ANOMALOUS GENES.",
+                    color = Color(0xFF701A75),
+                    style = Typography.bodySmall,
+                    fontFamily = FontFamily.Default,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 16.sp
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(anomalousGenes) { gene ->
+                    val benefit = WaveMath.getBenefitForAnomalousGene(gene.sequence)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .cyberglass(borderColor = CyberTheme.purpleBorder, backgroundColor = CyberTheme.purplePanel)
+                            .clickable {
+                                onSelectGene(gene.sequence)
+                                viewModel.synthManager.playBeep(587f, 0.05f, "triangle")
+                            }
+                            .padding(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = gene.sequence,
+                                    style = Typography.bodyMedium,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFD8B4FE)
+                                )
+                                Text(
+                                    text = benefit.name.uppercase(),
+                                    style = Typography.bodySmall,
+                                    fontFamily = FontFamily.Default,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFA855F7)
+                                )
+                                Text(
+                                    text = benefit.description.uppercase(),
+                                    style = Typography.labelSmall,
+                                    fontFamily = FontFamily.Default,
+                                    color = Color(0xFFCCC2DC),
+                                    lineHeight = 12.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "QTY: ",
+                                    style = Typography.bodyMedium,
+                                    fontFamily = FontFamily.Default,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFD8B4FE)
+                                )
+                                Text(
+                                    text = "x${gene.count}",
+                                    style = Typography.bodyMedium,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFD8B4FE)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// SUB-DIAGNOSTIC POPUPS
+// ==========================================
+@Composable
+fun GeneDetailsPopup(
+    viewModel: MainViewModel,
+    gene: String,
+    activeColor: Color,
+    activePanel: Color,
+    onClose: () -> Unit
+) {
+    val isAnom = WaveMath.isAnomalousGene(gene)
+    val benefit = if (isAnom) WaveMath.getBenefitForAnomalousGene(gene) else null
+    
+    AlertDialog(
+        onDismissRequest = onClose,
+        modifier = Modifier.cyberglass(
+            borderColor = if (isAnom) CyberTheme.purple else activeColor,
+            backgroundColor = if (isAnom) CyberTheme.purplePanel else activePanel
+        ),
+        containerColor = Color.Transparent,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (isAnom) {
+                    WireframeGalaxy(
+                        color = Color(0xFFD8B4FE),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "ANOMALOUS GENE",
+                        style = Typography.titleMedium,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFD8B4FE)
+                    )
+                } else {
+                    WireframeDna(
+                        color = activeColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "STANDARD GENE",
+                        style = Typography.titleMedium,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold,
+                        color = activeColor
+                    )
+                }
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "SEQUENCE: $gene",
+                    style = Typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isAnom) Color(0xFFD8B4FE) else activeColor
+                )
+
+                if (isAnom && benefit != null) {
+                    Text(
+                        text = "CLASSIFICATION: SYNODIC ANOMALOUS UNIT",
+                        style = Typography.bodySmall,
+                        fontFamily = FontFamily.Default,
+                        color = Color(0xFFA855F7),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "PASSIVE ACTION: ${benefit.name.uppercase()}",
+                        style = Typography.bodySmall,
+                        fontFamily = FontFamily.Default,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = benefit.description.uppercase(),
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        color = Color.LightGray,
+                        lineHeight = 12.sp
+                    )
+                } else {
+                    Text(
+                        text = "CLASSIFICATION: STABLE NUCLEOTIDE UNIT",
+                        style = Typography.bodySmall,
+                        fontFamily = FontFamily.Default,
+                        color = activeColor.copy(alpha = 0.6f),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "THIS SYNTHETIC BASE HAS SUCCESSFULLY BONDED WITH ORGANIC NUCLEOTIDES IN THE REACTOR. STABILITY OF FURTHER SPLICING WILL NOT BE ADVERSELY AFFECTED.",
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        color = Color.LightGray,
+                        lineHeight = 12.sp
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Box(
+                modifier = Modifier
+                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                    .clickable {
+                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                        onClose()
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "✕ CLOSE",
+                    color = Color.Red,
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    )
+}
+
+@Composable
+fun StepSearchGeneDetailsPopup(
+    viewModel: MainViewModel,
+    gene: String,
+    activeColor: Color,
+    activePanel: Color,
+    onClose: () -> Unit
+) {
+    val isAnom = WaveMath.isAnomalousGene(gene)
+    val benefit = if (isAnom) WaveMath.getBenefitForAnomalousGene(gene) else null
+    
+    AlertDialog(
+        onDismissRequest = onClose,
+        modifier = Modifier.cyberglass(
+            borderColor = if (isAnom) CyberTheme.purple else activeColor,
+            backgroundColor = if (isAnom) CyberTheme.purplePanel else activePanel
+        ),
+        containerColor = Color.Transparent,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (isAnom) {
+                    WireframeGalaxy(
+                        color = Color(0xFFD8B4FE),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "DECRYPTED ANOMALY MOLECULE",
+                        style = Typography.titleMedium,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFD8B4FE)
+                    )
+                } else {
+                    WireframeDna(
+                        color = activeColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "MOLECULAR STOCK DETAILED VIEW",
+                        style = Typography.titleMedium,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold,
+                        color = activeColor
+                    )
+                }
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "SEQUENCE: $gene",
+                    style = Typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isAnom) Color(0xFFD8B4FE) else activeColor
+                )
+
+                if (isAnom && benefit != null) {
+                    Text(
+                        text = "TACTICAL PERK: ${benefit.name.uppercase()}",
+                        style = Typography.bodySmall,
+                        fontFamily = FontFamily.Default,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = benefit.description.uppercase(),
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        color = Color.LightGray,
+                        lineHeight = 12.sp
+                    )
+                } else {
+                    Text(
+                        text = "STANDARD STABLE SEQUENCE. IDEAL FOR CREATURE TELOMERE REINFORCEMENT OPERATIONS.",
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        color = Color.LightGray,
+                        lineHeight = 12.sp
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Box(
+                modifier = Modifier
+                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                    .clickable {
+                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                        onClose()
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "✕ CLOSE",
+                    color = Color.Red,
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    )
+}
+
+@Composable
+fun VaultGeneDetailsPopup(
+    viewModel: MainViewModel,
+    gene: String,
+    onClose: () -> Unit
+) {
+    val benefit = WaveMath.getBenefitForAnomalousGene(gene)
+    
+    AlertDialog(
+        onDismissRequest = onClose,
+        modifier = Modifier.cyberglass(
+            borderColor = CyberTheme.purple,
+            backgroundColor = CyberTheme.purplePanel
+        ),
+        containerColor = Color.Transparent,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                WireframeGalaxy(
+                    color = Color(0xFFD8B4FE),
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "ANOMALY QUANTUM DECRYPT",
+                    style = Typography.titleMedium,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFD8B4FE)
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "SEQUENCE: $gene",
+                    style = Typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFD8B4FE)
+                )
+                Text(
+                    text = "PERK ID: ${benefit.id.uppercase()}",
+                    style = Typography.labelSmall,
+                    fontFamily = FontFamily.Default,
+                    color = Color(0xFFA855F7)
+                )
+                Text(
+                    text = "DESIGNATION: ${benefit.name.uppercase()}",
+                    style = Typography.bodySmall,
+                    fontFamily = FontFamily.Default,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = benefit.description.uppercase(),
+                    style = Typography.labelSmall,
+                    fontFamily = FontFamily.Default,
+                    color = Color.LightGray,
+                    lineHeight = 12.sp
+                )
+            }
+        },
+        confirmButton = {
+            Box(
+                modifier = Modifier
+                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                    .clickable {
+                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                        onClose()
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "✕ CLOSE",
+                    color = Color.Red,
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    )
+}
+
+// ==========================================
+// 1. COMBINATOR VIEW (Modularized & Slimmed)
 // ==========================================
 @Composable
 fun CombinatorView(viewModel: MainViewModel) {
@@ -1270,44 +3112,32 @@ fun CombinatorView(viewModel: MainViewModel) {
     val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
     val inventoryMetrics by viewModel.inventoryMetrics.collectAsState()
     
-    val uniqueGenesSize = remember(geneSequences) { geneSequences.size }
-    val multiCountGenesSize = remember(geneSequences) { geneSequences.count { it.count > 1 } }
-    val anomalousGenesSize = remember(geneSequences) { geneSequences.count { WaveMath.isAnomalousGene(it.sequence) } }
     val geneSequenceStrings = remember(geneSequences) { geneSequences.map { it.sequence } }
     
-    val coupling = remember(grandTotalStandardNucleotides) { WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis()) }
-    val chanceMetrics = remember(grandTotalStandardNucleotides, coupling) {
-        WaveMath.getAnomalyEngineSuccessChance(grandTotalStandardNucleotides, coupling)
+    // Last Main Subtab state to remember REACTOR/ANOMALY context
+    var lastMainSubTab by remember { mutableStateOf("pox") }
+    LaunchedEffect(bioLabSubTab) {
+        if (bioLabSubTab == "pox" || bioLabSubTab == "anomaly") {
+            lastMainSubTab = bioLabSubTab
+        }
     }
 
-    // UI colors and themes based on subtab
-    val activeColor = if (bioLabSubTab == "pox") CyberGreen else Color(0xFFA855F7)
-    val activeColorDim = if (bioLabSubTab == "pox") CyberGreenDim else Color(0xFF701A75)
-    val activeBorder = if (bioLabSubTab == "pox") CyberBorder else Color(0xFF4A125E)
-    val activePanel = if (bioLabSubTab == "pox") CyberPanel else Color(0xFF150B24)
-
-    // Local Overlay Visibility States
-    var showStepSearchOverlay by remember { mutableStateOf(false) }
-    var showPacketLogOverlay by remember { mutableStateOf(false) }
-    var showAnomalyVaultOverlay by remember { mutableStateOf(false) }
-
-    // Step Search local states
-    var stepSearchPrefix by remember { mutableStateOf("") }
-    var viewStepSearchMatchesOnly by remember { mutableStateOf(false) }
-    var stepSearchSelectedGene by remember { mutableStateOf<String?>(null) }
-
-    // Packet Log local states
+    // Local details popups state
     var selectedPacketByGene by remember { mutableStateOf<String?>(null) }
-    var packetLogQuery by remember { mutableStateOf("") }
-
-    // Selected anomalous gene details (within Anomaly Vault overlay)
+    var stepSearchSelectedGene by remember { mutableStateOf<String?>(null) }
     var selectedAnomalousGene by remember { mutableStateOf<String?>(null) }
 
     // Wave config calculations
     val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
     
+    // UI colors and themes based on subtab
+    val activeColor = if (lastMainSubTab == "pox") CyberGreen else CyberTheme.purple
+    val activeColorDim = if (lastMainSubTab == "pox") CyberGreenDim else CyberTheme.purpleDim
+    val activeBorder = if (lastMainSubTab == "pox") CyberBorder else CyberTheme.purpleBorder
+    val activePanel = if (lastMainSubTab == "pox") CyberPanel else CyberTheme.purplePanel
+    
     // Auto-generate metrics for NodeCrystalCanvas based on synodic daily wave configuration
-    val metrics = remember(wave, bioLabSubTab) {
+    val metrics = remember(wave, lastMainSubTab) {
         var widthG = 0.5f
         var widthA = 0.5f
         var widthT = 0.5f
@@ -1338,2215 +3168,243 @@ fun CombinatorView(viewModel: MainViewModel) {
             subnodeWidthT = widthT * scale,
             subnodeWidthC = widthC * scale,
             totalNodeWidth = 0.8f,
-            colorR = if (bioLabSubTab == "pox") 0 else 168,
-            colorG = if (bioLabSubTab == "pox") 255 else 85,
-            colorB = if (bioLabSubTab == "pox") 102 else 247
+            colorR = if (lastMainSubTab == "pox") 0 else 168,
+            colorG = if (lastMainSubTab == "pox") 255 else 85,
+            colorB = if (lastMainSubTab == "pox") 102 else 247
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Outer Column to structure scrollable content (weight 1f) and bottom switcher
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-
-            // 2. MAIN REACTOR CARD (representing Left Pane)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .cyberglass(borderColor = activeBorder, backgroundColor = activePanel)
-                    .padding(12.dp)
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    if (bioLabSubTab == "pox") {
-                        // Header
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "G.E.N. P.O.X. TIDE POOL REACTOR V2.4",
-                                color = CyberGreenDim,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Default
-                            )
-                            Text(
-                                text = if (poxReactorActive) "SYSTEMS ON" else "SYSTEMS OFF",
-                                color = if (poxReactorActive) CyberGreen else Color.Red,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Default,
-                                modifier = Modifier.clickable {
-                                    viewModel.setPoxReactorActive(!poxReactorActive)
-                                }
-                            )
-                        }
-
-                        // Title
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .requiredHeight(24.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "SINGLE-NODE CYBERNETIC SYNTHESIZER",
-                                color = Color.White,
-                                style = Typography.bodyMedium,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-
-                        // Flavor text
-                        Text(
-                            text = "Synthesize genes at a set rate or manually accelerate to speed up the P.O.X. Reactor.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = CyberGreen.copy(alpha = 0.8f),
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-
-                        // Top-Level Counts section
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
-                                .padding(vertical = 10.dp, horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "UNIQUE GENE IDS",
-                                    color = CyberGreenDim,
-                                    style = Typography.labelSmall,
-                                    fontFamily = FontFamily.Default,
-                                    fontSize = 9.sp
-                                )
-                                Row(
-                                    modifier = Modifier.padding(top = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "⬢ ",
-                                        color = CyberGreen,
-                                        fontSize = 14.sp
-                                    )
-                                    Text(
-                                        text = "$uniqueGenesSize",
-                                        color = Color.White,
-                                        style = Typography.bodyLarge,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .width(1.dp)
-                                    .height(35.dp)
-                                    .background(CyberBorder)
-                            )
-
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(start = 12.dp)
-                            ) {
-                                Text(
-                                    text = "MULTI-COUNT GENE IDS",
-                                    color = CyberGreenDim,
-                                    style = Typography.labelSmall,
-                                    fontFamily = FontFamily.Default,
-                                    fontSize = 9.sp
-                                )
-                                Row(
-                                    modifier = Modifier.padding(top = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "⬢ ",
-                                        color = CyberGreen,
-                                        fontSize = 14.sp
-                                    )
-                                    Text(
-                                        text = "$multiCountGenesSize",
-                                        color = Color.White,
-                                        style = Typography.bodyLarge,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        // Today's base-pair wave card
-                        val todayWave = wave
-                        val tomorrowWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 86400000L)
-                        val dayAfterWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 172800000L)
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .cyberglass(
-                                    borderColor = if (todayWave.isSuppressed) Color(0xFF990000) else CyberGreen,
-                                    backgroundColor = if (todayWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.6f)
-                                )
-                                .padding(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.weight(1f, fill = false)
-                                ) {
-                                    Text(
-                                        text = "⚡",
-                                        color = if (todayWave.isSuppressed) Color.Red else Color(0xFFFFB300),
-                                        fontSize = 14.sp
-                                    )
-                                    Column {
-                                        Text(
-                                            text = "TODAY'S BASE-PAIR WAVE",
-                                            color = CyberGreenDim,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 8.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = if (todayWave.isSuppressed) "DORMANT (CONGESTED DECAY)" else "ACTIVE: ${todayWave.pair} WAVE",
-                                            color = Color.White,
-                                            style = Typography.bodySmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-
-                                if (!todayWave.isSuppressed) {
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text(
-                                            text = "${todayWave.primary} ➔ ${todayWave.secondary}",
-                                            color = CyberGreen,
-                                            style = Typography.bodySmall,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        Text(
-                                            text = "1.12x & 1.62x BOOST",
-                                            color = CyberGreenDim,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 7.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                } else {
-                                    Text(
-                                        text = "NULL",
-                                        color = Color.Red,
-                                        style = Typography.labelSmall,
-                                        fontFamily = FontFamily.Default,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier
-                                            .background(Color(0xFF330000), RoundedCornerShape(2.dp))
-                                            .border(1.dp, Color.Red, RoundedCornerShape(2.dp))
-                                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Forecast Grid
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Tomorrow
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .cyberglass(
-                                        borderColor = if (tomorrowWave.isSuppressed) Color(0xFF990000) else Color.DarkGray,
-                                        backgroundColor = if (tomorrowWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f)
-                                    )
-                                    .padding(6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "TOMORROW BASE-PAIR",
-                                            color = CyberGreenDim,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 7.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = if (tomorrowWave.isSuppressed) "DORMANT" else "${tomorrowWave.pair} WAVE",
-                                            color = Color.White,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    if (!tomorrowWave.isSuppressed) {
-                                        Text(
-                                            text = "${tomorrowWave.primary}➔${tomorrowWave.secondary}",
-                                            color = CyberGreen,
-                                            style = Typography.labelSmall,
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Day After Tomorrow
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .cyberglass(
-                                        borderColor = if (dayAfterWave.isSuppressed) Color(0xFF990000) else Color.DarkGray,
-                                        backgroundColor = if (dayAfterWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f)
-                                    )
-                                    .padding(6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "DAY AFTER TOMORROW",
-                                            color = CyberGreenDim,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 7.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = if (dayAfterWave.isSuppressed) "DORMANT" else "${dayAfterWave.pair} WAVE",
-                                            color = Color.White,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    if (!dayAfterWave.isSuppressed) {
-                                        Text(
-                                            text = "${dayAfterWave.primary}➔${dayAfterWave.secondary}",
-                                            color = CyberGreen,
-                                            style = Typography.labelSmall,
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-
-                    } else {
-                        // Anomaly tab content
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "WARNING: UNKNOWN REACTOR",
-                                color = activeColorDim,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Default
-                            )
-                            Text(
-                                text = if (anomalyEngineActive) "SYSTEMS ON" else "SYSTEMS OFF",
-                                color = if (anomalyEngineActive) CyberGreen else Color.Red,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Default,
-                                modifier = Modifier.clickable {
-                                    viewModel.setAnomalyEngineActive(!anomalyEngineActive)
-                                }
-                            )
-                        }
-
-                        // Compact Title
-                        Row(
-                            modifier = Modifier.fillMaxWidth().requiredHeight(24.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "GENETIC ANOMALY HARMONIZER",
-                                color = Color.White,
-                                style = Typography.bodyMedium,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-
-                        // Flavor text
-                        Text(
-                            text = "Sacrifice existing genes to synthesize anomalous genes in the Anomaly Engine.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFA855F7).copy(alpha = 0.8f),
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-
-                        // Top-Level Counts section for Anomaly tab (standardized padding)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color.Black.copy(alpha = 0.4f))
-                                .padding(vertical = 10.dp, horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable {
-                                        viewModel.synthManager.playBeep(600f, 0.05f, "sine")
-                                        showAnomalyVaultOverlay = true
-                                    }
-                             ) {
-                                Text(
-                                    text = "ANOMALOUS GENE IDS",
-                                    color = Color(0xFFA855F7),
-                                    style = Typography.labelSmall,
-                                    fontFamily = FontFamily.Default,
-                                    fontSize = 9.sp
-                                )
-                                Row(
-                                    modifier = Modifier.padding(top = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "⬢ ",
-                                        color = Color(0xFFA855F7),
-                                        fontSize = 14.sp
-                                    )
-                                    Text(
-                                        text = "$anomalousGenesSize",
-                                        color = Color.White,
-                                        style = Typography.bodyLarge,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .width(1.dp)
-                                    .height(35.dp)
-                                    .background(Color(0xFF4A125E))
-                            )
-
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(start = 12.dp)
-                            ) {
-                                Text(
-                                    text = "TOTAL GENE STOCK",
-                                    color = Color(0xFFA855F7),
-                                    style = Typography.labelSmall,
-                                    fontFamily = FontFamily.Default,
-                                    fontSize = 9.sp
-                                )
-                                Row(
-                                    modifier = Modifier.padding(top = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "⬢ ",
-                                        color = CyberGreen,
-                                        fontSize = 14.sp
-                                    )
-                                    Text(
-                                        text = "$uniqueGenesSize",
-                                        color = Color.White,
-                                        style = Typography.bodyLarge,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        // Compact Info panel
-                        val meetsRequirement = grandTotalStandardNucleotides >= 250000L
-                        val formattedCount = String.format(Locale.US, "%,d", grandTotalStandardNucleotides)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .cyberglass(
-                                    borderColor = if (meetsRequirement) Color(0xFFA855F7) else Color(0xFF4A125E),
-                                    backgroundColor = Color.Black.copy(alpha = 0.6f)
-                                )
-                                .padding(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.weight(1f, fill = false)
-                                ) {
-                                    Text(
-                                        text = "~",
-                                        color = Color(0xFFA855F7),
-                                        fontSize = 14.sp
-                                    )
-                                    Column {
-                                        Text(
-                                            text = "ANOMALOUS RESOURCE & LOAD",
-                                            color = Color(0xFFD8B4FE),
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 8.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "$formattedCount / 250,000 NUCLEOTIDES",
-                                            color = Color.White,
-                                            style = Typography.bodySmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "RATE: -10K/LOOP",
-                                        color = Color(0xFFA855F7),
-                                        style = Typography.bodySmall,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                    Text(
-                                        text = "RESETS STABILITY",
-                                        color = Color(0xFFD8B4FE),
-                                        style = Typography.labelSmall,
-                                        fontFamily = FontFamily.Default,
-                                        fontSize = 7.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        // Anomaly Forecast Grid
-                        val formattedFinalChance = String.format(Locale.US, "%.3f%%", chanceMetrics.finalChance)
-                        val formattedModifier = String.format(Locale.US, "%+.3f%%", chanceMetrics.harmonicModifier)
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Left: Consolidation Chance
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color.Black.copy(alpha = 0.45f))
-                                    .padding(6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "CONSOLIDATION CHANCE",
-                                            color = Color(0xFFD8B4FE),
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 7.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "SUCCESS PROB",
-                                            color = Color.White,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    Text(
-                                        text = formattedFinalChance,
-                                        color = Color(0xFFA855F7),
-                                        style = Typography.labelSmall,
-                                        fontSize = 8.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
-
-                            // Right: Spectrum Coupling
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color.Black.copy(alpha = 0.45f))
-                                    .padding(6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "SPECTRUM COUPLING",
-                                            color = Color(0xFFD8B4FE),
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 7.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "HARMONIC MODIFIER",
-                                            color = Color.White,
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Default,
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    Text(
-                                        text = formattedModifier,
-                                        color = Color(0xFFA855F7),
-                                        style = Typography.labelSmall,
-                                        fontSize = 8.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Responsive split cyberglass visual chamber holding NodeCrystalCanvas and HolographicHelixReactor side-by-side
-                    ReactorVisualChamber(
-                        metrics = metrics,
-                        geneSequenceStrings = geneSequenceStrings,
-                        activeColor = activeColor,
-                        isActive = if (bioLabSubTab == "pox") poxReactorActive else anomalyEngineActive,
-                        isAnomaly = bioLabSubTab == "anomaly",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Ticker Row (Streamlined Transcription Deck)
-                    TranscriptionDecoderTicker(
-                        displayTextProvider = {
-                            if (bioLabSubTab == "anomaly") {
-                                if (!anomalyEngineActive) {
-                                    "--------"
-                                } else {
-                                    val syms = "XZYW?!$%&@#"
-                                    scrollingGene.mapIndexed { i, char ->
-                                        val idx = (char.code + i) % syms.length
-                                        syms[idx]
-                                    }.joinToString("")
-                                }
-                            } else {
-                                if (!poxReactorActive) {
-                                    "--------"
-                                } else {
-                                    scrollingGene
-                                }
-                            }
-                        },
-                        activeColor = activeColor,
-                        activeColorDim = activeColorDim,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Progress bar
-                    val isBoosted = boostSecondsLeft > 0
-                    val totalCycle = if (isBoosted) 8 else 16
-                    val targetProgress = if (bioLabSubTab == "anomaly") {
-                        if (anomalyEngineActive) {
-                            ((totalCycle - anomalyIdleTime).toFloat() / totalCycle.toFloat()).coerceIn(0f, 1f)
-                        } else {
-                            0f
-                        }
-                    } else {
-                        if (poxReactorActive) {
-                            ((totalCycle - poxIdleTime).toFloat() / totalCycle.toFloat()).coerceIn(0f, 1f)
-                        } else {
-                            0f
-                        }
-                    }
-
-                    // Smoothly animate progress using snap on reset
-                    val animatedProgress by animateFloatAsState(
-                        targetValue = targetProgress,
-                        animationSpec = if (targetProgress == 0f) {
-                            snap()
-                        } else {
-                            tween(durationMillis = 1000, easing = LinearEasing)
-                        },
-                        label = "reactorProgress"
-                    )
-
-                    // Responsive cyberglass progress oscilloscope wave scope
-                    ResonanceScopeChamber(
-                        progressProvider = { animatedProgress },
-                        isActive = if (bioLabSubTab == "pox") poxReactorActive else anomalyEngineActive,
-                        isAnomaly = bioLabSubTab == "anomaly",
-                        activeColor = activeColor,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Timer text and booster status
-                    ReactorTimerStatus(
-                        statusProvider = {
-                            if (bioLabSubTab == "anomaly") {
-                                if (anomalyEngineActive) "ANOMALOUS CONSOLIDATION IN: ${anomalyIdleTime}S" else "ANOMALOUS CONSOLIDATION: IDLE"
-                            } else {
-                                if (poxReactorActive) "GENE ARRAY READY IN: ${poxIdleTime}S" else "GENE ARRAY REACTOR: OFFLINE"
-                            }
-                        },
-                        colorProvider = {
-                            if (bioLabSubTab == "anomaly") {
-                                if (anomalyEngineActive) Color(0xFFA855F7) else Color.Gray
-                            } else {
-                                if (poxReactorActive) CyberGreenDim else Color.Red
-                            }
-                        },
-                        boostSecondsLeftProvider = { if (bioLabSubTab == "pox") boostSecondsLeft else 0 },
-                        activeColor = CyberGreen
-                    )
-
-
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Action buttons
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                if (devForceAnomaly) {
-                    Button(
-                        onClick = { viewModel.addDevGenes() },
-                        modifier = Modifier.fillMaxWidth().height(54.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0x30F97316),
-                            contentColor = Color(0xFFF97316)
-                        ),
-                        border = BorderStroke(1.dp, Color(0xFFF97316)),
-                        shape = RoundedCornerShape(2.dp),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text(
-                            text = "DEV: INJECT 10K GENES",
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(72.dp))
-        }
-    }
-}
-
-        // Floating Action Buttons in bottom-right corner (Step Search, Synthesis/Anomaly Log, & Sub-Tab Toggle)
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 16.dp, end = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Step Search Button (styled holographic square)
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .cyberglass(borderColor = activeColor, glowColor = activeColor.copy(alpha = 0.15f))
-                    .clickable {
-                        viewModel.synthManager.playBeep(600f, 0.05f, "sine")
-                        showStepSearchOverlay = true
-                    },
-                contentAlignment = Alignment.Center
-            ) {
+    val subTabs = remember(lastMainSubTab) {
+        listOf(
+            PoxSubTab("pox", "REACTOR", icon = { iconColor ->
+                WireframeDna(color = iconColor, modifier = Modifier.size(24.dp))
+            }),
+            PoxSubTab("anomaly", "ANOMALY", icon = { iconColor ->
+                WireframeGalaxy(color = iconColor, modifier = Modifier.size(24.dp))
+            }),
+            PoxSubTab("step_search", "STEP_SRCH", icon = { iconColor ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Text(
-                        text = "STEP",
-                        color = activeColor,
-                        fontSize = 6.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "SRCH",
-                        color = activeColor,
-                        fontSize = 6.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "DIAG",
-                        color = activeColor,
-                        fontSize = 6.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("STEP", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Text("SRCH", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Text("DIAG", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                 }
-            }
-
-            if (bioLabSubTab == "pox") {
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .cyberglass(borderColor = Color(0xFF00E1FF), glowColor = Color(0xFF00E1FF).copy(alpha = 0.15f))
-                        .clickable {
-                            viewModel.synthManager.playBeep(650f, 0.05f, "sine")
-                            showPacketLogOverlay = true
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
+            }),
+            PoxSubTab("logs", if (lastMainSubTab == "pox") "PACKET_LOG" else "ANOM_LOG", icon = { iconColor ->
+                if (lastMainSubTab == "pox") {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            text = "ATCGGCTA",
-                            color = Color(0xFF00E1FF),
-                            fontSize = 6.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "GCTAATCG",
-                            color = Color(0xFF00E1FF),
-                            fontSize = 6.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "CGATTAGC",
-                            color = Color(0xFF00E1FF),
-                            fontSize = 6.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("ATCGGCTA", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        Text("GCTAATCG", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        Text("CGATTAGC", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("XYZW!?$%", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        Text("&@#GCTAA", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        Text("ANOM.LOG", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                     }
                 }
+            })
+        )
+    }
+
+    PoxTabFrame(
+        flavorTitle = if (lastMainSubTab == "pox") "G.E.N. P.O.X. TIDE POOL REACTOR V2.4" else "WARNING: UNKNOWN REACTOR",
+        statusText = if (lastMainSubTab == "pox") {
+            if (poxReactorActive) "SYSTEMS ON" else "SYSTEMS OFF"
+        } else {
+            if (anomalyEngineActive) "SYSTEMS ON" else "SYSTEMS OFF"
+        },
+        statusColor = if (lastMainSubTab == "pox") {
+            if (poxReactorActive) CyberGreen else Color.Red
+        } else {
+            if (anomalyEngineActive) CyberGreen else Color.Red
+        },
+        onStatusClick = {
+            if (lastMainSubTab == "pox") {
+                viewModel.setPoxReactorActive(!poxReactorActive)
             } else {
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .cyberglass(borderColor = Color(0xFFA855F7), glowColor = Color(0xFFA855F7).copy(alpha = 0.15f))
-                        .clickable {
-                            viewModel.synthManager.playBeep(650f, 0.05f, "sine")
-                            showAnomalyVaultOverlay = true
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "XYZW!?$%",
-                            color = Color(0xFFD8B4FE),
-                            fontSize = 6.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "&@#GCTAA",
-                            color = Color(0xFFD8B4FE),
-                            fontSize = 6.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "ANOM.LOG",
-                            color = Color(0xFFD8B4FE),
-                            fontSize = 6.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
+                viewModel.setAnomalyEngineActive(!anomalyEngineActive)
             }
-
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .cyberglass(borderColor = activeColor, glowColor = activeColor.copy(alpha = 0.15f))
-                    .clickable {
-                        viewModel.synthManager.playBeep(600f, 0.08f, "sine")
-                        viewModel.setBioLabSubTab(if (bioLabSubTab == "pox") "anomaly" else "pox")
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                WireframeDna(
-                    color = activeColor,
-                    modifier = Modifier.size(24.dp)
+        },
+        headerTitle = if (lastMainSubTab == "pox") "SINGLE-NODE CYBERNETIC SYNTHESIZER" else "GENETIC ANOMALY HARMONIZER",
+        descriptionText = if (lastMainSubTab == "pox") {
+            "Synthesize genes at a set rate or manually accelerate to speed up the P.O.X. Reactor."
+        } else {
+            "Sacrifice existing genes to synthesize anomalous genes in the Anomaly Engine."
+        },
+        borderColor = activeBorder,
+        backgroundColor = activePanel,
+        isScrollable = (bioLabSubTab == "pox" || bioLabSubTab == "anomaly"),
+        subTabs = subTabs,
+        activeSubTab = bioLabSubTab,
+        onSubTabClick = { id, tag ->
+            viewModel.synthManager.playBeep(600f, 0.08f, "sine")
+            viewModel.setBioLabSubTab(id)
+        },
+        viewModel = viewModel
+    ) {
+        when (bioLabSubTab) {
+            "pox" -> {
+                ReactorDashboardView(
+                    viewModel = viewModel,
+                    activeBorder = activeBorder,
+                    activePanel = activePanel
                 )
             }
-        }
-
-        // ==========================================
-        // OVERLAY 1: MOLECULAR STEP-SEARCH
-        // ==========================================
-        if (showStepSearchOverlay) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .cyberglass(borderColor = activeColor, backgroundColor = Color.Black)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        // Prevent click-through to underlying dashboard components
+            "anomaly" -> {
+                AnomalyDashboardView(
+                    viewModel = viewModel,
+                    onAnomalyLogClick = {
+                        viewModel.setBioLabSubTab("logs")
                     }
-                    .padding(8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "MOLECULAR STEP-SEARCH DIRECTORY",
-                            color = activeColorDim,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
-                        )
-                        Box(
-                            modifier = Modifier
-                                .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
-                                .clickable {
-                                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                    showStepSearchOverlay = false
-                                    stepSearchPrefix = ""
-                                    viewStepSearchMatchesOnly = false
-                                    stepSearchSelectedGene = null
-                                }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "✕ CLOSE",
-                                color = Color.Red,
-                                fontSize = 8.sp,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    // Progress indicators (1-2bp, 3-4bp, 5-6bp, 7-8bp or character-by-character)
-                    val isAnomaly = bioLabSubTab == "anomaly"
-                    val stepSize = if (isAnomaly) 1 else 2
-                    val maxSteps = if (isAnomaly) 8 else 4
-                    val activeStep = stepSearchPrefix.length / stepSize
-                    val stepLabels = if (isAnomaly) {
-                        listOf("1bp", "2bp", "3bp", "4bp", "5bp", "6bp", "7bp", "8bp")
-                    } else {
-                        listOf("1-2bp", "3-4bp", "5-6bp", "7-8bp")
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        stepLabels.forEachIndexed { idx, stepLabel ->
-                            val isCompleted = activeStep > idx
-                            val isActive = activeStep == idx
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .cyberglass(
-                                        borderColor = if (isActive) activeColor else if (isCompleted) activeColorDim.copy(alpha = 0.5f) else Color.DarkGray,
-                                        backgroundColor = if (isActive) activeColor.copy(alpha = 0.15f) else Color.Transparent
-                                    )
-                                    .padding(vertical = 4.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = stepLabel,
-                                    style = Typography.labelSmall,
-                                    fontFamily = FontFamily.Default,
-                                    color = if (isActive || isCompleted) activeColor else Color.Gray,
-                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = if (isAnomaly) 7.5.sp else 9.sp
-                                )
-                            }
-                        }
-                    }
-
-                    // Query & Controls
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .cyberglass(borderColor = activeBorder, backgroundColor = activePanel)
-                            .padding(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "PREFIX: ",
-                                    style = Typography.labelSmall,
-                                    fontFamily = FontFamily.Default,
-                                    color = activeColorDim
-                                )
-                                if (isAnomaly) {
-                                    for (i in 0 until 8) {
-                                        val charStr = if (stepSearchPrefix.length > i) {
-                                            stepSearchPrefix[i].toString()
-                                        } else {
-                                            "•"
-                                        }
-                                        val isCurrent = activeStep == i
-                                        Text(
-                                            text = charStr,
-                                            style = Typography.bodyMedium,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isCurrent) Color.White else if (charStr != "•") activeColor else Color.DarkGray
-                                        )
-                                    }
-                                } else {
-                                    for (i in 0 until 4) {
-                                        val block = if (stepSearchPrefix.length >= (i + 1) * 2) {
-                                            stepSearchPrefix.substring(i * 2, (i + 1) * 2)
-                                        } else {
-                                            "••"
-                                        }
-                                        val isCurrent = activeStep == i
-                                        Text(
-                                            text = block,
-                                            style = Typography.bodyMedium,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isCurrent) Color.White else if (block != "••") activeColor else Color.DarkGray
-                                        )
-                                    }
-                                }
-                            }
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (activeStep > 0) {
-                                    Box(
-                                        modifier = Modifier
-                                            .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
-                                            .clickable {
-                                                stepSearchPrefix = stepSearchPrefix.dropLast(stepSize)
-                                                viewStepSearchMatchesOnly = false
-                                                viewModel.synthManager.playCombinatorTick()
-                                            }
-                                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "↶ UNDO",
-                                            color = Color.Yellow,
-                                            fontSize = 8.sp,
-                                            fontFamily = FontFamily.Default,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
-                                        .clickable {
-                                            stepSearchPrefix = ""
-                                            viewStepSearchMatchesOnly = false
-                                            stepSearchSelectedGene = null
-                                            viewModel.synthManager.playReject()
-                                        }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "✕ RESET",
-                                        color = Color.Yellow,
-                                        fontSize = 8.sp,
-                                        fontFamily = FontFamily.Default,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Main display area: Grid or list of matches
-                    val allInventoryGenes = geneSequences.map { it.sequence }
-                    val isDone = activeStep == maxSteps
-
-                    if (isDone || viewStepSearchMatchesOnly) {
-                        // Matches View
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "RESOLVED STOCK MATCHES:",
-                                    style = Typography.labelSmall,
-                                    fontFamily = FontFamily.Default,
-                                    color = activeColorDim
-                                )
-                                if (!isDone) {
-                                    Box(
-                                        modifier = Modifier
-                                            .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
-                                            .clickable {
-                                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                                viewStepSearchMatchesOnly = false
-                                            }
-                                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "✕ BACK",
-                                            color = Color.Yellow,
-                                            fontSize = 8.sp,
-                                            fontFamily = FontFamily.Default,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-                            
-                            val matches = allInventoryGenes.filter { it.startsWith(stepSearchPrefix) }
-                            
-                            if (matches.isEmpty()) {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = "NO MATCHING STANDARD OR ANOMALOUS GENES FOUND.",
-                                        color = activeColorDim,
-                                        style = Typography.bodySmall,
-                                        fontFamily = FontFamily.Default
-                                    )
-                                }
-                            } else {
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize().padding(top = 4.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    items(matches) { matchSeq ->
-                                        val count = geneSequences.find { it.sequence == matchSeq }?.count ?: 0
-                                        val isAnom = WaveMath.isAnomalousGene(matchSeq)
-                                        
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .cyberglass(
-                                                    borderColor = if (isAnom) Color(0xFFA855F7).copy(alpha = 0.5f) else activeBorder,
-                                                    backgroundColor = if (isAnom) Color(0xFF1E0B36) else activePanel
-                                                )
-                                                .clickable {
-                                                    stepSearchSelectedGene = matchSeq
-                                                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                                }
-                                                .padding(8.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column {
-                                                Text(
-                                                    text = matchSeq,
-                                                    style = Typography.bodyMedium,
-                                                    fontFamily = FontFamily.Monospace,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isAnom) Color(0xFFD8B4FE) else activeColor
-                                                )
-                                                Text(
-                                                    text = if (isAnom) "ANOMALY SECTOR" else "STANDARD GENE",
-                                                    style = Typography.labelSmall,
-                                                    fontFamily = FontFamily.Default,
-                                                    color = if (isAnom) Color(0xFFA855F7) else activeColorDim
-                                                )
-                                            }
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = "QTY: ",
-                                                    style = Typography.bodyMedium,
-                                                    fontFamily = FontFamily.Default,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isAnom) Color(0xFFD8B4FE) else activeColor
-                                                )
-                                                Text(
-                                                    text = "x$count",
-                                                    style = Typography.bodyMedium,
-                                                    fontFamily = FontFamily.Monospace,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isAnom) Color(0xFFD8B4FE) else activeColor
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // Grid View (Select Couple or Base)
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (isAnomaly) "SELECT ANOMALY BASE TO FILTER:" else "SELECT SEQUENCE COUPLE TO FILTER:",
-                                style = Typography.labelSmall,
-                                fontFamily = FontFamily.Default,
-                                color = activeColorDim,
-                                modifier = Modifier.padding(bottom = 6.dp)
-                            )
-
-                            if (isAnomaly) {
-                                val options = listOf("X", "Z", "Y", "W", "?", "!", "$", "%", "&", "@", "#")
-                                LazyVerticalGrid(
-                                    columns = GridCells.Fixed(4),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    items(options) { base ->
-                                        val tentative = stepSearchPrefix + base
-                                        val matchCount = allInventoryGenes.count { it.startsWith(tentative) }
-                                        val isEnabled = matchCount > 0
-                                        
-                                        Box(
-                                            modifier = Modifier
-                                                .cyberglass(
-                                                    borderColor = if (isEnabled) activeColor else Color.DarkGray.copy(alpha = 0.2f),
-                                                    backgroundColor = if (isEnabled) activePanel else Color.Transparent
-                                                )
-                                                .clickable(enabled = isEnabled) {
-                                                    stepSearchPrefix = tentative
-                                                    viewModel.synthManager.playCombinatorTick()
-                                                }
-                                                .padding(6.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(
-                                                    text = base,
-                                                    style = Typography.bodyMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isEnabled) Color.White else Color.Gray.copy(alpha = 0.3f),
-                                                    fontFamily = FontFamily.Monospace
-                                                )
-                                                if (isEnabled) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Text(
-                                                            text = "x",
-                                                            style = Typography.labelSmall,
-                                                            fontFamily = FontFamily.Default,
-                                                            fontSize = 9.5.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = activeColor
-                                                        )
-                                                        Text(
-                                                            text = "$matchCount",
-                                                            style = Typography.labelSmall,
-                                                            fontFamily = FontFamily.Monospace,
-                                                            fontSize = 9.5.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = activeColor
-                                                        )
-                                                        Text(
-                                                            text = " TYPES",
-                                                            style = Typography.labelSmall,
-                                                            fontFamily = FontFamily.Default,
-                                                            fontSize = 9.5.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = activeColor
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                val couples = listOf("AA", "AC", "AG", "AT", "CA", "CC", "CG", "CT", "GA", "GC", "GG", "GT", "TA", "TC", "TG", "TT")
-                                LazyVerticalGrid(
-                                    columns = GridCells.Fixed(4),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    items(couples) { couple ->
-                                        val tentative = stepSearchPrefix + couple
-                                        val matchCount = allInventoryGenes.count { it.startsWith(tentative) }
-                                        val isEnabled = matchCount > 0
-                                        
-                                        Box(
-                                            modifier = Modifier
-                                                .cyberglass(
-                                                    borderColor = if (isEnabled) activeColor else Color.DarkGray.copy(alpha = 0.2f),
-                                                    backgroundColor = if (isEnabled) activePanel else Color.Transparent
-                                                )
-                                                .clickable(enabled = isEnabled) {
-                                                    stepSearchPrefix = tentative
-                                                    viewModel.synthManager.playCombinatorTick()
-                                                }
-                                                .padding(6.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(
-                                                    text = couple,
-                                                    style = Typography.bodyMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isEnabled) Color.White else Color.Gray.copy(alpha = 0.3f),
-                                                    fontFamily = FontFamily.Monospace
-                                                )
-                                                if (isEnabled) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Text(
-                                                            text = "x",
-                                                            style = Typography.labelSmall,
-                                                            fontFamily = FontFamily.Default,
-                                                            fontSize = 9.5.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = activeColor
-                                                        )
-                                                        Text(
-                                                            text = "$matchCount",
-                                                            style = Typography.labelSmall,
-                                                            fontFamily = FontFamily.Monospace,
-                                                            fontSize = 9.5.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = activeColor
-                                                        )
-                                                        Text(
-                                                            text = " TYPES",
-                                                            style = Typography.labelSmall,
-                                                            fontFamily = FontFamily.Default,
-                                                            fontSize = 9.5.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = activeColor
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Intermediate matches shortcut button
-                    if (!isDone && stepSearchPrefix.isNotEmpty() && !viewStepSearchMatchesOnly) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(36.dp)
-                                .cyberglass(
-                                    borderColor = activeColorDim.copy(alpha = 0.5f),
-                                    backgroundColor = activeColorDim.copy(alpha = 0.15f)
-                                )
-                                .clickable {
-                                    viewStepSearchMatchesOnly = true
-                                    viewModel.synthManager.playCombinatorTick()
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "VIEW INTERMEDIATE MATCHES",
-                                style = Typography.labelSmall,
-                                color = activeColor,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
+                )
             }
-        }
-
-        // ==========================================
-        // OVERLAY 2: BATCH PACKET LOG
-        // ==========================================
-        if (showPacketLogOverlay) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .cyberglass(borderColor = Color(0xFF00FF41), backgroundColor = Color(0xFF020D04))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        // Prevent click-through to underlying dashboard components
-                    }
-                    .padding(12.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Header / Title bar
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "GENE SYNTHESIS LOG",
-                            color = Color(0xFF00FF41).copy(alpha = 0.75f),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
-                        )
-                        
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // CLEAR ALL Button
-                            Box(
-                                modifier = Modifier
-                                    .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
-                                    .clickable {
-                                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                        viewModel.clearDiscoveredPacketsLog()
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "✕ CLEAR ALL",
-                                    color = Color.Yellow,
-                                    fontSize = 8.sp,
-                                    fontFamily = FontFamily.Default,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            
-                            // CLOSE Button
-                            Box(
-                                modifier = Modifier
-                                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
-                                    .clickable {
-                                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                        showPacketLogOverlay = false
-                                        packetLogQuery = ""
-                                        selectedPacketByGene = null
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "✕ CLOSE",
-                                    color = Color.Red,
-                                    fontSize = 8.sp,
-                                    fontFamily = FontFamily.Default,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    // Info Bar
-                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                    val alpha by infiniteTransition.animateFloat(
-                        initialValue = 0.2f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(800, easing = LinearEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "alpha"
+            "step_search" -> {
+                StepSearchView(
+                    viewModel = viewModel,
+                    activeColor = activeColor,
+                    activeColorDim = activeColorDim,
+                    activeBorder = activeBorder,
+                    activePanel = activePanel,
+                    isAnomaly = (lastMainSubTab == "anomaly"),
+                    onSelectGene = { stepSearchSelectedGene = it },
+                    onClose = { viewModel.setBioLabSubTab(lastMainSubTab) }
+                )
+            }
+            "logs" -> {
+                if (lastMainSubTab == "pox") {
+                    BatchPacketLogView(
+                        viewModel = viewModel,
+                        onSelectGene = { selectedPacketByGene = it },
+                        onClose = { viewModel.setBioLabSubTab(lastMainSubTab) }
                     )
-                    
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .cyberglass(borderColor = Color(0xFF00FF41), backgroundColor = Color.Transparent)
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(Color(0xFF00FF41).copy(alpha = alpha))
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "SELECT ANY GENE BLOCK TO LOAD DETAILED ANALYSIS",
-                            color = Color(0xFF00FF41),
-                            fontSize = 8.5.sp,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    // Logs List
-                    val filteredPackets = discoveredPacketsLog.filter { packet ->
-                        packetLogQuery.isEmpty() || packet.genes.any { it.contains(packetLogQuery.uppercase()) }
-                    }
-
-                    if (filteredPackets.isEmpty()) {
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "NO SYNTHESIS PACKETS RECORDED IN THIS SECTOR.",
-                                color = Color(0xFF00FF41).copy(alpha = 0.5f),
-                                style = Typography.bodySmall,
-                                fontFamily = FontFamily.Default,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            itemsIndexed(filteredPackets) { pIdx, packet ->
-                                val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(packet.timestamp))
-                                val uniqueCount = packet.newGenes.size
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .cyberglass(
-                                            borderColor = Color(0xFF00FF41).copy(alpha = 0.25f),
-                                            backgroundColor = Color.Black.copy(alpha = 0.4f)
-                                        )
-                                        .padding(8.dp)
-                                ) {
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        // Packet Header
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = "#",
-                                                    style = Typography.labelSmall,
-                                                    fontFamily = FontFamily.Default,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF00FF41)
-                                                )
-                                                Text(
-                                                    text = "${discoveredPacketsLog.size - pIdx}",
-                                                    style = Typography.labelSmall,
-                                                    fontFamily = FontFamily.Monospace,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF00FF41)
-                                                )
-                                                Text(
-                                                    text = " PACKET SPLICED",
-                                                    style = Typography.labelSmall,
-                                                    fontFamily = FontFamily.Default,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF00FF41)
-                                                )
-                                            }
-                                            Row(
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Text(
-                                                        text = "$uniqueCount",
-                                                        style = Typography.labelSmall,
-                                                        fontFamily = FontFamily.Monospace,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Color(0xFF22D3EE)
-                                                    )
-                                                    Text(
-                                                        text = " NEW GENES",
-                                                        style = Typography.labelSmall,
-                                                        fontFamily = FontFamily.Default,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Color(0xFF22D3EE)
-                                                    )
-                                                }
-                                                Text(
-                                                    text = timeStr,
-                                                    style = Typography.labelSmall,
-                                                    color = Color.Gray,
-                                                    fontFamily = FontFamily.Monospace
-                                                )
-                                            }
-                                        }
-
-                                        // Genes display
-                                        if (packet.isAnomalous) {
-                                            val anomalousGene = packet.genes.firstOrNull() ?: "DECAYED!"
-                                            val isDecayed = anomalousGene == "DECAYED!"
-                                            val isNew = packet.newGenes.contains(anomalousGene)
-                                            
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .then(
-                                                        if (isNew) {
-                                                            Modifier.cyberglass(
-                                                                borderColor = Color(0xFFA855F7).copy(alpha = alpha),
-                                                                backgroundColor = Color.Transparent
-                                                            )
-                                                        } else {
-                                                            Modifier
-                                                        }
-                                                    )
-                                                    .clickable(enabled = !isDecayed) {
-                                                        selectedPacketByGene = anomalousGene
-                                                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                                    }
-                                                    .padding(12.dp),
-                                                contentAlignment = Alignment.CenterStart
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text(
-                                                        text = anomalousGene,
-                                                        style = Typography.bodyMedium,
-                                                        fontFamily = FontFamily.Monospace,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = if (isDecayed) Color.Red else Color(0xFFA855F7).copy(alpha = if (isNew) alpha else 1f)
-                                                    )
-                                                    if (!isDecayed) {
-                                                        Text(
-                                                            text = "SECURED [DIAGNOSE]",
-                                                            style = Typography.labelSmall,
-                                                            fontFamily = FontFamily.Default,
-                                                            fontSize = 7.5.sp,
-                                                            color = Color(0xFFD8B4FE)
-                                                        )
-                                                    } else {
-                                                        Text(
-                                                            text = "DECOMPOSED",
-                                                            style = Typography.labelSmall,
-                                                            fontFamily = FontFamily.Default,
-                                                            fontSize = 7.5.sp,
-                                                            color = Color.Red
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                for (row in 0 until 2) {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                    ) {
-                                                        for (col in 0 until 4) {
-                                                            val idx = row * 4 + col
-                                                            val gene = packet.genes.getOrNull(idx)
-                                                            if (gene != null) {
-                                                                val isNew = packet.newGenes.contains(gene)
-                                                                
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .weight(1f)
-                                                                        .then(
-                                                                            if (isNew) {
-                                                                                Modifier.cyberglass(
-                                                                                    borderColor = Color(0xFF22D3EE).copy(alpha = alpha),
-                                                                                    backgroundColor = Color.Transparent
-                                                                                )
-                                                                            } else {
-                                                                                Modifier
-                                                                            }
-                                                                        )
-                                                                        .clickable {
-                                                                            selectedPacketByGene = gene
-                                                                            viewModel.synthManager.playBeep(330f, 0.04f, "sine")
-                                                                        }
-                                                                        .padding(vertical = 12.dp),
-                                                                    contentAlignment = Alignment.Center
-                                                                ) {
-                                                                    Text(
-                                                                        text = gene,
-                                                                        style = Typography.labelSmall,
-                                                                        fontSize = 7.5.sp,
-                                                                        color = if (isNew) Color(0xFF22D3EE).copy(alpha = alpha) else Color(0xFF00FF41),
-                                                                        fontFamily = FontFamily.Monospace,
-                                                                        fontWeight = FontWeight.Bold
-                                                                    )
-                                                                }
-                                                            } else {
-                                                                Spacer(modifier = Modifier.weight(1f))
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Footer
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(4.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(Color(0xFF00FF41).copy(alpha = alpha))
-                            )
-                            Text(
-                                text = "STANDARD GENE SEARCH ACTIVE",
-                                color = Color(0xFF00FF41).copy(alpha = 0.8f),
-                                fontSize = 8.sp,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Text(
-                            text = "SECURE CONNECTION: AIS-DEV-ENV",
-                            color = Color(0xFF005511),
-                            fontSize = 7.5.sp,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                } else {
+                    AnomalyVaultView(
+                        viewModel = viewModel,
+                        onSelectGene = { selectedAnomalousGene = it },
+                        onClose = { viewModel.setBioLabSubTab(lastMainSubTab) }
+                    )
                 }
             }
         }
+        
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // ==========================================
-        // OVERLAY 3: DECRYPTED ANOMALY VAULT
-        // ==========================================
-        if (showAnomalyVaultOverlay) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .cyberglass(borderColor = Color(0xFFA855F7), backgroundColor = Color.Black)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        // Prevent click-through to underlying dashboard components
-                    }
-                    .padding(8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "ANOMALY DISCOVERY LOG",
-                            color = Color(0xFFD8B4FE).copy(alpha = 0.75f),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
-                        )
-                        Box(
-                            modifier = Modifier
-                                .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
-                                .clickable {
-                                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                    showAnomalyVaultOverlay = false
-                                    selectedAnomalousGene = null
-                                }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "✕ CLOSE",
-                                color = Color.Red,
-                                fontSize = 8.sp,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+        // Responsive split cyberglass visual chamber holding NodeCrystalCanvas and HolographicHelixReactor side-by-side
+        ReactorVisualChamber(
+            metrics = metrics,
+            geneSequenceStrings = geneSequenceStrings,
+            activeColor = activeColor,
+            isActive = if (lastMainSubTab == "pox") poxReactorActive else anomalyEngineActive,
+            isAnomaly = lastMainSubTab == "anomaly",
+            modifier = Modifier.fillMaxWidth()
+        )
 
-                    // Get all anomalous genes
-                    val anomalousGenes = geneSequences.filter { WaveMath.isAnomalousGene(it.sequence) }
-
-                    if (anomalousGenes.isEmpty()) {
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "ANOMALY DISCOVERY LOG EMPTY.\nENGAGE ANOMALY ENGINE TO ATTAIN ANOMALOUS GENES.",
-                                color = Color(0xFF701A75),
-                                style = Typography.bodySmall,
-                                fontFamily = FontFamily.Default,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 16.sp
-                            )
-                        }
+        // Ticker Row (Streamlined Transcription Deck)
+        TranscriptionDecoderTicker(
+            displayTextProvider = {
+                if (lastMainSubTab == "anomaly") {
+                    if (!anomalyEngineActive) {
+                        "--------"
                     } else {
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            items(anomalousGenes) { gene ->
-                                val benefit = WaveMath.getBenefitForAnomalousGene(gene.sequence)
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color(0xFF1E0B36))
-                                        .clickable {
-                                            selectedAnomalousGene = gene.sequence
-                                            viewModel.synthManager.playBeep(587f, 0.05f, "triangle")
-                                        }
-                                        .padding(8.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = gene.sequence,
-                                                style = Typography.bodyMedium,
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFD8B4FE)
-                                            )
-                                            Text(
-                                                text = benefit.name.uppercase(),
-                                                style = Typography.bodySmall,
-                                                fontFamily = FontFamily.Default,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFA855F7)
-                                            )
-                                            Text(
-                                                text = benefit.description.uppercase(),
-                                                style = Typography.labelSmall,
-                                                fontFamily = FontFamily.Default,
-                                                color = Color(0xFFCCC2DC),
-                                                lineHeight = 12.sp
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = "QTY: ",
-                                                style = Typography.bodyMedium,
-                                                fontFamily = FontFamily.Default,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFD8B4FE)
-                                            )
-                                            Text(
-                                                text = "x${gene.count}",
-                                                style = Typography.bodyMedium,
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFD8B4FE)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        val syms = "XZYW?!$%&@#"
+                        scrollingGene.mapIndexed { i, char ->
+                            val idx = (char.code + i) % syms.length
+                            syms[idx]
+                        }.joinToString("")
+                    }
+                } else {
+                    if (!poxReactorActive) {
+                        "--------"
+                    } else {
+                        scrollingGene
                     }
                 }
+            },
+            activeColor = activeColor,
+            activeColorDim = activeColorDim,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Progress bar
+        val isBoosted = boostSecondsLeft > 0
+        val totalCycle = if (isBoosted) 8 else 16
+        val targetProgress = if (lastMainSubTab == "anomaly") {
+            if (anomalyEngineActive) {
+                ((totalCycle - anomalyIdleTime).toFloat() / totalCycle.toFloat()).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
+        } else {
+            if (poxReactorActive) {
+                ((totalCycle - poxIdleTime).toFloat() / totalCycle.toFloat()).coerceIn(0f, 1f)
+            } else {
+                0f
             }
         }
 
-        // ==========================================
-        // SUB-DIAGNOSTIC POPUP: GENE DETAILS
-        // ==========================================
-        selectedPacketByGene?.let { gene ->
-            val isAnom = WaveMath.isAnomalousGene(gene)
-            val benefit = if (isAnom) WaveMath.getBenefitForAnomalousGene(gene) else null
-            
-            AlertDialog(
-                onDismissRequest = { selectedPacketByGene = null },
-                modifier = Modifier.cyberglass(
-                    borderColor = if (isAnom) Color(0xFFA855F7) else activeColor,
-                    backgroundColor = if (isAnom) Color(0xFF150B24) else activePanel
-                ),
-                containerColor = Color.Transparent,
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        if (isAnom) {
-                            WireframeGalaxy(
-                                color = Color(0xFFD8B4FE),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "ANOMALOUS GENE",
-                                style = Typography.titleMedium,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFD8B4FE)
-                            )
-                        } else {
-                            WireframeDna(
-                                color = activeColor,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "STANDARD GENE",
-                                style = Typography.titleMedium,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold,
-                                color = activeColor
-                            )
-                        }
-                    }
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "SEQUENCE: $gene",
-                            style = Typography.bodyMedium,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isAnom) Color(0xFFD8B4FE) else activeColor
-                        )
+        // Smoothly animate progress using snap on reset
+        val animatedProgress by animateFloatAsState(
+            targetValue = targetProgress,
+            animationSpec = if (targetProgress == 0f) {
+                snap()
+            } else {
+                tween(durationMillis = 1000, easing = LinearEasing)
+            },
+            label = "reactorProgress"
+        )
 
-                        if (isAnom && benefit != null) {
-                            Text(
-                                text = "CLASSIFICATION: SYNODIC ANOMALOUS UNIT",
-                                style = Typography.bodySmall,
-                                fontFamily = FontFamily.Default,
-                                color = Color(0xFFA855F7),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "PASSIVE ACTION: ${benefit.name.uppercase()}",
-                                style = Typography.bodySmall,
-                                fontFamily = FontFamily.Default,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = benefit.description.uppercase(),
-                                style = Typography.labelSmall,
-                                fontFamily = FontFamily.Default,
-                                color = Color.LightGray,
-                                lineHeight = 12.sp
-                            )
-                        } else {
-                            Text(
-                                text = "CLASSIFICATION: STABLE NUCLEOTIDE UNIT",
-                                style = Typography.bodySmall,
-                                fontFamily = FontFamily.Default,
-                                color = activeColorDim,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "THIS SYNTHETIC BASE HAS SUCCESSFULLY BONDED WITH ORGANIC NUCLEOTIDES IN THE REACTOR. STABILITY OF FURTHER SPLICING WILL NOT BE ADVERSELY AFFECTED.",
-                                style = Typography.labelSmall,
-                                fontFamily = FontFamily.Default,
-                                color = Color.LightGray,
-                                lineHeight = 12.sp
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    Box(
-                        modifier = Modifier
-                            .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
-                            .clickable {
-                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                selectedPacketByGene = null
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "✕ CLOSE",
-                            color = Color.Red,
-                            fontSize = 8.sp,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+        // Responsive cyberglass progress oscilloscope wave scope
+        ResonanceScopeChamber(
+            progressProvider = { animatedProgress },
+            isActive = if (lastMainSubTab == "pox") poxReactorActive else anomalyEngineActive,
+            isAnomaly = lastMainSubTab == "anomaly",
+            activeColor = activeColor,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Timer text and booster status
+        ReactorTimerStatus(
+            statusProvider = {
+                if (lastMainSubTab == "anomaly") {
+                    if (anomalyEngineActive) "ANOMALOUS CONSOLIDATION IN: ${anomalyIdleTime}S" else "ANOMALOUS CONSOLIDATION: IDLE"
+                } else {
+                    if (poxReactorActive) "GENE ARRAY READY IN: ${poxIdleTime}S" else "GENE ARRAY REACTOR: OFFLINE"
                 }
-            )
-        }
-
-        // ==========================================
-        // SUB-DIAGNOSTIC POPUP: STEP-SEARCH GENE DETAILS
-        // ==========================================
-        stepSearchSelectedGene?.let { gene ->
-            val isAnom = WaveMath.isAnomalousGene(gene)
-            val benefit = if (isAnom) WaveMath.getBenefitForAnomalousGene(gene) else null
-            
-            AlertDialog(
-                onDismissRequest = { stepSearchSelectedGene = null },
-                modifier = Modifier.cyberglass(
-                    borderColor = if (isAnom) Color(0xFFA855F7) else activeColor,
-                    backgroundColor = if (isAnom) Color(0xFF150B24) else activePanel
-                ),
-                containerColor = Color.Transparent,
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        if (isAnom) {
-                            WireframeGalaxy(
-                                color = Color(0xFFD8B4FE),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "DECRYPTED ANOMALY MOLECULE",
-                                style = Typography.titleMedium,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFD8B4FE)
-                            )
-                        } else {
-                            WireframeDna(
-                                color = activeColor,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "MOLECULAR STOCK DETAILED VIEW",
-                                style = Typography.titleMedium,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold,
-                                color = activeColor
-                            )
-                        }
-                    }
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "SEQUENCE: $gene",
-                            style = Typography.bodyMedium,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isAnom) Color(0xFFD8B4FE) else activeColor
-                        )
-
-                        if (isAnom && benefit != null) {
-                            Text(
-                                text = "TACTICAL PERK: ${benefit.name.uppercase()}",
-                                style = Typography.bodySmall,
-                                fontFamily = FontFamily.Default,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = benefit.description.uppercase(),
-                                style = Typography.labelSmall,
-                                fontFamily = FontFamily.Default,
-                                color = Color.LightGray,
-                                lineHeight = 12.sp
-                            )
-                        } else {
-                            Text(
-                                text = "STANDARD STABLE SEQUENCE. IDEAL FOR CREATURE TELOMERE REINFORCEMENT OPERATIONS.",
-                                style = Typography.labelSmall,
-                                fontFamily = FontFamily.Default,
-                                color = Color.LightGray,
-                                lineHeight = 12.sp
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    Box(
-                        modifier = Modifier
-                            .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
-                            .clickable {
-                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                stepSearchSelectedGene = null
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "✕ CLOSE",
-                            color = Color.Red,
-                            fontSize = 8.sp,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+            },
+            colorProvider = {
+                if (lastMainSubTab == "anomaly") {
+                    if (anomalyEngineActive) Color(0xFFA855F7) else Color.Gray
+                } else {
+                    if (poxReactorActive) CyberGreenDim else Color.Red
                 }
-            )
-        }
+            },
+            boostSecondsLeftProvider = { if (lastMainSubTab == "pox") boostSecondsLeft else 0 },
+            activeColor = CyberGreen
+        )
+    }
 
-        // ==========================================
-        // SUB-DIAGNOSTIC POPUP: VAULT GENE DETAILS
-        // ==========================================
-        selectedAnomalousGene?.let { gene ->
-            val benefit = WaveMath.getBenefitForAnomalousGene(gene)
-            
-            AlertDialog(
-                onDismissRequest = { selectedAnomalousGene = null },
-                modifier = Modifier.cyberglass(
-                    borderColor = Color(0xFFA855F7),
-                    backgroundColor = Color(0xFF150B24)
-                ),
-                containerColor = Color.Transparent,
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        WireframeGalaxy(
-                            color = Color(0xFFD8B4FE),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "ANOMALY QUANTUM DECRYPT",
-                            style = Typography.titleMedium,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFD8B4FE)
-                        )
-                    }
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "SEQUENCE: $gene",
-                            style = Typography.bodyMedium,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFD8B4FE)
-                        )
-                        Text(
-                            text = "PERK ID: ${benefit.id.uppercase()}",
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            color = Color(0xFFA855F7)
-                        )
-                        Text(
-                            text = "DESIGNATION: ${benefit.name.uppercase()}",
-                            style = Typography.bodySmall,
-                            fontFamily = FontFamily.Default,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = benefit.description.uppercase(),
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            color = Color.LightGray,
-                            lineHeight = 12.sp
-                        )
-                    }
-                },
-                confirmButton = {
-                    Box(
-                        modifier = Modifier
-                            .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
-                            .clickable {
-                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                selectedAnomalousGene = null
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "✕ CLOSE",
-                            color = Color.Red,
-                            fontSize = 8.sp,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            )
-        }
+    // Diagnostic popups
+    selectedPacketByGene?.let { gene ->
+        GeneDetailsPopup(viewModel, gene, activeColor, activePanel, onClose = { selectedPacketByGene = null })
+    }
+    stepSearchSelectedGene?.let { gene ->
+        StepSearchGeneDetailsPopup(viewModel, gene, activeColor, activePanel, onClose = { stepSearchSelectedGene = null })
+    }
+    selectedAnomalousGene?.let { gene ->
+        VaultGeneDetailsPopup(viewModel, gene, onClose = { selectedAnomalousGene = null })
     }
 }
+
 
 // ==========================================
 // 2. SPLICER VIEW
@@ -10517,6 +10375,293 @@ fun InventoryView(viewModel: MainViewModel) {
 // 7. SETTINGS VIEW
 // ==========================================
 @Composable
+fun ColorSliderRow(
+    label: String,
+    color: Color,
+    onColorChange: (Color) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+            .background(CyberPanel)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label.uppercase(),
+                style = Typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = CyberGreen
+            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp, 18.dp)
+                    .background(color, RoundedCornerShape(2.dp))
+                    .border(1.dp, CyberBorder, RoundedCornerShape(2.dp))
+            )
+        }
+
+        // R Slider
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "R: ${(color.red * 255).toInt().toString().padStart(3, ' ')}",
+                color = CyberGreenDim,
+                style = Typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.width(42.dp)
+            )
+            Slider(
+                value = color.red,
+                onValueChange = { onColorChange(Color(it, color.green, color.blue, 1f)) },
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = CyberGreen,
+                    activeTrackColor = CyberGreen,
+                    inactiveTrackColor = Color.Black
+                )
+            )
+        }
+
+        // G Slider
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "G: ${(color.green * 255).toInt().toString().padStart(3, ' ')}",
+                color = CyberGreenDim,
+                style = Typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.width(42.dp)
+            )
+            Slider(
+                value = color.green,
+                onValueChange = { onColorChange(Color(color.red, it, color.blue, 1f)) },
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = CyberGreen,
+                    activeTrackColor = CyberGreen,
+                    inactiveTrackColor = Color.Black
+                )
+            )
+        }
+
+        // B Slider
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "B: ${(color.blue * 255).toInt().toString().padStart(3, ' ')}",
+                color = CyberGreenDim,
+                style = Typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.width(42.dp)
+            )
+            Slider(
+                value = color.blue,
+                onValueChange = { onColorChange(Color(color.red, color.green, it, 1f)) },
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = CyberGreen,
+                    activeTrackColor = CyberGreen,
+                    inactiveTrackColor = Color.Black
+                )
+            )
+        }
+    }
+}
+
+@Composable
+fun PaletteSettingsView(viewModel: MainViewModel) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(text = "COLOR & PALETTE MANAGEMENT", style = Typography.titleMedium, color = CyberGreen)
+
+        val context = LocalContext.current
+
+        // Persistent Core Theme Box
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                .background(CyberPanel)
+                .padding(10.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text = "PERSISTENT CORE THEME", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberGreen)
+                Text(text = "Save your adjustments as the active core theme so they load automatically on launch.", style = Typography.bodySmall, color = CyberGreenDim)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            viewModel.synthManager.playSynthesisSuccess()
+                            CyberTheme.savePreset(context, "active_colors")
+                            viewModel.addLog("SYS: Secure Active Colors Saved.")
+                        },
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = Color.Black),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text("SAVE TO ACTIVE THEME", style = Typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // Preset Slots Box
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                .background(CyberPanel)
+                .padding(10.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text = "THEME PRESET SLOTS", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberGreen)
+                Text(text = "Save and load custom cyber presets.", style = Typography.bodySmall, color = CyberGreenDim)
+
+                listOf(
+                    Pair("preset_1", "PRESET ALPHA"),
+                    Pair("preset_2", "PRESET BETA"),
+                    Pair("preset_3", "PRESET GAMMA")
+                ).forEach { preset ->
+                    var isSaved by remember { mutableStateOf(context.getSharedPreferences("cyber_theme_presets", Context.MODE_PRIVATE).contains("${preset.first}_green")) }
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = preset.second,
+                            color = if (isSaved) CyberGreen else CyberGreenDim,
+                            style = Typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        Button(
+                            onClick = {
+                                viewModel.synthManager.playCombinatorTick()
+                                CyberTheme.savePreset(context, preset.first)
+                                isSaved = true
+                                viewModel.addLog("SYS: Theme saved to ${preset.second}.")
+                            },
+                            modifier = Modifier.height(28.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberGreenDim, contentColor = Color.Black),
+                            shape = RoundedCornerShape(2.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Text("SAVE", style = Typography.labelSmall, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                        }
+                        
+                        Button(
+                            onClick = {
+                                if (isSaved) {
+                                    viewModel.synthManager.playSynthesisSuccess()
+                                    CyberTheme.loadPreset(context, preset.first)
+                                    viewModel.addLog("SYS: Loaded theme from ${preset.second}.")
+                                }
+                            },
+                            enabled = isSaved,
+                            modifier = Modifier.height(28.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isSaved) CyberGreen else Color.Black,
+                                contentColor = if (isSaved) Color.Black else Color.Gray,
+                                disabledContainerColor = Color.Black,
+                                disabledContentColor = Color.Gray
+                            ),
+                            shape = RoundedCornerShape(2.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Text("LOAD", style = Typography.labelSmall, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(text = "CYBER GREEN PALETTE", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberGreen)
+        ColorSliderRow(label = "Primary Green", color = CyberTheme.green, onColorChange = { CyberTheme.green = it })
+        ColorSliderRow(label = "Dim Green", color = CyberTheme.greenDim, onColorChange = { CyberTheme.greenDim = it })
+        ColorSliderRow(label = "Green Border", color = CyberTheme.greenBorder, onColorChange = { CyberTheme.greenBorder = it })
+        ColorSliderRow(label = "Green Panel", color = CyberTheme.greenPanel, onColorChange = { CyberTheme.greenPanel = it })
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(text = "CYBER PURPLE PALETTE", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberTheme.purple)
+        ColorSliderRow(label = "Primary Purple", color = CyberTheme.purple, onColorChange = { CyberTheme.purple = it })
+        ColorSliderRow(label = "Dim Purple", color = CyberTheme.purpleDim, onColorChange = { CyberTheme.purpleDim = it })
+        ColorSliderRow(label = "Purple Border", color = CyberTheme.purpleBorder, onColorChange = { CyberTheme.purpleBorder = it })
+        ColorSliderRow(label = "Purple Panel", color = CyberTheme.purplePanel, onColorChange = { CyberTheme.purplePanel = it })
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(text = "CYBER CYAN PALETTE", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberTheme.cyan)
+        ColorSliderRow(label = "Primary Cyan", color = CyberTheme.cyan, onColorChange = { CyberTheme.cyan = it })
+        ColorSliderRow(label = "Dim Cyan", color = CyberTheme.cyanDim, onColorChange = { CyberTheme.cyanDim = it })
+        ColorSliderRow(label = "Cyan Border", color = CyberTheme.cyanBorder, onColorChange = { CyberTheme.cyanBorder = it })
+        ColorSliderRow(label = "Cyan Panel", color = CyberTheme.cyanPanel, onColorChange = { CyberTheme.cyanPanel = it })
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(text = "CYBER RED PALETTE", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberTheme.red)
+        ColorSliderRow(label = "Primary Red", color = CyberTheme.red, onColorChange = { CyberTheme.red = it })
+        ColorSliderRow(label = "Dim Red", color = CyberTheme.redDim, onColorChange = { CyberTheme.redDim = it })
+        ColorSliderRow(label = "Red Border", color = CyberTheme.redBorder, onColorChange = { CyberTheme.redBorder = it })
+        ColorSliderRow(label = "Red Panel", color = CyberTheme.redPanel, onColorChange = { CyberTheme.redPanel = it })
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(text = "GLOBAL BACKGROUND COLORS", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberGreen)
+        ColorSliderRow(label = "Main Background", color = CyberTheme.background, onColorChange = { CyberTheme.background = it })
+        ColorSliderRow(label = "Dark Background", color = CyberTheme.backgroundDark, onColorChange = { CyberTheme.backgroundDark = it })
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(
+            onClick = {
+                viewModel.synthManager.playCombinatorTick()
+                CyberTheme.resetToDefaults()
+            },
+            modifier = Modifier.fillMaxWidth().height(40.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = Color.Black),
+            shape = RoundedCornerShape(4.dp)
+        ) {
+            Text("RESET COLOR PALETTES TO DEFAULT", style = Typography.labelSmall, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+// ==========================================
+@Composable
 fun SettingsView(viewModel: MainViewModel) {
     var subTab by remember { mutableStateOf("general") }
 
@@ -10531,7 +10676,8 @@ fun SettingsView(viewModel: MainViewModel) {
         ) {
             listOf(
                 Pair("general", "GENERAL"),
-                Pair("telemetry", "TELEMETRY")
+                Pair("telemetry", "TELEMETRY"),
+                Pair("palette", "PALETTE")
             ).forEach { tab ->
                 val isActive = subTab == tab.first
                 Button(
@@ -10648,8 +10794,10 @@ fun SettingsView(viewModel: MainViewModel) {
                     }
                 }
             }
-        } else {
+        } else if (subTab == "telemetry") {
             TelemetryView(viewModel)
+        } else if (subTab == "palette") {
+            PaletteSettingsView(viewModel)
         }
     }
 }

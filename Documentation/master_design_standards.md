@@ -156,3 +156,25 @@ To enhance scanner map manipulation, the radar zoom is represented by a compact 
     *   Tapping the central zoom readout disc collapses it back into the small magnifying glass button.
     *   **Morphing Variables**: The size morphs from `46.dp` to `90.dp`, the center overlay size scales from `46.dp` to `54.dp`, the background opacity increases, the magnifying glass vector fades out, and the zoom dial/text fades in.
     *   **Layout Translation**: The padding shifts dynamically based on `expansionFraction`: `bottom` remains stationary at `70.dp` (maintaining a constant `8.dp` gap above the buttons), and `end` interpolates from `70.dp` (centered directly over the Radar button) to `21.dp` (perfectly centered above the combined span of both the Radar and List buttons).
+
+---
+
+## 9. Padding & Layout Spacing Standards
+
+To ensure pixel-perfect alignment and visual consistency across all view tabs:
+
+1. **Vertical Spacing Between Main Sibling Elements**:
+   - The standardized vertical spacing between sibling widgets (e.g. counts section, forecast wave card, forecast grid row, visualizer, scope card, logs) within a primary layout Column **must** be exactly `10.dp`.
+   - In Native Android (Jetpack Compose), this is enforced using `Arrangement.spacedBy(10.dp)` on the scrollable content Column inside `PoxTabFrame`.
+   - Manual `Spacer(modifier = Modifier.height(...))` dividers must **not** be inserted between standard sibling widgets inside these Columns to prevent spacing drift.
+
+2. **Inner Container Padding (Cyberglass Containers)**:
+   - **Primary Counts Panel**: The main numeric status grid or row at the top of a frame **must** use an inner padding of `vertical = 10.dp, horizontal = 8.dp` within its cyberglass wrapper.
+   - **Wide Status Card (e.g., active wave status)**: Uses an inner padding of `8.dp` on all sides.
+   - **Grid Forecast Cards (e.g., tomorrow/day after columns)**: Uses an inner padding of `6.dp` on all sides to prevent text clipping and wrapping on narrow devices.
+
+3. **Subtabs & Subframe Structure**:
+   - Subtabs (e.g., Step Search, Synthesis Lists, logs) and subframes **must** render inline inside the content slot of their parent tab frame (e.g., `PoxTabFrame`), rather than as overlays/dialogs.
+   - The primary tab header (containing the screen title, status indicator, and context description) and the bottom navigation subtabs **must** remain fully visible and active at all times.
+   - To accommodate scrollable listings or tables within a subtab (such as `LazyColumn` or `LazyVerticalGrid`), set `isScrollable = false` on the parent frame (e.g., `PoxTabFrame`) to disable outer column scrolling and constrain the height, allowing inner list components to use `.weight(1f)` without nested scrolling exceptions.
+

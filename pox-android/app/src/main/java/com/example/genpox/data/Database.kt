@@ -101,7 +101,7 @@ interface PoxDao {
     suspend fun clearCachedBuildingCells()
 }
 
-@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class, CachedRoadCell::class, CachedBuildingCell::class], version = 10, exportSchema = false)
+@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class, CachedRoadCell::class, CachedBuildingCell::class], version = 11, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class PoxDatabase : RoomDatabase() {
     abstract fun poxDao(): PoxDao

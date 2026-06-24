@@ -11,5 +11,6 @@ class PoxApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         repository = DefaultDataRepository(this)
+        com.example.genpox.theme.CyberTheme.loadPreset(this, "active_colors")
     }
 }

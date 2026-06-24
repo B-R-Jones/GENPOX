@@ -29,9 +29,9 @@ fun DualPaneConsoleFrame(
     secondaryTitle: String? = null,
     secondaryContent: (@Composable ColumnScope.() -> Unit)? = null
 ) {
-    val activeBorder = if (theme == "purple") Color(0xFFA855F7).copy(alpha = 0.4f) else CyberBorder
-    val activePanel = if (theme == "purple") Color(0xFF10071C) else CyberPanel
-    val headerColor = if (theme == "purple") Color(0xFFA855F7) else CyberGreenDim
+    val activeBorder = if (theme == "purple") CyberTheme.purple.copy(alpha = 0.4f) else CyberBorder
+    val activePanel = if (theme == "purple") CyberTheme.purplePanel else CyberPanel
+    val headerColor = if (theme == "purple") CyberTheme.purple else CyberGreenDim
 
     Column(
         modifier = modifier.fillMaxWidth(),

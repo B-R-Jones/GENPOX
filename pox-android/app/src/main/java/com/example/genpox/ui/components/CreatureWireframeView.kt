@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import kotlin.math.*
+import com.example.genpox.theme.CyberTheme
 
 class CreatureGeometry(val dna: String) {
     val vertices = mutableListOf<Vertex3D>()
@@ -330,10 +331,10 @@ fun CreatureWireframeView(
 
     // Holographic faction glow colors
     val factionColor = when (faction) {
-        "Infection" -> Color(0xFFEF4444)
-        "Mech" -> Color(0xFF3B82F6)
-        "Parasite" -> Color(0xFFA855F7)
-        else -> Color(0xFF00FF41)
+        "Infection" -> CyberTheme.red
+        "Mech" -> CyberTheme.cyan
+        "Parasite" -> CyberTheme.purple
+        else -> CyberTheme.green
     }
 
     val frontColor = factionColor

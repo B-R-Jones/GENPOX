@@ -21,8 +21,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.nativeCanvas
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.DualPaneConsoleFrame
+import com.example.genpox.ui.components.PoxTabFrame
+import com.example.genpox.ui.components.PoxSubTab
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import kotlin.math.cos
@@ -138,6 +143,39 @@ fun HoloFriendsIcon(color: Color, modifier: Modifier = Modifier) {
     }
 }
 
+@Composable
+fun HoloCautionIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(22.dp)) {
+        val w = size.width
+        val h = size.height
+        val cx = w / 2f
+        val cy = h / 2f
+        val strokeW = 1.5.dp.toPx()
+        
+        val path = Path().apply {
+            moveTo(cx, cy - h * 0.38f)
+            lineTo(cx + w * 0.42f, cy + h * 0.35f)
+            lineTo(cx - w * 0.42f, cy + h * 0.35f)
+            close()
+        }
+        
+        drawPath(path, color = color, style = Stroke(width = strokeW))
+        
+        drawLine(
+            color = color,
+            start = Offset(cx, cy - h * 0.12f),
+            end = Offset(cx, cy + h * 0.10f),
+            strokeWidth = strokeW * 1.2f
+        )
+        
+        drawCircle(
+            color = color,
+            radius = strokeW * 0.8f,
+            center = Offset(cx, cy + h * 0.22f)
+        )
+    }
+}
+
 // ==========================================
 // DATA CLASS DEFINITIONS
 // ==========================================
@@ -166,7 +204,7 @@ private data class PeerNode(
 @Composable
 fun NetworkView(viewModel: MainViewModel) {
     val coroutineScope = rememberCoroutineScope()
-    var activeSubView by remember { mutableStateOf("diagnostics") } // "diagnostics", "inbox", "friends"
+    var activeSubView by remember { mutableStateOf("hydranet") } // "hydranet", "diagnostics", "inbox", "friends"
 
     // Unified logs cached in viewmodel logs or local console
     val diagnosticsLogs = remember {
@@ -232,85 +270,65 @@ fun NetworkView(viewModel: MainViewModel) {
         )
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
+    val subTabs = listOf(
+        PoxSubTab("hydranet", "HYDRA", icon = { iconColor -> HoloCautionIcon(iconColor) }),
+        PoxSubTab("diagnostics", "GEAR", icon = { iconColor -> HoloGearIcon(iconColor) }),
+        PoxSubTab("inbox", "MAIL", icon = { iconColor -> HoloMailIcon(iconColor) }),
+        PoxSubTab("friends", "PEERS", icon = { iconColor -> HoloFriendsIcon(iconColor) })
+    )
+
+    PoxTabFrame(
+        flavorTitle = "G.E.N. P.O.X. HYDRA-NET V0.7",
+        statusText = "ONLINE",
+        statusColor = CyberGreen,
+        headerTitle = "MULTI-NODE COMMUNICATIONS",
+        descriptionText = "Manage your node contacts and communications here",
+        subTabs = subTabs,
+        activeSubTab = activeSubView,
+        onSubTabClick = { id, tag ->
+            activeSubView = id
+            addDiagnosticLog("NAV: Holo-deck switch to sub-screen [${tag}]")
+        },
+        viewModel = viewModel,
+        isScrollable = false
     ) {
-        // CONTENT AREA (depends on subView state)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 68.dp) // Leave clean buffer for floating buttons
-        ) {
-            when (activeSubView) {
-                "diagnostics" -> {
-                    DiagnosticsContent(
-                        viewModel = viewModel,
-                        diagnosticsLogs = diagnosticsLogs,
-                        logsListState = logsListState,
-                        onAddLog = { addDiagnosticLog(it) }
-                    )
-                }
-                "inbox" -> {
-                    InboxContent(
-                        viewModel = viewModel,
-                        messages = inboxMessages,
-                        onAddLog = { addDiagnosticLog(it) }
-                    )
-                }
-                "friends" -> {
-                    FriendsListContent(
-                        viewModel = viewModel,
-                        peers = peerNodes,
-                        onAddLog = { addDiagnosticLog(it) }
+        when (activeSubView) {
+            "hydranet" -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "HYDRA-NET CONNECTION SECURED. SYSTEMS NOMINAL.",
+                        color = CyberGreen.copy(alpha = 0.6f),
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Monospace
                     )
                 }
             }
-        }
-
-        // Pinned Holo-Nav Deck (Floating bottom-right buttons)
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 12.dp, end = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Bottom
-        ) {
-            listOf(
-                Pair("diagnostics", "GEAR"),
-                Pair("inbox", "MAIL"),
-                Pair("friends", "PEERS")
-            ).forEach { (subView, tag) ->
-                val isActive = activeSubView == subView
-                val borderColor = if (isActive) CyberGreen else CyberGreenDim.copy(alpha = 0.5f)
-                val glowColor = if (isActive) CyberGreen.copy(alpha = 0.2f) else Color.Transparent
-                val backColor = if (isActive) CyberGreen else Color(0xFF0F172A).copy(alpha = 0.85f)
-                val iconColor = if (isActive) Color.Black else CyberGreen
-
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .cyberglass(
-                            borderColor = borderColor,
-                            glowColor = glowColor,
-                            backgroundColor = backColor
-                        )
-                        .clickable {
-                            if (activeSubView != subView) {
-                                viewModel.synthManager.playCombinatorTick()
-                                activeSubView = subView
-                                addDiagnosticLog("NAV: Holo-deck switch to sub-screen [${tag}]")
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    when (subView) {
-                        "diagnostics" -> HoloGearIcon(iconColor)
-                        "inbox" -> HoloMailIcon(iconColor)
-                        "friends" -> HoloFriendsIcon(iconColor)
-                    }
-                }
+            "diagnostics" -> {
+                DiagnosticsContent(
+                    viewModel = viewModel,
+                    diagnosticsLogs = diagnosticsLogs,
+                    logsListState = logsListState,
+                    onAddLog = { addDiagnosticLog(it) }
+                )
+            }
+            "inbox" -> {
+                InboxContent(
+                    viewModel = viewModel,
+                    messages = inboxMessages,
+                    onAddLog = { addDiagnosticLog(it) }
+                )
+            }
+            "friends" -> {
+                FriendsListContent(
+                    viewModel = viewModel,
+                    peers = peerNodes,
+                    onAddLog = { addDiagnosticLog(it) }
+                )
             }
         }
     }
@@ -522,8 +540,7 @@ private fun InboxContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(4.dp),
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // Inbox Title Header
@@ -666,8 +683,7 @@ private fun FriendsListContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(4.dp),
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(
@@ -921,3 +937,5 @@ private fun FriendsListContent(
         }
     }
 }
+
+
