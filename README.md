@@ -214,20 +214,6 @@ A core part of the gameplay loop involves creatures traversing anomalies in the 
     ./gradlew test
     ```
 
-### Developer Scripts
-
-#### Pre-Caching Road Maps
-To fetch road geometries for location rendering, use the pre-cache script:
-1.  Navigate to the `pox-android` directory.
-2.  Configure target latitude/longitude coordinates in [download_roads.js](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/download_roads.js).
-3.  Execute the downloader:
-    ```bash
-    node download_roads.js
-    ```
-    This fetches map geometries from OpenStreetMap's Overpass API and saves them directly to the app's assets folder (`app/src/main/assets/pre_cached_roads.json`).
-
----
-
 ## 🔌 Integrated Dependencies & Libraries
 
 GENPOX is built on top of standard open-source tools:
