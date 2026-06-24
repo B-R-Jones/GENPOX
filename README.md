@@ -12,16 +12,16 @@ The gameplay in GENPOX is organized around three interconnected feedback loops:
 
 ```mermaid
 graph TD
-    A[Telemetry Scan Loop] -->|Raw Genomes| B(Genetic Engineering Loop)
+    A[Telemetry Scan Loop] -->|Transferred Creatures & Genomes| B(Genetic Engineering Loop)
     B -->|Specimen Breeding & Upgrades| C(Tactical Dispatch Loop)
     C -->|Harvested Nucleotides & Anomalies| B
     C -->|Decay & Failures| A
 ```
 
 ### 1. The Telemetry Scan Loop (Physical-Digital Ingestion)
-Players scan real-world physical elements (barcodes and QR codes) using the mobile device's camera.
-*   **Ingestion**: Powered by `CameraX` and `ML Kit Barcode Scanning`.
-*   **Result**: Decoded barcode strings are deterministically mapped into raw 64-character DNA nucleotide sequences (`A`, `G`, `T`, `C`), serving as the raw organic material to compile new specimens or extract gene chunks.
+Players scan real-world QR codes using the mobile device's camera.
+*   **Ingestion**: Powered by `CameraX` and `ML Kit Barcode Scanning` (configured to support QR codes).
+*   **Result**: Decoded QR code payloads (Base64-encoded JSON) are parsed to transfer and compile creatures from other player nodes (saving them in the local database with $99\%$ telomeres). Additionally, raw 64-character DNA sequences or 8-character gene blocks can be scanned directly to compile new specimens or register genetic blocks in the player's stock.
 
 ### 2. The Genetic Engineering Loop (Bio-Lab Refinery)
 Within the biological laboratory, players refine genetic sequences and breed specimens:
@@ -235,8 +235,8 @@ GENPOX is built on top of standard open-source tools:
 *   **Google Maps SDK for Android (`play-services-maps`)**: Background spatial tracking and tile providers.
 *   **Maps Compose (`maps-compose`)**: Procedural map components mapped inside Jetpack Compose overlays.
 *   **CameraX (`camerax`)**: Configured to capture raw camera frame streams for live analysis.
-*   **ML Kit Barcode Scanning (`play-services-mlkit-barcode-scanning`)**: Real-time barcode decoding framework.
-*   **ZXing (`zxing-core`)**: Offline vector QR code generator for sharing profile structures.
+*   **ML Kit Barcode Scanning (`play-services-mlkit-barcode-scanning`)**: Real-time QR code decoding engine used to parse incoming player transfer data.
+*   **ZXing (`zxing-core`)**: Offline vector QR code generator used to export and share creature profiles with other player nodes.
 *   **Google AI SDK (`google-generativeai`)**: Directly connects to Gemini API models to compile DNA sequences into lore, creature profiles, and dynamic stat blocks.
 *   **Jetpack Room (`room`)**: Object-relational mapping database supporting transactions.
 *   **Jetpack DataStore (`datastore-preferences`)**: Persistent key-value settings.
