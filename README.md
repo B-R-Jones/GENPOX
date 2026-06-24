@@ -6,6 +6,19 @@ All interface elements are built with a terminal-inspired HUD aesthetic, featuri
 
 ---
 
+## ☣️ Creator Manifesto: A Note on AI Use
+
+AI use in software development is a hot button issue. AI use in pretty much anything is don't-touch-the-stove hot. But let me offer my two cents:
+
+> **G.E.N. P.O.X. is my dream. Not Gemini's, not any LLMs, not any AIs.** The way it looks, the way it feels, the way it plays is all pulled directly from over 35 years of sci-fi nerd osmosis. What you see on the screen is what I see in my head. It is not a vision forced by AI. It is not an asset shoveled in from someone else. It's my direction to the perfect sous-chef. This soup, this fuckin' cybersoup, is mine.
+>
+> G.E.N. P.O.X. is built on the idea of taking powerful corporate technology meant for domination and turning it into something more. Not something good, but something chaotic. Something that breaks intended use on the rocks of bastardly action.
+>
+> The world is changing all around us, and none of us can stop it. What we can do is ride the wave and bend it, break it, make it work for us, even if it - and they - don't want to.
+>
+> **Get splicing, Agent.**
+
+---
 ## 🔁 Core Gameplay Loops
 
 The gameplay in GENPOX is organized around three interconnected feedback loops:
