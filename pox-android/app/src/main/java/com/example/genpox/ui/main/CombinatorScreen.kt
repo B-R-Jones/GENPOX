@@ -595,50 +595,6 @@ fun ReactorProgressPanel(
     val boostSecondsLeft by viewModel.boostSecondsLeft.collectAsState()
     val poxReactorActive by viewModel.poxReactorActive.collectAsState()
     val anomalyEngineActive by viewModel.anomalyEngineActive.collectAsState()
-    val activePolymerase by viewModel.activePolymerase.collectAsState()
-
-    val isBoosted = boostSecondsLeft > 0
-    val baseCycle = when (activePolymerase.uppercase()) {
-        "TAQ" -> 8
-        "PFU" -> 24
-        "TTH" -> 16
-        else -> 16
-    }
-    val totalCycle = if (isBoosted) baseCycle / 2 else baseCycle
-
-    val targetProgress = if (lastMainSubTab == "anomaly") {
-        if (anomalyEngineActive) {
-            ((totalCycle - anomalyIdleTime).toFloat() / totalCycle.toFloat()).coerceIn(0f, 1f)
-        } else {
-            0f
-        }
-    } else {
-        if (poxReactorActive) {
-            ((totalCycle - poxIdleTime).toFloat() / totalCycle.toFloat()).coerceIn(0f, 1f)
-        } else {
-            0f
-        }
-    }
-
-    // Smoothly animate progress using snap on reset
-    val animatedProgress by animateFloatAsState(
-        targetValue = targetProgress,
-        animationSpec = if (targetProgress == 0f) {
-            snap()
-        } else {
-            tween(durationMillis = 1000, easing = LinearEasing)
-        },
-        label = "reactorProgress"
-    )
-
-    // Responsive cyberglass progress oscilloscope wave scope
-    ResonanceScopeChamber(
-        progressProvider = { animatedProgress },
-        isActive = if (lastMainSubTab == "pox") poxReactorActive else anomalyEngineActive,
-        isAnomaly = lastMainSubTab == "anomaly",
-        activeColor = activeColor,
-        modifier = Modifier.fillMaxWidth()
-    )
 
     // Timer text and booster status
     ReactorTimerStatus(
