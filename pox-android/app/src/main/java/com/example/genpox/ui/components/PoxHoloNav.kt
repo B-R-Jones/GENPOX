@@ -164,7 +164,7 @@ fun PoxUnifiedHoloNav(
             rowButtons.forEachIndexed { buttonIndex, button ->
                 val normalX = buttonIndex * 54f
                 val stackedX = (M - 1) * 54f - (M - 1 - buttonIndex) * 3f
-                val offscreenShift = 43f
+                val offscreenShift = 64f
 
                 val targetX = normalX + (stackedX - normalX) * stackedProgress
                 val currentShift = offscreenShift * stackedProgress
