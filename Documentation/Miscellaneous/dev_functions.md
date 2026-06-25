@@ -31,8 +31,8 @@ UI elements declared in [MainScreen.kt](file:///c:/Users/Brent/Antigravity/GENPO
 | UI Control / Button | Location | Action |
 | :--- | :--- | :--- |
 | **GNPX Badge / Button** | [MainScreen.kt:L135-157](file:///c:/Users/Brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui/main/MainScreen.kt#L135-L157) | Rendered in the main header bar next to `NTP_SYNC`. Toggles `devForceAnomaly` (lights up high-contrast orange when active). |
-| **DEV: INJECT 10K GENES Button** | [PoxScreens.kt:L921-940](file:///c:/Users/Brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui/main/PoxScreens.kt#L921-L940) | Appears on the **P.O.X. Reactor** page under the acceleration button when GNPX Mode is active. Automatically generates 10,000 random 8-base genes and inserts them into inventory in bulk. |
-| **DEV: INJECT MISSING GENES Button** | [PoxScreens.kt:L2434-2454](file:///c:/Users/Brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui/main/PoxScreens.kt#L2434-2454) | Appears in the **Splicer** view when GNPX Mode is active. Automatically adds all 8-base target sequence segments missing from stock to the inventory. |
+| **DEV: INJECT 10K GENES Button** | [ReactorScreen.kt:L631-648](file:///c:/Users/Brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui/main/ReactorScreen.kt#L631-L648) | Appears on the **P.O.X. Reactor** page under the acceleration button when GNPX Mode is active. Automatically generates 10,000 random 8-base genes and inserts them into inventory in bulk. |
+| **DEV: INJECT MISSING GENES Button** | [SplicerScreen.kt:L1120-1139](file:///c:/Users/Brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui/main/SplicerScreen.kt#L1120-L1139) | Appears in the **Splicer** view when GNPX Mode is active. Automatically adds all 8-base target sequence segments missing from stock to the inventory. |
 
 ---
 

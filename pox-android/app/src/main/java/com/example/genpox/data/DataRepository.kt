@@ -41,10 +41,15 @@ interface DataRepository {
     val muteSound: Flow<Boolean>
     val scanRadius: Flow<Float>
     val targetSequence: Flow<String>
+    val rawStockA: Flow<Long>
+    val rawStockG: Flow<Long>
+    val rawStockT: Flow<Long>
+    val rawStockC: Flow<Long>
     suspend fun saveGeminiApiKey(apiKey: String)
     suspend fun setMuteSound(mute: Boolean)
     suspend fun setScanRadius(radius: Float)
     suspend fun saveTargetSequence(seq: String)
+    suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long)
 }
 
 class DefaultDataRepository(private val context: Context) : DataRepository {
@@ -125,6 +130,18 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
     override val targetSequence: Flow<String>
         get() = settings.targetSequence
 
+    override val rawStockA: Flow<Long>
+        get() = settings.rawStockA
+
+    override val rawStockG: Flow<Long>
+        get() = settings.rawStockG
+
+    override val rawStockT: Flow<Long>
+        get() = settings.rawStockT
+
+    override val rawStockC: Flow<Long>
+        get() = settings.rawStockC
+
     override suspend fun saveGeminiApiKey(apiKey: String) = settings.saveGeminiApiKey(apiKey)
 
     override suspend fun setMuteSound(mute: Boolean) = settings.setMuteSound(mute)
@@ -132,4 +149,7 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
     override suspend fun setScanRadius(radius: Float) = settings.setScanRadius(radius)
 
     override suspend fun saveTargetSequence(seq: String) = settings.saveTargetSequence(seq)
+
+    override suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long) =
+        settings.saveRawStocks(a, g, t, c)
 }

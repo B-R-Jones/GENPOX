@@ -40,6 +40,11 @@ class MainScreenViewModelTest {
         val muteFlow = MutableStateFlow(false)
         val radiusFlow = MutableStateFlow(55f)
         val targetSequenceFlow = MutableStateFlow("")
+        
+        val stockAFlow = MutableStateFlow(10000L)
+        val stockGFlow = MutableStateFlow(10000L)
+        val stockTFlow = MutableStateFlow(10000L)
+        val stockCFlow = MutableStateFlow(10000L)
 
         override val allCreatures: Flow<List<Creature>> = flowOf(creaturesList)
         override suspend fun getCreatureById(id: String): Creature? = creaturesList.find { it.id == id }
@@ -113,6 +118,18 @@ class MainScreenViewModelTest {
         }
         override suspend fun saveTargetSequence(seq: String) {
             targetSequenceFlow.value = seq
+        }
+
+        override val rawStockA: Flow<Long> = stockAFlow
+        override val rawStockG: Flow<Long> = stockGFlow
+        override val rawStockT: Flow<Long> = stockTFlow
+        override val rawStockC: Flow<Long> = stockCFlow
+
+        override suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long) {
+            stockAFlow.value = a
+            stockGFlow.value = g
+            stockTFlow.value = t
+            stockCFlow.value = c
         }
 
         val cachedRoadCells = mutableListOf<CachedRoadCell>()

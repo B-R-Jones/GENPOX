@@ -28,7 +28,8 @@ data class Creature(
     val isFullCoherence: Boolean = false,
     val coherenceType: String? = null,
     val isMutated: Boolean = false,
-    val originalSequence: String? = null
+    val originalSequence: String? = null,
+    val codonAdaptationIndex: Double = 1.0
 )
 
 @Entity(tableName = "gene_sequences")
@@ -36,7 +37,10 @@ data class Creature(
 data class GeneSequence(
     @PrimaryKey val sequence: String, // 8-character gene sequence
     val count: Int,
-    val discoveredAt: Long
+    val discoveredAt: Long,
+    val averageQScore: Double = 30.0,
+    val meltingTemp: Double = 0.0,
+    val minimumFreeEnergy: Double = 0.0
 )
 
 @Entity(tableName = "harvest_missions")

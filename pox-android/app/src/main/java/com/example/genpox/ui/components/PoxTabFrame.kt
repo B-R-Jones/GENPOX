@@ -44,97 +44,88 @@ fun PoxTabFrame(
     content: (@Composable ColumnScope.() -> Unit)? = null
 ) {
     val scrollModifier = if (isScrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
-    val bottomPadding = if (subTabs.isNotEmpty()) 68.dp else 0.dp
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .cyberglass(borderColor = borderColor, backgroundColor = backgroundColor)
+            .padding(12.dp)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = bottomPadding)
-                .then(scrollModifier),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .then(scrollModifier)
+                .padding(bottom = if (subTabs.isNotEmpty()) 56.dp else 0.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.Start
         ) {
-            Box(
+            // Top header row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                   text = flavorTitle.uppercase(),
+                   color = when (borderColor) {
+                       CyberBorder -> CyberGreenDim
+                       CyberTheme.purpleBorder -> CyberTheme.purpleDim
+                       CyberTheme.cyanBorder -> CyberTheme.cyanDim
+                       CyberTheme.redBorder -> CyberTheme.redDim
+                       else -> borderColor.copy(alpha = 0.6f)
+                   },
+                   fontSize = 9.sp,
+                   fontWeight = FontWeight.Bold,
+                   fontFamily = FontFamily.Default
+                )
+                Text(
+                    text = statusText.uppercase(),
+                    color = statusColor,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Default,
+                    modifier = if (onStatusClick != null) Modifier.clickable(onClick = onStatusClick) else Modifier
+                )
+            }
+
+            // Middle main title row
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (isScrollable) Modifier else Modifier.weight(1f))
-                    .cyberglass(borderColor = borderColor, backgroundColor = backgroundColor)
-                    .padding(12.dp)
+                    .requiredHeight(24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier.then(if (isScrollable) Modifier else Modifier.fillMaxHeight()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    // Top header row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                           text = flavorTitle.uppercase(),
-                           color = when (borderColor) {
-                               CyberBorder -> CyberGreenDim
-                               CyberTheme.purpleBorder -> CyberTheme.purpleDim
-                               CyberTheme.cyanBorder -> CyberTheme.cyanDim
-                               CyberTheme.redBorder -> CyberTheme.redDim
-                               else -> borderColor.copy(alpha = 0.6f)
-                           },
-                           fontSize = 9.sp,
-                           fontWeight = FontWeight.Bold,
-                           fontFamily = FontFamily.Default
-                        )
-                        Text(
-                            text = statusText.uppercase(),
-                            color = statusColor,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default,
-                            modifier = if (onStatusClick != null) Modifier.clickable(onClick = onStatusClick) else Modifier
-                        )
-                    }
+                Text(
+                    text = headerTitle.uppercase(),
+                    color = Color.White,
+                    style = Typography.bodyMedium,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
-                    // Middle main title row
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .requiredHeight(24.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = headerTitle.uppercase(),
-                            color = Color.White,
-                            style = Typography.bodyMedium,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+            // Bottom flavor/description text
+            Text(
+                text = descriptionText,
+                style = MaterialTheme.typography.bodySmall,
+                color = when (borderColor) {
+                    CyberBorder -> CyberGreen.copy(alpha = 0.8f)
+                    CyberTheme.purpleBorder -> CyberTheme.purple.copy(alpha = 0.8f)
+                    CyberTheme.cyanBorder -> CyberTheme.cyan.copy(alpha = 0.8f)
+                    CyberTheme.redBorder -> CyberTheme.red.copy(alpha = 0.8f)
+                    else -> borderColor.copy(alpha = 0.8f)
+                },
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Normal,
+                modifier = Modifier.padding(bottom = if (content != null) 4.dp else 0.dp)
+            )
 
-                    // Bottom flavor/description text
-                    Text(
-                        text = descriptionText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = when (borderColor) {
-                            CyberBorder -> CyberGreen.copy(alpha = 0.8f)
-                            CyberTheme.purpleBorder -> CyberTheme.purple.copy(alpha = 0.8f)
-                            CyberTheme.cyanBorder -> CyberTheme.cyan.copy(alpha = 0.8f)
-                            CyberTheme.redBorder -> CyberTheme.red.copy(alpha = 0.8f)
-                            else -> borderColor.copy(alpha = 0.8f)
-                        },
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Normal,
-                        modifier = Modifier.padding(bottom = if (content != null) 4.dp else 0.dp)
-                    )
-
-                    // Optional slot for inner elements
-                    if (content != null) {
-                        content()
-                    }
-                }
+            // Optional slot for inner elements
+            if (content != null) {
+                content()
             }
         }
 
@@ -142,9 +133,7 @@ fun PoxTabFrame(
             val activeColor = if (borderColor == CyberBorder) CyberGreen else borderColor
             val inactiveColor = if (borderColor == CyberBorder) CyberGreenDim else borderColor.copy(alpha = 0.6f)
             PoxHoloNav(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(bottom = 16.dp, end = 16.dp),
+                modifier = Modifier.align(Alignment.BottomEnd),
                 subTabs = subTabs,
                 activeSubTab = activeSubTab,
                 onSubTabClick = onSubTabClick,

@@ -25,6 +25,8 @@ import com.example.genpox.data.WaveMath
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.PoxCameraScanner
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -183,11 +185,6 @@ fun MainScreen(
     val geneSequences by viewModel.geneSequences.collectAsState()
     val disintegratedModal by viewModel.disintegratedModal.collectAsState()
 
-    val countA by viewModel.countA.collectAsState()
-    val countG by viewModel.countG.collectAsState()
-    val countT by viewModel.countT.collectAsState()
-    val countC by viewModel.countC.collectAsState()
-
     val logListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
@@ -299,47 +296,7 @@ fun MainScreen(
             }
 
             // 1b. Simplified global Nucleotide stockpile counter
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                    .background(Color.Black.copy(alpha = 0.4f))
-                    .padding(horizontal = 8.dp, vertical = 5.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                listOf(
-                    Pair("A", countA),
-                    Pair("G", countG),
-                    Pair("T", countT),
-                    Pair("C", countC)
-                ).forEach { (nucleotide, count) ->
-                    Text(
-                        text = "[ $nucleotide: $count ]",
-                        color = CyberGreen,
-                        style = Typography.labelSmall,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                    )
-                }
-                var tapCount by remember { mutableStateOf(0) }
-                Text(
-                    text = "• GEN ACTIVE",
-                    color = CyberGreenDim,
-                    style = Typography.labelSmall,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    modifier = Modifier.clickable {
-                        tapCount++
-                        if (tapCount >= 5) {
-                            tapCount = 0
-                            viewModel.toggleProfiler()
-                        }
-                    }
-                )
-            }
+            StockpileHeader(viewModel = viewModel)
 
             // 2. MAIN HUD ACTIVE DISPLAY SCREEN
             Box(
@@ -360,18 +317,45 @@ fun MainScreen(
                 }
             }
 
-            val bottomLogText = remember(logs) {
-                logs.lastOrNull() ?: "GENPOX COMPILER SYSTEM v2.0 READY."
+            val logsChannel = remember { Channel<String>(Channel.UNLIMITED) }
+            var lastSeenLogSize by remember { mutableStateOf(logs.size) }
+            var displayedLogText by remember { mutableStateOf(logs.lastOrNull() ?: "GENPOX COMPILER SYSTEM v2.0 READY.") }
+
+            LaunchedEffect(logs) {
+                if (logs.size > lastSeenLogSize) {
+                    for (i in lastSeenLogSize until logs.size) {
+                        logsChannel.trySend(logs[i])
+                    }
+                } else if (logs.size < lastSeenLogSize) {
+                    // Drain any queued logs in the channel because logs were cleared or reset
+                    while (true) {
+                        val result = logsChannel.tryReceive()
+                        if (result.isFailure) break
+                    }
+                    displayedLogText = logs.lastOrNull() ?: "GENPOX COMPILER SYSTEM v2.0 READY."
+                }
+                lastSeenLogSize = logs.size
             }
+
+            LaunchedEffect(Unit) {
+                while (true) {
+                    val nextLog = logsChannel.receive()
+                    displayedLogText = nextLog
+                    delay(1500L)
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(38.dp)
                     .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                     .background(Color.Black)
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
                 Text(
-                    text = bottomLogText,
+                    text = displayedLogText,
                     color = CyberGreen,
                     style = Typography.labelSmall,
                     fontSize = 9.sp,
@@ -636,6 +620,56 @@ fun MainScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun StockpileHeader(viewModel: MainViewModel) {
+    val rawStockA by viewModel.rawStockA.collectAsState()
+    val rawStockG by viewModel.rawStockG.collectAsState()
+    val rawStockT by viewModel.rawStockT.collectAsState()
+    val rawStockC by viewModel.rawStockC.collectAsState()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+            .background(Color.Black.copy(alpha = 0.4f))
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        listOf(
+            Pair("A", rawStockA),
+            Pair("G", rawStockG),
+            Pair("T", rawStockT),
+            Pair("C", rawStockC)
+        ).forEach { (nucleotide, count) ->
+            Text(
+                text = "[ $nucleotide: $count ]",
+                color = CyberGreen,
+                style = Typography.labelSmall,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+            )
+        }
+        var tapCount by remember { mutableStateOf(0) }
+        Text(
+            text = "• GEN ACTIVE",
+            color = CyberGreenDim,
+            style = Typography.labelSmall,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            modifier = Modifier.clickable {
+                tapCount++
+                if (tapCount >= 5) {
+                    tapCount = 0
+                    viewModel.toggleProfiler()
+                }
+            }
+        )
     }
 }
 

@@ -15,6 +15,10 @@ class PoxSettings(private val context: Context) {
         val MUTE_SOUND = booleanPreferencesKey("mute_sound")
         val SCAN_RADIUS = floatPreferencesKey("scan_radius")
         val TARGET_SEQUENCE = stringPreferencesKey("target_sequence")
+        val RAW_STOCK_A = longPreferencesKey("raw_stock_a")
+        val RAW_STOCK_G = longPreferencesKey("raw_stock_g")
+        val RAW_STOCK_T = longPreferencesKey("raw_stock_t")
+        val RAW_STOCK_C = longPreferencesKey("raw_stock_c")
     }
 
     val geminiApiKey: Flow<String> = context.dataStore.data.map { preferences ->
@@ -31,6 +35,22 @@ class PoxSettings(private val context: Context) {
 
     val targetSequence: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[TARGET_SEQUENCE] ?: ""
+    }
+
+    val rawStockA: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[RAW_STOCK_A] ?: 10000L
+    }
+
+    val rawStockG: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[RAW_STOCK_G] ?: 10000L
+    }
+
+    val rawStockT: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[RAW_STOCK_T] ?: 10000L
+    }
+
+    val rawStockC: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[RAW_STOCK_C] ?: 10000L
     }
 
     suspend fun saveGeminiApiKey(apiKey: String) {
@@ -54,6 +74,15 @@ class PoxSettings(private val context: Context) {
     suspend fun saveTargetSequence(seq: String) {
         context.dataStore.edit { preferences ->
             preferences[TARGET_SEQUENCE] = seq
+        }
+    }
+
+    suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[RAW_STOCK_A] = a
+            preferences[RAW_STOCK_G] = g
+            preferences[RAW_STOCK_T] = t
+            preferences[RAW_STOCK_C] = c
         }
     }
 }

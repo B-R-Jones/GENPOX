@@ -177,4 +177,5 @@ To ensure pixel-perfect alignment and visual consistency across all view tabs:
    - Subtabs (e.g., Step Search, Synthesis Lists, logs) and subframes **must** render inline inside the content slot of their parent tab frame (e.g., `PoxTabFrame`), rather than as overlays/dialogs.
    - The primary tab header (containing the screen title, status indicator, and context description) and the bottom navigation subtabs **must** remain fully visible and active at all times.
    - To accommodate scrollable listings or tables within a subtab (such as `LazyColumn` or `LazyVerticalGrid`), set `isScrollable = false` on the parent frame (e.g., `PoxTabFrame`) to disable outer column scrolling and constrain the height, allowing inner list components to use `.weight(1f)` without nested scrolling exceptions.
+   - **Navigation Placement**: No tab or subtab navigation buttons at the top of forms. All tab navigations must be handled via the lower tab grid. All subtab navigations must be handled via our dedicated composable for holo-nav buttons/controls.
 
