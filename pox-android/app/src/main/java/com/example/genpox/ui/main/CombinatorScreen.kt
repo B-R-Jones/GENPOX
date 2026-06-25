@@ -590,8 +590,6 @@ fun ReactorProgressPanel(
     lastMainSubTab: String,
     activeColor: Color
 ) {
-    val poxIdleTime by viewModel.poxIdleTime.collectAsState()
-    val anomalyIdleTime by viewModel.anomalyIdleTime.collectAsState()
     val boostSecondsLeft by viewModel.boostSecondsLeft.collectAsState()
     val poxReactorActive by viewModel.poxReactorActive.collectAsState()
     val anomalyEngineActive by viewModel.anomalyEngineActive.collectAsState()
@@ -600,9 +598,9 @@ fun ReactorProgressPanel(
     ReactorTimerStatus(
         statusProvider = {
             if (lastMainSubTab == "anomaly") {
-                if (anomalyEngineActive) "ANOMALOUS CONSOLIDATION IN: ${anomalyIdleTime}S" else "ANOMALOUS CONSOLIDATION: IDLE"
+                if (anomalyEngineActive) "ANOMALOUS CONSOLIDATION: ACTIVE" else "ANOMALOUS CONSOLIDATION: IDLE"
             } else {
-                if (poxReactorActive) "GENE ARRAY READY IN: ${poxIdleTime}S" else "GENE ARRAY REACTOR: OFFLINE"
+                if (poxReactorActive) "GENE ARRAY REACTOR: ONLINE" else "GENE ARRAY REACTOR: OFFLINE"
             }
         },
         colorProvider = {
