@@ -186,9 +186,14 @@ fun PoxUnifiedHoloNav(
                             this.scaleY = scale
                         }
                         .zIndex(zIndex),
-                    enabled = !isStacked && button.enabled,
+                    enabled = if (isStacked) (buttonIndex == M - 1) else button.enabled,
                     onClick = {
-                        button.onClick()
+                        if (isStacked) {
+                            viewModel.synthManager.playCombinatorTick()
+                            isStacked = false
+                        } else {
+                            button.onClick()
+                        }
                     }
                 ) {
                     button.content(if (isButtonActive) Color.Black else button.borderColor)
