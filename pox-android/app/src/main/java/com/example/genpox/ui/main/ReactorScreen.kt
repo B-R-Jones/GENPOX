@@ -83,6 +83,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.SystemFontFamily
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.drawText
+import com.example.genpox.data.BiophysicsEngine
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.IntOffset
@@ -388,6 +391,325 @@ fun ReactorTimerStatus(
     }
 }
 
+@Composable
+fun BiophysicalResonanceGraph(
+    tempDeviance: Float, // Temp - Tm
+    transcriptionSpeed: Float, // Frequency modifier
+    isAnomaly: Boolean,
+    soluteActive: String,
+    activeColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "graph_oscillation")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 4f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        val cy = h / 2f
+        
+        // Draw background grid lines
+        val gridColor = activeColor.copy(alpha = 0.08f)
+        val gridStroke = 0.5.dp.toPx()
+        
+        drawLine(gridColor, Offset(0f, h * 0.2f), Offset(w, h * 0.2f), strokeWidth = gridStroke)
+        drawLine(gridColor, Offset(0f, cy), Offset(w, cy), strokeWidth = gridStroke * 1.5f)
+        drawLine(gridColor, Offset(0f, h * 0.8f), Offset(w, h * 0.8f), strokeWidth = gridStroke)
+        
+        val numVerticalLines = 8
+        for (v in 1..numVerticalLines) {
+            val vx = w * (v.toFloat() / (numVerticalLines + 1))
+            drawLine(gridColor, Offset(vx, 0f), Offset(vx, h), strokeWidth = gridStroke)
+        }
+
+        // Draw Boundary Danger Zones (Dashed lines / shaded areas)
+        val upperBoundaryY = h * 0.2f
+        val lowerBoundaryY = h * 0.8f
+        
+        drawLine(
+            color = Color(0xFFEF4444).copy(alpha = 0.3f),
+            start = Offset(0f, upperBoundaryY),
+            end = Offset(w, upperBoundaryY),
+            strokeWidth = 1.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+        )
+        drawLine(
+            color = Color(0xFF22D3EE).copy(alpha = 0.3f),
+            start = Offset(0f, lowerBoundaryY),
+            end = Offset(w, lowerBoundaryY),
+            strokeWidth = 1.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+        )
+
+        val segments = 100
+        val isPhaseLocked = tempDeviance.absoluteValue <= 2.0f
+
+        if (isPhaseLocked) {
+            // Merge into a single CyberGreen wave!
+            val path = Path()
+            val maxAmp = h * 0.25f
+            for (i in 0..segments) {
+                val fraction = i.toFloat() / segments
+                val px = w * fraction
+                val envelope = sin(fraction * Math.PI).toFloat()
+                
+                // Frequency is locked
+                val angle = fraction * 4f * Math.PI.toFloat() - phase * transcriptionSpeed
+                val waveVal = sin(angle.toDouble()).toFloat() + 0.2f * sin((angle * 2.1f).toDouble()).toFloat()
+                
+                val py = cy + waveVal * maxAmp * envelope
+                if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+            }
+            drawPath(
+                path = path,
+                color = CyberGreen,
+                style = Stroke(width = 2.5.dp.toPx())
+            )
+        } else {
+            // Draw Target Wave (static blue/purple sine wave)
+            val targetPath = Path()
+            val targetAmp = h * 0.2f
+            for (i in 0..segments) {
+                val fraction = i.toFloat() / segments
+                val px = w * fraction
+                val envelope = sin(fraction * Math.PI).toFloat()
+                
+                val angle = fraction * 4f * Math.PI.toFloat() - phase * 0.5f // constant target speed
+                val waveVal = sin(angle.toDouble()).toFloat()
+                
+                val py = cy + waveVal * targetAmp * envelope
+                if (i == 0) targetPath.moveTo(px, py) else targetPath.lineTo(px, py)
+            }
+            drawPath(
+                path = targetPath,
+                color = Color(0xFF818CF8), // Indigo / Soft Purple-Blue
+                style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f))
+            )
+
+            // Draw Environmental Wave (dynamic yellow/orange/red/cyan wave shifting phase and amp)
+            val envPath = Path()
+            val devianceAbs = tempDeviance.absoluteValue
+            val maxAmp = (h * 0.3f).coerceAtMost(8.dp.toPx() + devianceAbs * 0.8f)
+            val phaseOffset = tempDeviance * 0.1f
+            
+            val envColor = when {
+                soluteActive.uppercase() == "DMSO" || soluteActive.uppercase() == "NETROPSIN" -> Color(0xFFA855F7) // Purple solute
+                tempDeviance > 15f -> Color(0xFFEF4444) // Excess Heat
+                tempDeviance < -15f -> Color(0xFF22D3EE) // Excess Cold
+                else -> Color(0xFFFBBF24) // Yellow (unaligned but warm)
+            }
+
+            for (i in 0..segments) {
+                val fraction = i.toFloat() / segments
+                val px = w * fraction
+                val envelope = sin(fraction * Math.PI).toFloat()
+                
+                val angle = fraction * 4f * Math.PI.toFloat() - phase * transcriptionSpeed + phaseOffset
+                var waveVal = sin(angle.toDouble()).toFloat()
+                
+                // Add jitter noise if temperature is high
+                if (devianceAbs > 12f) {
+                    val noiseAngle = fraction * 25f * Math.PI.toFloat() + phase * 4f
+                    waveVal += 0.1f * sin(noiseAngle.toDouble()).toFloat() * (devianceAbs / 30f).coerceAtMost(1.2f)
+                }
+
+                val py = cy + waveVal * maxAmp * envelope
+                if (i == 0) envPath.moveTo(px, py) else envPath.lineTo(px, py)
+            }
+            drawPath(
+                path = envPath,
+                color = envColor,
+                style = Stroke(width = 2.dp.toPx())
+            )
+        }
+    }
+}
+
+@Composable
+fun NucleotideDockingArray(
+    activeStrand: String,
+    activeStep: Int,
+    isCollapsed: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "docking_array_ripple")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(5000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+
+    val textMeasurer = rememberTextMeasurer()
+
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        
+        val points1 = ArrayList<Offset>()
+        val points2 = ArrayList<Offset>()
+        
+        val numNodes = 8
+        for (i in 0 until numNodes) {
+            val x = w * 0.08f + (w * 0.84f) * (i.toFloat() / (numNodes - 1))
+            val angle = i * 1.0f + phase
+            val y1 = h / 2f + sin(angle) * (h * 0.22f)
+            val y2 = h / 2f - sin(angle) * (h * 0.22f)
+            points1.add(Offset(x, y1))
+            points2.add(Offset(x, y2))
+        }
+        
+        // Draw connecting rungs (base-pair bonds)
+        for (i in 0 until numNodes) {
+            val alpha = if (isCollapsed) 0.15f else 0.25f
+            val rungColor = if (isCollapsed) Color(0xFFEF4444).copy(alpha = alpha) else CyberGreenDim.copy(alpha = alpha)
+            drawLine(
+                color = rungColor,
+                start = points1[i],
+                end = points2[i],
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
+            )
+        }
+        
+        // Draw the backbones
+        val path1 = Path()
+        val path2 = Path()
+        path1.moveTo(points1[0].x, points1[0].y)
+        path2.moveTo(points2[0].x, points2[0].y)
+        for (i in 1 until numNodes) {
+            path1.lineTo(points1[i].x, points1[i].y)
+            path2.lineTo(points2[i].x, points2[i].y)
+        }
+        
+        val backboneColor = if (isCollapsed) Color(0xFFEF4444) else CyberGreen.copy(alpha = 0.5f)
+        val backboneStroke = if (isCollapsed) 2.5.dp.toPx() else 1.5.dp.toPx()
+        val backboneEffect = if (isCollapsed) {
+            PathEffect.dashPathEffect(floatArrayOf(15f, 10f, 5f, 10f), phase * 10f)
+        } else {
+            null
+        }
+        
+        drawPath(
+            path = path1,
+            color = backboneColor,
+            style = Stroke(width = backboneStroke, pathEffect = backboneEffect)
+        )
+        drawPath(
+            path = path2,
+            color = backboneColor.copy(alpha = if (isCollapsed) 1.0f else 0.3f),
+            style = Stroke(width = backboneStroke * 0.7f, pathEffect = backboneEffect)
+        )
+        
+        // Draw hexagons along points1 (primary strand)
+        val hexRadius = (w * 0.045f).coerceAtMost(22.dp.toPx()).coerceAtLeast(12.dp.toPx())
+        for (i in 0 until numNodes) {
+            val center = points1[i]
+            val isFilled = i < activeStrand.length
+            val char = if (isFilled) activeStrand[i] else null
+            
+            val hexColor = when (char) {
+                'A' -> Color(0xFF38BDF8) // Cyan
+                'G' -> Color(0xFF34D399) // Green
+                'T' -> Color(0xFFFB7185) // Rose/Red
+                'C' -> Color(0xFFFBBF24) // Yellow
+                else -> if (isCollapsed) Color(0xFFEF4444).copy(alpha = 0.4f) else CyberGreen.copy(alpha = 0.3f)
+            }
+            
+            val hexPath = Path()
+            for (j in 0..5) {
+                val angleRad = j * Math.PI / 3f
+                val hx = center.x + hexRadius * cos(angleRad).toFloat()
+                val hy = center.y + hexRadius * sin(angleRad).toFloat()
+                if (j == 0) hexPath.moveTo(hx, hy) else hexPath.lineTo(hx, hy)
+            }
+            hexPath.close()
+            
+            if (isFilled && char != null) {
+                drawPath(
+                    path = hexPath,
+                    color = hexColor.copy(alpha = 0.15f),
+                    style = Fill
+                )
+                drawPath(
+                    path = hexPath,
+                    color = hexColor,
+                    style = Stroke(width = 2.dp.toPx())
+                )
+                
+                val textLayoutResult = textMeasurer.measure(
+                    text = char.toString(),
+                    style = TextStyle(
+                        color = hexColor,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+                drawText(
+                    textLayoutResult = textLayoutResult,
+                    topLeft = Offset(
+                        center.x - textLayoutResult.size.width / 2f,
+                        center.y - textLayoutResult.size.height / 2f
+                    )
+                )
+                
+                val barWidth = hexRadius * 1.2f
+                val barHeight = 2.5.dp.toPx()
+                val barTop = center.y + hexRadius + 3.dp.toPx()
+                val barColor = if (isCollapsed && i == activeStrand.length - 1) Color.Red else CyberGreen
+                
+                drawRect(
+                    color = Color.Black.copy(alpha = 0.5f),
+                    topLeft = Offset(center.x - barWidth / 2f, barTop),
+                    size = Size(barWidth, barHeight)
+                )
+                drawRect(
+                    color = barColor,
+                    topLeft = Offset(center.x - barWidth / 2f, barTop),
+                    size = Size(barWidth * 0.8f, barHeight)
+                )
+            } else {
+                drawPath(
+                    path = hexPath,
+                    color = hexColor,
+                    style = Stroke(
+                        width = 1.dp.toPx(),
+                        pathEffect = if (isCollapsed) PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f) else null
+                    )
+                )
+                
+                val textLayoutResult = textMeasurer.measure(
+                    text = (i + 1).toString(),
+                    style = TextStyle(
+                        color = hexColor.copy(alpha = 0.5f),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+                drawText(
+                    textLayoutResult = textLayoutResult,
+                    topLeft = Offset(
+                        center.x - textLayoutResult.size.width / 2f,
+                        center.y - textLayoutResult.size.height / 2f
+                    )
+                )
+            }
+        }
+    }
+}
+
 // ==========================================
 // REACTOR DASHBOARD VIEW
 // ==========================================
@@ -408,253 +730,458 @@ fun ReactorDashboardView(
     val tomorrowWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 86400000L)
     val dayAfterWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 172800000L)
 
+    val activeStrand by viewModel.activeSynthesisStrand.collectAsState()
+    val activeStep by viewModel.activeSynthesisStep.collectAsState()
+    val activeQ by viewModel.activeSynthesisQScore.collectAsState()
+    val activeTm by viewModel.activeSynthesisTm.collectAsState()
+    val activeMfe by viewModel.activeSynthesisMfe.collectAsState()
+    val currentTemp by viewModel.reactorTemperature.collectAsState()
+    val currentSalt by viewModel.reactorSalt.collectAsState()
+    val activePoly by viewModel.activePolymerase.collectAsState()
+    val activeSolute by viewModel.activeChemicalSolute.collectAsState()
+    val poxReactorActive by viewModel.poxReactorActive.collectAsState()
+
+    val targetSeq by viewModel.targetSynthesisSequence.collectAsState()
+    val isSynthesisActive by viewModel.isSynthesisActive.collectAsState()
+    val isReactionCollapsed by viewModel.isReactionCollapsed.collectAsState()
+    val bioWaste by viewModel.bioWaste.collectAsState()
+    val isLoopActive by viewModel.isLoopActive.collectAsState()
+
+    val targetTm = remember(targetSeq, currentSalt) {
+        BiophysicsEngine.calculateMeltingTemperature(targetSeq, currentSalt.toDouble())
+    }
+
+    val tempDeviance = currentTemp - targetTm.toFloat()
+    val safeMinTemp = remember(currentSalt) { 20.0f + (currentSalt * 40.0f) }
+    val safeMaxTemp = remember(currentSalt) { 65.0f + (currentSalt * 50.0f) }
+
+    val speedFactor = remember(activePoly) {
+        when (activePoly.uppercase()) {
+            "TAQ" -> 2.0f
+            "TTH" -> 1.0f
+            "PFU" -> 0.5f
+            else -> 1.0f
+        }
+    }
+    val targetMfe = remember(targetSeq) {
+        BiophysicsEngine.calculateMinimumFreeEnergy(targetSeq)
+    }
+
+    val waveColor = remember(tempDeviance, activeSolute) {
+        when {
+            activeSolute.uppercase() == "DMSO" || activeSolute.uppercase() == "NETROPSIN" -> Color(0xFFA855F7)
+            tempDeviance > 15f -> Color(0xFFEF4444)
+            tempDeviance < -15f -> Color(0xFF22D3EE)
+            else -> CyberGreen
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        // Counts section
-        Row(
+        // LIVE STEPPED SYNTHESIS TELEMETRY PANEL
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
-                .padding(vertical = 10.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+                .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.5f))
+                .padding(8.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "UNIQUE GENE IDS",
-                    color = CyberGreenDim,
-                    style = Typography.labelSmall,
-                    fontFamily = FontFamily.Default,
-                    fontSize = 9.sp
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Header Row
                 Row(
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "⬢ ", color = CyberGreen, fontSize = 14.sp)
                     Text(
-                        text = "$uniqueGenesSize",
-                        color = Color.White,
-                        style = Typography.bodyLarge,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        text = "LIVE TRANSCRIPTION TELEMETRY",
+                        color = CyberGreenDim,
+                        style = Typography.labelSmall,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default
+                    )
+                    Text(
+                        text = when {
+                            isReactionCollapsed -> "STATUS: COLLAPSED"
+                            isSynthesisActive -> "STATUS: TRANSCRIBING"
+                            else -> "STATUS: STANDBY"
+                        },
+                        color = when {
+                            isReactionCollapsed -> Color.Red
+                            isSynthesisActive -> CyberGreen
+                            else -> Color.Gray
+                        },
+                        style = Typography.labelSmall,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
                     )
                 }
-            }
 
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .height(35.dp)
-                    .background(CyberBorder)
-            )
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp)
-            ) {
-                Text(
-                    text = "MULTI-COUNT GENE IDS",
-                    color = CyberGreenDim,
-                    style = Typography.labelSmall,
-                    fontFamily = FontFamily.Default,
-                    fontSize = 9.sp
-                )
+                // Transcription monitor
                 Row(
-                    modifier = Modifier.padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(70.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(text = "⬢ ", color = CyberGreen, fontSize = 14.sp)
-                    Text(
-                        text = "$multiCountGenesSize",
-                        color = Color.White,
-                        style = Typography.bodyLarge,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
+                    // Growing sequence readout
+                    Box(
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .fillMaxHeight()
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .border(1.dp, activeBorder.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+                            .padding(6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = activeStrand.padEnd(8, '-'),
+                                color = if (isReactionCollapsed) Color.Red else if (activeQ <= 5.0 && activeStrand.isNotEmpty()) Color.Red else CyberGreen,
+                                fontSize = 18.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 2.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "STEP $activeStep/8 | ${activePoly.uppercase()}",
+                                color = Color.White.copy(alpha = 0.7f),
+                                style = Typography.labelSmall,
+                                fontSize = 7.5.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+
+                    // Biophysical details readout
+                    Column(
+                        modifier = Modifier
+                            .weight(1.5f)
+                            .fillMaxHeight()
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .border(1.dp, activeBorder.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+                            .padding(6.dp),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = String.format(Locale.US, "TEMP DEVIANCE: %+.1f°C", tempDeviance),
+                            color = if (kotlin.math.abs(tempDeviance) > 15f) Color(0xFFEF4444) else CyberGreen,
+                            fontSize = 7.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = String.format(Locale.US, "IDEAL TM: %.1f°C", targetTm),
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 7.5.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = String.format(Locale.US, "FOLD MFE: %.2f kcal", activeMfe),
+                            color = if (activeMfe <= -5.0) Color(0xFF22D3EE) else Color.White.copy(alpha = 0.7f),
+                            fontSize = 7.5.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = String.format(Locale.US, "EST. Q-SCORE: %.1f", activeQ),
+                            color = if (activeQ <= 15.0 && activeStrand.isNotEmpty()) Color.Red else Color(0xFFFFB300),
+                            fontSize = 7.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Waveguide visualizer + Docking Array combined in a row!
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(110.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Waveguide (normalized graph)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .cyberglass(borderColor = activeBorder.copy(alpha = 0.5f), backgroundColor = Color.Black.copy(alpha = 0.3f))
+                            .padding(2.dp)
+                    ) {
+                        BiophysicalResonanceGraph(
+                            tempDeviance = tempDeviance,
+                            transcriptionSpeed = speedFactor,
+                            isAnomaly = false,
+                            soluteActive = activeSolute,
+                            activeColor = CyberGreen,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    // Docking Array (hexagons)
+                    Box(
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .fillMaxHeight()
+                            .cyberglass(borderColor = activeBorder.copy(alpha = 0.5f), backgroundColor = Color.Black.copy(alpha = 0.3f))
+                    ) {
+                        NucleotideDockingArray(
+                            activeStrand = activeStrand,
+                            activeStep = activeStep,
+                            isCollapsed = isReactionCollapsed,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
         }
 
-        // Today's base-pair wave card
-        Box(
+        // Compact Feedstock & Bio-Waste Stockpile Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            val rawStockA by viewModel.rawStockA.collectAsState()
+            val rawStockG by viewModel.rawStockG.collectAsState()
+            val rawStockT by viewModel.rawStockT.collectAsState()
+            val rawStockC by viewModel.rawStockC.collectAsState()
+
+            val stocks = listOf(
+                Triple("A", rawStockA, Color(0xFF38BDF8)),
+                Triple("G", rawStockG, Color(0xFF34D399)),
+                Triple("T", rawStockT, Color(0xFFFB7185)),
+                Triple("C", rawStockC, Color(0xFFFBBF24)),
+                Triple("WASTE", bioWaste, Color(0xFFA855F7))
+            )
+            stocks.forEach { (label, amt, color) ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .cyberglass(borderColor = color.copy(alpha = 0.4f), backgroundColor = Color.Black.copy(alpha = 0.3f))
+                        .padding(vertical = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = label, color = color, fontSize = 7.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Text(text = String.format(Locale.US, "%d", amt), color = Color.White, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                    }
+                }
+            }
+        }
+
+        // Target Dial Row
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .cyberglass(
-                    borderColor = if (todayWave.isSuppressed) Color(0xFF990000) else CyberGreen,
-                    backgroundColor = if (todayWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.6f)
-                )
-                .padding(8.dp)
+                .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            Text(
+                text = "PROGRAM TARGET SEQUENCE (TAP DIALS TO CYCLE)",
+                color = CyberGreenDim,
+                style = Typography.labelSmall,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold
+            )
+            
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.weight(1f, fill = false)
-                ) {
-                    Text(
-                        text = "⚡",
-                        color = if (todayWave.isSuppressed) Color.Red else Color(0xFFFFB300),
-                        fontSize = 14.sp
-                    )
-                    Column {
-                        Text(
-                            text = "TODAY'S BASE-PAIR WAVE",
-                            color = CyberGreenDim,
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = if (todayWave.isSuppressed) "DORMANT (CONGESTED DECAY)" else "ACTIVE: ${todayWave.pair} WAVE",
-                            color = Color.White,
-                            style = Typography.bodySmall,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
+                for (i in 0..7) {
+                    val char = targetSeq[i]
+                    val baseColor = when (char) {
+                        'A' -> Color(0xFF38BDF8) // Cyan
+                        'G' -> Color(0xFF34D399) // Green
+                        'T' -> Color(0xFFFB7185) // Rose
+                        'C' -> Color(0xFFFBBF24) // Yellow
+                        else -> Color.Gray
                     }
-                }
-
-                if (!todayWave.isSuppressed) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "${todayWave.primary} ➔ ${todayWave.secondary}",
-                            color = CyberGreen,
-                            style = Typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = "1.12x & 1.62x BOOST",
-                            color = CyberGreenDim,
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontSize = 7.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                } else {
-                    Text(
-                        text = "NULL",
-                        color = Color.Red,
-                        style = Typography.labelSmall,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold,
+                    
+                    Box(
                         modifier = Modifier
-                            .background(Color(0xFF330000), RoundedCornerShape(2.dp))
-                            .border(1.dp, Color.Red, RoundedCornerShape(2.dp))
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (isSynthesisActive) Color.DarkGray.copy(alpha = 0.2f) else baseColor.copy(alpha = 0.1f))
+                            .border(
+                                width = 1.dp,
+                                color = if (isSynthesisActive) Color.Gray.copy(alpha = 0.3f) else baseColor.copy(alpha = 0.8f),
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .clickable(enabled = !isSynthesisActive) {
+                                viewModel.cycleTargetBase(i)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = char.toString(),
+                            color = if (isSynthesisActive) Color.Gray else baseColor,
+                            fontSize = 15.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
 
-        // Forecast Grid
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // Pre-flight checks and Initiate button
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.5f))
+                .padding(8.dp)
         ) {
-            // Tomorrow
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .cyberglass(
-                        borderColor = if (tomorrowWave.isSuppressed) Color(0xFF990000) else Color.DarkGray,
-                        backgroundColor = if (tomorrowWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f)
-                    )
-                    .padding(6.dp)
+            val rawStockA by viewModel.rawStockA.collectAsState()
+            val rawStockG by viewModel.rawStockG.collectAsState()
+            val rawStockT by viewModel.rawStockT.collectAsState()
+            val rawStockC by viewModel.rawStockC.collectAsState()
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "PRE-FLIGHT BIO-ANALYSIS",
+                        color = CyberGreenDim,
+                        style = Typography.labelSmall,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "IDEAL TM: ${String.format(Locale.US, "%.1f", targetTm)}°C",
+                        color = Color.White,
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "SAFE TEMP: ${safeMinTemp.toInt()}°C - ${safeMaxTemp.toInt()}°C",
+                        color = if (currentTemp < safeMinTemp || currentTemp > safeMaxTemp) Color(0xFFEF4444) else CyberGreen,
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "FOLD MFE: ${String.format(Locale.US, "%.2f", targetMfe)} kcal",
+                        color = if (targetMfe <= -5.0) Color(0xFF22D3EE) else Color.White.copy(alpha = 0.7f),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    
+                    // Warning indicator
+                    if (targetMfe <= -5.0 && activeSolute != "DMSO") {
                         Text(
-                            text = "TOMORROW BASE-PAIR",
-                            color = CyberGreenDim,
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
+                            text = "⚠ GC STALL RISK: INJECT DMSO",
+                            color = Color(0xFFFFB300),
                             fontSize = 7.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = if (tomorrowWave.isSuppressed) "DORMANT" else "${tomorrowWave.pair} WAVE",
-                            color = Color.White,
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
                         )
                     }
-                    if (!tomorrowWave.isSuppressed) {
+                    val gcPercent = targetSeq.count { it == 'G' || it == 'C' }.toDouble() / targetSeq.length.toDouble()
+                    if (gcPercent < 0.40 && activeSolute != "Netropsin") {
                         Text(
-                            text = "${tomorrowWave.primary}➔${tomorrowWave.secondary}",
-                            color = CyberGreen,
-                            style = Typography.labelSmall,
-                            fontSize = 8.5.sp,
+                            text = "⚠ AT DENATURATION RISK: INJECT NETROPSIN",
+                            color = Color(0xFFFFB300),
+                            fontSize = 7.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
                     }
                 }
-            }
+                
+                Spacer(modifier = Modifier.width(8.dp))
 
-            // Day After Tomorrow
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .cyberglass(
-                        borderColor = if (dayAfterWave.isSuppressed) Color(0xFF990000) else Color.DarkGray,
-                        backgroundColor = if (dayAfterWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f)
-                    )
-                    .padding(6.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                val hasEnoughStock = remember(targetSeq, rawStockA, rawStockG, rawStockT, rawStockC, activeSolute) {
+                    var reqA = 0L
+                    var reqG = 0L
+                    var reqT = 0L
+                    var reqC = 0L
+                    targetSeq.forEach { char ->
+                        when (char) {
+                            'A' -> reqA++
+                            'G' -> reqG++
+                            'T' -> reqT++
+                            'C' -> reqC++
+                        }
+                    }
+                    val soluteCost = if (activeSolute == "DMSO" || activeSolute == "Netropsin") 100L else 0L
+                    rawStockA >= (reqA + soluteCost) &&
+                    rawStockG >= (reqG + soluteCost) &&
+                    rawStockT >= (reqT + soluteCost) &&
+                    rawStockC >= (reqC + soluteCost)
+                }
+
+                val buttonEnabled = poxReactorActive && !isSynthesisActive && hasEnoughStock
+
+                Button(
+                    onClick = {
+                        viewModel.initiateStandardSynthesis()
+                    },
+                    enabled = buttonEnabled,
+                    modifier = Modifier
+                        .height(38.dp)
+                        .border(
+                            width = 1.dp,
+                            color = if (buttonEnabled) CyberGreen else Color.Gray.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(2.dp)
+                        ),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (buttonEnabled) Color(0x2034D399) else Color.Black.copy(alpha = 0.2f),
+                        contentColor = if (buttonEnabled) CyberGreen else Color.Gray
+                    ),
+                    shape = RoundedCornerShape(2.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
                 ) {
-                    Column {
-                        Text(
-                            text = "DAY AFTER TOMORROW",
-                            color = CyberGreenDim,
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontSize = 7.sp,
-                            fontWeight = FontWeight.Bold
+                    Text(
+                        text = if (isSynthesisActive) "SYNTHESIZING..." else "✕ INITIATE SYNTHESIS",
+                        style = Typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .border(
+                            width = 1.dp,
+                            color = if (isLoopActive) CyberGreen else Color.Gray.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(2.dp)
                         )
-                        Text(
-                            text = if (dayAfterWave.isSuppressed) "DORMANT" else "${dayAfterWave.pair} WAVE",
-                            color = Color.White,
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold
+                        .background(
+                            color = if (isLoopActive) Color(0x2034D399) else Color.Black.copy(alpha = 0.2f)
                         )
-                    }
-                    if (!dayAfterWave.isSuppressed) {
-                        Text(
-                            text = "${dayAfterWave.primary}➔${dayAfterWave.secondary}",
-                            color = CyberGreen,
-                            style = Typography.labelSmall,
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
+                        .clickable {
+                            viewModel.toggleLoopActive()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "⟲",
+                        color = if (isLoopActive) CyberGreen else Color.Gray,
+                        style = Typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
                 }
             }
         }
+
+
 
         if (devForceAnomaly) {
             Spacer(modifier = Modifier.height(10.dp))
             Button(
-                onClick = { viewModel.addDevGenes() },
+                onClick = { viewModel.addDevBases() },
                 modifier = Modifier.fillMaxWidth().height(40.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0x30F97316),
@@ -665,7 +1192,7 @@ fun ReactorDashboardView(
                 contentPadding = PaddingValues(0.dp)
             ) {
                 Text(
-                    text = "DEV: INJECT 10K GENES",
+                    text = "DEV: INJECT 10K BASES",
                     style = Typography.labelSmall,
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight.Bold
@@ -685,6 +1212,7 @@ fun ReactorParametersView(
     val rawStockG by viewModel.rawStockG.collectAsState()
     val rawStockT by viewModel.rawStockT.collectAsState()
     val rawStockC by viewModel.rawStockC.collectAsState()
+    val bioWaste by viewModel.bioWaste.collectAsState()
     val tempState by viewModel.reactorTemperature.collectAsState()
     val saltState by viewModel.reactorSalt.collectAsState()
     val activePolyState by viewModel.activePolymerase.collectAsState()
@@ -712,7 +1240,8 @@ fun ReactorParametersView(
                 Triple("A", rawStockA, Color(0xFF38BDF8)),
                 Triple("G", rawStockG, Color(0xFF34D399)),
                 Triple("T", rawStockT, Color(0xFFFB7185)),
-                Triple("C", rawStockC, Color(0xFFFBBF24))
+                Triple("C", rawStockC, Color(0xFFFBBF24)),
+                Triple("WASTE", bioWaste, Color(0xFFA855F7))
             )
             stockItems.forEach { (label, flowVal, color) ->
                 Box(
@@ -862,10 +1391,16 @@ fun ReactorParametersView(
                             shape = RoundedCornerShape(2.dp),
                             contentPadding = PaddingValues(0.dp)
                         ) {
+                            val btnText = when (poly.uppercase()) {
+                                "TAQ" -> "TAQ (FREE)"
+                                "TTH" -> "TTH (25/ALL + 50w)"
+                                "PFU" -> "PFU (50/ALL + 150w)"
+                                else -> poly.uppercase()
+                            }
                             Text(
-                                text = poly.uppercase(),
+                                text = btnText,
                                 style = Typography.labelSmall,
-                                fontSize = 8.5.sp,
+                                fontSize = 7.5.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
                             )
@@ -957,7 +1492,7 @@ fun ReactorParametersView(
                         Slider(
                             value = value,
                             onValueChange = onSet,
-                            valueRange = 0.0f..1.0f,
+                            valueRange = 0.05f..0.90f,
                             colors = SliderDefaults.colors(
                                 thumbColor = CyberGreen,
                                 activeTrackColor = CyberGreen,

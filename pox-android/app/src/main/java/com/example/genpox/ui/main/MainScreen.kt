@@ -12,6 +12,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -220,12 +225,20 @@ fun MainScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
+                    var tapCount by remember { mutableStateOf(0) }
                     Text(
                         text = "G.E.N.P.O.X. MAIN",
                         style = Typography.titleLarge,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = CyberGreen
+                        color = CyberGreen,
+                        modifier = Modifier.clickable {
+                            tapCount++
+                            if (tapCount >= 5) {
+                                tapCount = 0
+                                viewModel.toggleProfiler()
+                            }
+                        }
                     )
                     Text(
                         text = "STATUS: ONLINE [PORTRAIT ENHANCED]",
@@ -295,16 +308,22 @@ fun MainScreen(
                 }
             }
 
-            // 1b. Simplified global Nucleotide stockpile counter
-            StockpileHeader(viewModel = viewModel)
-
             // 2. MAIN HUD ACTIVE DISPLAY SCREEN
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .border(1.dp, CyberBorder, RoundedCornerShape(6.dp))
-                    .background(CyberPanel)
+                    .background(CyberPanel, RoundedCornerShape(6.dp))
+                    .drawBehind {
+                        val stroke = 1.dp.toPx()
+                        drawRoundRect(
+                            color = CyberBorder,
+                            topLeft = Offset(stroke / 2f, stroke / 2f),
+                            size = Size(size.width - stroke, size.height - stroke),
+                            cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx()),
+                            style = Stroke(width = stroke)
+                        )
+                    }
                     .padding(10.dp)
             ) {
                 when (selectedTab) {
@@ -623,53 +642,5 @@ fun MainScreen(
     }
 }
 
-@Composable
-fun StockpileHeader(viewModel: MainViewModel) {
-    val rawStockA by viewModel.rawStockA.collectAsState()
-    val rawStockG by viewModel.rawStockG.collectAsState()
-    val rawStockT by viewModel.rawStockT.collectAsState()
-    val rawStockC by viewModel.rawStockC.collectAsState()
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-            .background(Color.Black.copy(alpha = 0.4f))
-            .padding(horizontal = 8.dp, vertical = 5.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        listOf(
-            Pair("A", rawStockA),
-            Pair("G", rawStockG),
-            Pair("T", rawStockT),
-            Pair("C", rawStockC)
-        ).forEach { (nucleotide, count) ->
-            Text(
-                text = "[ $nucleotide: $count ]",
-                color = CyberGreen,
-                style = Typography.labelSmall,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-            )
-        }
-        var tapCount by remember { mutableStateOf(0) }
-        Text(
-            text = "• GEN ACTIVE",
-            color = CyberGreenDim,
-            style = Typography.labelSmall,
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-            modifier = Modifier.clickable {
-                tapCount++
-                if (tapCount >= 5) {
-                    tapCount = 0
-                    viewModel.toggleProfiler()
-                }
-            }
-        )
-    }
-}
 

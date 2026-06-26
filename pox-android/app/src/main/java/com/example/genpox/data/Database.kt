@@ -39,6 +39,9 @@ interface PoxDao {
     @Delete
     suspend fun deleteCreature(creature: Creature)
 
+    @Query("DELETE FROM creatures")
+    suspend fun deleteAllCreatures()
+
     // Gene Sequences
     @Query("SELECT * FROM gene_sequences ORDER BY discoveredAt DESC")
     fun getAllGeneSequences(): Flow<List<GeneSequence>>
@@ -54,6 +57,9 @@ interface PoxDao {
 
     @Delete
     suspend fun deleteGeneSequence(sequence: GeneSequence)
+
+    @Query("DELETE FROM gene_sequences")
+    suspend fun deleteAllGeneSequences()
 
     @Transaction
     suspend fun updateGeneStock(toInsertOrUpdate: List<GeneSequence>, toDelete: List<GeneSequence>) {

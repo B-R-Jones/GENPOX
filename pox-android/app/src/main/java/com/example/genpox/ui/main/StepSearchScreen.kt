@@ -122,6 +122,9 @@ fun StepSearchView(
         listOf("1-2bp", "3-4bp", "5-6bp", "7-8bp")
     }
 
+    val uniqueGenesSize = remember(geneSequences) { geneSequences.size }
+    val multiCountGenesSize = remember(geneSequences) { geneSequences.count { it.count > 1 } }
+
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -158,6 +161,72 @@ fun StepSearchView(
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight.Bold
                 )
+            }
+        }
+
+        // Registry Counts Section
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
+                .padding(vertical = 10.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "UNIQUE GENE IDS",
+                    color = activeColorDim,
+                    style = Typography.labelSmall,
+                    fontFamily = FontFamily.Default,
+                    fontSize = 9.sp
+                )
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "⬢ ", color = activeColor, fontSize = 14.sp)
+                    Text(
+                        text = "$uniqueGenesSize",
+                        color = Color.White,
+                        style = Typography.bodyLarge,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(35.dp)
+                    .background(activeBorder)
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
+            ) {
+                Text(
+                    text = "MULTI-COUNT GENE IDS",
+                    color = activeColorDim,
+                    style = Typography.labelSmall,
+                    fontFamily = FontFamily.Default,
+                    fontSize = 9.sp
+                )
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "⬢ ", color = activeColor, fontSize = 14.sp)
+                    Text(
+                        text = "$multiCountGenesSize",
+                        color = Color.White,
+                        style = Typography.bodyLarge,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 

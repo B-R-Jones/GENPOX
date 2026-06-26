@@ -403,6 +403,103 @@ fun BatchPacketLogView(
 }
 
 // ==========================================
+// TERMINAL LOG SUB-VIEW
+// ==========================================
+@Composable
+fun TerminalLogSubView(
+    viewModel: MainViewModel,
+    activeBorder: Color
+) {
+    val logs by viewModel.terminalLogs.collectAsState()
+    val listState = rememberLazyListState()
+
+    // Auto-scroll to the bottom when new logs arrive
+    LaunchedEffect(logs.size) {
+        if (logs.isNotEmpty()) {
+            listState.animateScrollToItem(logs.size - 1)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .padding(4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "ACTIVE TERMINAL LOGS",
+                color = Color(0xFF00FF41),
+                style = Typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+            
+            // Clear logs button
+            Text(
+                text = "CLEAR CACHE",
+                color = Color.Red,
+                style = Typography.labelSmall,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier
+                    .border(1.dp, Color.Red.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+                    .clickable { viewModel.clearTerminalLogs() }
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .border(1.dp, activeBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                .background(Color.Black.copy(alpha = 0.7f))
+                .padding(8.dp)
+        ) {
+            if (logs.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "TERMINAL LOG IS EMPTY.",
+                        color = Color(0xFF00FF41).copy(alpha = 0.5f),
+                        style = Typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(logs) { log ->
+                        Text(
+                            text = log,
+                            color = if (log.contains("CRITICAL") || log.contains("ERROR")) Color.Red 
+                                    else if (log.contains("MUTATION") || log.contains("CROSSTALK")) Color(0xFFF97316) 
+                                    else if (log.contains("SUCCESS") || log.contains("ENGAGED")) Color(0xFF00FF41)
+                                    else Color(0xFF00FF41).copy(alpha = 0.6f),
+                            style = Typography.bodySmall,
+                            fontSize = 8.5.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
 // 1. COMBINATOR VIEW (Modularized & Slimmed)
 // ==========================================
 @Composable
@@ -444,7 +541,7 @@ fun CombinatorView(viewModel: MainViewModel) {
     val activePanel = if (lastMainSubTab == "pox") CyberPanel else CyberTheme.purplePanel
 
     val subTabs = remember(lastMainSubTab) {
-        listOf(
+        val list = mutableListOf(
             PoxSubTab("parameters", "PARAMETERS", icon = { iconColor ->
                 WireframeReactorParametersIcon(color = iconColor, modifier = Modifier.size(24.dp))
             }),
@@ -453,18 +550,11 @@ fun CombinatorView(viewModel: MainViewModel) {
             }),
             PoxSubTab("anomaly", "ANOMALY", icon = { iconColor ->
                 WireframeGalaxy(color = iconColor, modifier = Modifier.size(24.dp))
-            }),
-            PoxSubTab("logs", if (lastMainSubTab == "pox") "PACKET_LOG" else "ANOM_LOG", icon = { iconColor ->
-                if (lastMainSubTab == "pox") {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text("ATCGGCTA", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                        Text("GCTAATCG", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                        Text("CGATTAGC", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                    }
-                } else {
+            })
+        )
+        if (lastMainSubTab != "pox") {
+            list.add(
+                PoxSubTab("logs", "ANOM_LOG", icon = { iconColor ->
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
@@ -473,9 +563,26 @@ fun CombinatorView(viewModel: MainViewModel) {
                         Text("&@#GCTAA", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                         Text("ANOM.LOG", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                     }
+                })
+            )
+        }
+        list.add(
+            PoxSubTab("terminal", "TERMINAL", icon = { iconColor ->
+                Box(
+                    modifier = Modifier.size(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = ">_",
+                        color = iconColor,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             })
         )
+        list
     }
 
     PoxTabFrame(
@@ -553,11 +660,9 @@ fun CombinatorView(viewModel: MainViewModel) {
             }
             "logs" -> {
                 if (lastMainSubTab == "pox") {
-                    BatchPacketLogView(
-                        viewModel = viewModel,
-                        onSelectGene = { selectedPacketByGene = it },
-                        onClose = { viewModel.setBioLabSubTab(lastMainSubTab) }
-                    )
+                    LaunchedEffect(Unit) {
+                        viewModel.setBioLabSubTab("pox")
+                    }
                 } else {
                     AnomalyVaultView(
                         viewModel = viewModel,
@@ -565,6 +670,12 @@ fun CombinatorView(viewModel: MainViewModel) {
                         onClose = { viewModel.setBioLabSubTab(lastMainSubTab) }
                     )
                 }
+            }
+            "terminal" -> {
+                TerminalLogSubView(
+                    viewModel = viewModel,
+                    activeBorder = activeBorder
+                )
             }
         }
         
@@ -593,6 +704,35 @@ fun ReactorProgressPanel(
     val boostSecondsLeft by viewModel.boostSecondsLeft.collectAsState()
     val poxReactorActive by viewModel.poxReactorActive.collectAsState()
     val anomalyEngineActive by viewModel.anomalyEngineActive.collectAsState()
+    val activeStep by viewModel.activeSynthesisStep.collectAsState()
+    
+    val isSynthesisActive by viewModel.isSynthesisActive.collectAsState()
+    val targetSeq by viewModel.targetSynthesisSequence.collectAsState()
+    val rawStockA by viewModel.rawStockA.collectAsState()
+    val rawStockG by viewModel.rawStockG.collectAsState()
+    val rawStockT by viewModel.rawStockT.collectAsState()
+    val rawStockC by viewModel.rawStockC.collectAsState()
+    val activeSolute by viewModel.activeChemicalSolute.collectAsState()
+
+    val hasEnoughStock = remember(targetSeq, rawStockA, rawStockG, rawStockT, rawStockC, activeSolute) {
+        var reqA = 0L
+        var reqG = 0L
+        var reqT = 0L
+        var reqC = 0L
+        targetSeq.forEach { char ->
+            when (char) {
+                'A' -> reqA++
+                'G' -> reqG++
+                'T' -> reqT++
+                'C' -> reqC++
+            }
+        }
+        val soluteCost = if (activeSolute == "DMSO" || activeSolute == "Netropsin") 100L else 0L
+        rawStockA >= (reqA + soluteCost) &&
+        rawStockG >= (reqG + soluteCost) &&
+        rawStockT >= (reqT + soluteCost) &&
+        rawStockC >= (reqC + soluteCost)
+    }
 
     // Timer text and booster status
     ReactorTimerStatus(
@@ -600,14 +740,30 @@ fun ReactorProgressPanel(
             if (lastMainSubTab == "anomaly") {
                 if (anomalyEngineActive) "ANOMALOUS CONSOLIDATION: ACTIVE" else "ANOMALOUS CONSOLIDATION: IDLE"
             } else {
-                if (poxReactorActive) "GENE ARRAY REACTOR: ONLINE" else "GENE ARRAY REACTOR: OFFLINE"
+                if (!poxReactorActive) {
+                    "GENE ARRAY REACTOR: OFFLINE"
+                } else if (isSynthesisActive) {
+                    "SYNTHESIZING: STEP $activeStep/8"
+                } else if (hasEnoughStock) {
+                    ""
+                } else {
+                    "INSUFFICIENT STOCK"
+                }
             }
         },
         colorProvider = {
             if (lastMainSubTab == "anomaly") {
                 if (anomalyEngineActive) Color(0xFFA855F7) else Color.Gray
             } else {
-                if (poxReactorActive) CyberGreenDim else Color.Red
+                if (!poxReactorActive) {
+                    Color.Red
+                } else if (isSynthesisActive) {
+                    CyberGreen
+                } else if (hasEnoughStock) {
+                    CyberGreen
+                } else {
+                    Color.Red
+                }
             }
         },
         boostSecondsLeftProvider = { if (lastMainSubTab == "pox") boostSecondsLeft else 0 },

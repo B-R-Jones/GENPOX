@@ -178,7 +178,37 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     }
 
     fun setActivePolymerase(value: String) {
+        val current = _activePolymerase.value
+        if (current.equals(value, ignoreCase = true)) return
+        
+        val valueUpper = value.uppercase()
+        val reqBase = when (valueUpper) {
+            "TTH" -> 25L
+            "PFU" -> 50L
+            else -> 0L
+        }
+        val reqWaste = when (valueUpper) {
+            "TTH" -> 50L
+            "PFU" -> 150L
+            else -> 0L
+        }
+        
+        if (_rawStockA.value < reqBase || _rawStockG.value < reqBase || _rawStockT.value < reqBase || _rawStockC.value < reqBase || _bioWaste.value < reqWaste) {
+            addLog("SELECTION ERROR: Insufficient stocks to engage $value ($value requires $reqBase of each base & $reqWaste Bio-Waste).")
+            synthManager.playReject()
+            return
+        }
+        
         _activePolymerase.value = value
+        
+        val costMsg = when (valueUpper) {
+            "TAQ" -> "Baseline enzyme selected (Free)."
+            "TTH" -> "Tth selected (Cost: 25 of all bases & 50 Bio-Waste deducted upon ignition)."
+            "PFU" -> "Pfu selected (Cost: 50 of all bases & 150 Bio-Waste deducted upon ignition)."
+            else -> ""
+        }
+        addLog("ENGAGED $value POLYMERASE: $costMsg")
+        synthManager.playBeep(440f, 0.1f, "sine")
     }
 
     fun setActiveChemicalSolute(value: String) {
@@ -186,19 +216,19 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     }
 
     fun setInletRatioA(value: Float) {
-        _inletRatioA.value = value
+        _inletRatioA.value = value.coerceIn(0.05f, 0.90f)
     }
 
     fun setInletRatioG(value: Float) {
-        _inletRatioG.value = value
+        _inletRatioG.value = value.coerceIn(0.05f, 0.90f)
     }
 
     fun setInletRatioT(value: Float) {
-        _inletRatioT.value = value
+        _inletRatioT.value = value.coerceIn(0.05f, 0.90f)
     }
 
     fun setInletRatioC(value: Float) {
-        _inletRatioC.value = value
+        _inletRatioC.value = value.coerceIn(0.05f, 0.90f)
     }
 
     // Countdown remaining (seconds) until next synthesis cycle for standard P.O.X. reactor
@@ -228,6 +258,42 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     // 8-character string mimicking visual synthesizer readout scrolling
     private val _scrollingGene = MutableStateFlow("--------")
     val scrollingGene: StateFlow<String> = _scrollingGene.asStateFlow()
+
+    // Real-time single-gene stepped synthesis states
+    private val _activeSynthesisStrand = MutableStateFlow("")
+    val activeSynthesisStrand: StateFlow<String> = _activeSynthesisStrand.asStateFlow()
+
+    private val _activeSynthesisStep = MutableStateFlow(0)
+    val activeSynthesisStep: StateFlow<Int> = _activeSynthesisStep.asStateFlow()
+
+    private val _activeSynthesisQScore = MutableStateFlow(0.0)
+    val activeSynthesisQScore: StateFlow<Double> = _activeSynthesisQScore.asStateFlow()
+
+    private val _activeSynthesisTm = MutableStateFlow(0.0)
+    val activeSynthesisTm: StateFlow<Double> = _activeSynthesisTm.asStateFlow()
+
+    private val _activeSynthesisMfe = MutableStateFlow(0.0)
+    val activeSynthesisMfe: StateFlow<Double> = _activeSynthesisMfe.asStateFlow()
+
+    private val _targetSynthesisSequence = MutableStateFlow("AAAAAAAA")
+    val targetSynthesisSequence: StateFlow<String> = _targetSynthesisSequence.asStateFlow()
+
+    private val _isSynthesisActive = MutableStateFlow(false)
+    val isSynthesisActive: StateFlow<Boolean> = _isSynthesisActive.asStateFlow()
+
+    private val _isReactionCollapsed = MutableStateFlow(false)
+    val isReactionCollapsed: StateFlow<Boolean> = _isReactionCollapsed.asStateFlow()
+
+    private val _bioWaste = MutableStateFlow(0L)
+    val bioWaste: StateFlow<Long> = _bioWaste.asStateFlow()
+
+    private val _isLoopActive = MutableStateFlow(false)
+    val isLoopActive: StateFlow<Boolean> = _isLoopActive.asStateFlow()
+
+    fun toggleLoopActive() {
+        _isLoopActive.value = !_isLoopActive.value
+        synthManager.playBeep(if (_isLoopActive.value) 600f else 400f, 0.1f, "sine")
+    }
 
     // Splicer/Constructor State Flows
     private val _targetSequence = MutableStateFlow("")
@@ -272,29 +338,56 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         synthManager.playBeep(650f, 0.05f, "sine")
     }
 
-    fun addDevGenes() {
+    fun addDevBases() {
         viewModelScope.launch(Dispatchers.IO) {
-            val bases = listOf("A", "G", "T", "C")
-            val random = java.util.Random()
+            val a = _rawStockA.value + 10000L
+            val g = _rawStockG.value + 10000L
+            val t = _rawStockT.value + 10000L
+            val c = _rawStockC.value + 10000L
             
-            val existingMap = geneSequences.value.associateBy { it.sequence }.toMutableMap()
+            _rawStockA.value = a
+            _rawStockG.value = g
+            _rawStockT.value = t
+            _rawStockC.value = c
+            repository.saveRawStocks(a, g, t, c)
+            addLog("DEV: Injected 10,000 units of all raw bases (A, G, T, C).")
+            synthManager.playSynthesisSuccess()
+        }
+    }
+
+    fun clearDevBases() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _rawStockA.value = 0L
+            _rawStockG.value = 0L
+            _rawStockT.value = 0L
+            _rawStockC.value = 0L
+            _bioWaste.value = 0L
+            repository.saveRawStocks(0L, 0L, 0L, 0L)
             
-            repeat(10000) {
-                var seq = ""
-                repeat(8) {
-                    seq += bases[random.nextInt(4)]
-                }
-                val existing = existingMap[seq]
-                if (existing != null) {
-                    existingMap[seq] = existing.copy(count = existing.count + 1)
-                } else {
-                    existingMap[seq] = GeneSequence(seq, 1, System.currentTimeMillis())
-                }
+            val currentPoly = _activePolymerase.value.uppercase()
+            if (currentPoly == "TTH" || currentPoly == "PFU") {
+                _activePolymerase.value = "Taq"
+                addLog("SYS WARNING: Selected enzyme reset to Taq due to stock depletion.")
             }
             
-            repository.insertGeneSequences(existingMap.values.toList())
-            addLog("DEV: Injected 10,000 random genes into biological inventory.")
-            synthManager.playSynthesisSuccess()
+            addLog("DEV: Raw stockpiles and Bio-Waste cleared to 0.")
+            synthManager.playReject()
+        }
+    }
+
+    fun clearDevGenes() {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteAllGeneSequences()
+            addLog("DEV: Cleared all Gene Sequences from database.")
+            synthManager.playReject()
+        }
+    }
+
+    fun clearDevCreatures() {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteAllCreatures()
+            addLog("DEV: Cleared all Creature specimens from database.")
+            synthManager.playReject()
         }
     }
 
@@ -962,8 +1055,13 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     fun addLog(log: String) {
         val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
         _terminalLogs.update { current ->
-            (current + "[$timeStr] $log").takeLast(30)
+            (current + "[$timeStr] $log").takeLast(100)
         }
+    }
+
+    fun clearTerminalLogs() {
+        _terminalLogs.value = emptyList()
+        addLog("SYS: Terminal cache cleared.")
     }
 
     fun setMute(mute: Boolean) {
@@ -2892,46 +2990,51 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     private fun startReactorHeartbeat() {
         heartbeatJob?.cancel()
         heartbeatJob = viewModelScope.launch(Dispatchers.Default) {
+            var siphonTick = 0
             while (true) {
                 kotlinx.coroutines.delay(1000L)
                 
-                // 0. Passive siphoning accumulation
-                val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
-                var incA = 2L
-                var incG = 2L
-                var incT = 2L
-                var incC = 2L
-                
-                if (!wave.isSuppressed) {
-                    val p = wave.primary
-                    val s = wave.secondary
-                    val pm = wave.primaryMultiplier
-                    val sm = wave.secondaryMultiplier
+                siphonTick++
+                if (siphonTick >= 5) {
+                    siphonTick = 0
+                    // 0. Passive siphoning accumulation
+                    val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
+                    var incA = 1L
+                    var incG = 1L
+                    var incT = 1L
+                    var incC = 1L
                     
-                    if (p == "A") incA = Math.round(2.0 * pm)
-                    if (p == "G") incG = Math.round(2.0 * pm)
-                    if (p == "T") incT = Math.round(2.0 * pm)
-                    if (p == "C") incC = Math.round(2.0 * pm)
+                    if (!wave.isSuppressed) {
+                        val p = wave.primary
+                        val s = wave.secondary
+                        val pm = wave.primaryMultiplier
+                        val sm = wave.secondaryMultiplier
+                        
+                        if (p == "A") incA = Math.round(1.0 * pm)
+                        if (p == "G") incG = Math.round(1.0 * pm)
+                        if (p == "T") incT = Math.round(1.0 * pm)
+                        if (p == "C") incC = Math.round(1.0 * pm)
+                        
+                        if (s == "A") incA = Math.round(1.0 * sm)
+                        if (s == "G") incG = Math.round(1.0 * sm)
+                        if (s == "T") incT = Math.round(1.0 * sm)
+                        if (s == "C") incC = Math.round(1.0 * sm)
+                    }
                     
-                    if (s == "A") incA = Math.round(2.0 * sm)
-                    if (s == "G") incG = Math.round(2.0 * sm)
-                    if (s == "T") incT = Math.round(2.0 * sm)
-                    if (s == "C") incC = Math.round(2.0 * sm)
-                }
-                
-                val nextA = _rawStockA.value + incA
-                val nextG = _rawStockG.value + incG
-                val nextT = _rawStockT.value + incT
-                val nextC = _rawStockC.value + incC
-                _rawStockA.value = nextA
-                _rawStockG.value = nextG
-                _rawStockT.value = nextT
-                _rawStockC.value = nextC
-                
-                ticksSinceLastSave++
-                if (ticksSinceLastSave >= 10) {
-                    ticksSinceLastSave = 0
-                    repository.saveRawStocks(nextA, nextG, nextT, nextC)
+                    val nextA = _rawStockA.value + incA
+                    val nextG = _rawStockG.value + incG
+                    val nextT = _rawStockT.value + incT
+                    val nextC = _rawStockC.value + incC
+                    _rawStockA.value = nextA
+                    _rawStockG.value = nextG
+                    _rawStockT.value = nextT
+                    _rawStockC.value = nextC
+                    
+                    ticksSinceLastSave++
+                    if (ticksSinceLastSave >= 10) {
+                        ticksSinceLastSave = 0
+                        repository.saveRawStocks(nextA, nextG, nextT, nextC)
+                    }
                 }
                 
                 
@@ -2944,33 +3047,18 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                         }
                     }
                     
-                    val poly = _activePolymerase.value.uppercase()
-                    val baseCycle = when (poly) {
-                        "TAQ" -> 8
-                        "PFU" -> 24
-                        "TTH" -> 16
-                        else -> 16
-                    }
-                    val isBoostActive = _boostSecondsLeft.value > 0
-                    val resetVal = if (isBoostActive) baseCycle / 2 else baseCycle
-                    
-                    // 1. Tick P.O.X. Reactor if active (paused for testing)
-                    if (_poxReactorActive.value) {
-                        val currentPoxIdle = _poxIdleTime.value
-                        var nextPoxVal = currentPoxIdle - 1
-                        if (isBoostActive && currentPoxIdle > (baseCycle / 2)) {
-                            nextPoxVal = baseCycle / 2
-                        }
-                        
-                        if (nextPoxVal <= 0) {
-                            triggerStandardSynthesis()
-                            nextPoxVal = resetVal
-                        }
-                        _poxIdleTime.value = nextPoxVal
-                    }
-                    
                     // 2. Tick Anomaly Engine if active (paused for testing)
                     if (_anomalyEngineActive.value) {
+                        val poly = _activePolymerase.value.uppercase()
+                        val baseCycle = when (poly) {
+                            "TAQ" -> 8
+                            "PFU" -> 24
+                            "TTH" -> 16
+                            else -> 16
+                        }
+                        val isBoostActive = _boostSecondsLeft.value > 0
+                        val resetVal = if (isBoostActive) baseCycle / 2 else baseCycle
+
                         val currentAnomalyIdle = _anomalyIdleTime.value
                         var nextAnomalyVal = currentAnomalyIdle - 1
                         if (isBoostActive && currentAnomalyIdle > (baseCycle / 2)) {
@@ -3226,230 +3314,389 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         }
     }
 
-    private suspend fun triggerStandardSynthesis() {
-        val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
-        val random = java.util.Random()
+    fun cycleTargetBase(index: Int) {
+        if (index !in 0..7) return
+        val current = _targetSynthesisSequence.value
+        val bases = listOf('A', 'G', 'T', 'C')
+        val charArray = current.toCharArray()
+        val currChar = charArray[index]
+        val nextIdx = (bases.indexOf(currChar) + 1) % bases.size
+        charArray[index] = bases[nextIdx]
+        _targetSynthesisSequence.value = String(charArray)
+        synthManager.playCombinatorTick()
+    }
+
+    fun initiateStandardSynthesis() {
+        if (_isSynthesisActive.value) return
         
-        val temp = _reactorTemperature.value
-        val salt = _reactorSalt.value.toDouble()
-        val poly = _activePolymerase.value
-        val solute = _activeChemicalSolute.value
-        
-        val batch = mutableListOf<String>()
-        val qScores = mutableListOf<Double>()
-        val meltingTemps = mutableListOf<Double>()
-        val mfes = mutableListOf<Double>()
-        
-        var totalReqA = 0L
-        var totalReqG = 0L
-        var totalReqT = 0L
-        var totalReqC = 0L
-        
-        val candidates = mutableListOf<String>()
-        
-        // 1. Generate candidate blocks
-        for (i in 0 until 8) {
-            val cand = generateBiophysicalGeneBlock(
-                wave, 
-                _inletRatioA.value, _inletRatioG.value, _inletRatioT.value, _inletRatioC.value, 
-                random
-            )
-            candidates.add(cand)
-            cand.forEach { char ->
-                when (char) {
-                    'A' -> totalReqA++
-                    'G' -> totalReqG++
-                    'T' -> totalReqT++
-                    'C' -> totalReqC++
-                }
-            }
-        }
-        
-        // Check raw stocks
-        var currentA = rawStockA.value
-        var currentG = rawStockG.value
-        var currentT = rawStockT.value
-        var currentC = rawStockC.value
-        
-        var actualSolute = solute
-        if (actualSolute == "DMSO" || actualSolute == "Netropsin") {
-            if (currentA >= 100 && currentG >= 100 && currentT >= 100 && currentC >= 100) {
-                currentA -= 100
-                currentG -= 100
-                currentT -= 100
-                currentC -= 100
-                addLog("SOLUTE INJECTION: Consumed 100 units of each base for active chemical solute buffer ($actualSolute).")
-            } else {
-                actualSolute = "None"
-                addLog("SOLUTE RUNTIME FAILURE: Insufficient raw base stock (100 each required). Chemical solute injection aborted.")
-            }
-        }
-        
-        var depletedSubstitutionActive = false
-        val finalBatch = mutableListOf<String>()
-        
-        // 2. Consume or substitute based on stockpile
-        for (cand in candidates) {
-            var finalSeq = ""
-            var substitutedCount = 0
+        viewModelScope.launch {
+            val target = _targetSynthesisSequence.value
+            val random = java.util.Random()
+            val temp = _reactorTemperature.value
+            val salt = _reactorSalt.value.toDouble()
+            val poly = _activePolymerase.value
+            val solute = _activeChemicalSolute.value
             
-            cand.forEach { expectedChar ->
-                var selectedChar = expectedChar
-                var available = false
-                
-                when (selectedChar) {
-                    'A' -> if (currentA > 0) { currentA--; available = true }
-                    'G' -> if (currentG > 0) { currentG--; available = true }
-                    'T' -> if (currentT > 0) { currentT--; available = true }
-                    'C' -> if (currentC > 0) { currentC--; available = true }
+            // Count bases in target sequence
+            var reqA = 0L
+            var reqG = 0L
+            var reqT = 0L
+            var reqC = 0L
+            target.forEach { char ->
+                when (char) {
+                    'A' -> reqA++
+                    'G' -> reqG++
+                    'T' -> reqT++
+                    'C' -> reqC++
                 }
+            }
+            
+            // Add cofactor costs if active
+            var soluteCost = 0L
+            var actualSolute = solute
+            if (actualSolute == "DMSO" || actualSolute == "Netropsin") {
+                soluteCost = 100L
+            }
+            
+            // Enzyme swap costs determined at start
+            val enzymeBaseCost = when (poly.uppercase()) {
+                "TTH" -> 25L
+                "PFU" -> 50L
+                else -> 0L
+            }
+            val enzymeWasteCost = when (poly.uppercase()) {
+                "TTH" -> 50L
+                "PFU" -> 150L
+                else -> 0L
+            }
+            
+            val totalReqA = reqA + soluteCost + enzymeBaseCost
+            val totalReqG = reqG + soluteCost + enzymeBaseCost
+            val totalReqT = reqT + soluteCost + enzymeBaseCost
+            val totalReqC = reqC + soluteCost + enzymeBaseCost
+            val currentWaste = _bioWaste.value
+            
+            val currentA = _rawStockA.value
+            val currentG = _rawStockG.value
+            val currentT = _rawStockT.value
+            val currentC = _rawStockC.value
+            
+            if (currentA < totalReqA || currentG < totalReqG || currentT < totalReqT || currentC < totalReqC || currentWaste < enzymeWasteCost) {
+                addLog("SYNTHESIS RUNTIME ERROR: Insufficient stocks for sequence, solutes, or enzyme swap cost ($poly requires $enzymeBaseCost bases & $enzymeWasteCost waste).")
+                _isLoopActive.value = false
+                synthManager.playReject()
+                return@launch
+            }
+            
+            // Calculate Stoichiometric Deviation and Q-score Penalty
+            val targetLen = target.length.toDouble()
+            val ratioA = target.count { it == 'A' }.toDouble() / targetLen
+            val ratioG = target.count { it == 'G' }.toDouble() / targetLen
+            val ratioT = target.count { it == 'T' }.toDouble() / targetLen
+            val ratioC = target.count { it == 'C' }.toDouble() / targetLen
+
+            val sumInlets = _inletRatioA.value + _inletRatioG.value + _inletRatioT.value + _inletRatioC.value
+            val normI_A = if (sumInlets > 0) _inletRatioA.value / sumInlets else 0.25f
+            val normI_G = if (sumInlets > 0) _inletRatioG.value / sumInlets else 0.25f
+            val normI_T = if (sumInlets > 0) _inletRatioT.value / sumInlets else 0.25f
+            val normI_C = if (sumInlets > 0) _inletRatioC.value / sumInlets else 0.25f
+
+            val deviation = Math.abs(normI_A - ratioA) +
+                            Math.abs(normI_G - ratioG) +
+                            Math.abs(normI_T - ratioT) +
+                            Math.abs(normI_C - ratioC)
+            val penalty = (deviation * 15.0).coerceAtMost(15.0)
+
+            // Lock reactor and deduct stocks
+            _isSynthesisActive.value = true
+            _isReactionCollapsed.value = false
+            _activeSynthesisStep.value = 0
+            _activeSynthesisStrand.value = ""
+            _activeSynthesisQScore.value = 0.0
+            
+            val afterA = currentA - totalReqA
+            val afterG = currentG - totalReqG
+            val afterT = currentT - totalReqT
+            val afterC = currentC - totalReqC
+            val afterWaste = currentWaste - enzymeWasteCost
+            
+            _rawStockA.value = afterA
+            _rawStockG.value = afterG
+            _rawStockT.value = afterT
+            _rawStockC.value = afterC
+            _bioWaste.value = afterWaste
+            repository.saveRawStocks(afterA, afterG, afterT, afterC)
+            
+            if (soluteCost > 0) {
+                addLog("SOLUTE INJECTION: Consumed 100 units of each base for active chemical solute buffer ($actualSolute).")
+            }
+            if (enzymeBaseCost > 0 || enzymeWasteCost > 0) {
+                addLog("ENZYME CHARGE: Consumed $enzymeBaseCost of all bases & $enzymeWasteCost Bio-Waste for $poly.")
+            }
+            
+            addLog("REACTOR: Initializing stepped transcription of target sequence \"$target\"...")
+            
+            val baseCycle = when (poly.uppercase()) {
+                "TAQ" -> 8
+                "PFU" -> 24
+                "TTH" -> 16
+                else -> 16
+            }
+            val isBoostActive = _boostSecondsLeft.value > 0
+            val cycleDuration = if (isBoostActive) baseCycle / 2 else baseCycle
+            
+            // Calculate interval per step in ms (minimum 100ms per step)
+            val stepIntervalMs = ((cycleDuration * 1000L) / 8).coerceAtLeast(100L)
+            
+            var collapsed = false
+            var finalStrand = ""
+            
+            for (step in 1..8) {
+                kotlinx.coroutines.delay(stepIntervalMs)
                 
-                if (!available) {
-                    // Depleted base! Substitute with any base that is available
-                    depletedSubstitutionActive = true
-                    substitutedCount++
-                    selectedChar = when {
-                        currentA > 0 -> { currentA--; 'A' }
-                        currentG > 0 -> { currentG--; 'G' }
-                        currentT > 0 -> { currentT--; 'T' }
-                        currentC > 0 -> { currentC--; 'C' }
-                        else -> 'A' // absolute zero, force fallback A without decrement
+                val expectedChar = target[step - 1]
+                var incorporatedChar = expectedChar
+                
+                // Crosstalk Mutation Roll (proofreading bypassed if using PFU)
+                if (!poly.equals("PFU", ignoreCase = true)) {
+                    val inletRatio = when (expectedChar) {
+                        'A' -> normI_A
+                        'G' -> normI_G
+                        'T' -> normI_T
+                        'C' -> normI_C
+                        else -> 1.0f
+                    }
+                    val roll = random.nextDouble()
+                    if (roll > inletRatio) {
+                        // Mutation triggered! Select a random base weighted by other inlets
+                        val options = listOf('A', 'G', 'T', 'C').filter { it != expectedChar }
+                        val otherWeights = options.map { o ->
+                            when (o) {
+                                'A' -> normI_A.toDouble()
+                                'G' -> normI_G.toDouble()
+                                'T' -> normI_T.toDouble()
+                                'C' -> normI_C.toDouble()
+                                else -> 0.0
+                            }
+                        }
+                        val sumOthers = otherWeights.sum()
+                        incorporatedChar = if (sumOthers > 0.0) {
+                            val rOthers = random.nextDouble() * sumOthers
+                            var accOthers = 0.0
+                            var sel = options.first()
+                            for (idx in options.indices) {
+                                accOthers += otherWeights[idx]
+                                if (rOthers < accOthers) {
+                                    sel = options[idx]
+                                    break
+                                }
+                            }
+                            sel
+                        } else {
+                            options[random.nextInt(options.size)]
+                        }
+                        
+                        addLog("CROSSTALK INTRUSION: Mismatched inlet ratios caused mutation at step $step! Incorporated $incorporatedChar instead of $expectedChar.")
                     }
                 }
-                finalSeq += selectedChar
-            }
-            
-            // Calculate Tm and MFE
-            var tm = BiophysicsEngine.calculateMeltingTemperature(finalSeq, salt)
-            var mfe = BiophysicsEngine.calculateMinimumFreeEnergy(finalSeq)
-            
-            // Calculate yield coefficient and roll for mutations
-            val sigma = when (poly.uppercase()) {
-                "TAQ" -> 15.0
-                "PFU" -> 5.0
-                "TTH" -> 25.0
-                else -> 15.0
-            }
-            val diff = temp.toDouble() - tm
-            val eta = Math.exp(-(diff * diff) / (2.0 * sigma * sigma))
-            
-            var baseQScore = BiophysicsEngine.calculatePhredQScore(poly, random)
-            if (substitutedCount > 0) {
-                baseQScore = (baseQScore - 15.0).coerceAtLeast(5.0)
-            }
-            var qScore = (baseQScore * eta).coerceAtLeast(5.0)
-            
-            var mutatedSeq = finalSeq
-            val mutationRolled = random.nextDouble() > eta
-            if (mutationRolled) {
-                val basesList = listOf('A', 'G', 'T', 'C')
-                val chars = mutatedSeq.toCharArray()
-                val numMutations = random.nextInt(2) + 1 // 1 or 2 mutations
-                for (m in 0 until numMutations) {
-                    val idx = random.nextInt(8)
-                    val oldChar = chars[idx]
-                    val allowedBases = basesList.filter { it != oldChar }
-                    chars[idx] = allowedBases[random.nextInt(allowedBases.size)]
-                }
-                mutatedSeq = String(chars)
-                // Recalculate parameters
-                tm = BiophysicsEngine.calculateMeltingTemperature(mutatedSeq, salt)
-                mfe = BiophysicsEngine.calculateMinimumFreeEnergy(mutatedSeq)
-                qScore = (qScore - 5.0).coerceAtLeast(5.0)
                 
-                addLog("MUTATION EVENT: Sub-optimal yield (yield coefficient: ${String.format("%.2f", eta)}) triggered mutation. Sequence mutated: $finalSeq -> $mutatedSeq.")
-            }
-            
-            // 3. Apply biophysical filtering
-            // GC Hairpin Stalling
-            if (temp < 30f && mfe <= -5.0) {
-                if (actualSolute != "DMSO") {
-                    // Stalling occurs! Randomize bases, Q-score penalty
-                    val bases = listOf('A', 'G', 'T', 'C')
-                    mutatedSeq = (1..8).map { bases[random.nextInt(4)] }.joinToString("")
-                    qScore = 5.0
-                    mfe = BiophysicsEngine.calculateMinimumFreeEnergy(mutatedSeq)
-                    tm = BiophysicsEngine.calculateMeltingTemperature(mutatedSeq, salt)
+                finalStrand += incorporatedChar
+                _activeSynthesisStrand.value = finalStrand
+                _activeSynthesisStep.value = step
+                
+                // Biophysics calculations
+                val tm = BiophysicsEngine.calculateMeltingTemperature(finalStrand, salt)
+                val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(finalStrand)
+                _activeSynthesisTm.value = tm
+                _activeSynthesisMfe.value = mfe
+                
+                // Phred Q Score tracking
+                val baseQ = BiophysicsEngine.calculatePhredQScore(poly, random)
+                val targetTmVal = BiophysicsEngine.calculateMeltingTemperature(target, salt)
+                val diff = temp.toDouble() - targetTmVal
+                val sigma = when (poly.uppercase()) {
+                    "TAQ" -> 15.0
+                    "PFU" -> 5.0
+                    "TTH" -> 25.0
+                    else -> 15.0
+                }
+                val eta = Math.exp(-(diff * diff) / (2.0 * sigma * sigma))
+                
+                val baseStepQ = (baseQ * eta - penalty).coerceIn(5.0, 40.0)
+                val prevQ = _activeSynthesisQScore.value
+                val newQ = if (step == 1) baseStepQ else (prevQ * (step - 1) + baseStepQ) / step
+                _activeSynthesisQScore.value = newQ.coerceIn(5.0, 40.0)
+                
+                // Biophysical failure checks
+                var failureTriggered = false
+                var collapseReason = ""
+                
+                // Inlet flow deprivation check
+                val inletVal = when (expectedChar) {
+                    'A' -> _inletRatioA.value
+                    'G' -> _inletRatioG.value
+                    'T' -> _inletRatioT.value
+                    'C' -> _inletRatioC.value
+                    else -> 0f
+                }
+                if (inletVal <= 0.05f) {
+                    failureTriggered = true
+                    collapseReason = "inlet deprivation ($expectedChar flow restricted to ${String.format(java.util.Locale.US, "%.0f%%", inletVal * 100)})"
+                }
+                
+                // GC Hairpin Stalling (Salt-dependent)
+                val stallThreshold = 20.0f + (salt.toFloat() * 40.0f)
+                val targetMfe = BiophysicsEngine.calculateMinimumFreeEnergy(target)
+                if (!failureTriggered && finalStrand.length >= 4 && temp < stallThreshold && targetMfe <= -5.0 && actualSolute != "DMSO") {
+                    failureTriggered = true
+                    collapseReason = "stalling (GC hairpin secondary fold stabilized by salt at ${String.format(java.util.Locale.US, "%.1f", stallThreshold)}°C)"
+                }
+                
+                // AT Denaturation (Salt-dependent)
+                val denatureThreshold = 65.0f + (salt.toFloat() * 50.0f)
+                val targetGcPercent = target.count { it == 'G' || it == 'C' }.toDouble() / target.length.toDouble()
+                if (!failureTriggered && finalStrand.length >= 4 && temp > denatureThreshold && targetGcPercent < 0.40 && actualSolute != "Netropsin") {
+                    failureTriggered = true
+                    collapseReason = "denaturation (AT bonds denatured due to low salt stabilization at ${String.format(java.util.Locale.US, "%.1f", denatureThreshold)}°C)"
+                }
+                
+                if (failureTriggered) {
+                    collapsed = true
+                    _isReactionCollapsed.value = true
+                    _bioWaste.value += 8
+                    addLog("CRITICAL COLLAPSE: Polymerase halted at step $step due to unstabilized $collapseReason. 8 raw bases converted to bio-waste.")
+                    synthManager.playReject()
+                    break
                 }
             }
             
-            // AT Denaturation
-            val gcPercent = mutatedSeq.count { it == 'G' || it == 'C' }.toDouble() / 8.0
-            if (temp > 75f && gcPercent < 0.40) {
-                if (actualSolute != "Netropsin") {
-                    // AT Denaturation occurs!
-                    val bases = listOf('A', 'G', 'T', 'C')
-                    mutatedSeq = (1..8).map { bases[random.nextInt(4)] }.joinToString("")
-                    qScore = 5.0
-                    mfe = BiophysicsEngine.calculateMinimumFreeEnergy(mutatedSeq)
-                    tm = BiophysicsEngine.calculateMeltingTemperature(mutatedSeq, salt)
+            if (!collapsed) {
+                // Success: persist sequence to database
+                val qScore = _activeSynthesisQScore.value
+                val currentList = geneSequences.value
+                val newGenesList = mutableListOf<String>()
+                val toInsertOrUpdate = mutableListOf<GeneSequence>()
+                
+                val match = currentList.find { it.sequence == finalStrand }
+                if (match != null) {
+                    val newQ = (match.averageQScore * match.count + qScore) / (match.count + 1)
+                    toInsertOrUpdate.add(match.copy(
+                        count = match.count + 1,
+                        averageQScore = newQ,
+                        meltingTemp = _activeSynthesisTm.value,
+                        minimumFreeEnergy = _activeSynthesisMfe.value
+                    ))
+                } else {
+                    newGenesList.add(finalStrand)
+                    toInsertOrUpdate.add(GeneSequence(
+                        sequence = finalStrand,
+                        count = 1,
+                        discoveredAt = System.currentTimeMillis(),
+                        averageQScore = qScore,
+                        meltingTemp = _activeSynthesisTm.value,
+                        minimumFreeEnergy = _activeSynthesisMfe.value
+                    ))
+                }
+                
+                repository.insertGeneSequences(toInsertOrUpdate)
+                
+                val packet = GenePacket(
+                    id = "PKT-" + UUID.randomUUID().toString().take(6).uppercase(),
+                    genes = listOf(finalStrand),
+                    timestamp = System.currentTimeMillis(),
+                    isAnomalous = false,
+                    newGenes = newGenesList
+                )
+                _discoveredPacketsLog.update { current ->
+                    (listOf(packet) + current).take(50)
+                }
+                
+                addLog("REACTOR SYNTHESIS: Compiled gene block $finalStrand (Q-Score: ${String.format(java.util.Locale.US, "%.1f", qScore)}).")
+                synthManager.playSynthesisSuccess()
+            }
+            
+            // Unlock reactor
+            _isSynthesisActive.value = false
+
+            // Check remaining resources for current enzyme
+            val remA = _rawStockA.value
+            val remG = _rawStockG.value
+            val remT = _rawStockT.value
+            val remC = _rawStockC.value
+            val remWaste = _bioWaste.value
+            val currentEnz = _activePolymerase.value.uppercase()
+            
+            val costBase = when (currentEnz) {
+                "TTH" -> 25L
+                "PFU" -> 50L
+                else -> 0L
+            }
+            val costWaste = when (currentEnz) {
+                "TTH" -> 50L
+                "PFU" -> 150L
+                else -> 0L
+            }
+            
+            if (remA < costBase || remG < costBase || remT < costBase || remC < costBase || remWaste < costWaste) {
+                _activePolymerase.value = "Taq"
+                addLog("SYS WARNING: Selected enzyme reset to Taq due to stock depletion.")
+                synthManager.playReject()
+            }
+            
+            // Loop synthesis handling
+            if (_isLoopActive.value) {
+                val nextEnz = _activePolymerase.value.uppercase()
+                val nextEnzBaseCost = when (nextEnz) {
+                    "TTH" -> 25L
+                    "PFU" -> 50L
+                    else -> 0L
+                }
+                val nextEnzWasteCost = when (nextEnz) {
+                    "TTH" -> 50L
+                    "PFU" -> 150L
+                    else -> 0L
+                }
+                
+                var nextReqA = 0L
+                var nextReqG = 0L
+                var nextReqT = 0L
+                var nextReqC = 0L
+                target.forEach { char ->
+                    when (char) {
+                        'A' -> nextReqA++
+                        'G' -> nextReqG++
+                        'T' -> nextReqT++
+                        'C' -> nextReqC++
+                    }
+                }
+                
+                var nextSoluteCost = 0L
+                val nextSolute = _activeChemicalSolute.value
+                if (nextSolute == "DMSO" || nextSolute == "Netropsin") {
+                    nextSoluteCost = 100L
+                }
+                
+                val nextTotalA = nextReqA + nextSoluteCost + nextEnzBaseCost
+                val nextTotalG = nextReqG + nextSoluteCost + nextEnzBaseCost
+                val nextTotalT = nextReqT + nextSoluteCost + nextEnzBaseCost
+                val nextTotalC = nextReqC + nextSoluteCost + nextEnzBaseCost
+                
+                val nextRemA = _rawStockA.value
+                val nextRemG = _rawStockG.value
+                val nextRemT = _rawStockT.value
+                val nextRemC = _rawStockC.value
+                val nextRemWaste = _bioWaste.value
+                
+                if (nextRemA >= nextTotalA && nextRemG >= nextTotalG && nextRemT >= nextTotalT && nextRemC >= nextTotalC && nextRemWaste >= nextEnzWasteCost) {
+                    kotlinx.coroutines.delay(500L)
+                    initiateStandardSynthesis()
+                } else {
+                    _isLoopActive.value = false
+                    addLog("SYS: Synthesis loop halted due to insufficient feedstock/biowaste.")
+                    synthManager.playReject()
                 }
             }
-            
-            finalBatch.add(mutatedSeq)
-            qScores.add(qScore)
-            meltingTemps.add(tm)
-            mfes.add(mfe)
         }
-        
-        // Save remaining raw stocks
-        repository.saveRawStocks(currentA, currentG, currentT, currentC)
-        
-        // Insert into database
-        val currentList = geneSequences.value
-        val newGenesList = mutableListOf<String>()
-        val toInsertOrUpdate = mutableListOf<GeneSequence>()
-        
-        for (i in 0 until 8) {
-            val seq = finalBatch[i]
-            val q = qScores[i]
-            val tm = meltingTemps[i]
-            val mfe = mfes[i]
-            
-            val match = currentList.find { it.sequence == seq }
-            if (match != null) {
-                val newQ = (match.averageQScore * match.count + q) / (match.count + 1)
-                toInsertOrUpdate.add(match.copy(
-                    count = match.count + 1,
-                    averageQScore = newQ,
-                    meltingTemp = tm,
-                    minimumFreeEnergy = mfe
-                ))
-            } else {
-                newGenesList.add(seq)
-                toInsertOrUpdate.add(GeneSequence(
-                    sequence = seq,
-                    count = 1,
-                    discoveredAt = System.currentTimeMillis(),
-                    averageQScore = q,
-                    meltingTemp = tm,
-                    minimumFreeEnergy = mfe
-                ))
-            }
-        }
-        
-        withContext(Dispatchers.IO) {
-            repository.insertGeneSequences(toInsertOrUpdate)
-        }
-        
-        // Save batch packet log
-        val packet = GenePacket(
-            id = "PKT-" + UUID.randomUUID().toString().take(6).uppercase(),
-            genes = finalBatch,
-            timestamp = System.currentTimeMillis(),
-            isAnomalous = false,
-            newGenes = newGenesList
-        )
-        _discoveredPacketsLog.update { current ->
-            (listOf(packet) + current).take(50)
-        }
-        
-        if (depletedSubstitutionActive) {
-            addLog("REACTOR SYNTHESIS: 8 standard genes compiled with base substitutions (Feedstock Depleted, Q-Score penalized).")
-        } else {
-            addLog("REACTOR SYNTHESIS: 8 standard genes successfully compiled.")
-        }
-        synthManager.playCombinatorTick()
     }
 
     private suspend fun triggerAnomalousSynthesis() {
@@ -3469,7 +3716,23 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
              _rawStockC.value = currentC
              repository.saveRawStocks(currentA, currentG, currentT, currentC)
             
-            _anomalyConsumedBases.value += 10000L // Increment the consumed bases in this run
+             _anomalyConsumedBases.value += 10000L // Increment the consumed bases in this run
+
+             val currentEnz = _activePolymerase.value.uppercase()
+             val costBase = when (currentEnz) {
+                 "TTH" -> 25L
+                 "PFU" -> 50L
+                 else -> 0L
+             }
+             val costWaste = when (currentEnz) {
+                 "TTH" -> 50L
+                 "PFU" -> 150L
+                 else -> 0L
+             }
+             if (currentA < costBase || currentG < costBase || currentT < costBase || currentC < costBase || _bioWaste.value < costWaste) {
+                 _activePolymerase.value = "Taq"
+                 addLog("SYS WARNING: Selected enzyme reset to Taq due to stock depletion from anomalous synthesis.")
+             }
 
             val coupling = WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis())
             // Calculate success chance based on cumulative bases consumed during this active run

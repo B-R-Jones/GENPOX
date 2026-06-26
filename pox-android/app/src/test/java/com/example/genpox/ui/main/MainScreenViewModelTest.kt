@@ -80,6 +80,12 @@ class MainScreenViewModelTest {
         override suspend fun deleteGeneSequence(sequence: GeneSequence) {
             sequencesList.remove(sequence)
         }
+        override suspend fun deleteAllCreatures() {
+            creaturesList.clear()
+        }
+        override suspend fun deleteAllGeneSequences() {
+            sequencesList.clear()
+        }
         override suspend fun updateGeneStock(toInsertOrUpdate: List<GeneSequence>, toDelete: List<GeneSequence>) {
             toDelete.forEach { sequencesList.remove(it) }
             toInsertOrUpdate.forEach { item ->

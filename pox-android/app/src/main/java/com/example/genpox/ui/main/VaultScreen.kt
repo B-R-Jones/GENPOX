@@ -100,6 +100,7 @@ fun VaultView(viewModel: MainViewModel) {
     val defenderId by viewModel.defenderCreatureId.collectAsState()
     val openedFrom by viewModel.creatureCardOpenedFrom.collectAsState()
     val harvestingCreatureIds by viewModel.harvestingCreatureIds.collectAsState()
+    val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
 
     // Local UI states
     var applyLibFilters by remember { mutableStateOf(true) }
@@ -199,345 +200,425 @@ fun VaultView(viewModel: MainViewModel) {
             if (activeCreature != null) {
                 CreatureDetailCard(c = activeCreature!!, viewModel = viewModel)
             } else {
-                when (vaultTab) {
-                    "creatures" -> {
-                        if (creatures.isEmpty()) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "GEN-VAULT DATABANKS OFFLINE.\nSEED GENETIC HOSTS IN COMBINATOR.",
-                                    color = CyberGreenDim,
-                                    style = Typography.bodyMedium,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        } else {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    val activeFiltersCount = (if (libFilterFaction != "ALL") 1 else 0) +
-                                            (if (libFilterType != "ALL") 1 else 0) +
-                                            (if (libFilterTag != "ALL") 1 else 0)
-                                    val exploreText = if (activeFiltersCount > 0) {
-                                        "EXPLORE FILTERS ($activeFiltersCount)"
-                                    } else {
-                                        "EXPLORE FILTERS"
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .border(1.dp, CyberBorder, RoundedCornerShape(2.dp))
-                                            .background(Color.Black)
-                                            .clickable {
-                                                viewModel.synthManager.playBeep(520f, 0.05f, "sine")
-                                                isFilterPanelExpanded = !isFilterPanelExpanded
-                                            }
-                                            .padding(horizontal = 6.dp, vertical = 3.dp)
-                                    ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        when (vaultTab) {
+                            "creatures" -> {
+                                if (creatures.isEmpty()) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                         Text(
-                                            text = if (isFilterPanelExpanded) "COLLAPSE FILTERS" else exploreText,
-                                            color = CyberGreen,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                            fontSize = 8.sp,
-                                            fontWeight = FontWeight.Bold
+                                            text = "GEN-VAULT DATABANKS OFFLINE.\nSEED GENETIC HOSTS IN COMBINATOR.",
+                                            color = CyberGreenDim,
+                                            style = Typography.bodyMedium,
+                                            textAlign = TextAlign.Center
                                         )
                                     }
-
-                                    Spacer(modifier = Modifier.weight(1f))
-
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                    ) {
-                                        Text(
-                                            text = "ACTIVE SELECTIONS: ",
-                                            color = CyberGreen,
-                                            fontSize = 8.sp,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "${filteredSortedCreatures.size} / ${creatures.size}",
-                                            color = CyberGreen,
-                                            fontSize = 8.sp,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-
-                                // Collapsible Filter Console
-                                if (isFilterPanelExpanded) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                                            .background(Color.Black.copy(alpha = 0.6f))
-                                            .padding(8.dp)
-                                    ) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                Box(modifier = Modifier.weight(1f)) {
-                                                    PoxDropdown(
-                                                        label = "Sort Sequence:",
-                                                        selectedOption = libSortBy,
-                                                        options = listOf(
-                                                            "name-asc" to "Name (A -> Z)",
-                                                            "name-desc" to "Name (Z -> A)",
-                                                            "type-asc" to "Type (A -> Z)",
-                                                            "type-desc" to "Type (Z -> A)",
-                                                            "faction-asc" to "Faction (A -> Z)",
-                                                            "vitality-desc" to "Vitality (High -> Low)",
-                                                            "attack-desc" to "Attack (High -> Low)",
-                                                            "defense-desc" to "Defense (High -> Low)",
-                                                            "speed-desc" to "Speed (High -> Low)",
-                                                            "tags-desc" to "Tag Density"
-                                                        ),
-                                                        onOptionSelected = {
-                                                            viewModel.synthManager.playBeep(480f, 0.02f, "sine")
-                                                            libSortBy = it
-                                                        }
-                                                    )
-                                                }
-                                                Box(modifier = Modifier.weight(1f)) {
-                                                    PoxDropdown(
-                                                        label = "Faction Classifier:",
-                                                        selectedOption = libFilterFaction,
-                                                        options = listOf(
-                                                            "ALL" to "All Factions",
-                                                            "Infection" to "Infection",
-                                                            "Mech" to "Mech",
-                                                            "Parasite" to "Parasite",
-                                                            "Containment" to "Containment"
-                                                        ),
-                                                        onOptionSelected = {
-                                                            viewModel.synthManager.playBeep(480f, 0.02f, "sine")
-                                                            libFilterFaction = it
-                                                        }
-                                                    )
-                                                }
-                                            }
-
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                Box(modifier = Modifier.weight(1f)) {
-                                                    val typeOptions = remember(uniqueTypes) {
-                                                        listOf("ALL" to "All Creature Types") + uniqueTypes.map { it to it }
-                                                    }
-                                                    PoxDropdown(
-                                                        label = "Creature Type:",
-                                                        selectedOption = libFilterType,
-                                                        options = typeOptions,
-                                                        onOptionSelected = {
-                                                            viewModel.synthManager.playBeep(480f, 0.02f, "sine")
-                                                            libFilterType = it
-                                                        }
-                                                    )
-                                                }
-                                                Box(modifier = Modifier.weight(1f)) {
-                                                    val tagOptions = listOf(
-                                                        "ALL" to "All Tags",
-                                                        "FAVORITE" to "Favorite",
-                                                        "DEFENDER" to "Defender",
-                                                        "AUTO-HACKER" to "Auto-Hacker",
-                                                        "FULL COHERENCE" to "Full Coherence",
-                                                        "NATURAL" to "Natural",
-                                                        "FORCED" to "Forced",
-                                                        "ALPHA GENE" to "Alpha Gene",
-                                                        "MODIFIED" to "Modified",
-                                                        "ORIGINAL" to "Original",
-                                                        "TRANSFER-ORIGIN" to "Transfer Origin"
-                                                    )
-                                                    PoxDropdown(
-                                                        label = "Creature Tags:",
-                                                        selectedOption = libFilterTag,
-                                                        options = tagOptions,
-                                                        onOptionSelected = {
-                                                            viewModel.synthManager.playBeep(480f, 0.02f, "sine")
-                                                            libFilterTag = it
-                                                        }
-                                                    )
-                                                }
-                                            }
-
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.End
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(2.dp))
-                                                        .background(Color.Black)
-                                                        .clickable {
-                                                            viewModel.synthManager.playBeep(420f, 0.1f, "sine")
-                                                            libSortBy = "name-asc"
-                                                            libFilterFaction = "ALL"
-                                                            libFilterType = "ALL"
-                                                            libFilterTag = "ALL"
-                                                        }
-                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                                ) {
-                                                    Text(
-                                                        text = "✕ CLEAR FILTERS",
-                                                        color = Color(0xFFEF4444),
-                                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                                        fontSize = 8.sp,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Base Panel Area
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f)
-                                        .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                                        .background(Color.Black.copy(alpha = 0.4f))
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                                } else {
                                     Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                                        modifier = Modifier.fillMaxSize(),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            if (applyLibFilters) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.Center
-                                                ) {
-                                                    Text(
-                                                        text = "SEQUENCES FOUND: ",
-                                                        color = CyberGreen,
-                                                        fontSize = 16.sp,
-                                                        fontWeight = FontWeight.Black,
-                                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                                        textAlign = TextAlign.Center
-                                                    )
-                                                    Text(
-                                                        text = "${filteredSortedCreatures.size}",
-                                                        color = CyberGreen,
-                                                        fontSize = 16.sp,
-                                                        fontWeight = FontWeight.Black,
-                                                        fontFamily = FontFamily.Monospace,
-                                                        textAlign = TextAlign.Center
-                                                    )
-                                                }
-                                                Text(
-                                                    text = "Matching sequence(s) loaded; click button below to view",
-                                                    color = CyberGreenDim,
-                                                    fontSize = 10.sp,
-                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                                    textAlign = TextAlign.Center
-                                                )
+                                            val activeFiltersCount = (if (libFilterFaction != "ALL") 1 else 0) +
+                                                    (if (libFilterType != "ALL") 1 else 0) +
+                                                    (if (libFilterTag != "ALL") 1 else 0)
+                                            val exploreText = if (activeFiltersCount > 0) {
+                                                "EXPLORE FILTERS ($activeFiltersCount)"
                                             } else {
+                                                "EXPLORE FILTERS"
+                                            }
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .border(1.dp, CyberBorder, RoundedCornerShape(2.dp))
+                                                    .background(Color.Black)
+                                                    .clickable {
+                                                        viewModel.synthManager.playBeep(520f, 0.05f, "sine")
+                                                        isFilterPanelExpanded = !isFilterPanelExpanded
+                                                    }
+                                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                                            ) {
                                                 Text(
-                                                    text = "NO FILTERS APPLIED",
-                                                    color = Color.Red,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Black,
+                                                    text = if (isFilterPanelExpanded) "COLLAPSE FILTERS" else exploreText,
+                                                    color = CyberGreen,
                                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                                    textAlign = TextAlign.Center
-                                                )
-                                                Text(
-                                                    text = "Enable filters or reconfigure search parameters using the filter options above.",
-                                                    color = CyberGreenDim,
-                                                    fontSize = 10.sp,
-                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                                    textAlign = TextAlign.Center
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold
                                                 )
                                             }
-                                        }
 
-                                        Button(
-                                            onClick = {
-                                                viewModel.synthManager.playBeep(800f, 0.08f, "sine")
-                                                viewingArchiveSearch = true
-                                            },
-                                            modifier = Modifier
-                                                .fillMaxWidth(0.8f)
-                                                .height(44.dp),
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = CyberGreen,
-                                                contentColor = Color.Black
-                                            ),
-                                            shape = RoundedCornerShape(4.dp)
-                                        ) {
+                                            Spacer(modifier = Modifier.weight(1f))
+
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp)
                                             ) {
-                                                Canvas(modifier = Modifier.size(12.dp)) {
-                                                    drawCircle(
-                                                        color = Color.Black,
-                                                        radius = 4.dp.toPx(),
-                                                        style = Stroke(width = 1.5.dp.toPx()),
-                                                        center = Offset(5.dp.toPx(), 5.dp.toPx())
-                                                    )
-                                                    drawLine(
-                                                        color = Color.Black,
-                                                        start = Offset(7.5.dp.toPx(), 7.5.dp.toPx()),
-                                                        end = Offset(11.dp.toPx(), 11.dp.toPx()),
-                                                        strokeWidth = 1.5.dp.toPx()
-                                                    )
-                                                }
                                                 Text(
-                                                    text = "VIEW SEQUENCES",
-                                                    style = Typography.labelLarge,
-                                                    fontWeight = FontWeight.Black,
-                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                                    text = "ACTIVE SELECTIONS: ",
+                                                    color = CyberGreen,
+                                                    fontSize = 8.sp,
+                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = "${filteredSortedCreatures.size} / ${creatures.size}",
+                                                    color = CyberGreen,
+                                                    fontSize = 8.sp,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontWeight = FontWeight.Bold
                                                 )
                                             }
                                         }
+
+                                        // Collapsible Filter Console
+                                        if (isFilterPanelExpanded) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                                                    .background(Color.Black.copy(alpha = 0.6f))
+                                                    .padding(8.dp)
+                                            ) {
+                                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Box(modifier = Modifier.weight(1f)) {
+                                                            PoxDropdown(
+                                                                label = "Sort Sequence:",
+                                                                selectedOption = libSortBy,
+                                                                options = listOf(
+                                                                    "name-asc" to "Name (A -> Z)",
+                                                                    "name-desc" to "Name (Z -> A)",
+                                                                    "type-asc" to "Type (A -> Z)",
+                                                                    "type-desc" to "Type (Z -> A)",
+                                                                    "faction-asc" to "Faction (A -> Z)",
+                                                                    "vitality-desc" to "Vitality (High -> Low)",
+                                                                    "attack-desc" to "Attack (High -> Low)",
+                                                                    "defense-desc" to "Defense (High -> Low)",
+                                                                    "speed-desc" to "Speed (High -> Low)",
+                                                                    "tags-desc" to "Tag Density"
+                                                                ),
+                                                                onOptionSelected = {
+                                                                    viewModel.synthManager.playBeep(480f, 0.02f, "sine")
+                                                                    libSortBy = it
+                                                                }
+                                                            )
+                                                        }
+                                                        Box(modifier = Modifier.weight(1f)) {
+                                                            PoxDropdown(
+                                                                label = "Faction Classifier:",
+                                                                selectedOption = libFilterFaction,
+                                                                options = listOf(
+                                                                    "ALL" to "All Factions",
+                                                                    "Infection" to "Infection",
+                                                                    "Mech" to "Mech",
+                                                                    "Parasite" to "Parasite",
+                                                                    "Containment" to "Containment"
+                                                                ),
+                                                                onOptionSelected = {
+                                                                    viewModel.synthManager.playBeep(480f, 0.02f, "sine")
+                                                                    libFilterFaction = it
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Box(modifier = Modifier.weight(1f)) {
+                                                            val typeOptions = remember(uniqueTypes) {
+                                                                listOf("ALL" to "All Creature Types") + uniqueTypes.map { it to it }
+                                                            }
+                                                            PoxDropdown(
+                                                                label = "Creature Type:",
+                                                                selectedOption = libFilterType,
+                                                                options = typeOptions,
+                                                                onOptionSelected = {
+                                                                    viewModel.synthManager.playBeep(480f, 0.02f, "sine")
+                                                                    libFilterType = it
+                                                                }
+                                                            )
+                                                        }
+                                                        Box(modifier = Modifier.weight(1f)) {
+                                                            val tagOptions = listOf(
+                                                                "ALL" to "All Tags",
+                                                                "FAVORITE" to "Favorite",
+                                                                "DEFENDER" to "Defender",
+                                                                "AUTO-HACKER" to "Auto-Hacker",
+                                                                "FULL COHERENCE" to "Full Coherence",
+                                                                "NATURAL" to "Natural",
+                                                                "FORCED" to "Forced",
+                                                                "ALPHA GENE" to "Alpha Gene",
+                                                                "MODIFIED" to "Modified",
+                                                                "ORIGINAL" to "Original",
+                                                                "TRANSFER-ORIGIN" to "Transfer Origin"
+                                                            )
+                                                            PoxDropdown(
+                                                                label = "Creature Tags:",
+                                                                selectedOption = libFilterTag,
+                                                                options = tagOptions,
+                                                                onOptionSelected = {
+                                                                    viewModel.synthManager.playBeep(480f, 0.02f, "sine")
+                                                                    libFilterTag = it
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.End
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(2.dp))
+                                                                .background(Color.Black)
+                                                                .clickable {
+                                                                    viewModel.synthManager.playBeep(420f, 0.1f, "sine")
+                                                                    libSortBy = "name-asc"
+                                                                    libFilterFaction = "ALL"
+                                                                    libFilterType = "ALL"
+                                                                    libFilterTag = "ALL"
+                                                                }
+                                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = "✕ CLEAR FILTERS",
+                                                                color = Color(0xFFEF4444),
+                                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                                                fontSize = 8.sp,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Base Panel Area
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .weight(1f)
+                                                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                                                .background(Color.Black.copy(alpha = 0.4f))
+                                                .padding(16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                                            ) {
+                                                Column(
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    if (applyLibFilters) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.Center
+                                                        ) {
+                                                            Text(
+                                                                text = "SEQUENCES FOUND: ",
+                                                                color = CyberGreen,
+                                                                fontSize = 16.sp,
+                                                                fontWeight = FontWeight.Black,
+                                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                                                textAlign = TextAlign.Center
+                                                            )
+                                                            Text(
+                                                                text = "${filteredSortedCreatures.size}",
+                                                                color = CyberGreen,
+                                                                fontSize = 16.sp,
+                                                                fontWeight = FontWeight.Black,
+                                                                fontFamily = FontFamily.Monospace,
+                                                                textAlign = TextAlign.Center
+                                                            )
+                                                        }
+                                                        Text(
+                                                            text = "Matching sequence(s) loaded; click button below to view",
+                                                            color = CyberGreenDim,
+                                                            fontSize = 10.sp,
+                                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                                            textAlign = TextAlign.Center
+                                                        )
+                                                    } else {
+                                                        Text(
+                                                            text = "NO FILTERS APPLIED",
+                                                            color = Color.Red,
+                                                            fontSize = 16.sp,
+                                                            fontWeight = FontWeight.Black,
+                                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                                            textAlign = TextAlign.Center
+                                                        )
+                                                        Text(
+                                                            text = "Enable filters or reconfigure search parameters using the filter options above.",
+                                                            color = CyberGreenDim,
+                                                            fontSize = 10.sp,
+                                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                                            textAlign = TextAlign.Center
+                                                        )
+                                                    }
+                                                }
+
+                                                Button(
+                                                    onClick = {
+                                                        viewModel.synthManager.playBeep(800f, 0.08f, "sine")
+                                                        viewingArchiveSearch = true
+                                                    },
+                                                    modifier = Modifier
+                                                        .fillMaxWidth(0.8f)
+                                                        .height(44.dp),
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = CyberGreen,
+                                                        contentColor = Color.Black
+                                                    ),
+                                                    shape = RoundedCornerShape(4.dp)
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                    ) {
+                                                        Canvas(modifier = Modifier.size(12.dp)) {
+                                                            drawCircle(
+                                                                color = Color.Black,
+                                                                radius = 4.dp.toPx(),
+                                                                style = Stroke(width = 1.5.dp.toPx()),
+                                                                center = Offset(5.dp.toPx(), 5.dp.toPx())
+                                                            )
+                                                            drawLine(
+                                                                color = Color.Black,
+                                                                start = Offset(7.5.dp.toPx(), 7.5.dp.toPx()),
+                                                                end = Offset(11.dp.toPx(), 11.dp.toPx()),
+                                                                strokeWidth = 1.5.dp.toPx()
+                                                            )
+                                                        }
+                                                        Text(
+                                                            text = "VIEW SEQUENCES",
+                                                            style = Typography.labelLarge,
+                                                            fontWeight = FontWeight.Black,
+                                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Warning banner
+                                        Text(
+                                            text = "WARNING: Trading creatures with other emulators within 30ft transfers custody. Transferred specimens are cleared permanently from memory sectors upon accepted linkage.",
+                                            color = CyberGreenDim,
+                                            fontSize = 8.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                            lineHeight = 11.sp,
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                                        )
                                     }
                                 }
-
-                                // Warning banner
-                                Text(
-                                    text = "WARNING: Trading creatures with other emulators within 30ft transfers custody. Transferred specimens are cleared permanently from memory sectors upon accepted linkage.",
-                                    color = CyberGreenDim,
-                                    fontSize = 8.sp,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                    lineHeight = 11.sp,
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                            }
+                            "search" -> {
+                                StepSearchView(
+                                    viewModel = viewModel,
+                                    activeColor = CyberGreen,
+                                    activeColorDim = CyberGreenDim,
+                                    activeBorder = CyberBorder,
+                                    activePanel = CyberPanel,
+                                    isAnomaly = false,
+                                    onSelectGene = { stepSearchSelectedGene = it },
+                                    onClose = {
+                                        vaultTab = "creatures"
+                                    },
+                                    modifier = Modifier.fillMaxSize(),
+                                    onDeconstructGene = { gene ->
+                                        geneToDeconstruct = gene
+                                    }
                                 )
                             }
                         }
                     }
-                    "search" -> {
-                        StepSearchView(
-                            viewModel = viewModel,
-                            activeColor = CyberGreen,
-                            activeColorDim = CyberGreenDim,
-                            activeBorder = CyberBorder,
-                            activePanel = CyberPanel,
-                            isAnomaly = false,
-                            onSelectGene = { stepSearchSelectedGene = it },
-                            onClose = {
-                                vaultTab = "creatures"
-                            },
-                            modifier = Modifier.weight(1f),
-                            onDeconstructGene = { gene ->
-                                geneToDeconstruct = gene
+
+                    if (devForceAnomaly) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = { viewModel.clearDevBases() },
+                                modifier = Modifier.weight(1f).height(32.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0x30EF4444),
+                                    contentColor = Color(0xFFEF4444)
+                                ),
+                                border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                                shape = RoundedCornerShape(2.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = "CLEAR STOCK",
+                                    style = Typography.labelSmall,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
-                        )
+                            Button(
+                                onClick = { viewModel.clearDevGenes() },
+                                modifier = Modifier.weight(1f).height(32.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0x30EF4444),
+                                    contentColor = Color(0xFFEF4444)
+                                ),
+                                border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                                shape = RoundedCornerShape(2.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = "CLEAR GENES",
+                                    style = Typography.labelSmall,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Button(
+                                onClick = { viewModel.clearDevCreatures() },
+                                modifier = Modifier.weight(1f).height(32.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0x30EF4444),
+                                    contentColor = Color(0xFFEF4444)
+                                ),
+                                border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                                shape = RoundedCornerShape(2.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = "CLEAR CREATURES",
+                                    style = Typography.labelSmall,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             }

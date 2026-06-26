@@ -104,6 +104,15 @@ fun Modifier.cyberglass(
             val tick = 8.dp.toPx()
             val stroke = 1.dp.toPx()
             
+            // Draw background outline border (1.dp)
+            drawRoundRect(
+                color = borderColor.copy(alpha = 0.35f),
+                topLeft = Offset(stroke / 2f, stroke / 2f),
+                size = Size(w - stroke, h - stroke),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx(), 4.dp.toPx()),
+                style = Stroke(width = stroke)
+            )
+
             // Top-left
             drawLine(borderColor, Offset(0f, 0f), Offset(tick, 0f), strokeWidth = stroke * 1.5f)
             drawLine(borderColor, Offset(0f, 0f), Offset(0f, tick), strokeWidth = stroke * 1.5f)
@@ -120,5 +129,4 @@ fun Modifier.cyberglass(
             drawLine(borderColor, Offset(w, h), Offset(w - tick, h), strokeWidth = stroke * 1.5f)
             drawLine(borderColor, Offset(w, h), Offset(w, h - tick), strokeWidth = stroke * 1.5f)
         }
-        .border(1.dp, borderColor.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
 )

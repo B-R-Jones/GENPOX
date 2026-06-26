@@ -8,6 +8,13 @@ Welcome to the **Bio-Lab P.O.X. Reactor (Tide Pool Reactor)** operations and dev
 
 The P.O.X. Reactor is the baseline biological refinery of the GENPOX network. Its primary purpose is to synthesize **Standard Gene Blocks** (8-base-pair DNA segments) from raw nucleotide feedstocks. These gene blocks are stored in the player's genetic inventory and later combined in the Splicer to construct functional creature genomes.
 
+### Manual Target Programming & Stepped Transcription
+Rather than running in the background, standard synthesis is a deliberate, high-stakes manual process:
+1. **Target Sequencing**: The player dials in a custom 8-base target sequence via interactive dials.
+2. **Pre-Flight Wave Tuning**: Telemetry displays the target's ideal melting temperature ($T_m$) and secondary structure folding energy ($MFE$). The player must adjust the temperature slider to phase-lock the dynamic environment wave with the target's frequency signature (merging them into a CyberGreen line).
+3. **Manual Ignition**: Tapping **`✕ INITIATE SYNTHESIS`** consumes the feedstock and starts the transcription cycle (8s for Taq, 16s for Tth, 24s for Pfu).
+4. **Catastrophic Reaction Collapse**: At each step, if the chamber drops outside safe thermodynamic limits (GC Hairpin stalling or AT Denaturation) without protective solutes (DMSO or Netropsin), the reaction collapses catastrophically. The cycle aborts, no gene block is created, and all feedstock is lost—converted instead into **Bio-Waste**.
+
 ### The Genetic Economy Loop
 ```mermaid
 graph LR
@@ -46,7 +53,8 @@ Solutes act as protective buffers to override biophysical limits:
 *   **Netropsin**: AT-stabilizer. Binds to the minor groove of AT-rich DNA to prevent **AT Denaturation** in hot chambers ($> 75^\circ\text{C}$).
 
 ### Inlet Sliders ($I_A, I_G, I_T, I_C$)
-Adjusting these sliders controls the raw base feed rate into the reaction chamber, dynamically biasing the probability distribution of synthesized nucleotides to favor specific base compositions.
+- **Purpose**: Adjusting these sliders controls the raw base feed rate into the reaction chamber.
+- **Inlet Deprivation Collapse**: In the manual synthesizer, if any base required by the target sequence has its inlet ratio restricted to $\le 5\%$, the reactor will suffer from inlet deprivation, collapsing the reaction catastrophically.
 
 ---
 
@@ -55,7 +63,7 @@ Adjusting these sliders controls the raw base feed rate into the reaction chambe
 The reactor runs on deterministic mathematical formulas representing true molecular biology dynamics.
 
 ### Wallace-Breslauer Melting Temperature ($T_m$)
-Evaluates the temperature at which $50\%$ of the DNA strand denatures:
+Evaluates the temperature at which $50\%$ of the current growing DNA strand denatures:
 $$T_m = 2 \cdot N_{\text{AT}} + 4 \cdot N_{\text{GC}} - 16.6 \cdot \log_{10}\left(\frac{0.05}{[\text{Salt}]}\right)$$
 *   $N_{\text{AT}}$: Total count of A/T bases in the sequence.
 *   $N_{\text{GC}}$: Total count of G/C (and anomalous) bases.
@@ -70,6 +78,7 @@ A metric representing synthesis precision:
 *   Standard base accuracy is modeled on the selected enzyme's fidelity.
 *   If raw stock for a base runs dry during a cycle, the reactor performs **Base Substitution** (substituting an available base). This penalizes the Phred score of the block by **$-15.0$** (clamped to a minimum of $5.0$), indicating a high-error template.
 *   Biophysical failures (unstabilized Stalling or Denaturation) scramble the block and reset its $Q$-score to $5.0$.
+*   **Incremental Calculation**: The Q-Score updates at each transcription step as a running average of the base-by-base synthesis quality, modulated by thermal matching efficiency.
 
 ### Codon Adaptation Index ($CAI$)
 During creature construction, the 64-character genome (compiled from 8 reactor blocks) is evaluated against faction-specific codon usage tables:
@@ -81,7 +90,7 @@ During creature construction, the 64-character genome (compiled from 8 reactor b
 ## 4. Operational Protocols
 
 ### 1. Passive Siphoning (Resolving starting locks)
-When a player starts with $0$ bases and $0$ creatures, standard synthesis is impossible. The reactor activates **Passive Nutrient Siphoning** which deposits raw bases directly into stockpiles every second.
+When a player starts with $0$ bases and $0$ creatures, standard synthesis is impossible. The reactor activates **Passive Nutrient Siphoning** which deposits raw bases directly into stockpiles every five seconds.
 - **Planetary Resonance**: Daily synodic waves synchronized with the moon phase boost siphoning yields for specific bases (e.g. `A` and `T` wave) using wave multipliers (ranging from $1.1\text{x}$ to $1.6\text{x}$).
 
 ### 2. Deconstruction and Recycling
@@ -89,7 +98,10 @@ Unneeded standard gene blocks can be recycled inside the Vault tab.
 - Recycling deconstructs the 8-base block, yielding **+1 raw base** for each respective letter in the sequence.
 - *Note: Anomalous blocks are too structurally complex and cannot be recycled.*
 
-### 3. Alternative Mode: Anomaly Unstable Fusion
+### 3. Bio-Waste Management
+Catastrophic collapses in standard synthesis generate **Bio-Waste** (+8 units per collapse). Bio-Waste accumulates as a stockpile resource next to raw feedstock reserves, documenting player mistakes.
+
+### 4. Alternative Mode: Anomaly Unstable Fusion
 By toggling off standard operations, players can engage the **Anomaly Engine** to hunt for volatile non-standard blocks containing `X, Y, Z, W, ?, !, $, %, &, @, #`.
 - **Requirements**: Requires a starting threshold of $250,000$ total bases and consumes $2,500$ of each base ($10,000$ total bases) per cycle.
 - **Success Rate**: Logarithmic scaling that increases with cumulative bases consumed in the current active run. If successful, it yields a rare anomalous block with a perfect Phred score ($40.0$). If unsuccessful, the bases decay into bio-waste.

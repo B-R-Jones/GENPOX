@@ -6,38 +6,31 @@ This report describes the technical design, mathematical algorithms, and state e
 
 ## 1. The Periodic Heartbeat Loop (Tick Engine)
 
-The core orchestration of time-based processes in the Bio-Lab is governed by the `startReactorHeartbeat` function in [MainViewModel.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui/main/MainViewModel.kt#L2832-L3038).
+The core orchestration of time-based background processes in the Bio-Lab is governed by the `startReactorHeartbeat` function in [MainViewModel.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui/main/MainViewModel.kt#L2920-L3007). Standard P.O.X. Reactor synthesis has been decoupled from the periodic background ticks, transitioning to a manually-initiated execution pipeline.
 
-### Execution Flow
+### Heartbeat Execution Flow
 - **Threading**: Runs on `Dispatchers.Default` using a background coroutine.
 - **Tick Interval**: Runs continuously with a `delay(1000L)` loop (1-second intervals).
 - **Core Ticking Operations**:
-  1. **Passive Siphoning & Nutrient Accumulation**: Siphons environmental nucleotides every second to ensure the player can progress from 0 bases.
-  2. **Reactor Boost Timers**: Decrements active boosters (which halve the synthesis cycle duration).
-  3. **Standard P.O.X. Reactor Ticks**: Progresses the standard synthesis idle timer.
-  4. **Anomaly Engine Ticks**: Progresses the unstable fusion timer.
-  5. **Harvest Missions Ticks**: Updates active missions in the database, transitions phases, and rolls for environmental mutations.
+  1. **Passive Siphoning & Nutrient Accumulation**: Siphons environmental nucleotides every five seconds to ensure feedstock availability.
+  2. **Reactor Boost Timers**: Decrements active booster seconds.
+  3. **Anomaly Engine Ticks**: Progresses the unstable fusion timer when active.
+  4. **Harvest Missions Ticks**: Updates active missions in the database, transitions phases, and rolls for environmental mutations.
 
 ```mermaid
 graph TD
-    A[1-Second Heartbeat Tick] --> B[Step 0: Passive Siphoning]
-    B --> C[Step 1: Decrement Boosters & Pause check]
-    C --> D{Standard Reactor Active?}
-    D -- Yes --> E[Decrement poxIdleTime]
-    E --> F{poxIdleTime <= 0?}
-    F -- Yes --> G[triggerStandardSynthesis]
-    F -- No --> H[Continue]
-    D -- No --> I[Skip Standard]
+    A[1-Second Heartbeat Tick] --> B[Step 0: Passive Siphoning (Every 5s)]
+    B --> C[Step 1: Decrement Boosters]
+    C --> D{Anomaly Engine Active?}
+    D -- Yes --> E[Decrement anomalyIdleTime]
+    E --> F{anomalyIdleTime <= 0?}
+    F -- Yes --> G{Reserves >= 2500 each?}
+    G -- Yes --> H[triggerAnomalousSynthesis]
+    G -- No --> I[Auto-Shutoff Engine]
+    F -- No --> J[Continue]
+    D -- No --> J
     
-    H & G & I --> J{Anomaly Engine Active?}
-    J -- Yes --> K[Decrement anomalyIdleTime]
-    K --> L{anomalyIdleTime <= 0?}
-    L -- Yes --> M{Reserves >= 2500 each?}
-    M -- Yes --> N[triggerAnomalousSynthesis]
-    M -- No --> O[Auto-Shutoff Engine]
-    L -- No --> P[Continue]
-    
-    P & N & O & J -- No --> Q[Step 3: Tick Harvest Missions & Mutations]
+    J & H & I --> K[Step 3: Tick Harvest Missions & Mutations]
 ```
 
 ---
@@ -45,7 +38,7 @@ graph TD
 ## 2. Step 0: Environmental Nucleotide Siphoning
 
 To solve the cold-start problem (where players begin with 0 bases/genes/creatures), the reactor passive loop accumulates raw nucleotides into stock buffers:
-- **Baseline Accumulation**: Each base (`A`, `G`, `T`, `C`) accumulates at a base rate of `+10` units per tick.
+- **Baseline Accumulation**: Each base (`A`, `G`, `T`, `C`) accumulates at a base rate of `+1` unit every five seconds.
 - **Planetary Resonance (Daily Waves)**:
   - Daily planetary waves distort base generation based on solar/lunar alignments using `WaveMath.getDailyWaveConfig`.
   - When the daily wave is active (`!wave.isSuppressed`), the wave specifies a primary base ($p$) and a secondary base ($s$) along with their corresponding multipliers ($pm$, $sm$).
@@ -58,38 +51,39 @@ To solve the cold-start problem (where players begin with 0 bases/genes/creature
 
 ## 3. Step 1: Standard P.O.X. Reactor (Standard Synthesis)
 
-Standard gene synthesis is executed when `_poxIdleTime` hits zero inside `triggerStandardSynthesis`.
+Standard gene synthesis has been refactored into a manual, pre-programmed synthesizer run. The player programmes a target sequence, tunes the biophysics, and manually initiates transcription.
 
-### Dynamic Cycle Time
-The base cycle time depends on the active polymerase enzyme selected in the Chamber:
-- **Taq Polymerase**: Fast (8 seconds cycle time).
-- **Tth Polymerase**: Medium (16 seconds cycle time).
-- **Pfu Polymerase**: Slow (24 seconds cycle time).
-- **Reactor Booster**: Active booster timers halve these values (e.g., Taq cycles in 4 seconds).
+### Pre-Flight Tuning & Phase-Lock
+- **Target Dial Programming**: The player configures the exact 8-character target sequence (cycling via clickable dials).
+- **Wave-Alignment (Phase-Lock)**: The player tunes the temperature slider until the environment wave matches the target wave phase and amplitude. Achieving alignment within $2^\circ\text{C}$ merges both waves into a single CyberGreen wave, indicating optimal biophysical resonance.
 
-### Synthesis Pipeline
-1. **Candidate Generation**:
-   Generates 8 candidate blocks of 8 bases each using the daily wave configuration and the player's raw stock inlet sliders ($I_A, I_G, I_T, I_C$):
-   $$\text{Weight}_{B} = \text{WaveModifier}_B \times I_B$$
-   Where $B \in \{A, G, T, C\}$. Bases are sampled probabilistically using these weights.
-2. **Feedstock Depletion & Base Substitutions**:
-   As the sequence is constructed, nucleotides are decremented from the raw stockpiles. If a stockpile is depleted mid-synthesis:
-   - **Base Substitution**: The reactor automatically substitutes the depleted base with any other available base in stock.
-   - **Absolute Fallback**: If all stockpiles are 0, it falls back to generating `A` without decrement.
-   - **Phred Quality Penalty**: Any substituted block suffers a severe quality penalty (subtracts `-15.0` from the Phred Q-Score, down to a minimum of `5.0`).
-3. **Biophysical Parameter Filtering**:
-   For each completed 8-character sequence, thermodynamic parameters are calculated via [BiophysicsEngine.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/BiophysicsEngine.kt):
+### Dynamic Cycle Time & Step Intervals
+Tapping **`✕ INITIATE SYNTHESIS`** starts a dedicated coroutine executing transcription base-by-base. The duration depends on the active polymerase enzyme:
+- **Taq Polymerase**: 8 seconds cycle time (1 second per step).
+- **Tth Polymerase**: 16 seconds cycle time (2 seconds per step).
+- **Pfu Polymerase**: 24 seconds cycle time (3 seconds per step).
+- **Reactor Booster**: Active booster timers halve these values (e.g., Taq cycles in 4 seconds, transcribing a base every 0.5 seconds).
+
+### Synthesis Pipeline & Biophysical Collapse
+1. **Feedstock Subtraction**: Before starting, the reactor verifies stock availability (target sequence cost plus 100 units of each base if a chemical solute buffer is selected). It deducts feedstock immediately upon ignition.
+2. **Stepped Transcription**: On each tick, the target base at that index is transcribed and visualised in the **Nucleotide Docking Array** (drawing base characters into hexagons).
+3. **Real-time Biophysical Filters & Collapse**:
+   After each base is appended, thermodynamic parameters are calculated for the *growing sequence* via [BiophysicsEngine.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/BiophysicsEngine.kt):
+   - **Inlet Deprivation**:
+     - *Trigger*: The inlet ratio slider for a nucleotide currently being transcribed in the target sequence is $\le 5\%$ (0.05).
+     - *Mitigation*: Open the corresponding inlet slider above 5%.
+     - *Failure*: Polymerase halts immediately due to inlet deprivation, causing a catastrophic reaction collapse (cycle aborts, feedstock lost, converted to **+8 Bio-Waste**).
    - **GC Hairpin Stalling**:
      - *Trigger*: Temperature ($T_{\text{react}}$) $< 30^\circ\text{C}$ and Minimum Free Energy ($MFE$) $\le -5.0$ kcal/mol.
      - *Mitigation*: Adding **DMSO** solute prevents stalling.
-     - *Failure*: If DMSO is absent, the sequence folds into a hairpin, stalling the polymerase. The sequence is scrambled (randomized), and the Q-Score drops to `5.0`.
+     - *Failure*: If DMSO is absent, the reaction **collapses catastrophically**. Transcription aborts immediately, the cycle terminates, no gene block is created, and the 8 deducted raw bases are converted to **+8 units of Bio-Waste**.
    - **AT Denaturation**:
-     - *Trigger*: Temperature ($T_{\text{react}}$) $> 75^\circ\text{C}$ and GC-content $< 40\%$.
+     - *Trigger*: Sequence length $\ge 4$, Temperature ($T_{\text{react}}$) $> 75^\circ\text{C}$, and GC-content $< 40\%$.
      - *Mitigation*: Adding **Netropsin** solute protects AT bonds.
-     - *Failure*: If Netropsin is absent, AT-rich strands denature (fall apart). The sequence is scrambled (randomized), and the Q-Score drops to `5.0`.
+     - *Failure*: If Netropsin is absent, AT-rich strands denature. The reaction **collapses catastrophically** (cycle aborts, feedstock lost, converted to **+8 Bio-Waste**).
 4. **Database Insertion & Packet Logging**:
-   - The final sequences are stored in the Room Database. If a sequence already exists in the inventory, its `count` is incremented, and its `averageQScore` is updated as a running average.
-   - A `GenePacket` is logged in the scrollable reactor feed.
+   - If all 8 steps complete successfully, the completed 8-base block is stored in the database. If it already exists in the inventory, its `count` is incremented and its `averageQScore` is updated as a running average.
+   - A single-gene `GenePacket` is logged in the scrollable reactor feed and a success chime is played.
 
 ---
 

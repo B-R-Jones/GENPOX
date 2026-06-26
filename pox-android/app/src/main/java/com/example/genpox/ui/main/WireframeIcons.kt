@@ -828,4 +828,33 @@ fun WireframeReactorParametersIcon(
     }
 }
 
+@Composable
+fun WireframeCloudIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val strokeW = 1.5.dp.toPx()
+        
+        val path = Path().apply {
+            moveTo(w * 0.25f, h * 0.7f)
+            // Left arch
+            cubicTo(w * 0.1f, h * 0.7f, w * 0.1f, h * 0.45f, w * 0.28f, h * 0.45f)
+            // Top/middle arch
+            cubicTo(w * 0.3f, h * 0.22f, w * 0.7f, h * 0.22f, w * 0.72f, h * 0.45f)
+            // Right arch
+            cubicTo(w * 0.9f, h * 0.45f, w * 0.9f, h * 0.7f, w * 0.75f, h * 0.7f)
+            close()
+        }
+        
+        drawPath(
+            path = path,
+            color = color,
+            style = Stroke(width = strokeW)
+        )
+    }
+}
+
 

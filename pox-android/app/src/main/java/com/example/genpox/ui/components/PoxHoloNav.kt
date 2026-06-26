@@ -114,6 +114,7 @@ fun PoxUnifiedHoloNav(
 
     Box(
         modifier = modifier
+            .zIndex(10f)
             .size(width = containerWidth, height = 46.dp)
             .pointerInput(rows.size) {
                 var totalDragX = 0f

@@ -146,181 +146,256 @@ fun ScannerView(viewModel: MainViewModel) {
         } ?: false
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) {
-            if (selectedAnomalyId != null && selectedAnomaly != null) {
-                LockedAnomalyDetails(
-                    anomaly = selectedAnomaly!!,
-                    viewModel = viewModel,
-                    userLat = lat,
-                    userLng = lng,
-                    activeMissionCoords = activeMissionCoords,
-                    depletedAnomalyCoords = depletedAnomalyCoords,
-                    activeAnomalyTab = activeAnomalyTab,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else if (scannerSubTab == "radar") {
-                HolographicRadarScanner(
-                    viewModel = viewModel,
-                    anomalies = anomalies,
-                    userLat = lat,
-                    userLng = lng,
-                    roads = roads,
-                    buildings = buildings,
-                    zoomMultiplier = zoomMultiplier,
-                    rotationAngle = rotationValue,
-                    selectedAnomalyId = selectedAnomalyId,
-                    onSelectAnomaly = { id -> viewModel.setSelectedAnomalyId(id) },
-                    zoomExpanded = zoomExpanded,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else if (scannerSubTab == "missions") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    if (activeMissionsList.isNotEmpty()) {
-                        ActiveDeployedSequencesList(
-                            activeMissions = activeMissionsList,
-                            onSelectAnomalyByLatLng = { mLat, mLng ->
-                                val anomaly = anomalies.find { Math.abs(it.lat - mLat) < 0.0001 && Math.abs(it.lng - mLng) < 0.0001 }
-                                if (anomaly != null) {
-                                    viewModel.setSelectedAnomalyId(anomaly.id)
-                                }
-                            },
-                            viewModel = viewModel
-                        )
-                    }
+    val subTabs = remember(activeMissionsList) {
+        val list = mutableListOf(
+            PoxSubTab("radar", "RADAR") { iconColor ->
+                Canvas(modifier = Modifier.size(24.dp)) {
+                    val w = size.width
+                    val h = size.height
+                    val center = Offset(w / 2f, h / 2f)
+                    val strokeW = 1.5.dp.toPx()
+
+                    drawCircle(iconColor, radius = w * 0.38f, center = center, style = Stroke(width = strokeW))
+                    drawCircle(iconColor, radius = w * 0.08f, center = center)
+
+                    drawLine(iconColor, Offset(center.x - w * 0.45f, center.y), Offset(center.x - w * 0.18f, center.y), strokeWidth = strokeW)
+                    drawLine(iconColor, Offset(center.x + w * 0.18f, center.y), Offset(center.x + w * 0.45f, center.y), strokeWidth = strokeW)
+                    drawLine(iconColor, Offset(center.x, center.y - h * 0.45f), Offset(center.x, center.y - h * 0.18f), strokeWidth = strokeW)
+                    drawLine(iconColor, Offset(center.x, center.y + h * 0.18f), Offset(center.x, center.y + h * 0.45f), strokeWidth = strokeW)
                 }
-            } else {
+            },
+            PoxSubTab("list", "LIST") { iconColor ->
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(1.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                            .background(CyberPanel)
-                            .padding(12.dp)
-                    ) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            horizontalAlignment = Alignment.Start
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "G.E.N. P.O.X. ANOMALY LOG V1.2",
-                                    color = CyberGreenDim,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Default
-                                )
-                                Text(
-                                    text = "ONLINE",
-                                    color = CyberGreen,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Default
-                                )
-                            }
+                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
+                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
+                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
+                }
+            },
+            PoxSubTab("forecast", "FORECAST") { iconColor ->
+                WireframeCloudIcon(color = iconColor)
+            }
+        )
+        if (activeMissionsList.isNotEmpty()) {
+            list.add(
+                PoxSubTab("missions", "MISSIONS") { iconColor ->
+                    WireframePickaxeIcon(color = iconColor)
+                }
+            )
+        }
+        list
+    }
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .requiredHeight(24.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "NEARBY FREQUENCY LOCATOR",
-                                    color = Color.White,
-                                    style = Typography.bodyMedium,
-                                    fontFamily = FontFamily.Default,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            Text(
-                                text = "Analyze the detailed telemetry signature of detected local anomalies.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = CyberGreen.copy(alpha = 0.8f),
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Normal,
-                                modifier = Modifier.padding(bottom = 4.dp)
+    PoxTabFrame(
+        flavorTitle = "G.E.N. P.O.X. ANOMALY LOG V1.2",
+        statusText = if (selectedAnomalyId != null) "LOCKED" else "ONLINE",
+        statusColor = if (selectedAnomalyId != null) Color.Red else CyberGreen,
+        headerTitle = "NEARBY FREQUENCY LOCATOR",
+        descriptionText = "Analyze the detailed telemetry signature of detected local anomalies.",
+        isScrollable = false,
+        subTabs = subTabs,
+        activeSubTab = scannerSubTab,
+        onSubTabClick = { id, _ -> viewModel.setScannerSubTab(id) },
+        viewModel = viewModel,
+        content = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                if (selectedAnomalyId != null && selectedAnomaly != null) {
+                    LockedAnomalyDetails(
+                        anomaly = selectedAnomaly!!,
+                        viewModel = viewModel,
+                        userLat = lat,
+                        userLng = lng,
+                        activeMissionCoords = activeMissionCoords,
+                        depletedAnomalyCoords = depletedAnomalyCoords,
+                        activeAnomalyTab = activeAnomalyTab,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    when (scannerSubTab) {
+                        "radar" -> {
+                            HolographicRadarScanner(
+                                viewModel = viewModel,
+                                anomalies = anomalies,
+                                userLat = lat,
+                                userLng = lng,
+                                roads = roads,
+                                buildings = buildings,
+                                zoomMultiplier = zoomMultiplier,
+                                rotationAngle = rotationValue,
+                                selectedAnomalyId = selectedAnomalyId,
+                                onSelectAnomaly = { id -> viewModel.setSelectedAnomalyId(id) },
+                                zoomExpanded = zoomExpanded,
+                                modifier = Modifier.fillMaxSize()
                             )
 
-                            if (devForceAnomaly) {
-                                Button(
-                                    onClick = {
-                                        viewModel.synthManager.playBeep(440f, 0.15f, "sawtooth")
-                                        viewModel.recallAllActiveMissions()
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 8.dp)
-                                        .requiredHeight(36.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFFEA580C),
-                                        contentColor = Color.White
-                                    ),
-                                    shape = RoundedCornerShape(4.dp)
-                                ) {
-                                    Text(
-                                        text = "⚡ DEV: RECALL ALL HARVESTERS",
-                                        style = Typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
+                            val zoomExpansionFraction by animateFloatAsState(
+                                targetValue = if (zoomExpanded) 1f else 0f,
+                                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+                                label = "zoom_expansion"
+                            )
+                            val rotationExpansionFraction by animateFloatAsState(
+                                targetValue = if (rotationExpanded) 1f else 0f,
+                                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+                                label = "rotation_expansion"
+                            )
+
+                            val animatedZoomEnd = (70f + 46f * rotationExpansionFraction - 49f * zoomExpansionFraction).dp
+                            val animatedZoomBottom = 70.dp
+
+                            val animatedRotEnd = (16f + 100f * zoomExpansionFraction).dp
+                            val animatedRotBottom = 70.dp
+
+                            ZoomScrollCircle(
+                                sliderValue = sliderValue,
+                                onValueChange = { sliderValue = it },
+                                zoomMultiplier = zoomMultiplier,
+                                zoomExpanded = zoomExpanded,
+                                onToggleExpand = {
+                                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                    zoomExpanded = !zoomExpanded
+                                    if (zoomExpanded) {
+                                        rotationExpanded = false
+                                    }
+                                },
+                                expansionFraction = zoomExpansionFraction,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(bottom = animatedZoomBottom, end = animatedZoomEnd)
+                            )
+
+                            RotationScrollCircle(
+                                rotationAngle = rotationValue,
+                                onValueChange = { rotationValue = it },
+                                rotationExpanded = rotationExpanded,
+                                onToggleExpand = {
+                                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                    rotationExpanded = !rotationExpanded
+                                    if (rotationExpanded) {
+                                        zoomExpanded = false
+                                    }
+                                },
+                                expansionFraction = rotationExpansionFraction,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(bottom = animatedRotBottom, end = animatedRotEnd)
+                            )
+                        }
+                        "missions" -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState()),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                if (activeMissionsList.isNotEmpty()) {
+                                    ActiveDeployedSequencesList(
+                                        activeMissions = activeMissionsList,
+                                        onSelectAnomalyByLatLng = { mLat, mLng ->
+                                            val anomaly = anomalies.find { Math.abs(it.lat - mLat) < 0.0001 && Math.abs(it.lng - mLng) < 0.0001 }
+                                            if (anomaly != null) {
+                                                viewModel.setSelectedAnomalyId(anomaly.id)
+                                            }
+                                        },
+                                        viewModel = viewModel
                                     )
                                 }
                             }
-
+                        }
+                        "forecast" -> {
+                            ScannerWaveForecastView(viewModel = viewModel)
+                        }
+                        else -> { // "list"
                             Column(
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState()),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                if (anomalies.isEmpty()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(200.dp)
-                                            .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                                            .background(Color.Black.copy(alpha = 0.4f)),
-                                        contentAlignment = Alignment.Center
+                                if (devForceAnomaly) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text(
-                                            text = "NO ANOMALIES IN RANGE.",
-                                            style = Typography.bodySmall,
-                                            color = CyberGreenDim
-                                        )
+                                        Button(
+                                            onClick = {
+                                                viewModel.synthManager.playBeep(440f, 0.15f, "sawtooth")
+                                                viewModel.recallAllActiveMissions()
+                                            },
+                                            modifier = Modifier.weight(1f).requiredHeight(36.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = Color(0xFFEA580C),
+                                                contentColor = Color.White
+                                            ),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "⚡ DEV: RECALL ALL",
+                                                style = Typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 9.sp
+                                            )
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                viewModel.synthManager.playBeep(440f, 0.15f, "sawtooth")
+                                                viewModel.refreshMap()
+                                            },
+                                            modifier = Modifier.weight(1f).requiredHeight(36.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = Color(0xFFEA580C),
+                                                contentColor = Color.White
+                                            ),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "⚡ DEV: REFRESH MAP",
+                                                style = Typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 9.sp
+                                            )
+                                        }
                                     }
-                                } else {
-                                    anomalies.take(5).forEach { anomaly ->
-                                        AnomalyItemRow(
-                                            anomaly = anomaly,
-                                            userLat = lat,
-                                            userLng = lng,
-                                            viewModel = viewModel,
-                                            onClick = { viewModel.setSelectedAnomalyId(anomaly.id) }
-                                        )
+                                }
+
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (anomalies.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(200.dp)
+                                                .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                                .background(Color.Black.copy(alpha = 0.4f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "NO ANOMALIES IN RANGE.",
+                                                style = Typography.bodySmall,
+                                                color = CyberGreenDim
+                                            )
+                                        }
+                                    } else {
+                                        anomalies.take(5).forEach { anomaly ->
+                                            AnomalyItemRow(
+                                                anomaly = anomaly,
+                                                userLat = lat,
+                                                userLng = lng,
+                                                viewModel = viewModel,
+                                                onClick = { viewModel.setSelectedAnomalyId(anomaly.id) }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -329,242 +404,61 @@ fun ScannerView(viewModel: MainViewModel) {
                 }
             }
 
-            if (selectedAnomalyId == null && scannerSubTab == "radar") {
-                val zoomExpansionFraction by animateFloatAsState(
-                    targetValue = if (zoomExpanded) 1f else 0f,
-                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
-                    label = "zoom_expansion"
-                )
-                val rotationExpansionFraction by animateFloatAsState(
-                    targetValue = if (rotationExpanded) 1f else 0f,
-                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
-                    label = "rotation_expansion"
-                )
-
-                val animatedZoomEnd = (70f + 46f * rotationExpansionFraction - 49f * zoomExpansionFraction).dp
-                val animatedZoomBottom = 70.dp
-
-                val animatedRotEnd = (16f + 100f * zoomExpansionFraction).dp
-                val animatedRotBottom = 70.dp
-
-                ZoomScrollCircle(
-                    sliderValue = sliderValue,
-                    onValueChange = { sliderValue = it },
-                    zoomMultiplier = zoomMultiplier,
-                    zoomExpanded = zoomExpanded,
-                    onToggleExpand = {
-                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                        zoomExpanded = !zoomExpanded
-                        if (zoomExpanded) {
-                            rotationExpanded = false
-                        }
-                    },
-                    expansionFraction = zoomExpansionFraction,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = animatedZoomBottom, end = animatedZoomEnd)
-                )
-
-                RotationScrollCircle(
-                    rotationAngle = rotationValue,
-                    onValueChange = { rotationValue = it },
-                    rotationExpanded = rotationExpanded,
-                    onToggleExpand = {
-                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                        rotationExpanded = !rotationExpanded
-                        if (rotationExpanded) {
-                            zoomExpanded = false
-                        }
-                    },
-                    expansionFraction = rotationExpansionFraction,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = animatedRotBottom, end = animatedRotEnd)
-                )
-            }
-
-            if (selectedAnomalyId == null) {
+            if (isHarvesting) {
+                val factionColor = when (selectedAnomaly?.faction) {
+                    "Infection" -> Color(0xFFEF4444)
+                    "Mech" -> Color(0xFFFBBF24)
+                    "Parasite" -> Color(0xFFA855F7)
+                    else -> Color(0xFF22D3EE)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
                 Row(
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = 12.dp, end = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.Bottom
+                        .fillMaxWidth()
+                        .border(1.dp, factionColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                        .background(Color.Black.copy(alpha = 0.4f))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    val isRadar = scannerSubTab == "radar"
-                    val radarBorderColor = if (isRadar) CyberGreen else CyberGreenDim.copy(alpha = 0.4f)
-                    val radarGlowColor = if (isRadar) CyberGreen.copy(alpha = 0.15f) else Color.Transparent
-
-                    PoxHoloButton(
-                        borderColor = radarBorderColor,
-                        glowColor = radarGlowColor,
-                        onClick = {
-                            viewModel.synthManager.playCombinatorTick()
-                            viewModel.setScannerSubTab("radar")
-                        }
+                    Button(
+                        onClick = { activeAnomalyTab = "scan" },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (activeAnomalyTab == "scan") factionColor else Color.Transparent,
+                            contentColor = if (activeAnomalyTab == "scan") (if (selectedAnomaly?.faction == "Parasite") Color.White else Color.Black) else factionColor.copy(alpha = 0.7f)
+                        ),
+                        shape = RoundedCornerShape(4.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
-                        Canvas(modifier = Modifier.size(24.dp)) {
-                            val w = size.width
-                            val h = size.height
-                            val center = Offset(w / 2f, h / 2f)
-                            val color = if (isRadar) CyberGreen else CyberGreenDim
-                            val strokeW = 1.5.dp.toPx()
-
-                            drawCircle(color, radius = w * 0.38f, center = center, style = Stroke(width = strokeW))
-                            drawCircle(color, radius = w * 0.08f, center = center)
-
-                            drawLine(color, Offset(center.x - w * 0.45f, center.y), Offset(center.x - w * 0.18f, center.y), strokeWidth = strokeW)
-                            drawLine(color, Offset(center.x + w * 0.18f, center.y), Offset(center.x + w * 0.45f, center.y), strokeWidth = strokeW)
-                            drawLine(color, Offset(center.x, center.y - h * 0.45f), Offset(center.x, center.y - h * 0.18f), strokeWidth = strokeW)
-                            drawLine(color, Offset(center.x, center.y + h * 0.18f), Offset(center.x, center.y + h * 0.45f), strokeWidth = strokeW)
-                        }
+                        Text(
+                            text = "SEQUENCE SCAN",
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
-                    val isList = scannerSubTab == "list"
-                    val listBorderColor = if (isList) CyberGreen else CyberGreenDim.copy(alpha = 0.4f)
-                    val listGlowColor = if (isList) CyberGreen.copy(alpha = 0.15f) else Color.Transparent
-
-                    PoxHoloButton(
-                        borderColor = listBorderColor,
-                        glowColor = listGlowColor,
-                        onClick = {
-                            viewModel.synthManager.playCombinatorTick()
-                            viewModel.setScannerSubTab("list")
-                        }
+                    Button(
+                        onClick = { activeAnomalyTab = "logs" },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (activeAnomalyTab == "logs") factionColor else Color.Transparent,
+                            contentColor = if (activeAnomalyTab == "logs") (if (selectedAnomaly?.faction == "Parasite") Color.White else Color.Black) else factionColor.copy(alpha = 0.7f)
+                        ),
+                        shape = RoundedCornerShape(4.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(1.dp)
-                        ) {
-                            val color = if (isList) CyberGreen else CyberGreenDim
-                            Text("???", color = color, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                            Text("???", color = color, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                            Text("???", color = color, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                        }
-                    }
-
-                    AnimatedVisibility(
-                        visible = activeMissionsList.isNotEmpty(),
-                        enter = slideInHorizontally(initialOffsetX = { it }) + expandHorizontally() + fadeIn(),
-                        exit = slideOutHorizontally(targetOffsetX = { it }) + shrinkHorizontally() + fadeOut()
-                    ) {
-                        val isMissions = scannerSubTab == "missions"
-                        val missionsBorderColor = if (isMissions) CyberGreen else CyberGreenDim.copy(alpha = 0.4f)
-                        val missionsGlowColor = if (isMissions) CyberGreen.copy(alpha = 0.15f) else Color.Transparent
-
-                        PoxHoloButton(
-                            borderColor = missionsBorderColor,
-                            glowColor = missionsGlowColor,
-                            onClick = {
-                                viewModel.synthManager.playCombinatorTick()
-                                viewModel.setScannerSubTab("missions")
-                            }
-                        ) {
-                            WireframePickaxeIcon(
-                                color = if (isMissions) CyberGreen else CyberGreenDim
-                            )
-                        }
-                    }
-
-                    if (devForceAnomaly) {
-                        val devColor = Color(0xFFF97316)
-                        PoxHoloButton(
-                            borderColor = devColor,
-                            glowColor = Color.Transparent,
-                            onClick = {
-                                viewModel.synthManager.playCombinatorTick()
-                                viewModel.refreshMap()
-                            }
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(1.dp)
-                            ) {
-                                Text(
-                                    text = "DEV",
-                                    color = devColor,
-                                    fontSize = 7.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    lineHeight = 7.sp
-                                )
-                                Text(
-                                    text = "MAP",
-                                    color = devColor,
-                                    fontSize = 7.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    lineHeight = 7.sp
-                                )
-                                Text(
-                                    text = "RSH",
-                                    color = devColor,
-                                    fontSize = 7.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    lineHeight = 7.sp
-                                )
-                            }
-                        }
+                        Text(
+                            text = "TELEMETRY LOGS",
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
         }
-
-        if (isHarvesting) {
-            // SEQUENCE SCAN / TELEMETRY LOGS switcher (emulating Bio-Lab switcher exactly)
-            val factionColor = when (selectedAnomaly?.faction) {
-                "Infection" -> Color(0xFFEF4444)
-                "Mech" -> Color(0xFFFBBF24)
-                "Parasite" -> Color(0xFFA855F7)
-                else -> Color(0xFF22D3EE)
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, factionColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                    .background(Color.Black.copy(alpha = 0.4f))
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Button(
-                    onClick = { activeAnomalyTab = "scan" },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (activeAnomalyTab == "scan") factionColor else Color.Transparent,
-                        contentColor = if (activeAnomalyTab == "scan") (if (selectedAnomaly?.faction == "Parasite") Color.White else Color.Black) else factionColor.copy(alpha = 0.7f)
-                    ),
-                    shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "SEQUENCE SCAN",
-                        style = Typography.labelSmall,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Button(
-                    onClick = { activeAnomalyTab = "logs" },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (activeAnomalyTab == "logs") factionColor else Color.Transparent,
-                        contentColor = if (activeAnomalyTab == "logs") (if (selectedAnomaly?.faction == "Parasite") Color.White else Color.Black) else factionColor.copy(alpha = 0.7f)
-                    ),
-                    shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "TELEMETRY LOGS",
-                        style = Typography.labelSmall,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-    }
+    )
 }
 
 class ProjectedAnomaly {
@@ -2780,4 +2674,194 @@ fun hasCoherenceShield(creature: Creature?, originalSequence: String?): Boolean 
         }
     }
     return false
+}
+
+@Composable
+fun ScannerWaveForecastView(viewModel: MainViewModel) {
+    val todayWave = remember { WaveMath.getDailyWaveConfig(System.currentTimeMillis()) }
+    val tomorrowWave = remember { WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 86400000L) }
+    val dayAfterWave = remember { WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 172800000L) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Today's base-pair wave card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .cyberglass(
+                    borderColor = if (todayWave.isSuppressed) Color(0xFF990000) else CyberGreen,
+                    backgroundColor = if (todayWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.6f)
+                )
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Text(
+                        text = "⚡",
+                        color = if (todayWave.isSuppressed) Color.Red else Color(0xFFFFB300),
+                        fontSize = 14.sp
+                    )
+                    Column {
+                        Text(
+                            text = "TODAY'S BASE-PAIR WAVE",
+                            color = CyberGreenDim,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (todayWave.isSuppressed) "DORMANT (CONGESTED DECAY)" else "ACTIVE: ${todayWave.pair} WAVE",
+                            color = Color.White,
+                            style = Typography.bodySmall,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                if (!todayWave.isSuppressed) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "${todayWave.primary} ➔ ${todayWave.secondary}",
+                            color = CyberGreen,
+                            style = Typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "1.12x & 1.62x BOOST",
+                            color = CyberGreenDim,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "NULL",
+                        color = Color.Red,
+                        style = Typography.labelSmall,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .background(Color(0xFF330000), RoundedCornerShape(2.dp))
+                            .border(1.dp, Color.Red, RoundedCornerShape(2.dp))
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        }
+
+        // Forecast Grid
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Tomorrow
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .cyberglass(
+                        borderColor = if (tomorrowWave.isSuppressed) Color(0xFF990000) else Color.DarkGray,
+                        backgroundColor = if (tomorrowWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f)
+                    )
+                    .padding(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "TOMORROW BASE-PAIR",
+                            color = CyberGreenDim,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (tomorrowWave.isSuppressed) "DORMANT" else "${tomorrowWave.pair} WAVE",
+                            color = Color.White,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (!tomorrowWave.isSuppressed) {
+                        Text(
+                            text = "${tomorrowWave.primary}➔${tomorrowWave.secondary}",
+                            color = CyberGreen,
+                            style = Typography.labelSmall,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+
+            // Day After Tomorrow
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .cyberglass(
+                        borderColor = if (dayAfterWave.isSuppressed) Color(0xFF990000) else Color.DarkGray,
+                        backgroundColor = if (dayAfterWave.isSuppressed) Color(0xFF1A0000) else Color.Black.copy(alpha = 0.45f)
+                    )
+                    .padding(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "DAY AFTER TOMORROW",
+                            color = CyberGreenDim,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (dayAfterWave.isSuppressed) "DORMANT" else "${dayAfterWave.pair} WAVE",
+                            color = Color.White,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (!dayAfterWave.isSuppressed) {
+                        Text(
+                            text = "${dayAfterWave.primary}➔${dayAfterWave.secondary}",
+                            color = CyberGreen,
+                            style = Typography.labelSmall,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
