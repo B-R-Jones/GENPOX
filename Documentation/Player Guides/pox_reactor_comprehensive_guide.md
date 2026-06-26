@@ -79,6 +79,7 @@ A metric representing synthesis precision:
 *   If raw stock for a base runs dry during a cycle, the reactor performs **Base Substitution** (substituting an available base). This penalizes the Phred score of the block by **$-15.0$** (clamped to a minimum of $5.0$), indicating a high-error template.
 *   Biophysical failures (unstabilized Stalling or Denaturation) scramble the block and reset its $Q$-score to $5.0$.
 *   **Incremental Calculation**: The Q-Score updates at each transcription step as a running average of the base-by-base synthesis quality, modulated by thermal matching efficiency.
+*   **Creature Scaling**: Average gene Q-scores determine a creature's starting telomeres and scale its maximum vitality. For details, see the [Q-Score & Vitality Guide](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides/pox_reactor_q_score_guide.md).
 
 ### Codon Adaptation Index ($CAI$)
 During creature construction, the 64-character genome (compiled from 8 reactor blocks) is evaluated against faction-specific codon usage tables:

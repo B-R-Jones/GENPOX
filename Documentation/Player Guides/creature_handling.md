@@ -10,7 +10,7 @@ Every creature is derived from a base 64-character DNA sequence composed of stan
 
 ### Stat Resolution Formulas
 Creature stats scale according to nucleotide density inside their active sequence:
-- **Vitality**: Base $100 + (A \times 5) + (\text{Length} / 2)$
+- **Vitality**: Base $100 + (A \times 5) + (\text{Length} / 2)$. Note: This base value is scaled dynamically by the average Phred Q-score of the creature's genes (see the [Q-Score & Vitality Guide](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides/pox_reactor_q_score_guide.md)).
 - **Attack**: resolved as $15 + (G \times 3)$, capped at $99$.
 - **Defense**: resolved as $15 + (T \times 3)$, capped at $99$.
 - **Speed**: resolved as $15 + (C \times 3)$, capped at $99$.
@@ -30,7 +30,8 @@ Faction alignment is determined by the dominant nucleotide frequency:
 - New creatures are compiled by consuming base sequences stored in the player inventory.
 - Appending new 8-character gene blocks to an existing creature permanently updates its sequence, increasing stats and potentially unlocking hybrid moves (e.g. at lengths $\ge 72$ and $\ge 80$).
 
-### Telomere Decay
+### Telomere Decay & Starting Stability
+- **Starting Telomeres**: When compiled, a creature's initial telomere percentage is determined by the average Q-score of its constituent gene blocks: $\text{Starting Telomeres} = (\text{Avg Q} \times 2.5) \in [10, 100]$.
 - Performing high-risk operations (such as harvesting anomalies or undergoing unstable reactor loops) causes telomere degradation.
 - Telomeres represent the specimen's active life percentage ($[0 - 100\%]$).
 - When a creature's telomere count reaches $0\%$, a **Chromosomal Failure** is logged:
@@ -57,5 +58,6 @@ Faction alignment is determined by the dominant nucleotide frequency:
 ---
 
 ## See Also
-- [Master Design & Font Standards](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/fonts_standardization.md)
-- [Scanner Locator & Radar Design](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/scanner_design.md)
+- [Reactor Transcription Q-Score Guide](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides/pox_reactor_q_score_guide.md)
+- [Master Design & Font Standards](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Design%20Guides/master_design_standards.md)
+- [Scanner Locator & Radar Design](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Design%20Guides/scanner_design.md)
