@@ -12,7 +12,7 @@ The P.O.X. Reactor is the baseline biological refinery of the GENPOX network. It
 Rather than running in the background, standard synthesis is a deliberate, high-stakes manual process:
 1. **Target Sequencing**: The player dials in a custom 8-base target sequence via interactive dials.
 2. **Pre-Flight Wave Tuning**: Telemetry displays the target's ideal melting temperature ($T_m$) and secondary structure folding energy ($MFE$). The player must adjust the temperature slider to phase-lock the dynamic environment wave with the target's frequency signature (merging them into a CyberGreen line).
-3. **Manual Ignition**: Tapping **`✕ INITIATE SYNTHESIS`** consumes the feedstock and starts the transcription cycle (8s for Taq, 16s for Tth, 24s for Pfu).
+3. **Manual Ignition**: Tapping **`✕ INITIATE SYNTHESIS`** consumes the feedstock and starts the transcription cycle (8s for Taq, 16s for Tth, 32s for Pfu).
 4. **Catastrophic Reaction Collapse**: At each step, if the chamber drops outside safe thermodynamic limits (GC Hairpin stalling or AT Denaturation) without protective solutes (DMSO or Netropsin), the reaction collapses catastrophically. The cycle aborts, no gene block is created, and all feedstock is lost—converted instead into **Bio-Waste**.
 
 ### The Genetic Economy Loop
@@ -45,7 +45,7 @@ The reactor console features interactive sliders and selectors allowing players 
 The selected polymerase enzyme dictates cycle speed, copy fidelity, and mutation discovery rates:
 *   **Taq Polymerase**: Fast cycles (**8 seconds**). Lacks proofreading (low Phred $Q$-scores of $15-25$), yielding high mutation frequencies that help discover new sequences.
 *   **Tth Polymerase**: Medium cycles (**16 seconds**). Moderate fidelity (Phred $Q$-scores of $25-33$) and high thermal stability, optimal for hot GC-runs.
-*   **Pfu Polymerase**: Slow cycles (**24 seconds**). Proofreading active, extremely high fidelity (Phred $Q$-scores of $35-40$) to duplicate stable templates without alterations.
+*   **Pfu Polymerase**: Slow cycles (**32 seconds**). Proofreading active, extremely high fidelity (Phred $Q$-scores of $35-40$) to duplicate stable templates without alterations.
 
 ### Chemical Solutes
 Solutes act as protective buffers to override biophysical limits:

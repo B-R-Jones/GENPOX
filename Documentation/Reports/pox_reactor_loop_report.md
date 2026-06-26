@@ -61,7 +61,7 @@ Standard gene synthesis has been refactored into a manual, pre-programmed synthe
 Tapping **`✕ INITIATE SYNTHESIS`** starts a dedicated coroutine executing transcription base-by-base. The duration depends on the active polymerase enzyme:
 - **Taq Polymerase**: 8 seconds cycle time (1 second per step).
 - **Tth Polymerase**: 16 seconds cycle time (2 seconds per step).
-- **Pfu Polymerase**: 24 seconds cycle time (3 seconds per step).
+- **Pfu Polymerase**: 32 seconds cycle time (4 seconds per step).
 - **Reactor Booster**: Active booster timers halve these values (e.g., Taq cycles in 4 seconds, transcribing a base every 0.5 seconds).
 
 ### Synthesis Pipeline & Biophysical Collapse

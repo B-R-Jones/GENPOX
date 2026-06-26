@@ -3052,7 +3052,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                         val poly = _activePolymerase.value.uppercase()
                         val baseCycle = when (poly) {
                             "TAQ" -> 8
-                            "PFU" -> 24
+                            "PFU" -> 32
                             "TTH" -> 16
                             else -> 16
                         }
@@ -3438,7 +3438,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             
             val baseCycle = when (poly.uppercase()) {
                 "TAQ" -> 8
-                "PFU" -> 24
+                "PFU" -> 32
                 "TTH" -> 16
                 else -> 16
             }

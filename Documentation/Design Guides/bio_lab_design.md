@@ -32,7 +32,7 @@ Players can optimize the synthesis yield and sequence characteristics by adjusti
 *   **Salt Concentration ($[Na^+]$)**: Ranges from $10\text{ mM}$ to $500\text{ mM}$. Modulates the melting temperature $T_m$ and shifts wave frequencies.
 *   **Enzyme Selection**:
     *   *Taq Polymerase*: Fast standard cycle (**8 seconds**). Low fidelity ($Q$-scores of $15-25$, high mutation rate).
-    *   *Pfu Polymerase*: Slow standard cycle (**24 seconds**). Proofreading active, high fidelity ($Q$-scores of $35-40$, perfect copy rate).
+    *   *Pfu Polymerase*: Slow standard cycle (**32 seconds**). Proofreading active, high fidelity ($Q$-scores of $35-40$, perfect copy rate).
     *   *Tth Polymerase*: Standard cycle (**16 seconds**). Highly heat-resistant.
 *   **Inlet Feed Ratios**: Players adjust channels to feed excess bases into the reactor, skewing wave transition probabilities to target specific sequences.
 
