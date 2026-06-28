@@ -225,9 +225,9 @@ fun SplicerView(viewModel: MainViewModel) {
     val splicingProgress by viewModel.splicingProgress.collectAsState()
     val inventoryGenes by viewModel.geneSequences.collectAsState()
     val splicerSubTab by viewModel.splicerSubTab.collectAsState()
-    val activeColor = CyberTheme.red
-    val activeBorder = CyberTheme.redBorder
-    val activePanel = CyberTheme.redPanel
+    val activeColor = CyberTheme.green
+    val activeBorder = CyberTheme.greenBorder
+    val activePanel = CyberTheme.greenPanel
 
     val subTabs = remember {
         listOf(
