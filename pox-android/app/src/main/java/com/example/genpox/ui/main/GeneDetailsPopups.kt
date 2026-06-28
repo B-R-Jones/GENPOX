@@ -242,24 +242,27 @@ fun GeneDetailsPopup(
             }
         },
         confirmButton = {
-            Box(
-                modifier = Modifier
-                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
-                    .clickable {
-                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                        onClose()
-                    }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "✕ CLOSE",
-                    color = Color.Red,
-                    fontSize = 8.sp,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            PoxButton(
+                text = "✕ CLOSE",
+                onClick = onClose,
+                buttonType = PoxButtonType.RED_DANGER,
+                buttonSize = PoxButtonSize.COMPACT,
+                sound = PoxButtonSound.BEEP_DEFAULT,
+                viewModel = viewModel
+            )
+        },
+        dismissButton = {
+            PoxButton(
+                text = "TARGET IN BIO-LAB",
+                onClick = {
+                    viewModel.setTargetSynthesisSequence(gene)
+                    onClose()
+                },
+                buttonType = PoxButtonType.CYAN_CELESTIAL,
+                buttonSize = PoxButtonSize.COMPACT,
+                sound = PoxButtonSound.BEEP_DEFAULT,
+                viewModel = viewModel
+            )
         }
     )
 }
@@ -399,50 +402,40 @@ fun StepSearchGeneDetailsPopup(
 
                 if (geneSequence != null && count > 0) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .cyberglass(
-                                borderColor = Color(0xFFEF4444),
-                                backgroundColor = Color(0xFF7F1D1D).copy(alpha = 0.15f)
-                            )
-                            .clickable {
-                                viewModel.synthManager.playBeep(600f, 0.05f, "sine")
-                                onDeconstructGene?.invoke(geneSequence)
-                            }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "♺ DECONSTRUCT GENE BLOCK",
-                            color = Color(0xFFFCA5A5),
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    PoxButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = "♺ DECONSTRUCT GENE BLOCK",
+                        onClick = { onDeconstructGene?.invoke(geneSequence) },
+                        buttonType = PoxButtonType.RED_DANGER,
+                        buttonSize = PoxButtonSize.STANDARD,
+                        sound = PoxButtonSound.BEEP_HIGH,
+                        viewModel = viewModel
+                    )
                 }
             }
         },
         confirmButton = {
-            Box(
-                modifier = Modifier
-                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
-                    .clickable {
-                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                        onClose()
-                    }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "✕ CLOSE",
-                    color = Color.Red,
-                    fontSize = 8.sp,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            PoxButton(
+                text = "✕ CLOSE",
+                onClick = onClose,
+                buttonType = PoxButtonType.RED_DANGER,
+                buttonSize = PoxButtonSize.COMPACT,
+                sound = PoxButtonSound.BEEP_DEFAULT,
+                viewModel = viewModel
+            )
+        },
+        dismissButton = {
+            PoxButton(
+                text = "TARGET IN BIO-LAB",
+                onClick = {
+                    viewModel.setTargetSynthesisSequence(gene)
+                    onClose()
+                },
+                buttonType = PoxButtonType.CYAN_CELESTIAL,
+                buttonSize = PoxButtonSize.COMPACT,
+                sound = PoxButtonSound.BEEP_DEFAULT,
+                viewModel = viewModel
+            )
         }
     )
 }
@@ -560,24 +553,27 @@ fun VaultGeneDetailsPopup(
             }
         },
         confirmButton = {
-            Box(
-                modifier = Modifier
-                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
-                    .clickable {
-                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                        onClose()
-                    }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "✕ CLOSE",
-                    color = Color.Red,
-                    fontSize = 8.sp,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            PoxButton(
+                text = "✕ CLOSE",
+                onClick = onClose,
+                buttonType = PoxButtonType.RED_DANGER,
+                buttonSize = PoxButtonSize.COMPACT,
+                sound = PoxButtonSound.BEEP_DEFAULT,
+                viewModel = viewModel
+            )
+        },
+        dismissButton = {
+            PoxButton(
+                text = "TARGET IN BIO-LAB",
+                onClick = {
+                    viewModel.setTargetSynthesisSequence(gene)
+                    onClose()
+                },
+                buttonType = PoxButtonType.CYAN_CELESTIAL,
+                buttonSize = PoxButtonSize.COMPACT,
+                sound = PoxButtonSound.BEEP_DEFAULT,
+                viewModel = viewModel
+            )
         }
     )
 }
@@ -729,67 +725,34 @@ fun GeneDeconstructPopup(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (gene.count > 1) {
-                    Box(
-                        modifier = Modifier
-                            .cyberglass(
-                                borderColor = Color(0xFFEF4444),
-                                backgroundColor = Color(0xFFEF4444).copy(alpha = 0.25f)
-                            )
-                            .clickable {
-                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                onConfirm(gene.count)
-                            }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "♺ DECONSTRUCT ALL",
-                            color = Color(0xFFFECACA),
-                            fontSize = 8.sp,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .cyberglass(borderColor = Color(0xFFEF4444), backgroundColor = Color(0xFFEF4444).copy(alpha = 0.15f))
-                        .clickable {
-                            viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                            onConfirm(deconstructCount)
-                        }
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "✓ DECONSTRUCT",
-                        color = Color(0xFFFCA5A5),
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold
+                    PoxButton(
+                        text = "♺ DECONSTRUCT ALL",
+                        onClick = { onConfirm(gene.count) },
+                        buttonType = PoxButtonType.RED_DANGER,
+                        buttonSize = PoxButtonSize.COMPACT,
+                        sound = PoxButtonSound.BEEP_DEFAULT,
+                        viewModel = viewModel
                     )
                 }
+                PoxButton(
+                    text = "✓ DECONSTRUCT",
+                    onClick = { onConfirm(deconstructCount) },
+                    buttonType = PoxButtonType.RED_MUTED,
+                    buttonSize = PoxButtonSize.COMPACT,
+                    sound = PoxButtonSound.BEEP_DEFAULT,
+                    viewModel = viewModel
+                )
             }
         },
         dismissButton = {
-            Box(
-                modifier = Modifier
-                    .cyberglass(borderColor = Color.Gray, backgroundColor = Color.Transparent)
-                    .clickable {
-                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                        onDismiss()
-                    }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "✕ CANCEL",
-                    color = Color.Gray,
-                    fontSize = 8.sp,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            PoxButton(
+                text = "✕ CANCEL",
+                onClick = onDismiss,
+                buttonType = PoxButtonType.GRAY_UTILITY,
+                buttonSize = PoxButtonSize.COMPACT,
+                sound = PoxButtonSound.BEEP_DEFAULT,
+                viewModel = viewModel
+            )
         }
     )
 }

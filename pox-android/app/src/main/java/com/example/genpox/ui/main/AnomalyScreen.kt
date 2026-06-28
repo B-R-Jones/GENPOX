@@ -487,25 +487,19 @@ fun HarvestingCountdownTimer(
 
     if (m != null) {
         if (m.isCompleted) {
-            // RECALL BUTTON
-            Button(
+            PoxButton(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                text = "RECALL SEQUENCE & BANK Stockpile",
                 onClick = {
                     viewModel.recallMission(m)
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(38.dp)
-                    .padding(bottom = 6.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E1FF), contentColor = Color.Black),
-                shape = RoundedCornerShape(4.dp)
-            ) {
-                Text(
-                    text = "RECALL SEQUENCE & BANK Stockpile",
-                    style = Typography.labelSmall,
-                    fontWeight = FontWeight.Black,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
+                buttonType = PoxButtonType.CYAN_CELESTIAL,
+                buttonSize = PoxButtonSize.LARGE,
+                sound = PoxButtonSound.BEEP_HIGH,
+                viewModel = viewModel
+            )
         } else {
             // HARVESTING TEXT
             val remaining = maxOf(0L, m.totalDuration - m.elapsedSeconds)
@@ -665,7 +659,7 @@ fun AnomalyItemRow(
                 .padding(horizontal = 6.dp, vertical = 3.dp)
         ) {
             Text(
-                text = "🧬 ${anomaly.gene}",
+                text = anomaly.gene,
                 color = factionColor,
                 style = Typography.bodySmall,
                 fontWeight = FontWeight.Bold,
@@ -862,56 +856,43 @@ fun LockedAnomalyActiveMissionContent(
             val trackedMissionId by viewModel.trackedMissionId.collectAsState()
             val isTrackingThis = trackedMissionId == activeMission.id
 
-            Button(
+            PoxButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = if (isTrackingThis) "✕ STOP TRACKING" else "TRACK HARVESTER",
                 onClick = {
-                    viewModel.synthManager.playBeep(480f, 0.05f, "sine")
                     if (isTrackingThis) {
                         viewModel.setTrackedMissionId(null)
                     } else {
                         viewModel.setTrackedMissionId(activeMission.id)
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(30.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isTrackingThis) CyberGreen else Color.Transparent,
-                    contentColor = if (isTrackingThis) Color.Black else CyberGreen
-                ),
-                border = BorderStroke(1.dp, CyberGreen.copy(alpha = 0.5f)),
-                shape = RoundedCornerShape(2.dp),
-                contentPadding = PaddingValues(vertical = 4.dp)
-            ) {
-                Text(
-                    text = if (isTrackingThis) "✕ STOP TRACKING" else "🛰️ TRACK HARVESTER",
-                    style = Typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 8.5.sp
-                )
-            }
+                buttonType = if (isTrackingThis) PoxButtonType.GREEN_PHOSPHOR else PoxButtonType.GREEN_MUTED,
+                buttonSize = PoxButtonSize.COMPACT,
+                sound = PoxButtonSound.BEEP_DEFAULT,
+                viewModel = viewModel
+            )
 
             Spacer(modifier = Modifier.height(4.dp))
 
             if (activeMission.isCompleted) {
-                Button(
+                val recallButtonType = when (anomaly.faction) {
+                    "Infection" -> PoxButtonType.RED_DANGER
+                    "Mech" -> PoxButtonType.YELLOW_WARNING
+                    "Parasite" -> PoxButtonType.PURPLE_ANOMALY
+                    else -> PoxButtonType.CYAN_CELESTIAL
+                }
+                PoxButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = "RECALL SEQUENCE & BANK Stockpile",
                     onClick = {
                         viewModel.recallMission(activeMission)
                         viewModel.setSelectedAnomalyId(null)
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(38.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = factionColor, contentColor = Color.Black),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        text = "RECALL SEQUENCE & BANK Stockpile",
-                        style = Typography.labelSmall,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
+                    buttonType = recallButtonType,
+                    buttonSize = PoxButtonSize.LARGE,
+                    sound = PoxButtonSound.BEEP_HIGH,
+                    viewModel = viewModel
+                )
             } else {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
@@ -1055,7 +1036,7 @@ fun LockedAnomalyDetails(
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(text = "GENE CARRIER:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                    Text(text = "🧬 ${anomaly.gene}", color = factionColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Text(text = anomaly.gene, color = factionColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(text = "EST. ACCURACY:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
@@ -1105,7 +1086,7 @@ fun LockedAnomalyDetails(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "✕ ANOMALY SIGNATURE DEPLETED",
+                            text = "ANOMALY SIGNATURE DEPLETED",
                             color = Color.Gray,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
@@ -1114,26 +1095,25 @@ fun LockedAnomalyDetails(
                     }
                 }
                 else -> {
-                    Button(
+                    val dispatchButtonType = when (anomaly.faction) {
+                        "Infection" -> PoxButtonType.RED_DANGER
+                        "Mech" -> PoxButtonType.YELLOW_WARNING
+                        "Parasite" -> PoxButtonType.PURPLE_ANOMALY
+                        else -> PoxButtonType.CYAN_CELESTIAL
+                    }
+                    PoxButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = "DISPATCH SEQUENCE TO ANOMALY",
                         onClick = {
                             viewModel.setSelectedAnomalyId(anomaly.id)
                             viewModel.setActiveCreature(null, openedFrom = "scanner")
-                            viewModel.synthManager.playBeep(520f, 0.08f, "sine")
                             viewModel.selectTab("vault")
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(38.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = factionColor, contentColor = Color.Black),
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "DISPATCH SEQUENCE TO ANOMALY",
-                            style = Typography.labelSmall,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
+                        buttonType = dispatchButtonType,
+                        buttonSize = PoxButtonSize.LARGE,
+                        sound = PoxButtonSound.BEEP_HIGH,
+                        viewModel = viewModel
+                    )
                 }
             }
         }
@@ -1246,7 +1226,7 @@ fun ActiveDeployedSequencesList(
                             .padding(horizontal = 4.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = if (isTrackingThis) "🛰️ TRK_ON" else "🛰️ TRACK",
+                            text = if (isTrackingThis) "TRK_ON" else "TRACK",
                             color = if (isTrackingThis) CyberGreen else Color.Gray,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
@@ -1266,7 +1246,7 @@ fun ActiveDeployedSequencesList(
                             .padding(horizontal = 4.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = if (m.isCompleted) "⚡ READY" else "HARVESTING",
+                            text = if (m.isCompleted) "READY" else "HARVESTING",
                             color = if (m.isCompleted) factionColor else Color.Gray,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,

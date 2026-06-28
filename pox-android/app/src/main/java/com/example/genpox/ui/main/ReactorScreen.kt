@@ -398,6 +398,8 @@ fun BiophysicalResonanceGraph(
     isAnomaly: Boolean,
     soluteActive: String,
     activeColor: Color,
+    isStallThreat: Boolean,
+    isDenatureThreat: Boolean,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "graph_oscillation")
@@ -409,6 +411,17 @@ fun BiophysicalResonanceGraph(
             repeatMode = RepeatMode.Restart
         ),
         label = "phase"
+    )
+
+    val pulseTransition = rememberInfiniteTransition(label = "boundary_pulse")
+    val pulseAlpha by pulseTransition.animateFloat(
+        initialValue = 0.15f,
+        targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_alpha"
     )
 
     Canvas(modifier = modifier.fillMaxSize()) {
@@ -434,23 +447,28 @@ fun BiophysicalResonanceGraph(
         val upperBoundaryY = h * 0.2f
         val lowerBoundaryY = h * 0.8f
         
+        val upperAlpha = if (isDenatureThreat) pulseAlpha else 0.3f
+        val upperStroke = if (isDenatureThreat) 2.5.dp.toPx() else 1.dp.toPx()
         drawLine(
-            color = Color(0xFFEF4444).copy(alpha = 0.3f),
+            color = Color(0xFFEF4444).copy(alpha = upperAlpha),
             start = Offset(0f, upperBoundaryY),
             end = Offset(w, upperBoundaryY),
-            strokeWidth = 1.dp.toPx(),
+            strokeWidth = upperStroke,
             pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
         )
+
+        val lowerAlpha = if (isStallThreat) pulseAlpha else 0.3f
+        val lowerStroke = if (isStallThreat) 2.5.dp.toPx() else 1.dp.toPx()
         drawLine(
-            color = Color(0xFF22D3EE).copy(alpha = 0.3f),
+            color = Color(0xFF22D3EE).copy(alpha = lowerAlpha),
             start = Offset(0f, lowerBoundaryY),
             end = Offset(w, lowerBoundaryY),
-            strokeWidth = 1.dp.toPx(),
+            strokeWidth = lowerStroke,
             pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
         )
 
         val segments = 100
-        val isPhaseLocked = tempDeviance.absoluteValue <= 2.0f
+        val isPhaseLocked = tempDeviance.absoluteValue <= 2.0f && !isStallThreat && !isDenatureThreat
 
         if (isPhaseLocked) {
             // Merge into a single CyberGreen wave!
@@ -752,8 +770,8 @@ fun ReactorDashboardView(
     }
 
     val tempDeviance = currentTemp - targetTm.toFloat()
-    val safeMinTemp = remember(currentSalt) { 20.0f + (currentSalt * 40.0f) }
-    val safeMaxTemp = remember(currentSalt) { 65.0f + (currentSalt * 50.0f) }
+    val safeMinTemp = remember(currentSalt) { 28.0f + (currentSalt * 30.0f) }
+    val safeMaxTemp = remember(currentSalt) { 22.0f + (currentSalt * 30.0f) }
 
     val speedFactor = remember(activePoly) {
         when (activePoly.uppercase()) {
@@ -765,6 +783,27 @@ fun ReactorDashboardView(
     }
     val targetMfe = remember(targetSeq) {
         BiophysicsEngine.calculateMinimumFreeEnergy(targetSeq)
+    }
+
+    val isStallThreat = remember(targetSeq, currentTemp, safeMinTemp, targetMfe, activeSolute) {
+        targetSeq.length >= 4 && currentTemp < safeMinTemp && targetMfe <= -5.0 && activeSolute != "DMSO"
+    }
+    val gcPercent = remember(targetSeq) {
+        if (targetSeq.isEmpty()) 0.0 else targetSeq.count { it == 'G' || it == 'C' }.toDouble() / targetSeq.length.toDouble()
+    }
+    val isDenatureThreat = remember(targetSeq, currentTemp, safeMaxTemp, gcPercent, activeSolute) {
+        targetSeq.length >= 4 && currentTemp > safeMaxTemp && gcPercent < 0.40 && activeSolute != "Netropsin"
+    }
+
+    val safeRangeText = remember(targetSeq, targetMfe, gcPercent, activeSolute, safeMinTemp, safeMaxTemp) {
+        val hasStall = targetSeq.length >= 4 && targetMfe <= -5.0 && activeSolute != "DMSO"
+        val hasDenature = targetSeq.length >= 4 && gcPercent < 0.40 && activeSolute != "Netropsin"
+        when {
+            hasStall && hasDenature -> "NONE"
+            hasStall -> "${safeMinTemp.toInt()}°C - 50°C"
+            hasDenature -> "15°C - ${safeMaxTemp.toInt()}°C"
+            else -> "15°C - 50°C"
+        }
     }
 
     val waveColor = remember(tempDeviance, activeSolute) {
@@ -827,69 +866,155 @@ fun ReactorDashboardView(
                     // Growing sequence readout
                     Box(
                         modifier = Modifier
-                            .weight(1.2f)
+                            .weight(1f)
                             .fillMaxHeight()
                             .background(Color.Black.copy(alpha = 0.4f))
                             .border(1.dp, activeBorder.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
                             .padding(6.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = activeStrand.padEnd(8, '-'),
-                                color = if (isReactionCollapsed) Color.Red else if (activeQ <= 5.0 && activeStrand.isNotEmpty()) Color.Red else CyberGreen,
-                                fontSize = 18.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 2.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "STEP $activeStep/8 | ${activePoly.uppercase()}",
-                                color = Color.White.copy(alpha = 0.7f),
-                                style = Typography.labelSmall,
-                                fontSize = 7.5.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
+                        Text(
+                            text = activeStrand.padEnd(8, '-'),
+                            color = if (isReactionCollapsed) Color.Red else if (activeQ <= 5.0 && activeStrand.isNotEmpty()) Color.Red else CyberGreen,
+                            fontSize = 18.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp
+                        )
                     }
 
-                    // Biophysical details readout
+                    // Pre-flight bio-analysis details readout: One row, three columns
                     Column(
                         modifier = Modifier
-                            .weight(1.5f)
+                            .weight(1.8f)
                             .fillMaxHeight()
                             .background(Color.Black.copy(alpha = 0.4f))
                             .border(1.dp, activeBorder.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
-                            .padding(6.dp),
-                        verticalArrangement = Arrangement.Center
+                            .padding(4.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = String.format(Locale.US, "TEMP DEVIANCE: %+.1f°C", tempDeviance),
-                            color = if (kotlin.math.abs(tempDeviance) > 15f) Color(0xFFEF4444) else CyberGreen,
+                            text = "PRE-FLIGHT BIO-ANALYSIS",
+                            color = CyberGreenDim,
+                            style = Typography.labelSmall,
                             fontSize = 7.5.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 2.dp)
                         )
-                        Text(
-                            text = String.format(Locale.US, "IDEAL TM: %.1f°C", targetTm),
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 7.5.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = String.format(Locale.US, "FOLD MFE: %.2f kcal", activeMfe),
-                            color = if (activeMfe <= -5.0) Color(0xFF22D3EE) else Color.White.copy(alpha = 0.7f),
-                            fontSize = 7.5.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = String.format(Locale.US, "EST. Q-SCORE: %.1f", activeQ),
-                            color = if (activeQ <= 15.0 && activeStrand.isNotEmpty()) Color.Red else Color(0xFFFFB300),
-                            fontSize = 7.5.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Column 1: Current Temp
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = String.format(Locale.US, "%.1f°C", currentTemp),
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "CURR TEMP",
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontSize = 6.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFamily = FontFamily.Default
+                                )
+                            }
+                            
+                            // Divider
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(20.dp)
+                                    .background(activeBorder.copy(alpha = 0.3f))
+                            )
+
+                            // Column 2: Ideal Temp
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = String.format(Locale.US, "%.1f°C", targetTm),
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "IDEAL TEMP",
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontSize = 6.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFamily = FontFamily.Default
+                                )
+                            }
+                            
+                            // Divider
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(20.dp)
+                                    .background(activeBorder.copy(alpha = 0.3f))
+                            )
+
+                            // Column 3: Safe Temp Range
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1.3f)
+                            ) {
+                                Text(
+                                    text = safeRangeText,
+                                    color = if (isStallThreat || isDenatureThreat) Color(0xFFEF4444) else CyberGreen,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "SAFE RANGE",
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontSize = 6.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFamily = FontFamily.Default
+                                )
+                            }
+
+                            // Divider
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(20.dp)
+                                    .background(activeBorder.copy(alpha = 0.3f))
+                            )
+
+                            // Column 4: Temp Deviance
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = String.format(Locale.US, "%+.1f°C", tempDeviance),
+                                    color = if (kotlin.math.abs(tempDeviance) > 15f) Color(0xFFEF4444) else CyberGreen,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "DEVIANCE",
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontSize = 6.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFamily = FontFamily.Default
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -914,6 +1039,8 @@ fun ReactorDashboardView(
                             isAnomaly = false,
                             soluteActive = activeSolute,
                             activeColor = CyberGreen,
+                            isStallThreat = isStallThreat,
+                            isDenatureThreat = isDenatureThreat,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -1039,140 +1166,57 @@ fun ReactorDashboardView(
             val rawStockT by viewModel.rawStockT.collectAsState()
             val rawStockC by viewModel.rawStockC.collectAsState()
 
+            val hasEnoughStock = remember(targetSeq, rawStockA, rawStockG, rawStockT, rawStockC, activeSolute) {
+                var reqA = 0L
+                var reqG = 0L
+                var reqT = 0L
+                var reqC = 0L
+                targetSeq.forEach { char ->
+                    when (char) {
+                        'A' -> reqA++
+                        'G' -> reqG++
+                        'T' -> reqT++
+                        'C' -> reqC++
+                    }
+                }
+                val soluteCost = if (activeSolute == "DMSO" || activeSolute == "Netropsin") 100L else 0L
+                rawStockA >= (reqA + soluteCost) &&
+                rawStockG >= (reqG + soluteCost) &&
+                rawStockT >= (reqT + soluteCost) &&
+                rawStockC >= (reqC + soluteCost)
+            }
+
+            val buttonEnabled = poxReactorActive && !isSynthesisActive && hasEnoughStock
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "PRE-FLIGHT BIO-ANALYSIS",
-                        color = CyberGreenDim,
-                        style = Typography.labelSmall,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "IDEAL TM: ${String.format(Locale.US, "%.1f", targetTm)}°C",
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = "SAFE TEMP: ${safeMinTemp.toInt()}°C - ${safeMaxTemp.toInt()}°C",
-                        color = if (currentTemp < safeMinTemp || currentTemp > safeMaxTemp) Color(0xFFEF4444) else CyberGreen,
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = "FOLD MFE: ${String.format(Locale.US, "%.2f", targetMfe)} kcal",
-                        color = if (targetMfe <= -5.0) Color(0xFF22D3EE) else Color.White.copy(alpha = 0.7f),
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    
-                    // Warning indicator
-                    if (targetMfe <= -5.0 && activeSolute != "DMSO") {
-                        Text(
-                            text = "⚠ GC STALL RISK: INJECT DMSO",
-                            color = Color(0xFFFFB300),
-                            fontSize = 7.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                    val gcPercent = targetSeq.count { it == 'G' || it == 'C' }.toDouble() / targetSeq.length.toDouble()
-                    if (gcPercent < 0.40 && activeSolute != "Netropsin") {
-                        Text(
-                            text = "⚠ AT DENATURATION RISK: INJECT NETROPSIN",
-                            color = Color(0xFFFFB300),
-                            fontSize = 7.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.width(8.dp))
-
-                val hasEnoughStock = remember(targetSeq, rawStockA, rawStockG, rawStockT, rawStockC, activeSolute) {
-                    var reqA = 0L
-                    var reqG = 0L
-                    var reqT = 0L
-                    var reqC = 0L
-                    targetSeq.forEach { char ->
-                        when (char) {
-                            'A' -> reqA++
-                            'G' -> reqG++
-                            'T' -> reqT++
-                            'C' -> reqC++
-                        }
-                    }
-                    val soluteCost = if (activeSolute == "DMSO" || activeSolute == "Netropsin") 100L else 0L
-                    rawStockA >= (reqA + soluteCost) &&
-                    rawStockG >= (reqG + soluteCost) &&
-                    rawStockT >= (reqT + soluteCost) &&
-                    rawStockC >= (reqC + soluteCost)
-                }
-
-                val buttonEnabled = poxReactorActive && !isSynthesisActive && hasEnoughStock
-
-                Button(
+                PoxButton(
+                    modifier = Modifier.weight(1f),
+                    text = if (isSynthesisActive) "SYNTHESIZING..." else "INITIATE SYNTHESIS",
                     onClick = {
                         viewModel.initiateStandardSynthesis()
                     },
                     enabled = buttonEnabled,
-                    modifier = Modifier
-                        .height(38.dp)
-                        .border(
-                            width = 1.dp,
-                            color = if (buttonEnabled) CyberGreen else Color.Gray.copy(alpha = 0.4f),
-                            shape = RoundedCornerShape(2.dp)
-                        ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (buttonEnabled) Color(0x2034D399) else Color.Black.copy(alpha = 0.2f),
-                        contentColor = if (buttonEnabled) CyberGreen else Color.Gray
-                    ),
-                    shape = RoundedCornerShape(2.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp)
-                ) {
-                    Text(
-                        text = if (isSynthesisActive) "SYNTHESIZING..." else "✕ INITIATE SYNTHESIS",
-                        style = Typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
+                    buttonType = PoxButtonType.GREEN_PHOSPHOR,
+                    buttonSize = PoxButtonSize.STANDARD,
+                    sound = PoxButtonSound.SUCCESS_CHIME,
+                    viewModel = viewModel
+                )
 
-                Spacer(modifier = Modifier.width(6.dp))
-
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .border(
-                            width = 1.dp,
-                            color = if (isLoopActive) CyberGreen else Color.Gray.copy(alpha = 0.4f),
-                            shape = RoundedCornerShape(2.dp)
-                        )
-                        .background(
-                            color = if (isLoopActive) Color(0x2034D399) else Color.Black.copy(alpha = 0.2f)
-                        )
-                        .clickable {
-                            viewModel.toggleLoopActive()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "⟲",
-                        color = if (isLoopActive) CyberGreen else Color.Gray,
-                        style = Typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
+                PoxButton(
+                    modifier = Modifier.width(38.dp),
+                    text = "⟲",
+                    onClick = {
+                        viewModel.toggleLoopActive()
+                    },
+                    buttonType = if (isLoopActive) PoxButtonType.GREEN_PHOSPHOR else PoxButtonType.GREEN_MUTED,
+                    buttonSize = PoxButtonSize.STANDARD,
+                    sound = PoxButtonSound.COMBINATOR_TICK,
+                    viewModel = viewModel
+                )
             }
         }
 
@@ -1180,24 +1224,105 @@ fun ReactorDashboardView(
 
         if (devForceAnomaly) {
             Spacer(modifier = Modifier.height(10.dp))
-            Button(
+            PoxButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = "DEV: INJECT 10K BASES & WASTE",
                 onClick = { viewModel.addDevBases() },
-                modifier = Modifier.fillMaxWidth().height(40.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0x30F97316),
-                    contentColor = Color(0xFFF97316)
-                ),
-                border = BorderStroke(1.dp, Color(0xFFF97316)),
-                shape = RoundedCornerShape(2.dp),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                Text(
-                    text = "DEV: INJECT 10K BASES",
-                    style = Typography.labelSmall,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
+                buttonType = PoxButtonType.YELLOW_WARNING,
+                buttonSize = PoxButtonSize.STANDARD,
+                sound = PoxButtonSound.BEEP_DEFAULT,
+                viewModel = viewModel
+            )
+        }
+    }
+}
+
+@Composable
+fun VerticalSpinnableDial(
+    selectedIndex: Int,
+    onIndexChange: (Int) -> Unit,
+    activeColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val channels = listOf("A", "G", "T", "C")
+    var dragAccumulator by remember { mutableStateOf(0f) }
+    var hasCycledInThisGesture by remember { mutableStateOf(false) }
+    val currentSelectedIndex by rememberUpdatedState(selectedIndex)
+    val currentOnIndexChange by rememberUpdatedState(onIndexChange)
+
+    Box(
+        modifier = modifier
+            .width(50.dp)
+            .height(80.dp)
+            .cyberglass(borderColor = activeColor, backgroundColor = Color.Black.copy(alpha = 0.5f))
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = {
+                        dragAccumulator = 0f
+                        hasCycledInThisGesture = false
+                    },
+                    onDragEnd = {
+                        dragAccumulator = 0f
+                        hasCycledInThisGesture = false
+                    },
+                    onDragCancel = {
+                        dragAccumulator = 0f
+                        hasCycledInThisGesture = false
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        if (!hasCycledInThisGesture) {
+                            dragAccumulator += dragAmount.y
+                            if (dragAccumulator > 40f) {
+                                val newIndex = (currentSelectedIndex - 1 + 4) % 4
+                                currentOnIndexChange(newIndex)
+                                hasCycledInThisGesture = true
+                                dragAccumulator = 0f
+                            } else if (dragAccumulator < -40f) {
+                                val newIndex = (currentSelectedIndex + 1) % 4
+                                currentOnIndexChange(newIndex)
+                                hasCycledInThisGesture = true
+                                dragAccumulator = 0f
+                            }
+                        }
+                    }
                 )
-            }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            val prevIndex = (selectedIndex - 1 + 4) % 4
+            Text(
+                text = channels[prevIndex],
+                color = Color.White.copy(alpha = 0.3f),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = channels[selectedIndex],
+                color = activeColor,
+                fontSize = 20.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            val nextIndex = (selectedIndex + 1) % 4
+            Text(
+                text = channels[nextIndex],
+                color = Color.White.copy(alpha = 0.3f),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -1221,6 +1346,8 @@ fun ReactorParametersView(
     val inletRatioGState by viewModel.inletRatioG.collectAsState()
     val inletRatioTState by viewModel.inletRatioT.collectAsState()
     val inletRatioCState by viewModel.inletRatioC.collectAsState()
+
+    var activeDialIndex by remember { mutableStateOf(0) } // 0=A, 1=G, 2=T, 3=C
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         // 1. RAW NUCLEOTIDE STOCKPILE FEEDSTOCK
@@ -1304,16 +1431,12 @@ fun ReactorParametersView(
                             fontSize = 10.sp
                         )
                     }
-                    Slider(
+                    PoxSlider(
                         value = tempState,
                         onValueChange = { viewModel.setReactorTemperature(it) },
-                        valueRange = 15f..95f,
-                        colors = SliderDefaults.colors(
-                            thumbColor = CyberGreen,
-                            activeTrackColor = CyberGreen,
-                            inactiveTrackColor = CyberBorder.copy(alpha = 0.3f)
-                        ),
-                        modifier = Modifier.height(24.dp)
+                        valueRange = 15f..50f,
+                        activeColor = CyberGreen,
+                        inactiveColor = CyberBorder
                     )
                 }
 
@@ -1339,117 +1462,83 @@ fun ReactorParametersView(
                             fontSize = 10.sp
                         )
                     }
-                    Slider(
+                    PoxSlider(
                         value = saltState,
                         onValueChange = { viewModel.setReactorSalt(it) },
-                        valueRange = 0.01f..0.50f,
-                        colors = SliderDefaults.colors(
-                            thumbColor = CyberGreen,
-                            activeTrackColor = CyberGreen,
-                            inactiveTrackColor = CyberBorder.copy(alpha = 0.3f)
-                        ),
-                        modifier = Modifier.height(24.dp)
+                        valueRange = 0.01f..0.15f,
+                        activeColor = CyberGreen,
+                        inactiveColor = CyberBorder
                     )
                 }
             }
         }
 
-        // 3. POLYMERASE & SOLUTE COFACTOR SELECTIONS
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Polymerase
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "POLYMERASE ENZYME",
-                    color = CyberGreenDim,
-                    style = Typography.labelSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
-                        .padding(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    val polymerases = listOf("Taq", "Pfu", "Tth")
-                    polymerases.forEach { poly ->
-                        val isSelected = activePolyState.equals(poly, ignoreCase = true)
-                        Button(
-                            onClick = { viewModel.setActivePolymerase(poly) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(26.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isSelected) CyberGreen.copy(alpha = 0.2f) else Color.Transparent,
-                                contentColor = if (isSelected) CyberGreen else Color.Gray
-                            ),
-                            border = BorderStroke(1.dp, if (isSelected) CyberGreen else CyberBorder.copy(alpha = 0.2f)),
-                            shape = RoundedCornerShape(2.dp),
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            val btnText = when (poly.uppercase()) {
-                                "TAQ" -> "TAQ (FREE)"
-                                "TTH" -> "TTH (25/ALL + 50w)"
-                                "PFU" -> "PFU (50/ALL + 150w)"
-                                else -> poly.uppercase()
-                            }
-                            Text(
-                                text = btnText,
-                                style = Typography.labelSmall,
-                                fontSize = 7.5.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+        // 3. POLYMERASE ENZYME SELECTOR
+        Column {
+            Text(
+                text = "POLYMERASE ENZYME",
+                color = CyberGreenDim,
+                style = Typography.labelSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val polymerases = listOf("Taq", "Tth", "Pfu")
+                polymerases.forEach { poly ->
+                    val isSelected = activePolyState.equals(poly, ignoreCase = true)
+                    val btnText = when (poly.uppercase()) {
+                        "TAQ" -> "TAQ (FREE)"
+                        "TTH" -> "TTH (25/ALL + 50w)"
+                        "PFU" -> "PFU (50/ALL + 150w)"
+                        else -> poly.uppercase()
                     }
+                    PoxButton(
+                        modifier = Modifier.weight(1f),
+                        text = btnText,
+                        onClick = { viewModel.setActivePolymerase(poly) },
+                        buttonType = if (isSelected) PoxButtonType.GREEN_PHOSPHOR else PoxButtonType.GREEN_MUTED,
+                        buttonSize = PoxButtonSize.COMPACT,
+                        sound = PoxButtonSound.COMBINATOR_TICK,
+                        viewModel = viewModel
+                    )
                 }
             }
+        }
 
-            // Chemical Solute
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "CHEMICAL SOLUTE COFACTOR",
-                    color = CyberGreenDim,
-                    style = Typography.labelSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
-                        .padding(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    val solutes = listOf("None", "DMSO", "Netropsin")
-                    solutes.forEach { solute ->
-                        val isSelected = activeSoluteState.equals(solute, ignoreCase = true)
-                        Button(
-                            onClick = { viewModel.setActiveChemicalSolute(solute) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(26.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isSelected) CyberGreen.copy(alpha = 0.2f) else Color.Transparent,
-                                contentColor = if (isSelected) CyberGreen else Color.Gray
-                            ),
-                            border = BorderStroke(1.dp, if (isSelected) CyberGreen else CyberBorder.copy(alpha = 0.2f)),
-                            shape = RoundedCornerShape(2.dp),
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            Text(
-                                text = solute.uppercase(),
-                                style = Typography.labelSmall,
-                                fontSize = 8.5.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+        // 4. CHEMICAL SOLUTE COFACTOR SELECTOR
+        Column {
+            Text(
+                text = "CHEMICAL SOLUTE COFACTOR",
+                color = CyberGreenDim,
+                style = Typography.labelSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val solutes = listOf("None", "DMSO", "Netropsin")
+                solutes.forEach { solute ->
+                    val isSelected = activeSoluteState.equals(solute, ignoreCase = true)
+                    PoxButton(
+                        modifier = Modifier.weight(1f),
+                        text = solute.uppercase(),
+                        onClick = { viewModel.setActiveChemicalSolute(solute) },
+                        buttonType = if (isSelected) PoxButtonType.GREEN_PHOSPHOR else PoxButtonType.GREEN_MUTED,
+                        buttonSize = PoxButtonSize.COMPACT,
+                        sound = PoxButtonSound.COMBINATOR_TICK,
+                        viewModel = viewModel
+                    )
                 }
             }
         }
@@ -1469,51 +1558,93 @@ fun ReactorParametersView(
                 .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
                 .padding(8.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                val channels = listOf(
-                    Triple("INLET A", inletRatioAState, { v: Float -> viewModel.setInletRatioA(v) }),
-                    Triple("INLET G", inletRatioGState, { v: Float -> viewModel.setInletRatioG(v) }),
-                    Triple("INLET T", inletRatioTState, { v: Float -> viewModel.setInletRatioT(v) }),
-                    Triple("INLET C", inletRatioCState, { v: Float -> viewModel.setInletRatioC(v) })
+            val activeBaseColor = remember(activeDialIndex) {
+                when (activeDialIndex) {
+                    0 -> Color(0xFF38BDF8) // A: Cyan
+                    1 -> Color(0xFF34D399) // G: Green
+                    2 -> Color(0xFFFB7185) // T: Rose
+                    else -> Color(0xFFFBBF24) // C: Yellow
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Dial selector on the left
+                VerticalSpinnableDial(
+                    selectedIndex = activeDialIndex,
+                    onIndexChange = {
+                        activeDialIndex = it
+                    },
+                    activeColor = activeBaseColor,
+                    modifier = Modifier.align(Alignment.CenterVertically)
                 )
-                channels.forEach { (label, value, onSet) ->
+
+                // Dynamic slider controls on the right
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    val label = when (activeDialIndex) {
+                        0 -> "INLET A"
+                        1 -> "INLET G"
+                        2 -> "INLET T"
+                        else -> "INLET C"
+                    }
+                    val value = when (activeDialIndex) {
+                        0 -> inletRatioAState
+                        1 -> inletRatioGState
+                        2 -> inletRatioTState
+                        else -> inletRatioCState
+                    }
+                    val onValueChange: (Float) -> Unit = { v ->
+                        when (activeDialIndex) {
+                            0 -> viewModel.setInletRatioA(v)
+                            1 -> viewModel.setInletRatioG(v)
+                            2 -> viewModel.setInletRatioT(v)
+                            else -> viewModel.setInletRatioC(v)
+                        }
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = label,
+                            text = "$label RATIO BIAS",
                             color = Color.White,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 8.sp,
-                            modifier = Modifier.width(60.dp)
-                        )
-                        Slider(
-                            value = value,
-                            onValueChange = onSet,
-                            valueRange = 0.05f..0.90f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = CyberGreen,
-                                activeTrackColor = CyberGreen,
-                                inactiveTrackColor = CyberBorder.copy(alpha = 0.3f)
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(20.dp)
+                            fontSize = 8.5.sp
                         )
                         Text(
                             text = String.format(Locale.US, "%.2f", value),
-                            color = CyberGreen,
+                            color = activeBaseColor,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 8.5.sp,
-                            modifier = Modifier
-                                .width(30.dp)
-                                .padding(start = 4.dp),
-                            textAlign = TextAlign.End
+                            fontSize = 9.sp
                         )
                     }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    PoxSlider(
+                        value = value,
+                        onValueChange = onValueChange,
+                        valueRange = 0.05f..0.90f,
+                        activeColor = activeBaseColor,
+                        inactiveColor = activeBaseColor,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "SWIPE DIAL VERTICALLY TO CYCLE CHANNELS",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 7.sp,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Normal
+                    )
                 }
             }
         }

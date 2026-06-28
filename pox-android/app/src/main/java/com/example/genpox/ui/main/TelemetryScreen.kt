@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.genpox.data.WaveMath
 import com.example.genpox.theme.*
+import com.example.genpox.ui.components.*
 import kotlinx.coroutines.delay
 import kotlin.math.*
 import androidx.compose.animation.core.*
@@ -521,16 +522,12 @@ fun LunarCycleSimulator() {
                 fontFamily = FontFamily.Monospace
             )
         }
-        Slider(
+        PoxSlider(
             value = moonAge,
             onValueChange = { moonAge = it },
             valueRange = 0f..29.53f,
-            colors = SliderDefaults.colors(
-                thumbColor = CyberGreen,
-                activeTrackColor = CyberGreenDim,
-                inactiveTrackColor = Color.DarkGray
-            ),
-            modifier = Modifier.height(20.dp)
+            activeColor = CyberGreen,
+            inactiveColor = Color.DarkGray
         )
 
         // Moon Phase shadow drawing
@@ -930,16 +927,12 @@ fun LogarithmicSuccessGraph() {
                 fontFamily = FontFamily.Monospace
             )
         }
-        Slider(
+        PoxSlider(
             value = totalGenes,
             onValueChange = { totalGenes = it },
             valueRange = 10000f..250000f,
-            colors = SliderDefaults.colors(
-                thumbColor = CyberGreen,
-                activeTrackColor = CyberGreenDim,
-                inactiveTrackColor = Color.DarkGray
-            ),
-            modifier = Modifier.height(20.dp)
+            activeColor = CyberGreen,
+            inactiveColor = Color.DarkGray
         )
 
         Row(
@@ -955,16 +948,12 @@ fun LogarithmicSuccessGraph() {
                 fontFamily = FontFamily.Monospace
             )
         }
-        Slider(
+        PoxSlider(
             value = coupling,
             onValueChange = { coupling = it },
             valueRange = 60f..100f,
-            colors = SliderDefaults.colors(
-                thumbColor = CyberGreen,
-                activeTrackColor = CyberGreenDim,
-                inactiveTrackColor = Color.DarkGray
-            ),
-            modifier = Modifier.height(20.dp)
+            activeColor = CyberGreen,
+            inactiveColor = Color.DarkGray
         )
 
         Text(
@@ -1058,16 +1047,12 @@ fun DensityDragBarChart() {
                 fontFamily = FontFamily.Monospace
             )
         }
-        Slider(
+        PoxSlider(
             value = baseDensity,
             onValueChange = { baseDensity = it },
             valueRange = -0.33f..0.33f,
-            colors = SliderDefaults.colors(
-                thumbColor = CyberGreen,
-                activeTrackColor = CyberGreenDim,
-                inactiveTrackColor = Color.DarkGray
-            ),
-            modifier = Modifier.height(20.dp)
+            activeColor = CyberGreen,
+            inactiveColor = Color.DarkGray
         )
 
         Row(
@@ -1083,16 +1068,12 @@ fun DensityDragBarChart() {
                 fontFamily = FontFamily.Monospace
             )
         }
-        Slider(
+        PoxSlider(
             value = lunarShift,
             onValueChange = { lunarShift = it },
             valueRange = -0.06f..0.06f,
-            colors = SliderDefaults.colors(
-                thumbColor = CyberGreen,
-                activeTrackColor = CyberGreenDim,
-                inactiveTrackColor = Color.DarkGray
-            ),
-            modifier = Modifier.height(20.dp)
+            activeColor = CyberGreen,
+            inactiveColor = Color.DarkGray
         )
 
         Row(

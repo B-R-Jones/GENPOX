@@ -2,6 +2,8 @@ package com.example.genpox.ui.main
 
 import com.example.genpox.data.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,9 +55,12 @@ class ReactorSimulationTest {
             creaturesList.remove(creature)
         }
 
-        override val allGeneSequences: Flow<List<GeneSequence>> = flowOf(sequencesList)
+        val sequencesFlow = MutableStateFlow<List<GeneSequence>>(emptyList())
+        override val allGeneSequences: Flow<List<GeneSequence>> = sequencesFlow
+        
         override suspend fun insertGeneSequence(sequence: GeneSequence) {
             sequencesList.add(sequence)
+            sequencesFlow.value = sequencesList.toList()
         }
         override suspend fun insertGeneSequences(sequences: List<GeneSequence>) {
             sequences.forEach { seq ->
@@ -66,19 +71,23 @@ class ReactorSimulationTest {
                     sequencesList.add(seq)
                 }
             }
+            sequencesFlow.value = sequencesList.toList()
         }
         override suspend fun updateGeneSequence(sequence: GeneSequence) {
             val index = sequencesList.indexOfFirst { it.sequence == sequence.sequence }
             if (index != -1) sequencesList[index] = sequence
+            sequencesFlow.value = sequencesList.toList()
         }
         override suspend fun deleteGeneSequence(sequence: GeneSequence) {
             sequencesList.remove(sequence)
+            sequencesFlow.value = sequencesList.toList()
         }
         override suspend fun deleteAllCreatures() {
             creaturesList.clear()
         }
         override suspend fun deleteAllGeneSequences() {
             sequencesList.clear()
+            sequencesFlow.value = emptyList()
         }
         override suspend fun updateGeneStock(toInsertOrUpdate: List<GeneSequence>, toDelete: List<GeneSequence>) {
             toDelete.forEach { sequencesList.remove(it) }
@@ -90,6 +99,7 @@ class ReactorSimulationTest {
                     sequencesList.add(item)
                 }
             }
+            sequencesFlow.value = sequencesList.toList()
         }
 
         override val activeMissions: Flow<List<HarvestMission>> = flowOf(missionsList)
@@ -185,6 +195,9 @@ class ReactorSimulationTest {
         val targetFlow = targetField.get(viewModel) as MutableStateFlow<String>
         targetFlow.value = "AAAAAAAA"
 
+        // Set temperature to a safe range (below new denaturation threshold of 23.5°C)
+        viewModel.setReactorTemperature(16.0f)
+
         // Set inlets high to avoid collapse
         viewModel.setInletRatioA(0.90f)
         viewModel.setInletRatioT(0.05f)
@@ -270,10 +283,10 @@ class ReactorSimulationTest {
         viewModel.setInletRatioG(0.05f)
         viewModel.setInletRatioC(0.05f)
 
-        // Step A: Low Salt (0.01M), High Temp (70°C). T_denature = 65 + 0.01 * 50 = 65.5°C.
-        // 70°C > 65.5°C -> Denaturation Collapse!
+        // Step A: Low Salt (0.01M), Temp (25°C). T_denature = 22 + 0.01 * 30 = 22.3°C.
+        // 25°C > 22.3°C -> Denaturation Collapse!
         viewModel.setReactorSalt(0.01f)
-        viewModel.setReactorTemperature(70.0f)
+        viewModel.setReactorTemperature(25.0f)
         viewModel.setActiveChemicalSolute("None")
 
         viewModel.initiateStandardSynthesis()
@@ -281,10 +294,10 @@ class ReactorSimulationTest {
         assertTrue("Reaction should have collapsed at low salt", viewModel.isReactionCollapsed.value)
         assertFalse("Synthesis should be finished", viewModel.isSynthesisActive.value)
 
-        // Step B: High Salt (0.30M), High Temp (70°C). T_denature = 65 + 0.3 * 50 = 80°C.
-        // 70°C < 80°C -> Protected!
-        viewModel.setReactorSalt(0.30f)
-        viewModel.setReactorTemperature(70.0f)
+        // Step B: High Salt (0.15M), Temp (25°C). T_denature = 22 + 0.15 * 30 = 26.5°C.
+        // 25°C < 26.5°C -> Protected!
+        viewModel.setReactorSalt(0.15f)
+        viewModel.setReactorTemperature(25.0f)
 
         viewModel.initiateStandardSynthesis()
         advanceUntilIdle()
@@ -313,8 +326,8 @@ class ReactorSimulationTest {
         viewModel.setInletRatioA(0.05f)
         viewModel.setInletRatioT(0.05f)
 
-        // Step A: Low Salt (0.05M), Temp (35°C). T_stall = 20 + 0.05 * 40 = 22.0°C.
-        // 35°C > 22°C -> Safe from stalling!
+        // Step A: Low Salt (0.05M), Temp (35°C). T_stall = 28 + 0.05 * 30 = 29.5°C.
+        // 35°C > 29.5°C -> Safe from stalling!
         viewModel.setReactorSalt(0.05f)
         viewModel.setReactorTemperature(35.0f)
         viewModel.setActiveChemicalSolute("None")
@@ -323,10 +336,10 @@ class ReactorSimulationTest {
         advanceUntilIdle()
         assertFalse("Reaction should succeed at low salt stalling check", viewModel.isReactionCollapsed.value)
 
-        // Step B: High Salt (0.45M), Temp (35°C). T_stall = 20 + 0.45 * 40 = 38.0°C.
-        // 35°C < 38°C -> Stalling Collapse!
-        viewModel.setReactorSalt(0.45f)
-        viewModel.setReactorTemperature(35.0f)
+        // Step B: High Salt (0.15M), Temp (30°C). T_stall = 28 + 0.15 * 30 = 32.5°C.
+        // 30°C < 32.5°C -> Stalling Collapse!
+        viewModel.setReactorSalt(0.15f)
+        viewModel.setReactorTemperature(30.0f)
 
         viewModel.initiateStandardSynthesis()
         advanceUntilIdle()
@@ -406,5 +419,100 @@ class ReactorSimulationTest {
         val lastCompiled = repository.sequencesList.lastOrNull()
         assertTrue("Compiled sequence must be present", lastCompiled != null)
         assertEquals("AAAAAAAA", lastCompiled?.sequence)
+    }
+
+    @Test
+    fun testInletBlockPrevention() = runTest {
+        // Setup target sequence requiring 'A'
+        val targetField = viewModel.javaClass.getDeclaredField("_targetSynthesisSequence")
+        targetField.isAccessible = true
+        val targetFlow = targetField.get(viewModel) as MutableStateFlow<String>
+        targetFlow.value = "AAAAAAAA"
+
+        // Set Inlet A to 0.05f (absolute minimum / restricted)
+        viewModel.setInletRatioA(0.05f)
+
+        // Give plenty of stock
+        repository.saveRawStocks(1000L, 1000L, 1000L, 1000L)
+        val initialA = viewModel.rawStockA.value
+
+        // Try to initiate
+        viewModel.initiateStandardSynthesis()
+        advanceUntilIdle()
+
+        // Verify synthesis is blocked (not active, no stocks deducted)
+        assertFalse(viewModel.isSynthesisActive.value)
+        assertEquals(initialA, viewModel.rawStockA.value)
+    }
+
+    @Test
+    fun testProratedBioWasteRecovery() = runTest {
+        // Target: AAAAAAAT (High AT)
+        val targetField = viewModel.javaClass.getDeclaredField("_targetSynthesisSequence")
+        targetField.isAccessible = true
+        val targetFlow = targetField.get(viewModel) as MutableStateFlow<String>
+        targetFlow.value = "AAAAAAAT"
+
+        // Set inlets > 5% to pass pre-flight block checks
+        viewModel.setInletRatioA(0.80f)
+        viewModel.setInletRatioT(0.08f)
+        viewModel.setInletRatioG(0.06f)
+        viewModel.setInletRatioC(0.06f)
+
+        // Give plenty of stock, zero out waste initial
+        repository.saveRawStocks(1000L, 1000L, 1000L, 1000L)
+        val bioWasteField = viewModel.javaClass.getDeclaredField("_bioWaste")
+        bioWasteField.isAccessible = true
+        val bioWasteFlow = bioWasteField.get(viewModel) as MutableStateFlow<Long>
+        bioWasteFlow.value = 0L
+
+        // Trigger denaturation collapse at step 4: Low Salt (0.01M), Temp (25°C). T_denature = 22.3°C.
+        viewModel.setReactorSalt(0.01f)
+        viewModel.setReactorTemperature(25.0f)
+        viewModel.setActiveChemicalSolute("None")
+
+        viewModel.initiateStandardSynthesis()
+        advanceUntilIdle()
+
+        // Verify reaction collapsed and returned exactly 4 bio-waste (collapses at step 4)
+        assertTrue(viewModel.isReactionCollapsed.value)
+        assertEquals(4L, viewModel.bioWaste.value)
+    }
+
+    @Test
+    fun testBulkRecycleMatchingGenes() = runTest {
+        // Start collection to trigger Lazily started StateFlow
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.geneSequences.collect {}
+        }
+
+        // Setup initial vault sequences
+        val g1 = GeneSequence(sequence = "AAAAATAT", count = 2, discoveredAt = System.currentTimeMillis(), averageQScore = 30.0)
+        val g2 = GeneSequence(sequence = "AAAAGCGC", count = 3, discoveredAt = System.currentTimeMillis(), averageQScore = 32.0)
+        val g3 = GeneSequence(sequence = "GCGCGCGC", count = 1, discoveredAt = System.currentTimeMillis(), averageQScore = 35.0)
+        repository.insertGeneSequence(g1)
+        repository.insertGeneSequence(g2)
+        repository.insertGeneSequence(g3)
+        advanceUntilIdle()
+
+        // Zero out initial waste
+        val bioWasteField = viewModel.javaClass.getDeclaredField("_bioWaste")
+        bioWasteField.isAccessible = true
+        val bioWasteFlow = bioWasteField.get(viewModel) as MutableStateFlow<Long>
+        bioWasteFlow.value = 0L
+
+        // Trigger bulk recycle for prefix "AAAA"
+        viewModel.recycleMatchingGenes("AAAA")
+        advanceUntilIdle()
+
+        // Verify matches are deleted, non-matches remain
+        val allSequences = repository.sequencesList
+        org.junit.Assert.assertNull(allSequences.find { it.sequence == "AAAAATAT" })
+        org.junit.Assert.assertNull(allSequences.find { it.sequence == "AAAAGCGC" })
+        org.junit.Assert.assertNotNull(allSequences.find { it.sequence == "GCGCGCGC" })
+
+        // Verify Bio-Waste yield: (2 + 3) * 8 = 40L
+        assertEquals(40L, viewModel.bioWaste.value)
+        job.cancel()
     }
 }

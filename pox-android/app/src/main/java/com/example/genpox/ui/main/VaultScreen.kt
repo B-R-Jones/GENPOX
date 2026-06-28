@@ -111,9 +111,7 @@ fun VaultView(viewModel: MainViewModel) {
     var libFilterType by remember { mutableStateOf("ALL") }
     var libFilterTag by remember { mutableStateOf("ALL") }
 
-    var vaultTab by remember(creatures) {
-        mutableStateOf(if (creatures.isEmpty()) "search" else "creatures")
-    }
+    val vaultTab by viewModel.vaultSubTab.collectAsState()
     var geneToDeconstruct by remember { mutableStateOf<GeneSequence?>(null) }
     var stepSearchSelectedGene by remember { mutableStateOf<String?>(null) }
 
@@ -193,7 +191,7 @@ fun VaultView(viewModel: MainViewModel) {
                 if (activeCreature != null) {
                     viewModel.setActiveCreature(null)
                 }
-                vaultTab = id
+                viewModel.setVaultSubTab(id)
             },
             viewModel = viewModel
         ) {
@@ -541,7 +539,7 @@ fun VaultView(viewModel: MainViewModel) {
                                     isAnomaly = false,
                                     onSelectGene = { stepSearchSelectedGene = it },
                                     onClose = {
-                                        vaultTab = "creatures"
+                                        viewModel.setVaultSubTab("creatures")
                                     },
                                     modifier = Modifier.fillMaxSize(),
                                     onDeconstructGene = { gene ->
@@ -561,63 +559,33 @@ fun VaultView(viewModel: MainViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Button(
+                            PoxButton(
+                                modifier = Modifier.weight(1f),
+                                text = "CLEAR STOCK",
                                 onClick = { viewModel.clearDevBases() },
-                                modifier = Modifier.weight(1f).height(32.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0x30EF4444),
-                                    contentColor = Color(0xFFEF4444)
-                                ),
-                                border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                                shape = RoundedCornerShape(2.dp),
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Text(
-                                    text = "CLEAR STOCK",
-                                    style = Typography.labelSmall,
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Button(
+                                buttonType = PoxButtonType.RED_MUTED,
+                                buttonSize = PoxButtonSize.COMPACT,
+                                sound = PoxButtonSound.COMBINATOR_TICK,
+                                viewModel = viewModel
+                            )
+                            PoxButton(
+                                modifier = Modifier.weight(1f),
+                                text = "CLEAR GENES",
                                 onClick = { viewModel.clearDevGenes() },
-                                modifier = Modifier.weight(1f).height(32.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0x30EF4444),
-                                    contentColor = Color(0xFFEF4444)
-                                ),
-                                border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                                shape = RoundedCornerShape(2.dp),
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Text(
-                                    text = "CLEAR GENES",
-                                    style = Typography.labelSmall,
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Button(
+                                buttonType = PoxButtonType.RED_MUTED,
+                                buttonSize = PoxButtonSize.COMPACT,
+                                sound = PoxButtonSound.COMBINATOR_TICK,
+                                viewModel = viewModel
+                            )
+                            PoxButton(
+                                modifier = Modifier.weight(1f),
+                                text = "CLEAR CREATURES",
                                 onClick = { viewModel.clearDevCreatures() },
-                                modifier = Modifier.weight(1f).height(32.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0x30EF4444),
-                                    contentColor = Color(0xFFEF4444)
-                                ),
-                                border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                                shape = RoundedCornerShape(2.dp),
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Text(
-                                    text = "CLEAR CREATURES",
-                                    style = Typography.labelSmall,
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                                buttonType = PoxButtonType.RED_MUTED,
+                                buttonSize = PoxButtonSize.COMPACT,
+                                sound = PoxButtonSound.COMBINATOR_TICK,
+                                viewModel = viewModel
+                            )
                         }
                     }
                 }
@@ -1130,26 +1098,20 @@ fun CreatureDetailCard(
                             fontFamily = FontFamily.Default
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        Button(
+                        PoxButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = "DISPATCH SEQUENCE TO ANOMALY",
                             onClick = {
                                 viewModel.dispatchMission(c, lockedAnom)
                                 viewModel.setSelectedAnomalyId(null)
                                 viewModel.setActiveCreature(null)
                                 viewModel.selectTab("scanner")
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(38.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA855F7), contentColor = Color.Black),
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                text = "DISPATCH SEQUENCE TO ANOMALY",
-                                style = Typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
+                            buttonType = PoxButtonType.PURPLE_ANOMALY,
+                            buttonSize = PoxButtonSize.LARGE,
+                            sound = PoxButtonSound.BEEP_HIGH,
+                            viewModel = viewModel
+                        )
                     } else {
                         Text(
                             text = "NO ANOMALY TARGET LOCKED. SCAN FOR ANOMALIES FIRST.",

@@ -113,6 +113,11 @@ fun StepSearchView(
     var stepSearchPrefix by remember { mutableStateOf("") }
     var viewStepSearchMatchesOnly by remember { mutableStateOf(false) }
 
+    val matches = remember(geneSequences, stepSearchPrefix) {
+        geneSequences.filter { it.sequence.startsWith(stepSearchPrefix, ignoreCase = true) }
+    }
+    val matchCount = remember(matches) { matches.sumOf { it.count } }
+
     val stepSize = if (isAnomaly) 1 else 2
     val maxSteps = if (isAnomaly) 8 else 4
     val activeStep = stepSearchPrefix.length / stepSize
@@ -130,39 +135,14 @@ fun StepSearchView(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "MOLECULAR STEP-SEARCH DIRECTORY",
-                color = activeColorDim,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Default
-            )
-            Box(
-                modifier = Modifier
-                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
-                    .clickable {
-                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                        stepSearchPrefix = ""
-                        viewStepSearchMatchesOnly = false
-                        onClose()
-                    }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "✕ CLOSE",
-                    color = Color.Red,
-                    fontSize = 8.sp,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
+        Text(
+            text = "MOLECULAR STEP-SEARCH DIRECTORY",
+            color = activeColorDim,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Default,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         // Registry Counts Section
         Row(
@@ -238,6 +218,26 @@ fun StepSearchView(
             stepLabels.forEachIndexed { idx, stepLabel ->
                 val isCompleted = activeStep > idx
                 val isActive = activeStep == idx
+                val isPrefixFilled = if (isAnomaly) {
+                    stepSearchPrefix.length > idx
+                } else {
+                    stepSearchPrefix.length >= (idx + 1) * 2
+                }
+                
+                val displayText = if (isAnomaly) {
+                    if (stepSearchPrefix.length > idx) {
+                        stepSearchPrefix[idx].toString()
+                    } else {
+                        stepLabel
+                    }
+                } else {
+                    if (stepSearchPrefix.length >= (idx + 1) * 2) {
+                        stepSearchPrefix.substring(idx * 2, (idx + 1) * 2)
+                    } else {
+                        stepLabel
+                    }
+                }
+                
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -245,16 +245,16 @@ fun StepSearchView(
                             borderColor = if (isActive) activeColor else if (isCompleted) activeColorDim.copy(alpha = 0.5f) else Color.DarkGray,
                             backgroundColor = if (isActive) activeColor.copy(alpha = 0.15f) else Color.Transparent
                         )
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 10.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = stepLabel,
+                        text = displayText,
                         style = Typography.labelSmall,
-                        fontFamily = FontFamily.Default,
-                        color = if (isActive || isCompleted) activeColor else Color.Gray,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = if (isAnomaly) 7.5.sp else 9.sp
+                        fontFamily = if (isPrefixFilled) FontFamily.Monospace else FontFamily.Default,
+                        color = if (isPrefixFilled) Color.White else if (isActive || isCompleted) activeColor else Color.Gray,
+                        fontWeight = if (isActive || isPrefixFilled) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = if (isAnomaly) 10.sp else 12.sp
                     )
                 }
             }
@@ -269,99 +269,58 @@ fun StepSearchView(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "PREFIX: ",
-                        style = Typography.labelSmall,
-                        fontFamily = FontFamily.Default,
-                        color = activeColorDim
-                    )
-                    if (isAnomaly) {
-                        for (i in 0 until 8) {
-                            val charStr = if (stepSearchPrefix.length > i) {
-                                stepSearchPrefix[i].toString()
-                            } else {
-                                "•"
-                            }
-                            val isCurrent = activeStep == i
-                            Text(
-                                text = charStr,
-                                style = Typography.bodyMedium,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isCurrent) Color.White else if (charStr != "•") activeColor else Color.DarkGray
-                            )
-                        }
-                    } else {
-                        for (i in 0 until 4) {
-                            val block = if (stepSearchPrefix.length >= (i + 1) * 2) {
-                                stepSearchPrefix.substring(i * 2, (i + 1) * 2)
-                            } else {
-                                "••"
-                            }
-                            val isCurrent = activeStep == i
-                            Text(
-                                text = block,
-                                style = Typography.bodyMedium,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isCurrent) Color.White else if (block != "••") activeColor else Color.DarkGray
-                            )
-                        }
-                    }
-                }
+                // Button 1: UNDO
+                val undoEnabled = activeStep > 0
+                PoxButton(
+                    modifier = Modifier.weight(1f),
+                    text = "↶ UNDO",
+                    onClick = {
+                        stepSearchPrefix = stepSearchPrefix.dropLast(stepSize)
+                        viewStepSearchMatchesOnly = false
+                    },
+                    enabled = undoEnabled,
+                    buttonType = PoxButtonType.YELLOW_WARNING,
+                    buttonSize = PoxButtonSize.STANDARD,
+                    sound = PoxButtonSound.COMBINATOR_TICK,
+                    viewModel = viewModel
+                )
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (activeStep > 0) {
-                        Box(
-                            modifier = Modifier
-                                .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
-                                .clickable {
-                                    stepSearchPrefix = stepSearchPrefix.dropLast(stepSize)
-                                    viewStepSearchMatchesOnly = false
-                                    viewModel.synthManager.playCombinatorTick()
-                                }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "↶ UNDO",
-                                color = Color.Yellow,
-                                fontSize = 8.sp,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
-                            .clickable {
-                                stepSearchPrefix = ""
-                                viewStepSearchMatchesOnly = false
-                                viewModel.synthManager.playReject()
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "✕ RESET",
-                            color = Color.Yellow,
-                            fontSize = 8.sp,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
+                // Button 2: RESET
+                val resetEnabled = stepSearchPrefix.isNotEmpty()
+                PoxButton(
+                    modifier = Modifier.weight(1f),
+                    text = "✕ RESET",
+                    onClick = {
+                        stepSearchPrefix = ""
+                        viewStepSearchMatchesOnly = false
+                    },
+                    enabled = resetEnabled,
+                    buttonType = PoxButtonType.YELLOW_WARNING,
+                    buttonSize = PoxButtonSize.STANDARD,
+                    sound = PoxButtonSound.REJECT_BEEP,
+                    viewModel = viewModel
+                )
+
+                // Button 3: RECYCLE
+                val recycleEnabled = stepSearchPrefix.isNotEmpty() && matchCount > 0
+                val wasteYield = matchCount * 8
+                PoxButton(
+                    modifier = Modifier.weight(1f),
+                    text = "♺ RECYCLE (+$wasteYield W)",
+                    onClick = {
+                        viewModel.recycleMatchingGenes(stepSearchPrefix)
+                        stepSearchPrefix = ""
+                        viewStepSearchMatchesOnly = false
+                    },
+                    enabled = recycleEnabled,
+                    buttonType = PoxButtonType.PURPLE_ANOMALY,
+                    buttonSize = PoxButtonSize.STANDARD,
+                    sound = PoxButtonSound.BEEP_DEFAULT,
+                    viewModel = viewModel
+                )
             }
         }
 

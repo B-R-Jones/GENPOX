@@ -92,9 +92,167 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.Immutable
 
 
+@Stable
+class ScannerRadarState(
+    sliderValue: Float = 2.0f,
+    zoomExpanded: Boolean = false,
+    rotationValue: Float = 0f,
+    rotationExpanded: Boolean = false
+) {
+    var sliderValue by mutableStateOf(sliderValue)
+    var zoomExpanded by mutableStateOf(zoomExpanded)
+    var rotationValue by mutableStateOf(rotationValue)
+    var rotationExpanded by mutableStateOf(rotationExpanded)
+}
+
 @Composable
-fun ScannerView(viewModel: MainViewModel) {
+fun rememberScannerRadarState(
+    sliderValue: Float = 2.0f,
+    zoomExpanded: Boolean = false,
+    rotationValue: Float = 0f,
+    rotationExpanded: Boolean = false
+) = remember {
+    ScannerRadarState(sliderValue, zoomExpanded, rotationValue, rotationExpanded)
+}
+
+@Composable
+fun ScannerView(
+    viewModel: MainViewModel,
+    isFullscreen: Boolean = false,
+    contentOnly: Boolean = false,
+    controlsOnly: Boolean = false,
+    state: ScannerRadarState = rememberScannerRadarState(),
+    modifier: Modifier = Modifier
+) {
+    val selectedAnomalyId by viewModel.selectedAnomalyId.collectAsState()
+    val scannerSubTab by viewModel.scannerSubTab.collectAsState()
+
+    if (selectedAnomalyId == null && scannerSubTab == "radar") {
+        ScannerRadarView(
+            viewModel = viewModel,
+            isFullscreen = isFullscreen,
+            contentOnly = contentOnly,
+            controlsOnly = controlsOnly,
+            state = state,
+            modifier = modifier
+        )
+    } else {
+        ScannerNormalView(viewModel)
+    }
+}
+
+@Composable
+fun ScannerRadarView(
+    viewModel: MainViewModel,
+    isFullscreen: Boolean,
+    contentOnly: Boolean = false,
+    controlsOnly: Boolean = false,
+    state: ScannerRadarState = rememberScannerRadarState(),
+    modifier: Modifier = Modifier
+) {
     val anomalies by viewModel.anomalies.collectAsState()
+    val baseFonts by viewModel.baseFonts.collectAsState()
+    val lat by viewModel.latitude.collectAsState()
+    val lng by viewModel.longitude.collectAsState()
+    val roads by viewModel.roads.collectAsState()
+    val buildings by viewModel.buildings.collectAsState()
+    val selectedAnomalyId by viewModel.selectedAnomalyId.collectAsState()
+    val scannerSubTab by viewModel.scannerSubTab.collectAsState()
+    val activeMissionCoords by viewModel.activeMissionCoords.collectAsState()
+    val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
+
+    val activeMissions by viewModel.activeMissions.collectAsState()
+    val activeMissionsList = remember(activeMissions) { activeMissions.filter { !it.isReturned } }
+
+    val zoomSteps = listOf(4.0f, 2.0f, 1.0f, 0.5f, 0.25f)
+    val lowerIndex = state.sliderValue.toInt().coerceIn(0, 3)
+    val upperIndex = lowerIndex + 1
+    val fraction = state.sliderValue - lowerIndex
+    val zoomMultiplier = zoomSteps[lowerIndex] + fraction * (zoomSteps[upperIndex] - zoomSteps[lowerIndex])
+
+    LaunchedEffect(zoomMultiplier) {
+        viewModel.updateZoom(zoomMultiplier)
+    }
+
+    // Auto-collapse zoom and rotation expanded if sub-tab changes from radar
+    LaunchedEffect(scannerSubTab) {
+        if (scannerSubTab != "radar") {
+            state.zoomExpanded = false
+            state.rotationExpanded = false
+        }
+    }
+
+    val subTabs = remember(activeMissionsList) {
+        val list = mutableListOf(
+            PoxSubTab("radar", "RADAR") { iconColor ->
+                Canvas(modifier = Modifier.size(24.dp)) {
+                    val w = size.width
+                    val h = size.height
+                    val center = Offset(w / 2f, h / 2f)
+                    val strokeW = 1.5.dp.toPx()
+
+                    drawCircle(iconColor, radius = w * 0.38f, center = center, style = Stroke(width = strokeW))
+                    drawCircle(iconColor, radius = w * 0.08f, center = center)
+
+                    drawLine(iconColor, Offset(center.x - w * 0.45f, center.y), Offset(center.x - w * 0.18f, center.y), strokeWidth = strokeW)
+                    drawLine(iconColor, Offset(center.x + w * 0.18f, center.y), Offset(center.x + w * 0.45f, center.y), strokeWidth = strokeW)
+                    drawLine(iconColor, Offset(center.x, center.y - h * 0.45f), Offset(center.x, center.y - h * 0.18f), strokeWidth = strokeW)
+                    drawLine(iconColor, Offset(center.x, center.y + h * 0.18f), Offset(center.x, center.y + h * 0.45f), strokeWidth = strokeW)
+                }
+            },
+            PoxSubTab("list", "LIST") { iconColor ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                ) {
+                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
+                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
+                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
+                }
+            },
+            PoxSubTab("forecast", "FORECAST") { iconColor ->
+                WireframeCloudIcon(color = iconColor)
+            }
+        )
+        if (activeMissionsList.isNotEmpty()) {
+            list.add(
+                PoxSubTab("missions", "MISSIONS") { iconColor ->
+                    WireframePickaxeIcon(color = iconColor)
+                }
+            )
+        }
+        list
+    }
+
+    Box(
+        modifier = modifier.fillMaxSize()
+    ) {
+        if (!controlsOnly) {
+            HolographicRadarScanner(
+                viewModel = viewModel,
+                anomalies = anomalies,
+                baseFonts = baseFonts,
+                userLat = lat,
+                userLng = lng,
+                roads = roads,
+                buildings = buildings,
+                zoomMultiplier = zoomMultiplier,
+                rotationAngle = state.rotationValue,
+                selectedAnomalyId = selectedAnomalyId,
+                onSelectAnomaly = { id -> viewModel.setSelectedAnomalyId(id) },
+                zoomExpanded = state.zoomExpanded,
+                rotationExpanded = state.rotationExpanded,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+    }
+}
+
+@Composable
+fun ScannerNormalView(viewModel: MainViewModel) {
+    val anomalies by viewModel.anomalies.collectAsState()
+    val baseFonts by viewModel.baseFonts.collectAsState()
     val lat by viewModel.latitude.collectAsState()
     val lng by viewModel.longitude.collectAsState()
     val roads by viewModel.roads.collectAsState()
@@ -110,28 +268,6 @@ fun ScannerView(viewModel: MainViewModel) {
     val activeMissions by viewModel.activeMissions.collectAsState()
     val activeMissionsList = remember(activeMissions) { activeMissions.filter { !it.isReturned } }
 
-    var sliderValue by remember { mutableStateOf(2.0f) }
-    val zoomSteps = listOf(4.0f, 2.0f, 1.0f, 0.5f, 0.25f)
-    val lowerIndex = sliderValue.toInt().coerceIn(0, 3)
-    val upperIndex = lowerIndex + 1
-    val fraction = sliderValue - lowerIndex
-    val zoomMultiplier = zoomSteps[lowerIndex] + fraction * (zoomSteps[upperIndex] - zoomSteps[lowerIndex])
-
-    LaunchedEffect(zoomMultiplier) {
-        viewModel.updateZoom(zoomMultiplier)
-    }
-
-    var zoomExpanded by remember { mutableStateOf(false) }
-    var rotationValue by remember { mutableStateOf(0f) }
-    var rotationExpanded by remember { mutableStateOf(false) }
-
-    // Auto-collapse zoom and rotation expanded if sub-tab changes from radar
-    LaunchedEffect(scannerSubTab) {
-        if (scannerSubTab != "radar") {
-            zoomExpanded = false
-            rotationExpanded = false
-        }
-    }
 
     // Auto-redirect from missions tab if there are no active missions
     LaunchedEffect(activeMissionsList, scannerSubTab) {
@@ -199,6 +335,7 @@ fun ScannerView(viewModel: MainViewModel) {
         activeSubTab = scannerSubTab,
         onSubTabClick = { id, _ -> viewModel.setScannerSubTab(id) },
         viewModel = viewModel,
+        drawSubTabs = false,
         content = {
             Box(
                 modifier = Modifier
@@ -218,74 +355,6 @@ fun ScannerView(viewModel: MainViewModel) {
                     )
                 } else {
                     when (scannerSubTab) {
-                        "radar" -> {
-                            HolographicRadarScanner(
-                                viewModel = viewModel,
-                                anomalies = anomalies,
-                                userLat = lat,
-                                userLng = lng,
-                                roads = roads,
-                                buildings = buildings,
-                                zoomMultiplier = zoomMultiplier,
-                                rotationAngle = rotationValue,
-                                selectedAnomalyId = selectedAnomalyId,
-                                onSelectAnomaly = { id -> viewModel.setSelectedAnomalyId(id) },
-                                zoomExpanded = zoomExpanded,
-                                modifier = Modifier.fillMaxSize()
-                            )
-
-                            val zoomExpansionFraction by animateFloatAsState(
-                                targetValue = if (zoomExpanded) 1f else 0f,
-                                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
-                                label = "zoom_expansion"
-                            )
-                            val rotationExpansionFraction by animateFloatAsState(
-                                targetValue = if (rotationExpanded) 1f else 0f,
-                                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
-                                label = "rotation_expansion"
-                            )
-
-                            val animatedZoomEnd = (70f + 46f * rotationExpansionFraction - 49f * zoomExpansionFraction).dp
-                            val animatedZoomBottom = 70.dp
-
-                            val animatedRotEnd = (16f + 100f * zoomExpansionFraction).dp
-                            val animatedRotBottom = 70.dp
-
-                            ZoomScrollCircle(
-                                sliderValue = sliderValue,
-                                onValueChange = { sliderValue = it },
-                                zoomMultiplier = zoomMultiplier,
-                                zoomExpanded = zoomExpanded,
-                                onToggleExpand = {
-                                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                    zoomExpanded = !zoomExpanded
-                                    if (zoomExpanded) {
-                                        rotationExpanded = false
-                                    }
-                                },
-                                expansionFraction = zoomExpansionFraction,
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(bottom = animatedZoomBottom, end = animatedZoomEnd)
-                            )
-
-                            RotationScrollCircle(
-                                rotationAngle = rotationValue,
-                                onValueChange = { rotationValue = it },
-                                rotationExpanded = rotationExpanded,
-                                onToggleExpand = {
-                                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                    rotationExpanded = !rotationExpanded
-                                    if (rotationExpanded) {
-                                        zoomExpanded = false
-                                    }
-                                },
-                                expansionFraction = rotationExpansionFraction,
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(bottom = animatedRotBottom, end = animatedRotEnd)
-                            )
-                        }
                         "missions" -> {
                             Column(
                                 modifier = Modifier
@@ -605,6 +674,157 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGroupContoursClipped(
     }
 }
 
+class ProjectedFont(
+    val font: PoxBaseFont,
+    val fx: Float,
+    val fy: Float,
+    val maxRadiusPx: Float,
+    val peakHeightPx: Float,
+    val epsilon: Float,
+    val kLobe: Int,
+    val phiOffset: Double,
+    val baseColor: Color,
+    val flickerMultiplier: Float,
+    val animScale: Float
+)
+
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBaseFontRingClipped(
+    group: List<ProjectedFont>,
+    ringIndex: Int,
+    uRing: Float,
+    ringAlpha: Float,
+    phiOffset: Double,
+    rotRad: Double,
+    tiltYScale: Float,
+    sinTilt: Float,
+    baseColor: Color,
+    clipIdx: Int,
+    scale: Double
+) {
+    if (clipIdx >= group.size) {
+        val pFont = group[ringIndex]
+        val peakHeightPx = 120.dp.toPx() * pFont.animScale
+        val maxRadiusPx = ((pFont.font.maxRadiusFeet / 364000.0) * scale).toFloat() * pFont.animScale
+        val ringZ = uRing * peakHeightPx
+        val ringRadius = maxRadiusPx * kotlin.math.sqrt(1.0f - uRing * uRing)
+        if (ringRadius < 0.1f) return
+        
+        val ringPath = Path()
+        for (i in 0..36) {
+            val theta = (i * 2.0 * Math.PI) / 36.0
+            val rBase = ringRadius * (1.0f + pFont.epsilon * cos(pFont.kLobe * theta + pFont.phiOffset).toFloat())
+            val thetaRotated = theta - rotRad
+            val px = pFont.fx + rBase * cos(thetaRotated).toFloat()
+            val py = pFont.fy - rBase * sin(thetaRotated).toFloat() * tiltYScale - ringZ * sinTilt
+            if (i == 0) ringPath.moveTo(px, py) else ringPath.lineTo(px, py)
+        }
+        ringPath.close()
+        
+        drawPath(
+            path = ringPath,
+            color = baseColor.copy(alpha = ringAlpha),
+            style = Stroke(width = 0.8.dp.toPx())
+        )
+        return
+    }
+    
+    if (clipIdx == ringIndex) {
+        drawBaseFontRingClipped(
+            group, ringIndex, uRing, ringAlpha, phiOffset,
+            rotRad, tiltYScale, sinTilt, baseColor, clipIdx + 1, scale
+        )
+    } else {
+        val otherFont = group[clipIdx]
+        val peakHeightPx = 120.dp.toPx() * otherFont.animScale
+        val maxRadiusPx = ((otherFont.font.maxRadiusFeet / 364000.0) * scale).toFloat() * otherFont.animScale
+        val ringZ = uRing * peakHeightPx
+        val ringRadius = maxRadiusPx * kotlin.math.sqrt(1.0f - uRing * uRing)
+        
+        val otherRingPath = Path()
+        if (ringRadius >= 0.1f) {
+            for (i in 0..36) {
+                val theta = (i * 2.0 * Math.PI) / 36.0
+                val rBase = ringRadius * (1.0f + otherFont.epsilon * cos(otherFont.kLobe * theta + otherFont.phiOffset).toFloat())
+                val thetaRotated = theta - rotRad
+                val px = otherFont.fx + rBase * cos(thetaRotated).toFloat()
+                val py = otherFont.fy - rBase * sin(thetaRotated).toFloat() * tiltYScale - ringZ * sinTilt
+                if (i == 0) otherRingPath.moveTo(px, py) else otherRingPath.lineTo(px, py)
+            }
+            otherRingPath.close()
+        }
+        
+        clipPath(otherRingPath, clipOp = ClipOp.Difference) {
+            drawBaseFontRingClipped(
+                group, ringIndex, uRing, ringAlpha, phiOffset,
+                rotRad, tiltYScale, sinTilt, baseColor, clipIdx + 1, scale
+            )
+        }
+    }
+}
+
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBaseFontBoundaryClipped(
+    group: List<ProjectedFont>,
+    boundaryIndex: Int,
+    phiOffset: Double,
+    rotRad: Double,
+    tiltYScale: Float,
+    baseColor: Color,
+    clipIdx: Int,
+    scale: Double
+) {
+    if (clipIdx >= group.size) {
+        val pFont = group[boundaryIndex]
+        val maxRadiusPx = ((pFont.font.maxRadiusFeet / 364000.0) * scale).toFloat() * pFont.animScale
+        if (maxRadiusPx < 0.1f) return
+        
+        val boundaryPath = Path()
+        for (i in 0..36) {
+            val theta = (i * 2.0 * Math.PI) / 36.0
+            val rBase = maxRadiusPx * (1.0f + pFont.epsilon * cos(pFont.kLobe * theta + pFont.phiOffset).toFloat())
+            val thetaRotated = theta - rotRad
+            val px = pFont.fx + rBase * cos(thetaRotated).toFloat()
+            val py = pFont.fy - rBase * sin(thetaRotated).toFloat() * tiltYScale
+            if (i == 0) boundaryPath.moveTo(px, py) else boundaryPath.lineTo(px, py)
+        }
+        boundaryPath.close()
+        
+        drawPath(
+            path = boundaryPath,
+            color = baseColor.copy(alpha = 0.12f * pFont.flickerMultiplier),
+            style = Stroke(width = 0.8.dp.toPx())
+        )
+        return
+    }
+    
+    if (clipIdx == boundaryIndex) {
+        drawBaseFontBoundaryClipped(
+            group, boundaryIndex, phiOffset, rotRad, tiltYScale, baseColor, clipIdx + 1, scale
+        )
+    } else {
+        val otherFont = group[clipIdx]
+        val maxRadiusPx = ((otherFont.font.maxRadiusFeet / 364000.0) * scale).toFloat() * otherFont.animScale
+        val otherBoundaryPath = Path()
+        if (maxRadiusPx >= 0.1f) {
+            for (i in 0..36) {
+                val theta = (i * 2.0 * Math.PI) / 36.0
+                val rBase = maxRadiusPx * (1.0f + otherFont.epsilon * cos(otherFont.kLobe * theta + otherFont.phiOffset).toFloat())
+                val thetaRotated = theta - rotRad
+                val px = otherFont.fx + rBase * cos(thetaRotated).toFloat()
+                val py = otherFont.fy - rBase * sin(thetaRotated).toFloat() * tiltYScale
+                if (i == 0) otherBoundaryPath.moveTo(px, py) else otherBoundaryPath.lineTo(px, py)
+            }
+            otherBoundaryPath.close()
+        }
+        
+        clipPath(otherBoundaryPath, clipOp = ClipOp.Difference) {
+            drawBaseFontBoundaryClipped(
+                group, boundaryIndex, phiOffset, rotRad, tiltYScale, baseColor, clipIdx + 1, scale
+            )
+        }
+    }
+}
+
+
 @Immutable
 class StableRoads(val list: List<List<Pair<Double, Double>>>)
 
@@ -638,6 +858,23 @@ private fun StaticMapLayer(
     val staticBuildingPath = remember { Path() }
     val projectedXBuffer = remember { FloatArray(256) }
     val projectedYBuffer = remember { FloatArray(256) }
+
+    val dynamicallySortedBuildings = remember(sortedBuildings, cosRot, sinRot, scale, cosLat, localMapCenterLat, localMapCenterLng) {
+        sortedBuildings.list.sortedBy { building ->
+            val pt = building.points.firstOrNull()
+            if (pt != null) {
+                val dLat = pt.lat - localMapCenterLat
+                val dLng = (pt.lng - localMapCenterLng) * cosLat
+                val xUn = cxPx + (dLng * scale).toFloat()
+                val yUn = cyPx - (dLat * scale).toFloat()
+                val dx = xUn - cxPx
+                val dy = yUn - cyPx
+                cyPx + dx * sinRot + dy * cosRot
+            } else {
+                0f
+            }
+        }
+    }
 
     fun projectX(lat: Double, lng: Double): Float {
         val dLng = (lng - localMapCenterLng) * cosLat
@@ -721,7 +958,7 @@ private fun StaticMapLayer(
 
         // Draw Vector Buildings
         val zoomFade = (1.0f - ((mathZoom - 1.5f) / 2.0f)).coerceIn(0.0f, 1.0f)
-        val buildingList = sortedBuildings.list
+        val buildingList = dynamicallySortedBuildings
         val buildingsSize = buildingList.size
 
         for (bIdx in 0 until buildingsSize) {
@@ -940,6 +1177,7 @@ private fun StaticMapLayer(
 fun HolographicRadarScanner(
     viewModel: MainViewModel,
     anomalies: List<PoxAnomaly>,
+    baseFonts: List<PoxBaseFont>,
     userLat: Double,
     userLng: Double,
     roads: List<List<Pair<Double, Double>>>,
@@ -949,6 +1187,7 @@ fun HolographicRadarScanner(
     selectedAnomalyId: String?,
     onSelectAnomaly: (String) -> Unit,
     zoomExpanded: Boolean = false,
+    rotationExpanded: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val isProfilerEnabled by viewModel.isProfilerEnabled.collectAsState()
@@ -959,6 +1198,7 @@ fun HolographicRadarScanner(
     val mathZoom = zoomMultiplier * 0.625f
     val tiltProgress = ((0.35f - zoomMultiplier) / (0.35f - 0.26f)).coerceIn(0.0f, 1.0f)
     val tiltYScale = 1.0f - 0.90f * tiltProgress
+    val sinTilt = kotlin.math.sqrt(1.0f - tiltYScale * tiltYScale)
     val tiltZoomFactor = 1.0f + 2.0f * tiltProgress
     val rotRad = Math.toRadians(rotationAngle.toDouble())
     val cosRot = kotlin.math.cos(rotRad).toFloat()
@@ -1121,13 +1361,37 @@ fun HolographicRadarScanner(
         }
     }
 
+    val fontPaints = remember(density) {
+        val colors = mapOf(
+            'A' to Color(0xFF38BDF8).toArgb(),
+            'G' to Color(0xFF34D399).toArgb(),
+            'T' to Color(0xFFFB7185).toArgb(),
+            'C' to Color(0xFFFBBF24).toArgb()
+        )
+        colors.mapValues { (_, argb) ->
+            android.graphics.Paint().apply {
+                color = argb
+                textSize = textSizePx
+                typeface = android.graphics.Typeface.MONOSPACE
+                textAlign = android.graphics.Paint.Align.LEFT
+            }
+        }
+    }
+
+    val fontShadowPaint = remember(density) {
+        android.graphics.Paint().apply {
+            color = Color.Black.copy(alpha = 0.8f).toArgb()
+            textSize = textSizePx
+            typeface = android.graphics.Typeface.MONOSPACE
+            textAlign = android.graphics.Paint.Align.LEFT
+        }
+    }
+
     val timeState = remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(activeMissionsList.isNotEmpty()) {
-        if (activeMissionsList.isNotEmpty()) {
-            while (true) {
-                withFrameMillis {
-                    timeState.value = System.currentTimeMillis()
-                }
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameMillis {
+                timeState.value = System.currentTimeMillis()
             }
         }
     }
@@ -1321,9 +1585,9 @@ fun HolographicRadarScanner(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(anomalies, localMapCenterLat, localMapCenterLng, mathZoom, zoomExpanded, rotationAngle) {
+                .pointerInput(anomalies, localMapCenterLat, localMapCenterLng, mathZoom, zoomExpanded, rotationExpanded, rotationAngle) {
                     detectTapGestures { tapOffset ->
-                        if (zoomExpanded) return@detectTapGestures
+                        if (zoomExpanded || rotationExpanded) return@detectTapGestures
                         val minTapRadius = 24.dp.toPx()
                         val clickedAnomalies = mutableListOf<Pair<PoxAnomaly, Double>>()
 
@@ -2028,6 +2292,298 @@ fun HolographicRadarScanner(
                     }
                 }
 
+                // 6c. Render Base Fonts with Overlap Grouping & Clipping
+                val baseFontsVal = baseFonts
+                val baseFontsSize = baseFontsVal.size
+                
+                val projectedFonts = ArrayList<ProjectedFont>()
+                for (fIdx in 0 until baseFontsSize) {
+                    val font = baseFontsVal[fIdx]
+                    val fy = projectY(font.lat, font.lng)
+                    val fx = projectX(font.lat, font.lng) + getGlitchOffsetX(fy, timeMs)
+                    
+                    val baseColor = when (font.baseType) {
+                        'A' -> Color(0xFF38BDF8)
+                        'G' -> Color(0xFF34D399)
+                        'T' -> Color(0xFFFB7185)
+                        'C' -> Color(0xFFFBBF24)
+                        else -> Color.Cyan
+                    }
+                    
+                    val ageMs = timeMs - font.spawnTime
+                    val remainingMs = (font.durationMs - ageMs).coerceAtLeast(0L)
+                    val animScale = minOf((ageMs / 3000f).coerceIn(0f, 1f), (remainingMs / 3000f).coerceIn(0f, 1f))
+                    
+                    val fadeAlpha = if (ageMs < 1000L) {
+                        (ageMs / 1000f).coerceIn(0f, 1f)
+                    } else if (remainingMs < 1000L) {
+                        (remainingMs / 1000f).coerceIn(0f, 1f)
+                    } else {
+                        1.0f
+                    }
+                    val noiseSeed = font.id.hashCode() + (timeMs / 30)
+                    val noiseVal = (java.util.Random(noiseSeed).nextFloat() * 0.15f) - 0.075f
+                    val flickerMultiplier = (fadeAlpha + noiseVal).coerceIn(0f, 1f)
+                    
+                    val maxRadiusPx = ((font.maxRadiusFeet / 364000.0) * scale).toFloat() * animScale
+                    val peakHeightPx = 120.dp.toPx() * animScale
+                    
+                    val seed = font.id.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
+                    val epsilon = 0.15f + (seed % 3) * 0.05f
+                    val kLobe = 3 + (seed % 3)
+                    val phiOffset = (seed % 360) * (Math.PI / 180.0)
+                    
+                    projectedFonts.add(
+                        ProjectedFont(
+                            font = font,
+                            fx = fx,
+                            fy = fy,
+                            maxRadiusPx = maxRadiusPx,
+                            peakHeightPx = peakHeightPx,
+                            epsilon = epsilon,
+                            kLobe = kLobe,
+                            phiOffset = phiOffset,
+                            baseColor = baseColor,
+                            flickerMultiplier = flickerMultiplier,
+                            animScale = animScale
+                        )
+                    )
+                }
+                
+                // Group overlapping fonts
+                val fontVisited = BooleanArray(baseFontsSize)
+                val fontGroups = ArrayList<ArrayList<ProjectedFont>>()
+                for (i in 0 until baseFontsSize) {
+                    if (!fontVisited[i]) {
+                        val group = ArrayList<ProjectedFont>()
+                        val queue = ArrayList<Int>()
+                        queue.add(i)
+                        fontVisited[i] = true
+                        
+                        var qIdx = 0
+                        while (qIdx < queue.size) {
+                            val currIdx = queue[qIdx++]
+                            val currProj = projectedFonts[currIdx]
+                            group.add(currProj)
+                            
+                            for (j in 0 until baseFontsSize) {
+                                if (!fontVisited[j]) {
+                                    val otherProj = projectedFonts[j]
+                                    val dx = currProj.fx - otherProj.fx
+                                    val dy = currProj.fy - otherProj.fy
+                                    val dist = kotlin.math.sqrt(dx * dx + dy * dy)
+                                    if (dist < (currProj.maxRadiusPx + otherProj.maxRadiusPx)) {
+                                        fontVisited[j] = true
+                                        queue.add(j)
+                                    }
+                                }
+                            }
+                        }
+                        fontGroups.add(group)
+                    }
+                }
+
+                for (gIdx in 0 until fontGroups.size) {
+                    val group = fontGroups[gIdx]
+                    val groupSize = group.size
+                    if (groupSize == 0) continue
+                    
+                    // 1. Draw unified 3D Volumetric Heatmap Glow for the group
+                    val numGlowLayers = 8
+                    val peakHeightPx = group[0].peakHeightPx
+                    
+                    for (gl in 0..numGlowLayers) {
+                        val uGlow = gl.toFloat() / numGlowLayers
+                        val glowZ = uGlow * peakHeightPx
+                        
+                        val layerPath = Path()
+                        var layerHasActiveShapes = false
+                        for (i in 0 until groupSize) {
+                            val pFont = group[i]
+                            val glowRadius = pFont.maxRadiusPx * kotlin.math.sqrt(1.0f - uGlow * uGlow)
+                            if (glowRadius < 0.1f) continue
+                            layerHasActiveShapes = true
+                            
+                            val fontPath = Path()
+                            for (step in 0..36) {
+                                val theta = (step * 2.0 * Math.PI) / 36.0
+                                val rBase = glowRadius * (1.0f + pFont.epsilon * cos(pFont.kLobe * theta + pFont.phiOffset).toFloat())
+                                val thetaRotated = theta - rotRad
+                                val px = pFont.fx + rBase * cos(thetaRotated).toFloat()
+                                val py = pFont.fy - rBase * sin(thetaRotated).toFloat() * tiltYScale - glowZ * sinTilt
+                                if (step == 0) fontPath.moveTo(px, py) else fontPath.lineTo(px, py)
+                            }
+                            fontPath.close()
+                            layerPath.addPath(fontPath)
+                        }
+                        
+                        if (layerHasActiveShapes) {
+                            clipPath(layerPath) {
+                                for (i in 0 until groupSize) {
+                                    val pFont = group[i]
+                                    val glowRadius = pFont.maxRadiusPx * kotlin.math.sqrt(1.0f - uGlow * uGlow)
+                                    if (glowRadius < 0.1f) continue
+                                    
+                                    val glowAlpha = (0.28f * (1.0f - uGlow) * pFont.flickerMultiplier) / numGlowLayers
+                                    scale(scaleX = 1f, scaleY = tiltYScale, pivot = Offset(pFont.fx, pFont.fy - glowZ * sinTilt)) {
+                                        drawCircle(
+                                            color = pFont.baseColor.copy(alpha = glowAlpha),
+                                            radius = glowRadius,
+                                            center = Offset(pFont.fx, pFont.fy - glowZ * sinTilt)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 2. Draw Faint Static Ground Boundaries for the group (seamlessly merged)
+                    for (i in 0 until groupSize) {
+                        val pFont = group[i]
+                        drawBaseFontBoundaryClipped(
+                            group = group,
+                            boundaryIndex = i,
+                            phiOffset = pFont.phiOffset,
+                            rotRad = rotRad,
+                            tiltYScale = tiltYScale,
+                            baseColor = pFont.baseColor,
+                            clipIdx = 0,
+                            scale = scale
+                        )
+                    }
+                    
+                    // 3. Draw Pulsing 3D Wireframe Rings for the group (seamlessly merged)
+                    if (peakHeightPx > 0.1f) {
+                        val pulseProgress = (timeMs % 600) / 600f
+                        val numPulsingRings = 4
+                        for (rIdx in 0 until numPulsingRings) {
+                            val ringProgress = (rIdx.toFloat() / numPulsingRings + pulseProgress) % 1.0f
+                            val uRing = 1.0f - ringProgress
+                            
+                            for (i in 0 until groupSize) {
+                                val pFont = group[i]
+                                val ringAlpha = (4.0f * ringProgress * (1.0f - ringProgress)).coerceIn(0f, 1f) * 0.40f * pFont.flickerMultiplier
+                                
+                                drawBaseFontRingClipped(
+                                    group = group,
+                                    ringIndex = i,
+                                    uRing = uRing,
+                                    ringAlpha = ringAlpha,
+                                    phiOffset = pFont.phiOffset,
+                                    rotRad = rotRad,
+                                    tiltYScale = tiltYScale,
+                                    sinTilt = sinTilt,
+                                    baseColor = pFont.baseColor,
+                                    clipIdx = 0,
+                                    scale = scale
+                                )
+                            }
+                        }
+                        
+                        // 4. Draw Cascading Peak Particles for each font in the group (thinned out & sped up)
+                        for (i in 0 until groupSize) {
+                            val pFont = group[i]
+                            val numStreaks = 16
+                            val cycleDuration = 1200L
+                            
+                            for (s in 0 until numStreaks) {
+                                val streakSeed = (pFont.font.id.hashCode().toLong() xor (s.toLong() * 104729L)).let {
+                                    if (it == Long.MIN_VALUE) 0L else kotlin.math.abs(it)
+                                }
+                                val progressOffset = java.util.Random(streakSeed).nextFloat()
+                                
+                                val cycleIndex = (timeMs + (progressOffset * cycleDuration).toLong()) / cycleDuration
+                                val fireSeed = (pFont.font.id.hashCode().toLong() xor (s.toLong() * 104729L) xor (cycleIndex * 7919L)).let {
+                                    if (it == Long.MIN_VALUE) 0L else kotlin.math.abs(it)
+                                }
+                                val fireRandom = java.util.Random(fireSeed)
+                                val theta = fireRandom.nextFloat() * 2f * Math.PI.toFloat()
+                                
+                                val progress = ((timeMs + (progressOffset * cycleDuration).toLong()) % cycleDuration) / cycleDuration.toFloat()
+                                val thetaRotated = theta - rotRad
+                                
+                                val u = 1f - progress
+                                val zc = u * peakHeightPx
+                                val rc = pFont.maxRadiusPx * kotlin.math.sqrt(1f - u * u)
+                                val rDistc = rc * (1f + pFont.epsilon * cos(pFont.kLobe * theta + pFont.phiOffset).toFloat())
+                                
+                                val scx = pFont.fx + rDistc * cos(thetaRotated).toFloat()
+                                val scy = pFont.fy - rDistc * sin(thetaRotated).toFloat() * tiltYScale - zc * sinTilt
+                                
+                                val prevProgress = (progress - 0.20f).coerceAtLeast(0f)
+                                val uPrev = 1f - prevProgress
+                                
+                                val zp = uPrev * peakHeightPx
+                                val rp = pFont.maxRadiusPx * kotlin.math.sqrt(1f - uPrev * uPrev)
+                                val rDistp = rp * (1f + pFont.epsilon * cos(pFont.kLobe * theta + pFont.phiOffset).toFloat())
+                                
+                                val spx = pFont.fx + rDistp * cos(thetaRotated).toFloat()
+                                val spy = pFont.fy - rDistp * sin(thetaRotated).toFloat() * tiltYScale - zp * sinTilt
+                                
+                                val pNoiseSeed = pFont.font.id.hashCode() + s * 1000 + (timeMs / 15)
+                                val pRandom = java.util.Random(pNoiseSeed)
+                                val pNoiseVal = (pRandom.nextFloat() * 0.60f) - 0.30f
+                                val pFlicker = (1.0f + pNoiseVal).coerceIn(0.1f, 1.5f)
+                                
+                                val particleAlpha = ((1f - progress) * 0.95f * pFlicker * pFont.flickerMultiplier).coerceIn(0f, 1f)
+                                val strokeWidthVal = 1.0.dp.toPx() * pFlicker
+                                
+                                drawLine(
+                                    color = pFont.baseColor.copy(alpha = particleAlpha),
+                                    start = Offset(spx, spy),
+                                    end = Offset(scx, scy),
+                                    strokeWidth = strokeWidthVal
+                                )
+                            }
+                        }
+                    }
+                    
+                    // 5. Draw Text labels for each font in the group
+                    for (i in 0 until groupSize) {
+                        val pFont = group[i]
+                        val ageMs = timeMs - pFont.font.spawnTime
+                        val remainingSeconds = ((pFont.font.durationMs - ageMs) / 1000L).coerceAtLeast(0L)
+                        val baseFullName = when (pFont.font.baseType) {
+                            'A' -> "Adenine"
+                            'G' -> "Guanine"
+                            'T' -> "Thymine"
+                            'C' -> "Cytosine"
+                            else -> "Base"
+                        }
+                        val labelText = "[FONT: $baseFullName - ${remainingSeconds}s left]"
+                        
+                        val labelPaint = fontPaints[pFont.font.baseType] ?: fontPaints['A']!!
+                        val shadowPaint = fontShadowPaint
+                        
+                        val textX = pFont.fx + (16.dp.toPx() * pFont.animScale) + 6f
+                        val textY = pFont.fy + 3f
+                        
+                        val originalLabelAlpha = labelPaint.alpha
+                        val originalShadowAlpha = shadowPaint.alpha
+                        labelPaint.alpha = (originalLabelAlpha * pFont.flickerMultiplier).toInt().coerceIn(0, 255)
+                        shadowPaint.alpha = (originalShadowAlpha * pFont.flickerMultiplier).toInt().coerceIn(0, 255)
+                        
+                        if (isProfilerEnabled) {
+                            profilerState.drawTextCount += 2
+                        }
+                        drawContext.canvas.nativeCanvas.drawText(
+                            labelText,
+                            textX + 1f,
+                            textY + 1f,
+                            shadowPaint
+                        )
+                        drawContext.canvas.nativeCanvas.drawText(
+                            labelText,
+                            textX,
+                            textY,
+                            labelPaint
+                        )
+                        
+                        labelPaint.alpha = originalLabelAlpha
+                        shadowPaint.alpha = originalShadowAlpha
+                    }
+                }
+
                 // 5. Draw bright horizontal scanline sweep ray spanning full width of the container
                 // Outer blooming glow
                 drawLine(
@@ -2195,451 +2751,6 @@ fun HolographicRadarScanner(
     }
 }
 
-@Composable
-fun ZoomScrollCircle(
-    sliderValue: Float,
-    onValueChange: (Float) -> Unit,
-    zoomMultiplier: Float,
-    zoomExpanded: Boolean,
-    onToggleExpand: () -> Unit,
-    expansionFraction: Float,
-    modifier: Modifier = Modifier
-) {
-    val cyberGreen = Color(0xFF00FF66)
-
-    val currentSize = (46f + 44f * expansionFraction).dp
-    val centralSize = (46f + 8f * expansionFraction).dp
-
-    Box(
-        modifier = modifier
-            .size(currentSize)
-            .clip(androidx.compose.foundation.shape.CircleShape)
-            .background(Color.Black.copy(alpha = 0.4f + 0.25f * expansionFraction))
-            .pointerInput(zoomExpanded, sliderValue) {
-                if (!zoomExpanded) {
-                    detectTapGestures {
-                        onToggleExpand()
-                    }
-                } else {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull() ?: continue
-                            if (change.pressed) {
-                                val cx = size.width / 2f
-                                val cy = size.height / 2f
-                                val dx = change.position.x - cx
-                                val dy = change.position.y - cy
-                                val dist = kotlin.math.sqrt(dx * dx + dy * dy)
-                                val centerDiscRadiusPx = (27f * expansionFraction).dp.toPx()
-
-                                if (dist >= centerDiscRadiusPx) {
-                                    change.consume()
-                                    val angleRad = kotlin.math.atan2(dy, dx)
-                                    var angleDeg = Math.toDegrees(angleRad.toDouble()).toFloat()
-                                    if (angleDeg < 0) angleDeg += 360f
-
-                                    // Align 0 (min) at 90 degrees (pointing straight down)
-                                    var relativeAngle = angleDeg - 90f
-                                    if (relativeAngle < 0) relativeAngle += 360f
-
-                                    val prevValue = sliderValue
-                                    val targetValue = (relativeAngle / 360f) * 4f
-
-                                    if (prevValue < 1.0f && targetValue > 3.0f) {
-                                        onValueChange(0f)
-                                    } else if (prevValue > 3.0f && targetValue < 1.0f) {
-                                        onValueChange(4f)
-                                    } else {
-                                        onValueChange(targetValue)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val cy = h / 2f
-            val cx = w / 2f
-
-            // 1. Draw the magnifying glass button contents (fades out as expanded)
-            if (expansionFraction < 1f) {
-                val iconAlpha = 1f - expansionFraction
-                val iconColor = cyberGreen.copy(alpha = iconAlpha)
-                
-                val lensCx = cx - w * 0.05f * (1f - expansionFraction)
-                val lensCy = cy - h * 0.05f * (1f - expansionFraction)
-                val lensRadius = w * 0.22f
-                val strokeW = 1.5.dp.toPx()
-
-                // Draw lens circle
-                drawCircle(
-                    color = iconColor,
-                    radius = lensRadius,
-                    center = Offset(lensCx, lensCy),
-                    style = Stroke(width = strokeW)
-                )
-
-                // Draw connected handle extending to bottom-right
-                drawLine(
-                    color = iconColor,
-                    start = Offset(lensCx + lensRadius * 0.3f, lensCy + lensRadius * 0.3f),
-                    end = Offset(cx + w * 0.25f, cy + h * 0.25f),
-                    strokeWidth = strokeW * 1.5f
-                )
-
-                // Faint outer green circle boundary for the button when collapsed
-                drawCircle(
-                    color = cyberGreen.copy(alpha = 0.4f * iconAlpha),
-                    radius = (w / 2f) - 1.dp.toPx(),
-                    style = Stroke(width = 1.dp.toPx())
-                )
-            }
-
-            // 2. Draw active track & slider thumb of the circular dial (fades in as expanded)
-            if (expansionFraction > 0f) {
-                val dialAlpha = expansionFraction
-                val trackRadius = (w / 2f) - 10.dp.toPx()
-
-                // Thin green circle background track
-                drawCircle(
-                    color = cyberGreen.copy(alpha = 0.2f * dialAlpha),
-                    radius = trackRadius,
-                    style = Stroke(width = 1.5.dp.toPx())
-                )
-
-                // Highlighted active track segment
-                val activeSweep = (sliderValue / 4f) * 360f
-                drawArc(
-                    color = cyberGreen.copy(alpha = dialAlpha),
-                    startAngle = 90f,
-                    sweepAngle = activeSweep,
-                    useCenter = false,
-                    style = Stroke(width = 2.5.dp.toPx())
-                )
-
-                // Slider Thumb line pointer (fades in once almost fully expanded)
-                if (expansionFraction > 0.8f) {
-                    val thumbAlpha = (expansionFraction - 0.8f) / 0.2f
-                    val thumbAngle = 90f + activeSweep
-                    val thumbRad = Math.toRadians(thumbAngle.toDouble())
-                    val ux = kotlin.math.cos(thumbRad).toFloat()
-                    val uy = kotlin.math.sin(thumbRad).toFloat()
-
-                    val innerR = trackRadius - 5.dp.toPx()
-                    val outerR = trackRadius + 5.dp.toPx()
-                    val lineStart = Offset(cx + innerR * ux, cy + innerR * uy)
-                    val lineEnd = Offset(cx + outerR * ux, cy + outerR * uy)
-
-                    // Draw outer glow line
-                    drawLine(
-                        color = cyberGreen.copy(alpha = 0.35f * thumbAlpha),
-                        start = lineStart,
-                        end = lineEnd,
-                        strokeWidth = 6.dp.toPx(),
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
-
-                    // Draw solid pointer line
-                    drawLine(
-                        color = cyberGreen.copy(alpha = thumbAlpha),
-                        start = lineStart,
-                        end = lineEnd,
-                        strokeWidth = 2.5.dp.toPx(),
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
-                }
-            }
-        }
-
-        // Central overlay disc holding the zoom readout (fades/scales in)
-        Box(
-            modifier = Modifier
-                .size(centralSize)
-                .clip(androidx.compose.foundation.shape.CircleShape)
-                .background(Color.Black.copy(alpha = 0.85f * expansionFraction))
-                .then(
-                    if (zoomExpanded) {
-                        Modifier.clickable {
-                            onToggleExpand()
-                        }
-                    } else Modifier
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (expansionFraction > 0.3f) {
-                val textAlpha = (expansionFraction - 0.3f) / 0.7f
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.scale(expansionFraction)
-                ) {
-                    Text(
-                        text = "ZOOM",
-                        color = cyberGreen.copy(alpha = 0.6f * textAlpha),
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = String.format(java.util.Locale.US, "%.2fx", zoomMultiplier),
-                        color = cyberGreen.copy(alpha = textAlpha),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RotationScrollCircle(
-    rotationAngle: Float,
-    onValueChange: (Float) -> Unit,
-    rotationExpanded: Boolean,
-    onToggleExpand: () -> Unit,
-    expansionFraction: Float,
-    modifier: Modifier = Modifier
-) {
-    val cyberGreen = Color(0xFF00FF66)
-
-    val currentSize = (46f + 44f * expansionFraction).dp
-    val centralSize = (46f + 8f * expansionFraction).dp
-
-    Box(
-        modifier = modifier
-            .size(currentSize)
-            .clip(androidx.compose.foundation.shape.CircleShape)
-            .background(Color.Black.copy(alpha = 0.4f + 0.25f * expansionFraction))
-            .pointerInput(rotationExpanded, rotationAngle) {
-                if (!rotationExpanded) {
-                    detectTapGestures {
-                        onToggleExpand()
-                    }
-                } else {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull() ?: continue
-                            if (change.pressed) {
-                                val cx = size.width / 2f
-                                val cy = size.height / 2f
-                                val dx = change.position.x - cx
-                                val dy = change.position.y - cy
-                                val dist = kotlin.math.sqrt(dx * dx + dy * dy)
-                                val centerDiscRadiusPx = (27f * expansionFraction).dp.toPx()
-
-                                if (dist >= centerDiscRadiusPx) {
-                                    change.consume()
-                                    val angleRad = kotlin.math.atan2(dy, dx)
-                                    var angleDeg = Math.toDegrees(angleRad.toDouble()).toFloat()
-                                    if (angleDeg < 0) angleDeg += 360f
-
-                                    // Align 0 at 90 degrees (pointing straight down)
-                                    var relativeAngle = angleDeg - 90f
-                                    if (relativeAngle < 0) relativeAngle += 360f
-
-                                    onValueChange(relativeAngle)
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val cy = h / 2f
-            val cx = w / 2f
-
-            // 1. Draw double-ended arrow ellipse (fades out as expanded)
-            if (expansionFraction < 1f) {
-                val iconAlpha = 1f - expansionFraction
-                val iconColor = cyberGreen.copy(alpha = iconAlpha)
-                val strokeW = 1.5.dp.toPx()
-
-                val rx = w * 0.26f
-                val ry = h * 0.16f
-
-                // Draw two arcs
-                // Arc 1: bottom-left/right (from 20f to 140f)
-                drawArc(
-                    color = iconColor,
-                    startAngle = 20f,
-                    sweepAngle = 120f,
-                    useCenter = false,
-                    topLeft = Offset(cx - rx, cy - ry),
-                    size = Size(rx * 2, ry * 2),
-                    style = Stroke(width = strokeW)
-                )
-
-                // Arc 2: top-left/right (from 200f to 320f)
-                drawArc(
-                    color = iconColor,
-                    startAngle = 200f,
-                    sweepAngle = 120f,
-                    useCenter = false,
-                    topLeft = Offset(cx - rx, cy - ry),
-                    size = Size(rx * 2, ry * 2),
-                    style = Stroke(width = strokeW)
-                )
-
-                // Arrow head helper
-                fun drawArrowHead(thetaDeg: Float, clockwise: Boolean) {
-                    val theta = Math.toRadians(thetaDeg.toDouble())
-                    val px = cx + rx * kotlin.math.cos(theta).toFloat()
-                    val py = cy + ry * kotlin.math.sin(theta).toFloat()
-                    
-                    val tx = -rx * kotlin.math.sin(theta).toFloat()
-                    val ty = ry * kotlin.math.cos(theta).toFloat()
-                    val len = kotlin.math.sqrt(tx * tx + ty * ty)
-                    if (len < 0.01f) return
-                    
-                    val dirX = (tx / len) * (if (clockwise) 1f else -1f)
-                    val dirY = (ty / len) * (if (clockwise) 1f else -1f)
-                    
-                    val normX = -dirY
-                    val normY = dirX
-                    
-                    val arrowLen = 5.dp.toPx()
-                    val arrowWidth = 3.dp.toPx()
-                    
-                    val pBackX = px - dirX * arrowLen
-                    val pBackY = py - dirY * arrowLen
-                    
-                    val pLeftX = pBackX + normX * arrowWidth
-                    val pLeftY = pBackY + normY * arrowWidth
-                    
-                    val pRightX = pBackX - normX * arrowWidth
-                    val pRightY = pBackY - normY * arrowWidth
-                    
-                    val arrowPath = Path().apply {
-                        moveTo(px, py)
-                        lineTo(pLeftX, pLeftY)
-                        lineTo(pRightX, pRightY)
-                        close()
-                    }
-                    drawPath(arrowPath, color = iconColor, style = Fill)
-                }
-
-                // Draw arrowheads at the ends of the arcs
-                drawArrowHead(140f, clockwise = true)
-                drawArrowHead(20f, clockwise = false)
-                drawArrowHead(320f, clockwise = true)
-                drawArrowHead(200f, clockwise = false)
-
-                // Faint outer green circle boundary for the button when collapsed
-                drawCircle(
-                    color = cyberGreen.copy(alpha = 0.4f * iconAlpha),
-                    radius = (w / 2f) - 1.dp.toPx(),
-                    style = Stroke(width = 1.dp.toPx())
-                )
-            }
-
-            // 2. Draw active track & slider thumb of the circular dial (fades in as expanded)
-            if (expansionFraction > 0f) {
-                val dialAlpha = expansionFraction
-                val trackRadius = (w / 2f) - 10.dp.toPx()
-
-                // Thin green circle background track
-                drawCircle(
-                    color = cyberGreen.copy(alpha = 0.2f * dialAlpha),
-                    radius = trackRadius,
-                    style = Stroke(width = 1.5.dp.toPx())
-                )
-
-                // Highlighted active track segment (maps rotationAngle from 0 to 360)
-                val activeSweep = (rotationAngle / 360f) * 360f
-                drawArc(
-                    color = cyberGreen.copy(alpha = dialAlpha),
-                    startAngle = 90f,
-                    sweepAngle = activeSweep,
-                    useCenter = false,
-                    style = Stroke(width = 2.5.dp.toPx())
-                )
-
-                // Slider Thumb line pointer (fades in once almost fully expanded)
-                if (expansionFraction > 0.8f) {
-                    val thumbAlpha = (expansionFraction - 0.8f) / 0.2f
-                    val thumbAngle = 90f + activeSweep
-                    val thumbRad = Math.toRadians(thumbAngle.toDouble())
-                    val ux = kotlin.math.cos(thumbRad).toFloat()
-                    val uy = kotlin.math.sin(thumbRad).toFloat()
-
-                    val innerR = trackRadius - 5.dp.toPx()
-                    val outerR = trackRadius + 5.dp.toPx()
-                    val lineStart = Offset(cx + innerR * ux, cy + innerR * uy)
-                    val lineEnd = Offset(cx + outerR * ux, cy + outerR * uy)
-
-                    // Draw outer glow line
-                    drawLine(
-                        color = cyberGreen.copy(alpha = 0.35f * thumbAlpha),
-                        start = lineStart,
-                        end = lineEnd,
-                        strokeWidth = 6.dp.toPx(),
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
-
-                    // Draw solid pointer line
-                    drawLine(
-                        color = cyberGreen.copy(alpha = thumbAlpha),
-                        start = lineStart,
-                        end = lineEnd,
-                        strokeWidth = 2.5.dp.toPx(),
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
-                }
-            }
-        }
-
-        // Central overlay disc holding the rotation readout (fades/scales in)
-        Box(
-            modifier = Modifier
-                .size(centralSize)
-                .clip(androidx.compose.foundation.shape.CircleShape)
-                .background(Color.Black.copy(alpha = 0.85f * expansionFraction))
-                .then(
-                    if (rotationExpanded) {
-                        Modifier.clickable {
-                            onToggleExpand()
-                        }
-                    } else Modifier
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (expansionFraction > 0.3f) {
-                val textAlpha = (expansionFraction - 0.3f) / 0.7f
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.scale(expansionFraction)
-                ) {
-                    Text(
-                        text = "ROTATION",
-                        color = cyberGreen.copy(alpha = 0.6f * textAlpha),
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = String.format(java.util.Locale.US, "%.0f°", rotationAngle),
-                        color = cyberGreen.copy(alpha = textAlpha),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-        }
-    }
-}
 
 fun calculateDistanceInFeet(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
     val dx = (lng2 - lng1) * 111000.0 * kotlin.math.cos(Math.toRadians(lat1))

@@ -58,7 +58,7 @@ val Typography = Typography(
 3. **Buttons, Dialogs & Nav Headers**: Use `Sans-Serif` (Space Grotesk) to improve readability of standard menu commands, button triggers, and dialog overlays. All text inside these components **must** be capitalized completely (rendered in uppercase).
 4. **Logs & Decryption Feeds**: Command terminals, decryption feeds, and siphoning logs **must** use `Monospace`.
 5. **Form & Overlay Headers**: Form headers, panel headers, and popup overlay headers **must** use Sans-Serif (`FontFamily.Default` / Space Grotesk), `9.sp` (or equivalent `text-[9px]`) font size, the tab's secondary dim primary color (e.g., `activeColorDim`, `CyberGreenDim`, or dim purple/red), and be written in uppercase without any enclosing brackets `[` `]` or extraneous characters like leading bullet points (`●`).
-6. **General Syntax Constraints**: No leading emojis, bullet points, or symbols in text labels/headers. No containing brackets `[` `]` or braces `{}`. Keep texts simple, clean, and uppercase.
+6. **General Syntax Constraints & Emoji Ban**: Emojis are strictly banned from all user-facing text, labels, buttons, headers, logs, and popups to preserve the sci-fi retro terminal aesthetic. No leading emojis, bullet points, or symbols in text labels/headers. No containing brackets `[` `]` or braces `{}`. Keep texts simple, clean, and uppercase.
 
 ---
 
@@ -183,3 +183,7 @@ To ensure pixel-perfect alignment and visual consistency across all view tabs:
    - To accommodate scrollable listings or tables within a subtab (such as `LazyColumn` or `LazyVerticalGrid`), set `isScrollable = false` on the parent frame (e.g., `PoxTabFrame`) to disable outer column scrolling and constrain the height, allowing inner list components to use `.weight(1f)` without nested scrolling exceptions.
    - **Navigation Placement**: No tab or subtab navigation buttons at the top of forms. All tab navigations must be handled via the lower tab grid. All subtab navigations must be handled via our dedicated composable for holo-nav buttons/controls.
    - **No bottom flavor or info text**: To maximize content area and prevent UI clutter, we must never take up space at the bottom of a frame with flavor text, info text, or any other kind of passive status text. Only active functional indicators or countdowns (such as synthesis progress or active boost remaining) are permitted at the bottom.
+
+4. **No Scrolling on Main Frames (Banned Solution)**:
+   - Using scrolling as a solution to resolve crowded user interfaces on main screens or tabs is strictly banned.
+   - Main frames and tab screens must be designed layout-wise to be completely usable, visible, and functional without requiring the player to scroll to access any interactive controls (such as sliders, selectors, or action buttons). All controls must fit comfortably within the viewport.

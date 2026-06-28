@@ -329,9 +329,28 @@ class PoxSynthManager {
                 val amp = (rawVal * Short.MAX_VALUE * 0.05 * envelope).toInt()
                 samples[i] = amp.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
             }
+        }
+    }
+
+
+    fun playGeigerClick(volumeMultiplier: Float = 1.0f) {
+        if (isMuted) return
+        coroutineScope.launch {
+            if (!requestFocus()) return@launch
+            val durationSec = 0.005f
+            val numSamples = (sampleRate * durationSec).toInt()
+            val samples = ShortArray(numSamples)
+            val random = java.util.Random()
+            for (i in 0 until numSamples) {
+                val noise = -1.0 + 2.0 * random.nextDouble()
+                val envelope = Math.exp(-6.0 * i / numSamples)
+                val amp = (noise * Short.MAX_VALUE * 0.08 * envelope * volumeMultiplier).toInt()
+                samples[i] = amp.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+            }
             writeAndPlay(samples)
         }
     }
+
 
     private fun writeAndPlay(samples: ShortArray) {
         var track: AudioTrack? = null

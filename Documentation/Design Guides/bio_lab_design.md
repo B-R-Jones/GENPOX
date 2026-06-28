@@ -29,7 +29,7 @@ Players can optimize the synthesis yield and sequence characteristics by adjusti
 *   **Temperature ($T_{\text{react}}$)**:
     *   *High Temperature ($> 75^\circ\text{C}$)*: GC-rich sequences survive. AT-rich denature and fail unless stabilized by **Netropsin**.
     *   *Low Temperature ($15^\circ\text{C} - 30^\circ\text{C}$)*: AT-rich sequences survive. GC-rich templates form rigid internal hairpins (thermodynamic trapping) and stall unless stabilized by **DMSO / Formamide**.
-*   **Salt Concentration ($[Na^+]$)**: Ranges from $10\text{ mM}$ to $500\text{ mM}$. Modulates the melting temperature $T_m$ and shifts wave frequencies.
+*   **Salt Concentration ($[Na^+]$)**: Ranges from $10\text{ mM}$ to $150\text{ mM}$ ($0.01\text{ M} - 0.15\text{ M}$). Modulates the melting temperature $T_m$ and scales polymerase transcription speed (up to $+20\%$ boost at $150\text{ mM}$).
 *   **Enzyme Selection**:
     *   *Taq Polymerase*: Fast standard cycle (**8 seconds**). Low fidelity ($Q$-scores of $15-25$, high mutation rate).
     *   *Pfu Polymerase*: Slow standard cycle (**32 seconds**). Proofreading active, high fidelity ($Q$-scores of $35-40$, perfect copy rate).

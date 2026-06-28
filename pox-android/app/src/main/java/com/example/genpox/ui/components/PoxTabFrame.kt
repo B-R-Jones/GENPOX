@@ -41,6 +41,7 @@ fun PoxTabFrame(
     activeSubTab: String = "",
     onSubTabClick: ((String, String) -> Unit)? = null,
     viewModel: MainViewModel? = null,
+    drawSubTabs: Boolean = true,
     content: (@Composable ColumnScope.() -> Unit)? = null
 ) {
     val scrollModifier = if (isScrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
@@ -129,7 +130,7 @@ fun PoxTabFrame(
             }
         }
 
-        if (subTabs.isNotEmpty() && onSubTabClick != null && viewModel != null) {
+        if (drawSubTabs && subTabs.isNotEmpty() && onSubTabClick != null && viewModel != null) {
             val activeColor = if (borderColor == CyberBorder) CyberGreen else borderColor
             val inactiveColor = if (borderColor == CyberBorder) CyberGreenDim else borderColor.copy(alpha = 0.6f)
             PoxHoloNav(

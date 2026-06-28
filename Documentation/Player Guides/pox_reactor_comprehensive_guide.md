@@ -32,14 +32,19 @@ graph LR
 The reactor console features interactive sliders and selectors allowing players to adjust chemical solute levels, enzymes, and temperature variables to target specific genetic structures.
 
 ### Temperature ($T_{\text{react}}$)
-- **Range**: $15^\circ\text{C}$ to $95^\circ\text{C}$.
+- **Range**: $15^\circ\text{C}$ to $50^\circ\text{C}$.
 - **Thermomechanical Effects**: Modulates which base pairings survive.
-  - **High Temperature ($> 75^\circ\text{C}$)**: Induces thermal stress. Selects for stable GC-rich sequences. However, AT-rich strands will **denature (melt apart)** unless stabilized by **Netropsin**.
-  - **Low Temperature ($15^\circ\text{C} - 30^\circ\text{C}$)**: GC-rich strands tend to form stable secondary folds (hairpins) that block polymerase progression (**GC Hairpin Stalling**). This thermodynamic trap is avoided if **DMSO** is added. Otherwise, AT-rich strands are naturally favored.
+  - **High Temperature (typically $> 22.3^\circ\text{C} - 26.5^\circ\text{C}$ depending on salt)**: Induces thermal stress. Selects for stable GC-rich sequences. However, AT-rich strands will **denature (melt apart)** unless stabilized by **Netropsin**.
+  - **Low Temperature (typically $< 28.3^\circ\text{C} - 32.5^\circ\text{C}$ depending on salt)**: GC-rich strands tend to form stable secondary folds (hairpins) that block polymerase progression (**GC Hairpin Stalling**). This thermodynamic trap is avoided if **DMSO** is added. Otherwise, AT-rich strands are naturally favored.
 
 ### Salt Concentration ($[Na^+]$)
-- **Range**: $0.01\text{ M}$ ($10\text{ mM}$) to $0.50\text{ M}$ ($500\text{ mM}$).
+- **Range**: $0.01\text{ M}$ ($10\text{ mM}$) to $0.15\text{ M}$ ($150\text{ mM}$).
 - **Effect**: Shifts the overall melting temperature ($T_m$) of the DNA strands. Higher salt concentrations neutralize the negative charge on the DNA backbone, stabilizing double helices and raising the effective $T_m$.
+- **Speed Multiplier**: Monovalent salt concentration accelerates polymerase binding. The step transcription speed scales dynamically, yielding up to a **$20\%$ speed boost** at $0.15\text{ M}$ compared to standard $0.05\text{ M}$ baseline speed.
+- **Dynamic Safe Range Display**: The console Safe Range indicator dynamically computes limits based on active sequence threats:
+  - Stalling risk (GC-dense): `T_stall - 50°C`
+  - Denaturation risk (AT-dense): `15°C - T_denature`
+  - Immune/Buffered (Neutral): `15°C - 50°C`
 
 ### Polymerase Chamber Selector
 The selected polymerase enzyme dictates cycle speed, copy fidelity, and mutation discovery rates:
@@ -49,8 +54,8 @@ The selected polymerase enzyme dictates cycle speed, copy fidelity, and mutation
 
 ### Chemical Solutes
 Solutes act as protective buffers to override biophysical limits:
-*   **DMSO (Dimethyl Sulfoxide)**: GC-destabilizer. Added to prevent **GC Hairpin Stalling** in cold chambers ($< 30^\circ\text{C}$).
-*   **Netropsin**: AT-stabilizer. Binds to the minor groove of AT-rich DNA to prevent **AT Denaturation** in hot chambers ($> 75^\circ\text{C}$).
+*   **DMSO (Dimethyl Sulfoxide)**: GC-destabilizer. Added to prevent **GC Hairpin Stalling** in cold chambers ($< 28.3^\circ\text{C} - 32.5^\circ\text{C}$ depending on salt).
+*   **Netropsin**: AT-stabilizer. Binds to the minor groove of AT-rich DNA to prevent **AT Denaturation** in hot chambers ($> 22.3^\circ\text{C} - 26.5^\circ\text{C}$ depending on salt).
 
 ### Inlet Sliders ($I_A, I_G, I_T, I_C$)
 - **Purpose**: Adjusting these sliders controls the raw base feed rate into the reaction chamber.

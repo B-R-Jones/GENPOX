@@ -137,10 +137,10 @@ fun SingleDnaDotGrid(
                                 Color(0xFFA855F7)
                             } else {
                                 when (baseChar.uppercaseChar()) {
-                                    'A' -> Color(0xFF00FF41)
-                                    'G' -> Color(0xFFFBBF24)
-                                    'T' -> Color(0xFF60A5FA)
-                                    'C' -> Color(0xFFEC4899)
+                                    'A' -> Color(0xFF38BDF8)
+                                    'G' -> Color(0xFF34D399)
+                                    'T' -> Color(0xFFFB7185)
+                                    'C' -> Color(0xFFFBBF24)
                                     else -> Color(0xFF404040)
                                 }
                             }

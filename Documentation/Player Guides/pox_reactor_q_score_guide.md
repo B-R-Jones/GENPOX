@@ -69,6 +69,6 @@ $$\text{Scaled Vitality} = \text{Base Vitality} \times \left(0.5 + 0.5 \times \f
 
 ## 4. Tips for Maximizing Q-Scores
 
-1.  **Use Pfu for Clones**: Pfu is slower (32 seconds) and expensive, but its proofreading completely ignores inlet crosstalk, guaranteeing near-perfect Q40 accuracy *if* temperature is aligned.
+1.  **Use Pfu for Clones**: Pfu is slower (32 seconds) and expensive, but its proofreading prevents physical sequence mutations (crosstalk mutations), guaranteeing that you get the exact target sequence. Note that it is still subject to the stoichiometric Q-score penalty if inlets are not aligned.
 2.  **Phase-Lock the Wave**: Ensure your reactor temperature slider is adjusted so the environment wave merges into a CyberGreen line with the target sequence wave. This guarantees $T_{\text{react}} \approx T_m$, keeping the yield factor $\eta \approx 1.0$.
-3.  **Balance Inlets for Taq/Tth**: When utilizing Taq or Tth, you must match the raw base inlet sliders to the proportion of A, G, T, C bases in your target sequence. Failure to do so incurs the stoichiometric penalty and triggers crosstalk mutations.
+3.  **Balance Feedstock Inlets**: Regardless of which polymerase is used, you must match the raw base inlet sliders to the proportion of A, G, T, and C bases in your target sequence. Failure to do so incurs a stoichiometric deviation penalty (up to $-15.0$ to the step Q-score). While Pfu prevents physical sequence errors, it *does not* protect against this quality penalty.

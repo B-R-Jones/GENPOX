@@ -29,6 +29,11 @@ import com.example.genpox.PoxApplication
 import com.example.genpox.data.WaveMath
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.PoxCameraScanner
+import com.example.genpox.ui.components.CloudChamberVisualizer
+import com.example.genpox.ui.components.PoxHoloNav
+import com.example.genpox.ui.components.PoxSubTab
+import com.example.genpox.ui.components.PoxRadarDials
+import androidx.compose.ui.text.font.FontFamily
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
@@ -189,6 +194,10 @@ fun MainScreen(
     val showScanner by viewModel.showScanner.collectAsState()
     val geneSequences by viewModel.geneSequences.collectAsState()
     val disintegratedModal by viewModel.disintegratedModal.collectAsState()
+    val scannerSubTab by viewModel.scannerSubTab.collectAsState()
+    val selectedAnomalyId by viewModel.selectedAnomalyId.collectAsState()
+    val isScannerRadar = selectedTab == "scanner" && scannerSubTab == "radar" && selectedAnomalyId == null
+    val scannerRadarState = rememberScannerRadarState()
 
     val logListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -207,6 +216,22 @@ fun MainScreen(
             .fillMaxSize()
             .background(CyberBackgroundDark)
     ) {
+        // Persistent Cloud Chamber Background Animation
+        CloudChamberVisualizer(
+            viewModel = viewModel,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        if (isScannerRadar) {
+            ScannerView(
+                viewModel = viewModel,
+                isFullscreen = true,
+                contentOnly = true,
+                state = scannerRadarState,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -309,30 +334,34 @@ fun MainScreen(
             }
 
             // 2. MAIN HUD ACTIVE DISPLAY SCREEN
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(CyberPanel, RoundedCornerShape(6.dp))
-                    .drawBehind {
-                        val stroke = 1.dp.toPx()
-                        drawRoundRect(
-                            color = CyberBorder,
-                            topLeft = Offset(stroke / 2f, stroke / 2f),
-                            size = Size(size.width - stroke, size.height - stroke),
-                            cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx()),
-                            style = Stroke(width = stroke)
-                        )
+            if (isScannerRadar) {
+                Spacer(modifier = Modifier.weight(1f))
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(CyberPanel, RoundedCornerShape(6.dp))
+                        .drawBehind {
+                            val stroke = 1.dp.toPx()
+                            drawRoundRect(
+                                color = CyberBorder,
+                                topLeft = Offset(stroke / 2f, stroke / 2f),
+                                size = Size(size.width - stroke, size.height - stroke),
+                                cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx()),
+                                style = Stroke(width = stroke)
+                            )
+                        }
+                        .padding(10.dp)
+                ) {
+                    when (selectedTab) {
+                        "combinator" -> CombinatorView(viewModel)
+                        "splicer" -> SplicerView(viewModel)
+                        "vault" -> VaultView(viewModel)
+                        "scanner" -> ScannerView(viewModel, isFullscreen = false)
+                        "network" -> NetworkView(viewModel)
+                        "settings" -> SettingsView(viewModel)
                     }
-                    .padding(10.dp)
-            ) {
-                when (selectedTab) {
-                    "combinator" -> CombinatorView(viewModel)
-                    "splicer" -> SplicerView(viewModel)
-                    "vault" -> VaultView(viewModel)
-                    "scanner" -> ScannerView(viewModel)
-                    "network" -> NetworkView(viewModel)
-                    "settings" -> SettingsView(viewModel)
                 }
             }
 
@@ -453,6 +482,84 @@ fun MainScreen(
                         }
                     }
                 }
+            }
+        }
+
+        if (isScannerRadar) {
+            PoxRadarDials(
+                state = scannerRadarState,
+                viewModel = viewModel,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .padding(6.dp)
+            )
+        }
+
+        if (selectedTab == "scanner") {
+            val scannerSubTab by viewModel.scannerSubTab.collectAsState()
+            val activeMissions by viewModel.activeMissions.collectAsState()
+            val activeMissionsList = remember(activeMissions) { activeMissions.filter { !it.isReturned } }
+
+            val subTabs = remember(activeMissionsList) {
+                val list = mutableListOf(
+                    PoxSubTab("radar", "RADAR") { iconColor ->
+                        androidx.compose.foundation.Canvas(modifier = Modifier.size(24.dp)) {
+                            val w = size.width
+                            val h = size.height
+                            val center = Offset(w / 2f, h / 2f)
+                            val strokeW = 1.5.dp.toPx()
+
+                            drawCircle(iconColor, radius = w * 0.38f, center = center, style = Stroke(width = strokeW))
+                            drawCircle(iconColor, radius = w * 0.08f, center = center)
+
+                            drawLine(iconColor, Offset(center.x - w * 0.45f, center.y), Offset(center.x - w * 0.18f, center.y), strokeWidth = strokeW)
+                            drawLine(iconColor, Offset(center.x + w * 0.18f, center.y), Offset(center.x + w * 0.45f, center.y), strokeWidth = strokeW)
+                            drawLine(iconColor, Offset(center.x, center.y - h * 0.45f), Offset(center.x, center.y - h * 0.18f), strokeWidth = strokeW)
+                            drawLine(iconColor, Offset(center.x, center.y + h * 0.18f), Offset(center.x, center.y + h * 0.45f), strokeWidth = strokeW)
+                        }
+                    },
+                    PoxSubTab("list", "LIST") { iconColor ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(1.dp)
+                        ) {
+                            Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
+                            Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
+                            Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
+                        }
+                    },
+                    PoxSubTab("forecast", "FORECAST") { iconColor ->
+                        WireframeCloudIcon(color = iconColor)
+                    }
+                )
+                if (activeMissionsList.isNotEmpty()) {
+                    list.add(
+                        PoxSubTab("missions", "MISSIONS") { iconColor ->
+                            WireframePickaxeIcon(color = iconColor)
+                        }
+                    )
+                }
+                list
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .padding(6.dp)
+            ) {
+                PoxHoloNav(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 144.dp, end = 12.dp),
+                    subTabs = subTabs,
+                    activeSubTab = scannerSubTab,
+                    onSubTabClick = { id, _ -> viewModel.setScannerSubTab(id) },
+                    viewModel = viewModel,
+                    activeColor = CyberGreen,
+                    inactiveColor = CyberGreenDim
+                )
             }
         }
 

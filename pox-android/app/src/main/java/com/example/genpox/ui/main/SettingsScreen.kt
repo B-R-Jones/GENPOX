@@ -140,15 +140,12 @@ fun ColorSliderRow(
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.width(42.dp)
             )
-            Slider(
+            PoxSlider(
                 value = color.red,
                 onValueChange = { onColorChange(Color(it, color.green, color.blue, 1f)) },
                 modifier = Modifier.weight(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = CyberGreen,
-                    activeTrackColor = CyberGreen,
-                    inactiveTrackColor = Color.Black
-                )
+                activeColor = CyberGreen,
+                inactiveColor = Color.Black
             )
         }
 
@@ -165,15 +162,12 @@ fun ColorSliderRow(
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.width(42.dp)
             )
-            Slider(
+            PoxSlider(
                 value = color.green,
                 onValueChange = { onColorChange(Color(color.red, it, color.blue, 1f)) },
                 modifier = Modifier.weight(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = CyberGreen,
-                    activeTrackColor = CyberGreen,
-                    inactiveTrackColor = Color.Black
-                )
+                activeColor = CyberGreen,
+                inactiveColor = Color.Black
             )
         }
 
@@ -190,15 +184,12 @@ fun ColorSliderRow(
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.width(42.dp)
             )
-            Slider(
+            PoxSlider(
                 value = color.blue,
                 onValueChange = { onColorChange(Color(color.red, color.green, it, 1f)) },
                 modifier = Modifier.weight(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = CyberGreen,
-                    activeTrackColor = CyberGreen,
-                    inactiveTrackColor = Color.Black
-                )
+                activeColor = CyberGreen,
+                inactiveColor = Color.Black
             )
         }
     }

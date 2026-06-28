@@ -127,6 +127,24 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         _scannerSubTab.value = subTab
     }
 
+    // Gen-Vault Subtab Hoisted Navigation State
+    private val _vaultSubTab = MutableStateFlow("creatures")
+    val vaultSubTab: StateFlow<String> = _vaultSubTab.asStateFlow()
+
+    fun setVaultSubTab(subTab: String) {
+        _vaultSubTab.value = subTab
+        synthManager.playBeep(if (subTab == "creatures") 440f else 587f, 0.05f, "sine")
+    }
+
+    // Splicer Subtab Hoisted Navigation State
+    private val _splicerSubTab = MutableStateFlow("splicer")
+    val splicerSubTab: StateFlow<String> = _splicerSubTab.asStateFlow()
+
+    fun setSplicerSubTab(subTab: String) {
+        _splicerSubTab.value = subTab
+        synthManager.playBeep(if (subTab == "splicer") 440f else 587f, 0.05f, "sine")
+    }
+
     // P.O.X. Reactor active state
     private val _poxReactorActive = MutableStateFlow(true)
     val poxReactorActive: StateFlow<Boolean> = _poxReactorActive.asStateFlow()
@@ -302,6 +320,9 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     private val _splicerSlots = MutableStateFlow<List<String?>>(List<String?>(8) { null })
     val splicerSlots: StateFlow<List<String?>> = _splicerSlots.asStateFlow()
 
+    private val _splicerQScores = MutableStateFlow<List<Double>>(List(8) { 25.0 })
+    val splicerQScores: StateFlow<List<Double>> = _splicerQScores.asStateFlow()
+
     private val _activeSlotSelection = MutableStateFlow<Int?>(null)
     val activeSlotSelection: StateFlow<Int?> = _activeSlotSelection.asStateFlow()
 
@@ -344,13 +365,15 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             val g = _rawStockG.value + 10000L
             val t = _rawStockT.value + 10000L
             val c = _rawStockC.value + 10000L
+            val waste = _bioWaste.value + 10000L
             
             _rawStockA.value = a
             _rawStockG.value = g
             _rawStockT.value = t
             _rawStockC.value = c
+            _bioWaste.value = waste
             repository.saveRawStocks(a, g, t, c)
-            addLog("DEV: Injected 10,000 units of all raw bases (A, G, T, C).")
+            addLog("DEV: Injected 10,000 units of all raw bases (A, G, T, C) and 10,000 Bio-Waste.")
             synthManager.playSynthesisSuccess()
         }
     }
@@ -498,6 +521,19 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
     private val _longitude = MutableStateFlow(-122.0841)
     val longitude: StateFlow<Double> = _longitude.asStateFlow()
+
+    private val _baseFonts = MutableStateFlow<List<PoxBaseFont>>(emptyList())
+    val baseFonts: StateFlow<List<PoxBaseFont>> = _baseFonts.asStateFlow()
+
+    private val _nearestFontDistance = MutableStateFlow<Double?>(null)
+    val nearestFontDistance: StateFlow<Double?> = _nearestFontDistance.asStateFlow()
+
+    private val _activeSiphonedFont = MutableStateFlow<PoxBaseFont?>(null)
+    val activeSiphonedFont: StateFlow<PoxBaseFont?> = _activeSiphonedFont.asStateFlow()
+
+    private val _siphonedRate = MutableStateFlow(0L)
+    val siphonedRate: StateFlow<Long> = _siphonedRate.asStateFlow()
+
 
     private val _roads = MutableStateFlow<List<List<Pair<Double, Double>>>>(emptyList())
     val roads: StateFlow<List<List<Pair<Double, Double>>>> = _roads.asStateFlow()
@@ -649,7 +685,38 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
         // Start dynamic heatwave simulation
         startHeatwaveSimulation()
+
+        // Start Geiger counter clicks loop when on radar map near a font
+        viewModelScope.launch {
+            combine(selectedTab, scannerSubTab, nearestFontDistance) { tab, subTab, distance ->
+                Triple(tab, subTab, distance)
+            }.collectLatest { (tab, subTab, distance) ->
+                if (tab == "scanner" && subTab == "radar" && distance != null && distance <= 500.0) {
+                    while (true) {
+                        val d = nearestFontDistance.value ?: 500.0
+                        if (d > 500.0) break
+                        val lambda = 0.4 + 5.6 * Math.pow(1.0 - (d / 500.0), 2.0)
+                        val intervalMs = (1000.0 / lambda).toLong()
+                        val volume = (1.0f - (d / 500.0).toFloat()).coerceIn(0.1f, 1.0f)
+                        synthManager.playGeigerClick(volume)
+                        delay(intervalMs)
+                    }
+                }
+            }
+        }
+
+        // Auto-switch to search tab if no creatures exist on first load
+        var hasAutoDirectedToSearch = false
+        viewModelScope.launch {
+            creatures.collect { list ->
+                if (!hasAutoDirectedToSearch && list.isEmpty()) {
+                    _vaultSubTab.value = "search"
+                    hasAutoDirectedToSearch = true
+                }
+            }
+        }
     }
+
 
     fun selectTab(tab: String) {
         if (_selectedTab.value != tab) {
@@ -768,7 +835,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                     destroyedBlocks = destroyedBlocks
                 )
 
-                addLog("🚨 CHROMOSOMAL FAILURE: \"${creature.name}\" disintegrated! Telomeres reached 0%. Returned ${returnedBlocks.size} gene blocks, lost ${destroyedBlocks.size} permanently!")
+                addLog("CHROMOSOMAL FAILURE: \"${creature.name}\" disintegrated! Telomeres reached 0%. Returned ${returnedBlocks.size} gene blocks, lost ${destroyedBlocks.size} permanently!")
                 synthManager.playReject()
             } else {
                 val updated = creature.copy(telomeres = nextT)
@@ -776,7 +843,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 if (_activeCreature.value?.id == creatureId) {
                     _activeCreature.value = updated
                 }
-                addLog("🧬 CELLULAR INTEGRITY: \"${creature.name}\" telomeres shortened by -$amount% due to $reason. [Current life: $nextT%]")
+                addLog("CELLULAR INTEGRITY: \"${creature.name}\" telomeres shortened by -$amount% due to $reason. [Current life: $nextT%]")
             }
         }
     }
@@ -790,6 +857,8 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 return@launch
             }
 
+            val weldedGeneQ = match.averageQScore
+
             val updatedGene = match.copy(count = match.count - 1)
             if (updatedGene.count == 0) {
                 repository.deleteGeneSequence(match)
@@ -801,12 +870,10 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             val newAppended = creature.appendedGenes + gene
             val details = constructProceduralDetails(newSeq)
 
-            val currentStock = geneSequences.value
-            val blocks = (0 until newSeq.length step 8).map { newSeq.substring(it, it + 8) }
-            val qScoresList = blocks.map { seq ->
-                currentStock.find { it.sequence == seq }?.averageQScore ?: 25.0
-            }
-            val avgQ = qScoresList.average()
+            val prevAvgQ = creature.telomeres / 2.5
+            val prevBlocks = creature.sequence.length / 8
+            val avgQ = (prevAvgQ * prevBlocks + weldedGeneQ) / (prevBlocks + 1)
+            
             val scaledTelomeres = (avgQ * 2.5).toInt().coerceIn(10, 100)
             val scaledVitality = (details.vitality * (0.5 + 0.5 * (avgQ / 40.0))).toInt()
             
@@ -2479,10 +2546,15 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 }
             }
 
-            // Update slot
+            // Update slot and cache Q-score
             val updatedSlots = _splicerSlots.value.toMutableList()
             updatedSlots[slotIdx] = seq
             _splicerSlots.value = updatedSlots
+
+            val updatedQScores = _splicerQScores.value.toMutableList()
+            updatedQScores[slotIdx] = match.averageQScore
+            _splicerQScores.value = updatedQScores
+
             _activeSlotSelection.value = null
             _slotSequenceFilter.value = ""
 
@@ -2508,6 +2580,11 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             val updatedSlots = _splicerSlots.value.toMutableList()
             updatedSlots[slotIdx] = null
             _splicerSlots.value = updatedSlots
+
+            val updatedQScores = _splicerQScores.value.toMutableList()
+            updatedQScores[slotIdx] = 25.0
+            _splicerQScores.value = updatedQScores
+
             addLog("Returned gene segment #${slotIdx + 1} to archive stock")
         }
     }
@@ -2519,6 +2596,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             if (target.length != 64) return@launch
 
             val updatedSlots = _splicerSlots.value.toMutableList()
+            val updatedQScores = _splicerQScores.value.toMutableList()
             val currentStockMap = geneSequences.value.associateBy { it.sequence }.toMutableMap()
             val modifiedSequences = mutableSetOf<String>()
 
@@ -2533,6 +2611,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                         val updatedGene = matchedGene.copy(count = matchedGene.count - 1)
                         currentStockMap[requiredGene] = updatedGene
                         updatedSlots[i] = requiredGene
+                        updatedQScores[i] = matchedGene.averageQScore
                         modifiedSequences.add(requiredGene)
                         didChanges = true
                         autoFilledCount++
@@ -2561,6 +2640,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 }
 
                 _splicerSlots.value = updatedSlots
+                _splicerQScores.value = updatedQScores
                 addLog("AUTO GENE: Filled $autoFilledCount matching slots with verified stock segments.")
             } else {
                 addLog("AUTO GENE: No matching segments found in stock for any unfilled slots.")
@@ -2624,11 +2704,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             // Wait 1.5s at 100% progress to appreciate the completed matrix/helix
             kotlinx.coroutines.delay(1500L)
 
-            val currentStock = geneSequences.value
-            val qScoresList = slots.filterNotNull().map { seq ->
-                currentStock.find { it.sequence == seq }?.averageQScore ?: 25.0
-            }
-            val avgQ = qScoresList.average()
+            val avgQ = _splicerQScores.value.average()
             val scaledTelomeres = (avgQ * 2.5).toInt().coerceIn(10, 100)
 
             val spawned = compileDeterministicOffline(fullDNASeq)
@@ -2651,7 +2727,14 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             addLog("SUCCESSFUL ASSEMBLY OF ${finalCreature.name}!")
             synthManager.playSynthesisSuccess()
 
+            if (matchesTarget) {
+                val nextTarget = generateRandom64Sequence()
+                repository.saveTargetSequence(nextTarget)
+                addLog("GEN-NET: Target sequence fully compiled! Generating new Synodic Sequence matrix.")
+            }
+
             _splicerSlots.value = List<String?>(8) { null }
+            _splicerQScores.value = List(8) { 25.0 }
             _isSplicing.value = false
             _splicingProgress.value = 0
 
@@ -2748,7 +2831,9 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             val stepLogs = mutableListOf<StepLog>()
 
             val activeSplicerSlots = _splicerSlots.value
+            val activeSplicerQScores = _splicerQScores.value
             var failedAtSecond = -1
+            val recruitedQScores = mutableListOf<Double>()
 
             for (i in 0 until 8) {
                 val expectedGene = dnaSeq.substring(i * 8, (i + 1) * 8)
@@ -2757,28 +2842,34 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 // Scaffold checks (100% success or unstable base/void)
                 var scaffoldStr = ""
                 var scaffoldType = ""
+                var qScore = 25.0
 
                 if (isManualMatch) {
                     scaffoldStr = expectedGene
                     scaffoldType = "PRE-ALIGNED MANUAL GENE"
+                    qScore = activeSplicerQScores.getOrNull(i) ?: 25.0
                 } else {
-                    val hasMatch = currentStock.any { it.sequence == expectedGene && it.count > 0 }
-                    if (hasMatch) {
+                    val matchedGene = currentStock.find { it.sequence == expectedGene && it.count > 0 }
+                    if (matchedGene != null) {
                         deductFromStock(expectedGene)
                         scaffoldStr = expectedGene
                         scaffoldType = "MATCH STOCK RECRUITED"
+                        qScore = matchedGene.averageQScore
                     } else {
                         val anyGene = currentStock.find { it.count > 0 }
                         if (anyGene != null) {
                             deductFromStock(anyGene.sequence)
                             scaffoldStr = anyGene.sequence
                             scaffoldType = "ANY GENE UNSTABLE BASE [${anyGene.sequence.take(4)}...]"
+                            qScore = anyGene.averageQScore
                         } else {
                             scaffoldStr = "--------"
                             scaffoldType = "VOID SYNTHESIS SCAFFOLD"
+                            qScore = 25.0
                         }
                     }
                 }
+                recruitedQScores.add(qScore)
 
                 stepLogs.add(StepLog(
                     second = minOf(7, i + 1),
@@ -2908,16 +2999,12 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 }
 
                 _splicerSlots.value = List<String?>(8) { null }
+                _splicerQScores.value = List(8) { 25.0 }
                 
                 // Save updated raw stocks on success
                 repository.saveRawStocks(tempRawA, tempRawG, tempRawT, tempRawC)
 
-                val blocks = (0 until 8).map { dnaSeq.substring(it * 8, (it + 1) * 8) }
-                val currentStock = geneSequences.value
-                val qScoresList = blocks.map { seq ->
-                    currentStock.find { it.sequence == seq }?.averageQScore ?: 25.0
-                }
-                val avgQ = qScoresList.average()
+                val avgQ = recruitedQScores.average()
                 val scaledTelomeres = (avgQ * 2.5).toInt().coerceIn(10, 100)
 
                 val spawned = compileDeterministicOffline(dnaSeq)
@@ -2991,8 +3078,83 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         heartbeatJob?.cancel()
         heartbeatJob = viewModelScope.launch(Dispatchers.Default) {
             var siphonTick = 0
+            var siphonLogTicks = 0
             while (true) {
                 kotlinx.coroutines.delay(1000L)
+
+                val now = System.currentTimeMillis()
+                var currentFonts = _baseFonts.value.filter { !it.isExpired(now) }
+                val pLat = _latitude.value
+                val pLng = _longitude.value
+
+                if (currentFonts.size < 3) {
+                    val updatedFonts = currentFonts.toMutableList()
+                    val random = java.util.Random()
+                    while (updatedFonts.size < 5) {
+                        val distFeet = 150.0 + random.nextDouble() * 650.0
+                        val angle = random.nextDouble() * 2.0 * Math.PI
+                        val dLat = (distFeet * Math.cos(angle)) / 364000.0
+                        val dLng = (distFeet * Math.sin(angle)) / (364000.0 * Math.cos(Math.toRadians(pLat)))
+
+                        val fontId = "FNT-" + UUID.randomUUID().toString().take(6).uppercase()
+                        val bases = listOf('A', 'G', 'T', 'C')
+                        val fontBase = bases[random.nextInt(4)]
+                        val lifetime = 60000L + random.nextInt(60).toLong() * 1000L // 60s to 120s
+
+                        updatedFonts.add(PoxBaseFont(fontId, pLat + dLat, pLng + dLng, fontBase, now, lifetime))
+                    }
+                    currentFonts = updatedFonts
+                    _baseFonts.value = currentFonts
+                } else {
+                    _baseFonts.value = currentFonts
+                }
+
+                var nearestDist: Double? = null
+                var activeSiphonFont: PoxBaseFont? = null
+                var gatherRate = 0L
+
+                for (font in currentFonts) {
+                    val dist = calculateDistanceInFeet(pLat, pLng, font.lat, font.lng)
+                    val currentNearest = nearestDist
+                    if (currentNearest == null || dist < currentNearest) {
+                        nearestDist = dist
+                    }
+                    if (dist <= font.maxRadiusFeet) {
+                        activeSiphonFont = font
+                        gatherRate = font.getGatherAmount(dist)
+                    }
+                }
+
+                _nearestFontDistance.value = nearestDist
+                _activeSiphonedFont.value = activeSiphonFont
+                _siphonedRate.value = gatherRate
+
+                val currentSiphonFont = activeSiphonFont
+                if (gatherRate > 0 && currentSiphonFont != null) {
+                    val base = currentSiphonFont.baseType
+                    when (base) {
+                        'A' -> _rawStockA.value += gatherRate
+                        'G' -> _rawStockG.value += gatherRate
+                        'T' -> _rawStockT.value += gatherRate
+                        'C' -> _rawStockC.value += gatherRate
+                    }
+                    repository.saveRawStocks(_rawStockA.value, _rawStockG.value, _rawStockT.value, _rawStockC.value)
+                    siphonLogTicks++
+                    if (siphonLogTicks >= 3) {
+                        siphonLogTicks = 0
+                        val baseName = when (currentSiphonFont.baseType) {
+                            'A' -> "Adenine"
+                            'G' -> "Guanine"
+                            'T' -> "Thymine"
+                            'C' -> "Cytosine"
+                            else -> "Unknown"
+                        }
+                        addLog("[SIPHON] Siphoned +$gatherRate $baseName units from Font.")
+                    }
+                } else {
+                    siphonLogTicks = 0
+                }
+
                 
                 siphonTick++
                 if (siphonTick >= 5) {
@@ -3314,6 +3476,27 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         }
     }
 
+    fun recycleMatchingGenes(prefix: String) {
+        if (prefix.isEmpty()) return
+        viewModelScope.launch {
+            val matches = geneSequences.value.filter { it.sequence.startsWith(prefix, ignoreCase = true) }
+            if (matches.isEmpty()) return@launch
+            
+            var totalCount = 0L
+            matches.forEach { gene ->
+                totalCount += gene.count
+                repository.deleteGeneSequence(gene)
+            }
+            
+            val wasteYield = totalCount * 8
+            val newWaste = _bioWaste.value + wasteYield
+            _bioWaste.value = newWaste
+            
+            addLog("VAULT RECYCLING: Bulk deconstructed $totalCount matching gene blocks. Recovered +$wasteYield Bio-Waste.")
+            synthManager.playSynthesisSuccess()
+        }
+    }
+
     fun cycleTargetBase(index: Int) {
         if (index !in 0..7) return
         val current = _targetSynthesisSequence.value
@@ -3324,6 +3507,15 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         charArray[index] = bases[nextIdx]
         _targetSynthesisSequence.value = String(charArray)
         synthManager.playCombinatorTick()
+    }
+
+    fun setTargetSynthesisSequence(sequence: String) {
+        if (sequence.length == 8) {
+            _targetSynthesisSequence.value = sequence.uppercase()
+            selectTab("combinator")
+            addLog("SYS: Set Bio-Lab synthesis target sequence to ${sequence.uppercase()}")
+            synthManager.playCombinatorTick()
+        }
     }
 
     fun initiateStandardSynthesis() {
@@ -3349,6 +3541,18 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                     'T' -> reqT++
                     'C' -> reqC++
                 }
+            }
+
+            // Pre-flight inlet validation: required bases must have open inlets (> 5%)
+            val hasInletAError = reqA > 0 && _inletRatioA.value <= 0.05f
+            val hasInletGError = reqG > 0 && _inletRatioG.value <= 0.05f
+            val hasInletTError = reqT > 0 && _inletRatioT.value <= 0.05f
+            val hasInletCError = reqC > 0 && _inletRatioC.value <= 0.05f
+            
+            if (hasInletAError || hasInletGError || hasInletTError || hasInletCError) {
+                addLog("SYNTHESIS BLOCKED: Feedstock inlets for required bases must be open to at least 5% to charge chamber.")
+                synthManager.playReject()
+                return@launch
             }
             
             // Add cofactor costs if active
@@ -3445,8 +3649,12 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             val isBoostActive = _boostSecondsLeft.value > 0
             val cycleDuration = if (isBoostActive) baseCycle / 2 else baseCycle
             
+            // Salt speed multiplier: 1.0 at 0.05M (standard), faster at higher salt, slower at lower salt.
+            val saltSpeedMultiplier = 1.0 + (salt - 0.05) * 2.0
+            val adjustedCycleDuration = cycleDuration / saltSpeedMultiplier
+            
             // Calculate interval per step in ms (minimum 100ms per step)
-            val stepIntervalMs = ((cycleDuration * 1000L) / 8).coerceAtLeast(100L)
+            val stepIntervalMs = ((adjustedCycleDuration * 1000L) / 8).toLong().coerceAtLeast(100L)
             
             var collapsed = false
             var finalStrand = ""
@@ -3545,17 +3753,16 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 }
                 
                 // GC Hairpin Stalling (Salt-dependent)
-                val stallThreshold = 20.0f + (salt.toFloat() * 40.0f)
-                val targetMfe = BiophysicsEngine.calculateMinimumFreeEnergy(target)
-                if (!failureTriggered && finalStrand.length >= 4 && temp < stallThreshold && targetMfe <= -5.0 && actualSolute != "DMSO") {
+                val stallThreshold = 28.0f + (salt.toFloat() * 30.0f)
+                if (!failureTriggered && finalStrand.length >= 4 && temp < stallThreshold && mfe <= -5.0 && actualSolute != "DMSO") {
                     failureTriggered = true
                     collapseReason = "stalling (GC hairpin secondary fold stabilized by salt at ${String.format(java.util.Locale.US, "%.1f", stallThreshold)}°C)"
                 }
                 
                 // AT Denaturation (Salt-dependent)
-                val denatureThreshold = 65.0f + (salt.toFloat() * 50.0f)
-                val targetGcPercent = target.count { it == 'G' || it == 'C' }.toDouble() / target.length.toDouble()
-                if (!failureTriggered && finalStrand.length >= 4 && temp > denatureThreshold && targetGcPercent < 0.40 && actualSolute != "Netropsin") {
+                val denatureThreshold = 22.0f + (salt.toFloat() * 30.0f)
+                val currentGcPercent = finalStrand.count { it == 'G' || it == 'C' }.toDouble() / finalStrand.length.toDouble()
+                if (!failureTriggered && finalStrand.length >= 4 && temp > denatureThreshold && currentGcPercent < 0.40 && actualSolute != "Netropsin") {
                     failureTriggered = true
                     collapseReason = "denaturation (AT bonds denatured due to low salt stabilization at ${String.format(java.util.Locale.US, "%.1f", denatureThreshold)}°C)"
                 }
@@ -3563,8 +3770,8 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 if (failureTriggered) {
                     collapsed = true
                     _isReactionCollapsed.value = true
-                    _bioWaste.value += 8
-                    addLog("CRITICAL COLLAPSE: Polymerase halted at step $step due to unstabilized $collapseReason. 8 raw bases converted to bio-waste.")
+                    _bioWaste.value += step
+                    addLog("CRITICAL COLLAPSE: Polymerase halted at step $step due to unstabilized $collapseReason. $step raw bases converted to bio-waste.")
                     synthManager.playReject()
                     break
                 }
@@ -3932,3 +4139,25 @@ data class BuildingBBox(val minLat: Double, val maxLat: Double, val minLng: Doub
                minLng <= other.maxLng && maxLng >= other.minLng
     }
 }
+
+data class PoxBaseFont(
+    val id: String,
+    val lat: Double,
+    val lng: Double,
+    val baseType: Char, // 'A', 'G', 'T', 'C'
+    val spawnTime: Long,
+    val durationMs: Long = 90000L, // 90 seconds
+    val maxRadiusFeet: Double = 500.0
+) {
+    fun isExpired(now: Long): Boolean {
+        return now - spawnTime >= durationMs
+    }
+
+    fun getGatherAmount(distanceFeet: Double): Long {
+        if (distanceFeet > maxRadiusFeet) return 0L
+        val maxGather = 40.0
+        val ratio = 1.0 - (distanceFeet / maxRadiusFeet)
+        return Math.round(maxGather * Math.pow(ratio, 4.0)).coerceAtLeast(0L)
+    }
+}
+

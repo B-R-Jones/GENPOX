@@ -14,10 +14,17 @@ Understanding the relationship between **Ideal Temperature** and the **Safe Temp
 
 ### Safe Temperature Range
 *   **Definition**: The thermodynamic safety window inside which the polymerase enzyme can actively compile the DNA strand. This window is governed by two salt-dependent limits:
-    *   **Lower Bound (GC Hairpin Stalling)**: $T_{\text{stall}} = 20^\circ\text{C} + [Na^+] \times 40^\circ\text{C}$
-    *   **Upper Bound (AT Denaturation)**: $T_{\text{denature}} = 65^\circ\text{C} + [Na^+] \times 50^\circ\text{C}$
+    *   **Lower Bound (GC Hairpin Stalling)**: $T_{\text{stall}} = 28^\circ\text{C} + [Na^+] \times 30^\circ\text{C}$
+    *   **Upper Bound (AT Denaturation)**: $T_{\text{denature}} = 22^\circ\text{C} + [Na^+] \times 30^\circ\text{C}$
 *   **What it Controls**: **Reaction Survival**.
-*   **Tuning Goal**: Keep the chamber temperature between these two limits, or inject protective chemical solutes.
+*   **UI Display (Context-Aware Safe Range)**: The UI dynamically calculates and displays the actual safe range for the active sequence under current chemical solute conditions:
+    *   **AT-dense sequences** (denaturation risk): displays `15°C - T_denature` (e.g., `15°C - 23°C` at standard salt).
+    *   **GC-dense sequences** (stalling risk): displays `T_stall - 50°C` (e.g., `29°C - 50°C` at standard salt).
+    *   **Balanced/Buffered sequences**: displays the full `15°C - 50°C` range.
+*   **Tuning Goal**: Keep the chamber temperature inside the displayed dynamic Safe Range. The salt slider range is optimized between **$0.01\text{ M}$ and $0.15\text{ M}$** to cover this active biophysical safety envelope.
+*   **Synthesis Speed Multiplier**: Increasing salt concentration speeds up polymerase transcription binding. The step duration is scaled by:
+    $$\text{saltSpeedMultiplier} = 1.0 + ([Na^+] - 0.05) \times 2.0$$
+    This yields up to a **$20\%$ speed boost** at $0.15\text{ M}$ salt compared to standard baseline speed.
 *   **Consequence of Deviation**: If the chamber temperature crosses either threshold without the appropriate protective solute, the reaction suffers a **Catastrophic Collapse**. The run aborts, the strand is destroyed, and the consumed feedstock is converted into Bio-Waste.
 
 ---
@@ -40,22 +47,22 @@ Use the following hot and cold runs to test the reactor's biophysical responses.
 *   **Initial Setup**: Polymerase = Taq, Chem Suite = None.
 
 #### Run A1: Low Salt Collapse (Expected: Fail)
-1.  Set **Salt** to `0.01 M` (Lowering salt decreases backbone stability; $T_{\text{denature}} = 65.5^\circ\text{C}$).
-2.  Set **Temperature** to `70°C`.
-3.  Fill feedstock stocks and tap **✕ INITIATE SYNTHESIS**.
+1.  Set **Salt** to `0.01 M` (Lowering salt decreases backbone stability; $T_{\text{denature}} = 22.3^\circ\text{C}$).
+2.  Set **Temperature** to `25°C`.
+3.  Fill feedstock stocks and tap **INITIATE SYNTHESIS**.
 4.  *Observation*: The reaction will collapse catastrophically around Step 4. The log will report: `CRITICAL COLLAPSE: Polymerase halted ... due to unstabilized denaturation`.
 
 #### Run A2: High Salt Stabilization (Expected: Pass)
-1.  Increase **Salt** to `0.30 M` (Raising salt stabilizes AT bonds; $T_{\text{denature}} = 80.0^\circ\text{C}$).
-2.  Maintain **Temperature** at `70°C`.
-3.  Tap **✕ INITIATE SYNTHESIS**.
+1.  Increase **Salt** to `0.15 M` (Raising salt stabilizes AT bonds; $T_{\text{denature}} = 26.5^\circ\text{C}$).
+2.  Maintain **Temperature** at `25°C`.
+3.  Tap **INITIATE SYNTHESIS**.
 4.  *Observation*: The synthesis compiles successfully. Salt stabilization prevented denaturation in the hot chamber.
 
 #### Run A3: Netropsin Buffer Stabilization (Expected: Pass)
-1.  Lower **Salt** back to `0.01 M` ($T_{\text{denature}} = 65.5^\circ\text{C}$).
+1.  Lower **Salt** back to `0.01 M` ($T_{\text{denature}} = 22.3^\circ\text{C}$).
 2.  Inject **Netropsin** solute.
-3.  Maintain **Temperature** at `70°C`.
-4.  Tap **✕ INITIATE SYNTHESIS**.
+3.  Maintain **Temperature** at `25°C`.
+4.  Tap **INITIATE SYNTHESIS**.
 5.  *Observation*: The synthesis compiles successfully. Netropsin protected the AT-rich sequence despite low salt.
 
 ---
@@ -66,20 +73,20 @@ Use the following hot and cold runs to test the reactor's biophysical responses.
 *   **Initial Setup**: Polymerase = Taq, Chem Suite = None.
 
 #### Run B1: High Salt Collapse (Expected: Fail)
-1.  Set **Salt** to `0.45 M` (Raising salt stabilizes secondary folds; $T_{\text{stall}} = 38.0^\circ\text{C}$).
-2.  Set **Temperature** to `35°C`.
-3.  Tap **✕ INITIATE SYNTHESIS**.
+1.  Set **Salt** to `0.15 M` (Raising salt stabilizes secondary folds; $T_{\text{stall}} = 32.5^\circ\text{C}$).
+2.  Set **Temperature** to `30°C`.
+3.  Tap **INITIATE SYNTHESIS**.
 4.  *Observation*: The reaction collapses at Step 4. The log will report: `CRITICAL COLLAPSE: Polymerase halted ... due to unstabilized stalling`.
 
 #### Run B2: Low Salt Prevention (Expected: Pass)
-1.  Lower **Salt** to `0.05 M` (Lowering salt destabilizes the hairpin; $T_{\text{stall}} = 22.0^\circ\text{C}$).
-2.  Maintain **Temperature** at `35°C`.
-3.  Tap **✕ INITIATE SYNTHESIS**.
+1.  Lower **Salt** to `0.05 M` (Lowering salt destabilizes the hairpin; $T_{\text{stall}} = 29.5^\circ\text{C}$).
+2.  Set **Temperature** to `35°C`.
+3.  Tap **INITIATE SYNTHESIS**.
 4.  *Observation*: The synthesis compiles successfully. Destabilizing the secondary structures via low salt prevented stalling.
 
 #### Run B3: DMSO Buffer Stabilization (Expected: Pass)
-1.  Raise **Salt** back to `0.45 M` ($T_{\text{stall}} = 38.0^\circ\text{C}$).
+1.  Raise **Salt** back to `0.15 M` ($T_{\text{stall}} = 32.5^\circ\text{C}$).
 2.  Inject **DMSO** solute.
-3.  Maintain **Temperature** at `35°C`.
-4.  Tap **✕ INITIATE SYNTHESIS**.
+3.  Set **Temperature** to `30°C`.
+4.  Tap **INITIATE SYNTHESIS**.
 5.  *Observation*: The synthesis compiles successfully. DMSO destabilized the GC folds and allowed transcription in the cold, high-salt chamber.

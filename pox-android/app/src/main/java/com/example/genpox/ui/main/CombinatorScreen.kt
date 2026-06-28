@@ -441,17 +441,13 @@ fun TerminalLogSubView(
             )
             
             // Clear logs button
-            Text(
+            PoxButton(
                 text = "CLEAR CACHE",
-                color = Color.Red,
-                style = Typography.labelSmall,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier
-                    .border(1.dp, Color.Red.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
-                    .clickable { viewModel.clearTerminalLogs() }
-                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                onClick = { viewModel.clearTerminalLogs() },
+                buttonType = PoxButtonType.RED_MUTED,
+                buttonSize = PoxButtonSize.COMPACT,
+                sound = PoxButtonSound.REJECT_BEEP,
+                viewModel = viewModel
             )
         }
 
@@ -547,9 +543,6 @@ fun CombinatorView(viewModel: MainViewModel) {
             }),
             PoxSubTab("pox", "REACTOR", icon = { iconColor ->
                 WireframeDna(color = iconColor, modifier = Modifier.size(24.dp))
-            }),
-            PoxSubTab("anomaly", "ANOMALY", icon = { iconColor ->
-                WireframeGalaxy(color = iconColor, modifier = Modifier.size(24.dp))
             })
         )
         if (lastMainSubTab != "pox") {
@@ -618,15 +611,15 @@ fun CombinatorView(viewModel: MainViewModel) {
             "GENETIC ANOMALY HARMONIZER"
         },
         descriptionText = if (bioLabSubTab == "parameters") {
-            "Manage your reactor to improve synthesis accuracy"
+            "Manage your reactor to improve synthesis accuracy and gene quality."
         } else if (lastMainSubTab == "pox") {
-            "Synthesize genes at a set rate or manually accelerate to speed up the P.O.X. Reactor."
+            "Program your reactor, confirm ideal sequence coherence, and initiate synthesis."
         } else {
             "Sacrifice existing genes to synthesize anomalous genes in the Anomaly Engine."
         },
         borderColor = activeBorder,
         backgroundColor = activePanel,
-        isScrollable = (bioLabSubTab == "pox" || bioLabSubTab == "anomaly" || bioLabSubTab == "parameters"),
+        isScrollable = (bioLabSubTab == "pox" || bioLabSubTab == "anomaly"),
         subTabs = subTabs,
         activeSubTab = bioLabSubTab,
         onSubTabClick = { id, tag ->

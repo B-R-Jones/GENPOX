@@ -224,94 +224,76 @@ fun SplicerView(viewModel: MainViewModel) {
     val isSplicing by viewModel.isSplicing.collectAsState()
     val splicingProgress by viewModel.splicingProgress.collectAsState()
     val inventoryGenes by viewModel.geneSequences.collectAsState()
+    val splicerSubTab by viewModel.splicerSubTab.collectAsState()
+    val activeColor = CyberTheme.red
+    val activeBorder = CyberTheme.redBorder
+    val activePanel = CyberTheme.redPanel
+
+    val subTabs = remember {
+        listOf(
+            PoxSubTab("splicer", "SPLICER", icon = { iconColor ->
+                WireframeDna(color = iconColor, modifier = Modifier.size(24.dp))
+            }),
+            PoxSubTab("terminal", "TERMINAL", icon = { iconColor ->
+                Box(
+                    modifier = Modifier.size(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = ">_",
+                        color = iconColor,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            })
+        )
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Main view content: SplicerLeftPanel is always rendered full size!
-        SplicerLeftPanel(
-            viewModel = viewModel,
-            targetSequence = targetSequence,
-            splicerSlots = splicerSlots,
-            activeSlotSelection = activeSlotSelection,
-            isReactorFrozen = isReactorFrozen,
-            reactorFreezeTimeLeft = reactorFreezeTimeLeft,
-            isForcedConstructionActive = isForcedConstructionActive,
-            isForcedLoopActive = isForcedLoopActive,
-            forcedConstructionLogs = forcedConstructionLogs,
-            isSplicing = isSplicing,
-            splicingProgress = splicingProgress,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // Floating action buttons (Layered Stack)
-        if (!isForcedConstructionActive && !isSplicing) {
-            val hasEmpty = splicerSlots.contains(null)
-            val slotBorderColor = if (hasEmpty) CyberGreenDim.copy(alpha = 0.4f) else CyberGreen
-            val slotGlowColor = if (hasEmpty) Color.Transparent else CyberGreen.copy(alpha = 0.15f)
-            val slotBgColor = if (hasEmpty) Color.Transparent else Color(0xFF0A0A0F).copy(alpha = 0.75f)
-
-            val frontRow = listOf(
-                HoloNavButton(
-                    id = "force",
-                    borderColor = Color(0xFFEF4444),
-                    glowColor = Color(0xFFEF4444).copy(alpha = 0.15f),
-                    backgroundColor = Color(0xFF0A0A0F).copy(alpha = 0.75f),
-                    enabled = true,
-                    onClick = {
-                        viewModel.synthManager.playCombinatorTick()
-                        viewModel.startForcedConstruction()
-                    },
-                    content = { color -> HoloDnaForceIcon(color = color) }
-                ),
-                HoloNavButton(
-                    id = "slot",
-                    borderColor = slotBorderColor,
-                    glowColor = slotGlowColor,
-                    backgroundColor = slotBgColor,
-                    enabled = !hasEmpty,
-                    onClick = {
-                        viewModel.synthManager.playCombinatorTick()
-                        viewModel.constructSplicedCreature()
-                    },
-                    content = { color -> HoloDnaSlotIcon(color = color) }
-                )
-            )
-
-            val backRow = listOf(
-                HoloNavButton(
-                    id = "auto_loop",
-                    borderColor = Color(0xFFEF4444),
-                    glowColor = Color(0xFFEF4444).copy(alpha = 0.15f),
-                    backgroundColor = Color(0xFF0A0A0F).copy(alpha = 0.75f),
-                    enabled = true,
-                    onClick = {
-                        viewModel.synthManager.playCombinatorTick()
-                        viewModel.setIsForcedLoopActive(true)
-                        viewModel.startForcedConstruction()
-                    },
-                    content = { color -> HoloDnaAutoLoopIcon(color = color) }
-                ),
-                HoloNavButton(
-                    id = "auto_slot",
-                    borderColor = CyberGreen,
-                    glowColor = CyberGreen.copy(alpha = 0.15f),
-                    backgroundColor = Color(0xFF0A0A0F).copy(alpha = 0.75f),
-                    enabled = true,
-                    onClick = {
-                        viewModel.synthManager.playCombinatorTick()
-                        viewModel.autofillSplicerSlots()
-                    },
-                    content = { color -> HoloDnaAutoSlotIcon(color = color) }
-                )
-            )
-
-            PoxUnifiedHoloNav(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(bottom = 12.dp, end = 12.dp),
-                rows = listOf(frontRow, backRow),
-                allowStacking = true,
-                viewModel = viewModel
-            )
+        PoxTabFrame(
+            flavorTitle = "G.E.N. P.O.X. SPLICING ASSEMBLY CHAMBER V1.7",
+            statusText = if (isForcedConstructionActive || isSplicing) "ACTIVE" else "READY",
+            statusColor = if (isForcedConstructionActive || isSplicing) Color.Red else CyberGreen,
+            headerTitle = "MOLECULAR SPLICING SEQUENCER",
+            descriptionText = "Splice DNA fragments together to assemble your target species or override system thresholds using forced compilation.",
+            borderColor = activeBorder,
+            backgroundColor = activePanel,
+            isScrollable = false,
+            subTabs = subTabs,
+            activeSubTab = splicerSubTab,
+            onSubTabClick = { id, tag ->
+                viewModel.setSplicerSubTab(id)
+            },
+            viewModel = viewModel
+        ) {
+            when (splicerSubTab) {
+                "splicer" -> {
+                    SplicerLeftPanel(
+                        viewModel = viewModel,
+                        targetSequence = targetSequence,
+                        splicerSlots = splicerSlots,
+                        activeSlotSelection = activeSlotSelection,
+                        isReactorFrozen = isReactorFrozen,
+                        reactorFreezeTimeLeft = reactorFreezeTimeLeft,
+                        isForcedConstructionActive = isForcedConstructionActive,
+                        isForcedLoopActive = isForcedLoopActive,
+                        forcedConstructionLogs = forcedConstructionLogs,
+                        isSplicing = isSplicing,
+                        splicingProgress = splicingProgress,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                "terminal" -> {
+                    SplicerTerminalLogView(
+                        viewModel = viewModel,
+                        forcedConstructionLogs = forcedConstructionLogs,
+                        isForcedLoopActive = isForcedLoopActive,
+                        activeBorder = activeBorder
+                    )
+                }
+            }
         }
 
         // Slotting UI Floating Panel (holographic popup overlay)
@@ -480,23 +462,15 @@ fun SplicerLeftPanel(
                 }
 
                 if (isForcedLoopActive) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(32.dp)
-                            .cyberglass(borderColor = Color(0xFFEF4444), backgroundColor = Color(0x30B91C1C))
-                            .clickable { viewModel.setIsForcedLoopActive(false) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "✕ EXIT AUTO-SYNTHESIS LOOP CASCADE",
-                            color = Color.White,
-                            style = Typography.bodySmall,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp
-                        )
-                    }
+                    PoxButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = "✕ EXIT AUTO-SYNTHESIS LOOP CASCADE",
+                        onClick = { viewModel.setIsForcedLoopActive(false) },
+                        buttonType = PoxButtonType.RED_DANGER,
+                        buttonSize = PoxButtonSize.STANDARD,
+                        sound = PoxButtonSound.REJECT_BEEP,
+                        viewModel = viewModel
+                    )
                 }
             }
         }
@@ -986,33 +960,72 @@ fun SplicerLeftPanel(
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(6.dp))            // Synthesizer Actions and Forced Emergency Overrides
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    PoxButton(
+                        modifier = Modifier.weight(1f),
+                        text = "AUTO-FILL SLOTS",
+                        onClick = { viewModel.autofillSplicerSlots() },
+                        buttonType = PoxButtonType.GREEN_MUTED,
+                        buttonSize = PoxButtonSize.STANDARD,
+                        sound = PoxButtonSound.COMBINATOR_TICK,
+                        viewModel = viewModel
+                    )
+                    val hasEmpty = splicerSlots.contains(null)
+                    PoxButton(
+                        modifier = Modifier.weight(1f),
+                        text = "CONSTRUCT SPECIMEN",
+                        onClick = { viewModel.constructSplicedCreature() },
+                        enabled = !hasEmpty,
+                        buttonType = PoxButtonType.GREEN_PHOSPHOR,
+                        buttonSize = PoxButtonSize.STANDARD,
+                        sound = PoxButtonSound.SUCCESS_CHIME,
+                        viewModel = viewModel
+                    )
+                }
 
-            // Synthesizer Actions and Forced Emergency Overrides
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-
-
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PoxButton(
+                        modifier = Modifier.weight(1f),
+                        text = "FORCED CONSTRUCTION",
+                        onClick = { viewModel.startForcedConstruction() },
+                        enabled = !isForcedConstructionActive && !isSplicing,
+                        buttonType = PoxButtonType.RED_DANGER,
+                        buttonSize = PoxButtonSize.STANDARD,
+                        sound = PoxButtonSound.BEEP_HIGH,
+                        viewModel = viewModel
+                    )
+                    PoxButton(
+                        modifier = Modifier.width(38.dp),
+                        text = "⟲",
+                        onClick = { viewModel.setIsForcedLoopActive(!isForcedLoopActive) },
+                        buttonType = if (isForcedLoopActive) PoxButtonType.RED_DANGER else PoxButtonType.RED_MUTED,
+                        buttonSize = PoxButtonSize.STANDARD,
+                        sound = PoxButtonSound.COMBINATOR_TICK,
+                        viewModel = viewModel
+                    )
+                }
 
                 val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
                 if (devForceAnomaly) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(32.dp)
-                            .cyberglass(borderColor = Color(0x80A855F7), backgroundColor = Color(0x20A855F7))
-                            .clickable { viewModel.devInjectMissingTargetGenes() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "DEV: INJECT MISSING GENES",
-                            color = Color(0xFFD8B4FE),
-                            style = Typography.bodySmall,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp
-                        )
-                    }
+                    PoxButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = "DEV: INJECT MISSING GENES",
+                        onClick = { viewModel.devInjectMissingTargetGenes() },
+                        buttonType = PoxButtonType.YELLOW_WARNING,
+                        buttonSize = PoxButtonSize.STANDARD,
+                        sound = PoxButtonSound.BEEP_DEFAULT,
+                        viewModel = viewModel
+                    )
                 }
             }
         }
@@ -1291,6 +1304,26 @@ fun SplicerRightPanel(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(32.dp)
+                .cyberglass(borderColor = Color(0xFF22D3EE), backgroundColor = Color(0x1522D3EE))
+                .clickable { viewModel.setTargetSynthesisSequence(expected) },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "TARGET IN BIO-LAB",
+                color = Color(0xFF22D3EE),
+                style = Typography.bodySmall,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Bold,
+                fontSize = 9.sp
+            )
+        }
     }
 }
 
@@ -1409,3 +1442,88 @@ fun SplicerTestView(viewModel: MainViewModel) {
         )
     }
 }
+
+@Composable
+fun SplicerTerminalLogView(
+    viewModel: MainViewModel,
+    forcedConstructionLogs: List<String>,
+    isForcedLoopActive: Boolean,
+    activeBorder: Color
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(8.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "FORCED SEQUENCING LOG TERMINAL",
+                    color = Color(0xFFEF4444),
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Default,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "P.O.X. REACTOR TELEMETRY OVERRIDES",
+                color = Color.White,
+                style = Typography.bodyMedium,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val listState = rememberLazyListState()
+            LaunchedEffect(forcedConstructionLogs.size) {
+                if (forcedConstructionLogs.isNotEmpty()) {
+                    listState.animateScrollToItem(forcedConstructionLogs.size - 1)
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .background(Color(0xFF050505))
+                    .border(1.dp, activeBorder.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                    .padding(6.dp),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(forcedConstructionLogs) { log ->
+                    val isAlert = log.contains("FAILED") || log.contains("WARNING") || log.contains("Failed") || log.contains("Sacrificed")
+                    Text(
+                        text = log,
+                        color = if (isAlert) Color(0xFFFCA5A5) else Color(0xFF34D399),
+                        style = Typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (isForcedLoopActive) {
+            PoxButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = "✕ EXIT AUTO-SYNTHESIS LOOP CASCADE",
+                onClick = { viewModel.setIsForcedLoopActive(false) },
+                buttonType = PoxButtonType.RED_DANGER,
+                buttonSize = PoxButtonSize.STANDARD,
+                sound = PoxButtonSound.REJECT_BEEP,
+                viewModel = viewModel
+            )
+        }
+    }
+}
+
