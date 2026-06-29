@@ -235,7 +235,7 @@ object WaveMath {
     }
 
     fun generateAnomalousGene(random: Random = Random()): String {
-        val chars = "XZYW?!$%&@#"
+        val chars = "ATCG"
         var result = ""
         for (i in 0 until 8) {
             result += chars[random.nextInt(chars.length)]
@@ -244,9 +244,7 @@ object WaveMath {
     }
 
     fun isAnomalousGene(seq: String): Boolean {
-        if (seq.length != 8) return false
-        val chars = "XZYW?!$%&@#"
-        return seq.any { it in chars }
+        return false
     }
 
     fun getBenefitForAnomalousGene(gene: String): AnomalousBenefit {
@@ -374,18 +372,6 @@ object WaveMath {
     }
 
     fun getAnomalousBenefits(sequence: String): List<AnomalousBenefit> {
-        val benefits = mutableListOf<AnomalousBenefit>()
-        for (i in 0 until sequence.length step 8) {
-            if (i + 8 <= sequence.length) {
-                val chunk = sequence.substring(i, i + 8)
-                if (isAnomalousGene(chunk)) {
-                    val b = getBenefitForAnomalousGene(chunk)
-                    if (benefits.none { it.id == b.id }) {
-                        benefits.add(b)
-                    }
-                }
-            }
-        }
-        return benefits
+        return emptyList()
     }
 }

@@ -14,7 +14,7 @@ object BiophysicsEngine {
      * Uses a salt-corrected Wallace-Breslauer formulation.
      */
     fun calculateMeltingTemperature(sequence: String, saltMolar: Double = 0.05): Double {
-        val gcCount = sequence.count { it == 'G' || it == 'C' || it == 'Z' || it == '%' || it == '&' }
+        val gcCount = sequence.count { it == 'G' || it == 'C' }
         val atCount = sequence.length - gcCount
         
         // Wallace formula: Tm = 2*(A+T) + 4*(G+C)
@@ -44,8 +44,7 @@ object BiophysicsEngine {
         // Complementary pair checker
         val isPair = { c1: Char, c2: Char ->
             (c1 == 'A' && c2 == 'T') || (c1 == 'T' && c2 == 'A') ||
-            (c1 == 'G' && c2 == 'C') || (c1 == 'C' && c2 == 'G') ||
-            (c1 == 'X' && c2 == 'Y') || (c1 == 'Y' && c2 == 'X')
+            (c1 == 'G' && c2 == 'C') || (c1 == 'C' && c2 == 'G')
         }
         
         // Hydrogen bonding energy values
@@ -53,7 +52,6 @@ object BiophysicsEngine {
             when {
                 (c1 == 'G' && c2 == 'C') || (c1 == 'C' && c2 == 'G') -> -3.0 // 3 H-bonds
                 (c1 == 'A' && c2 == 'T') || (c1 == 'T' && c2 == 'A') -> -2.0 // 2 H-bonds
-                (c1 == 'X' && c2 == 'Y') || (c1 == 'Y' && c2 == 'X') -> -4.0 // Anomalous quantum pairing
                 else -> 0.0
             }
         }

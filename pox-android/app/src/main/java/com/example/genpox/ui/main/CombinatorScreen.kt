@@ -511,16 +511,10 @@ fun CombinatorView(viewModel: MainViewModel) {
     
     val geneSequenceStrings = remember(geneSequences) { geneSequences.map { it.sequence } }
     
-    // Last Main Subtab state to remember REACTOR/ANOMALY context
+    // Last Main Subtab state to remember REACTOR context
     var lastMainSubTab by remember { mutableStateOf("pox") }
     LaunchedEffect(bioLabSubTab) {
-        if (bioLabSubTab == "pox" || bioLabSubTab == "anomaly" || bioLabSubTab == "parameters") {
-            if (bioLabSubTab == "pox" || bioLabSubTab == "parameters") {
-                lastMainSubTab = "pox"
-            } else {
-                lastMainSubTab = "anomaly"
-            }
-        }
+        lastMainSubTab = "pox"
     }
 
     // Local details popups state
@@ -531,35 +525,19 @@ fun CombinatorView(viewModel: MainViewModel) {
     val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
     
     // UI colors and themes based on subtab
-    val activeColor = if (lastMainSubTab == "pox") CyberGreen else CyberTheme.purple
-    val activeColorDim = if (lastMainSubTab == "pox") CyberGreenDim else CyberTheme.purpleDim
-    val activeBorder = if (lastMainSubTab == "pox") CyberBorder else CyberTheme.purpleBorder
-    val activePanel = if (lastMainSubTab == "pox") CyberPanel else CyberTheme.purplePanel
+    val activeColor = CyberGreen
+    val activeColorDim = CyberGreenDim
+    val activeBorder = CyberBorder
+    val activePanel = CyberPanel
 
-    val subTabs = remember(lastMainSubTab) {
-        val list = mutableListOf(
+    val subTabs = remember {
+        listOf(
             PoxSubTab("parameters", "PARAMETERS", icon = { iconColor ->
                 WireframeReactorParametersIcon(color = iconColor, modifier = Modifier.size(24.dp))
             }),
             PoxSubTab("pox", "REACTOR", icon = { iconColor ->
                 WireframeDna(color = iconColor, modifier = Modifier.size(24.dp))
-            })
-        )
-        if (lastMainSubTab != "pox") {
-            list.add(
-                PoxSubTab("logs", "ANOM_LOG", icon = { iconColor ->
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text("XYZW!?$%", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                        Text("&@#GCTAA", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                        Text("ANOM.LOG", color = iconColor, fontSize = 6.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                    }
-                })
-            )
-        }
-        list.add(
+            }),
             PoxSubTab("terminal", "TERMINAL", icon = { iconColor ->
                 Box(
                     modifier = Modifier.size(24.dp),
@@ -575,51 +553,32 @@ fun CombinatorView(viewModel: MainViewModel) {
                 }
             })
         )
-        list
     }
 
     PoxTabFrame(
         flavorTitle = if (bioLabSubTab == "parameters") {
             "Tide Pool Reactor : Reactor Specifications & Parameters"
-        } else if (lastMainSubTab == "pox") {
+        } else {
             "G.E.N. P.O.X. TIDE POOL REACTOR V2.4"
-        } else {
-            "WARNING: UNKNOWN REACTOR"
         },
-        statusText = if (lastMainSubTab == "pox") {
-            if (poxReactorActive) "SYSTEMS ON" else "SYSTEMS OFF"
-        } else {
-            if (anomalyEngineActive) "SYSTEMS ON" else "SYSTEMS OFF"
-        },
-        statusColor = if (lastMainSubTab == "pox") {
-            if (poxReactorActive) CyberGreen else Color.Red
-        } else {
-            if (anomalyEngineActive) CyberGreen else Color.Red
-        },
+        statusText = if (poxReactorActive) "SYSTEMS ON" else "SYSTEMS OFF",
+        statusColor = if (poxReactorActive) CyberGreen else Color.Red,
         onStatusClick = {
-            if (lastMainSubTab == "pox") {
-                viewModel.setPoxReactorActive(!poxReactorActive)
-            } else {
-                viewModel.setAnomalyEngineActive(!anomalyEngineActive)
-            }
+            viewModel.setPoxReactorActive(!poxReactorActive)
         },
         headerTitle = if (bioLabSubTab == "parameters") {
             "P.O.X. Reactor Parameters"
-        } else if (lastMainSubTab == "pox") {
-            "SINGLE-NODE CYBERNETIC SYNTHESIZER"
         } else {
-            "GENETIC ANOMALY HARMONIZER"
+            "SINGLE-NODE CYBERNETIC SYNTHESIZER"
         },
         descriptionText = if (bioLabSubTab == "parameters") {
             "Manage your reactor to improve synthesis accuracy and gene quality."
-        } else if (lastMainSubTab == "pox") {
-            "Program your reactor, confirm ideal sequence coherence, and initiate synthesis."
         } else {
-            "Sacrifice existing genes to synthesize anomalous genes in the Anomaly Engine."
+            "Program your reactor, confirm ideal sequence coherence, and initiate synthesis."
         },
         borderColor = activeBorder,
         backgroundColor = activePanel,
-        isScrollable = (bioLabSubTab == "pox" || bioLabSubTab == "anomaly"),
+        isScrollable = (bioLabSubTab == "pox"),
         subTabs = subTabs,
         activeSubTab = bioLabSubTab,
         onSubTabClick = { id, tag ->
@@ -643,31 +602,17 @@ fun CombinatorView(viewModel: MainViewModel) {
                     activePanel = activePanel
                 )
             }
-            "anomaly" -> {
-                AnomalyDashboardView(
-                    viewModel = viewModel,
-                    onAnomalyLogClick = {
-                        viewModel.setBioLabSubTab("logs")
-                    }
-                )
-            }
-            "logs" -> {
-                if (lastMainSubTab == "pox") {
-                    LaunchedEffect(Unit) {
-                        viewModel.setBioLabSubTab("pox")
-                    }
-                } else {
-                    AnomalyVaultView(
-                        viewModel = viewModel,
-                        onSelectGene = { selectedAnomalousGene = it },
-                        onClose = { viewModel.setBioLabSubTab(lastMainSubTab) }
-                    )
-                }
-            }
             "terminal" -> {
                 TerminalLogSubView(
                     viewModel = viewModel,
                     activeBorder = activeBorder
+                )
+            }
+            else -> {
+                ReactorDashboardView(
+                    viewModel = viewModel,
+                    activeBorder = activeBorder,
+                    activePanel = activePanel
                 )
             }
         }

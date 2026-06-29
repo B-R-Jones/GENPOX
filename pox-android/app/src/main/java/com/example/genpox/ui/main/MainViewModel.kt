@@ -3457,37 +3457,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                         }
                     }
                     
-                    // 2. Tick Anomaly Engine if active (paused for testing)
-                    if (_anomalyEngineActive.value) {
-                        val poly = _activePolymerase.value.uppercase()
-                        val baseCycle = when (poly) {
-                            "TAQ" -> 8
-                            "PFU" -> 32
-                            "TTH" -> 16
-                            else -> 16
-                        }
-                        val isBoostActive = _boostSecondsLeft.value > 0
-                        val resetVal = if (isBoostActive) baseCycle / 2 else baseCycle
-
-                        val currentAnomalyIdle = _anomalyIdleTime.value
-                        var nextAnomalyVal = currentAnomalyIdle - 1
-                        if (isBoostActive && currentAnomalyIdle > (baseCycle / 2)) {
-                            nextAnomalyVal = baseCycle / 2
-                        }
-                        
-                        if (nextAnomalyVal <= 0) {
-                            if (rawStockA.value >= 2500 && rawStockG.value >= 2500 && 
-                                rawStockT.value >= 2500 && rawStockC.value >= 2500) {
-                                triggerAnomalousSynthesis()
-                            } else {
-                                _anomalyEngineActive.value = false
-                                _anomalyConsumedBases.value = 0L
-                                addLog("ANOMALY ENGINE SHUT DOWN: Out of raw nucleotides (requires 2,500 of each base) to sustain fusion.")
-                            }
-                            nextAnomalyVal = resetVal
-                        }
-                        _anomalyIdleTime.value = nextAnomalyVal
-                    }
+                    // 2. Tick Anomaly Engine is disabled (anomalous features decoupled)
                     
                     // 3. Tick active harvest missions in database
                     val activeMissionsList = activeMissions.value
