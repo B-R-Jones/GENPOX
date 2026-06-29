@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.drawscope.scale
@@ -228,6 +229,8 @@ fun SplicerView(viewModel: MainViewModel) {
     val activeColor = CyberTheme.green
     val activeBorder = CyberTheme.greenBorder
     val activePanel = CyberTheme.greenPanel
+    var selectedGeneDetails by remember { mutableStateOf<String?>(null) }
+    var onEjectActiveGene by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val subTabs = remember {
         listOf(
@@ -253,11 +256,23 @@ fun SplicerView(viewModel: MainViewModel) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         PoxTabFrame(
-            flavorTitle = "G.E.N. P.O.X. SPLICING ASSEMBLY CHAMBER V1.7",
+            flavorTitle = if (splicerSubTab == "splicer") {
+                if (isForcedConstructionActive) "P.O.X. REACTOR ACTIVE (OVERRIDE)" else "G.E.N. P.O.X. SPLICING ASSEMBLY CHAMBER V1.7"
+            } else {
+                "P.O.X. REACTOR TELEMETRY OVERRIDES"
+            },
             statusText = if (isForcedConstructionActive || isSplicing) "ACTIVE" else "READY",
             statusColor = if (isForcedConstructionActive || isSplicing) Color.Red else CyberGreen,
-            headerTitle = "MOLECULAR SPLICING SEQUENCER",
-            descriptionText = "Splice DNA fragments together to assemble your target species or override system thresholds using forced compilation.",
+            headerTitle = if (splicerSubTab == "splicer") {
+                if (isForcedConstructionActive) "FORCED SEQUENCING ACTIVE" else "SINGLE-NODE SEQUENCING"
+            } else {
+                "FORCED SEQUENCING LOG TERMINAL"
+            },
+            descriptionText = if (splicerSubTab == "splicer") {
+                "Fill all slots with stockpiled genes to assemble the target genome."
+            } else {
+                "Observe reactor telemetry logs and system overrides."
+            },
             borderColor = activeBorder,
             backgroundColor = activePanel,
             isScrollable = false,
@@ -282,6 +297,10 @@ fun SplicerView(viewModel: MainViewModel) {
                         forcedConstructionLogs = forcedConstructionLogs,
                         isSplicing = isSplicing,
                         splicingProgress = splicingProgress,
+                        onShowGeneDetails = { gene, eject ->
+                            selectedGeneDetails = gene
+                            onEjectActiveGene = eject
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -330,6 +349,21 @@ fun SplicerView(viewModel: MainViewModel) {
                 )
             }
         }
+
+        // Gene details popup overlay
+        selectedGeneDetails?.let { gene ->
+            GeneDetailsPopup(
+                viewModel = viewModel,
+                gene = gene,
+                activeColor = activeColor,
+                activePanel = activePanel,
+                onEject = onEjectActiveGene,
+                onClose = {
+                    selectedGeneDetails = null
+                    onEjectActiveGene = null
+                }
+            )
+        }
     }
 }
 
@@ -346,39 +380,48 @@ fun SplicerLeftPanel(
     forcedConstructionLogs: List<String>,
     isSplicing: Boolean,
     splicingProgress: Int,
+    onShowGeneDetails: (String, (() -> Unit)?) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "hex_wave")
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+
+    val allFull = splicerSlots.none { it == null }
+    var currentSpin by remember { mutableStateOf(0f) }
+    LaunchedEffect(allFull) {
+        if (allFull) {
+            while (true) {
+                currentSpin += 0.02f
+                delay(16)
+            }
+        } else {
+            val remainder = currentSpin % (2f * Math.PI.toFloat())
+            val target = currentSpin - remainder
+            animate(
+                initialValue = currentSpin,
+                targetValue = target,
+                animationSpec = spring(stiffness = Spring.StiffnessLow)
+            ) { value, _ ->
+                currentSpin = value
+            }
+        }
+    }
+
     if (isForcedConstructionActive) {
         // Emergency Forced Compile Terminal Screen
         Column(
-            modifier = modifier
-                .cyberglass(borderColor = Color(0xFFEF4444), backgroundColor = Color.Black)
-                .padding(12.dp),
+            modifier = modifier,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "FORCED SEQUENCING ACTIVE",
-                        color = Color(0xFFEF4444),
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "P.O.X. REACTOR ACTIVE (OVERRIDE)",
-                    color = Color.White,
-                    style = Typography.bodyMedium,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
 
                 // CRT scrolling terminal logs container
                 val displayedLogs = remember { mutableStateListOf<String>() }
@@ -477,9 +520,7 @@ fun SplicerLeftPanel(
     } else if (isSplicing) {
         // Splicing Morphogenesis Screen
         Column(
-            modifier = modifier
-                .cyberglass(borderColor = CyberBorder, backgroundColor = CyberPanel)
-                .padding(12.dp),
+            modifier = modifier,
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -694,268 +735,197 @@ fun SplicerLeftPanel(
             )
         }
     } else {
-        // Standard Re-sequencing grid layout panel
+        // Standard Re-sequencing compact circular genome matrix panel
         Column(
-            modifier = modifier
-                .cyberglass(borderColor = CyberBorder, backgroundColor = CyberPanel)
-                .padding(12.dp),
+            modifier = modifier,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "G.E.N. P.O.X. E-MERGE SEQUENCER V1.7",
-                        color = CyberGreenDim,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Default
-                    )
-                    Text(
-                        text = "SYSTEMS ON",
-                        color = CyberGreen,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Default
-                    )
-                }
+            // Main workspace with Circular Splicing Matrix
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                val density = LocalDensity.current
+                val widthDp = with(density) { constraints.maxWidth.toDp() }.value
+                val heightDp = with(density) { constraints.maxHeight.toDp() }.value
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .requiredHeight(24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "SINGLE-NODE SEQUENCING",
-                        color = Color.White,
-                        style = Typography.bodyMedium,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
+                val centerX = widthDp / 2f
+                val centerY = heightDp / 2f
+                val radius = minOf(widthDp, heightDp) * 0.35f
+
+                // 1. Background spokes and rotating DNA wireframe
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val w = size.width
+                    val h = size.height
+                    val cx = w / 2f
+                    val cy = h / 2f
+                    val rPx = radius * density.density
+
+                    // Central core glowing outline
+                    drawCircle(
+                        color = CyberGreenDim.copy(alpha = 0.25f),
+                        radius = rPx * 0.4f,
+                        center = Offset(cx, cy),
+                        style = Stroke(width = 1.dp.toPx())
                     )
-                }
-                Text(
-                    text = "Fill all slots with stockpiled genes to assemble the target genome.",
-                    color = CyberGreen.copy(alpha = 0.8f),
-                    style = Typography.bodySmall,
-                    fontFamily = FontFamily.Default,
-                    fontSize = 10.sp
-                )
 
-                // 8 Slots grid (arranged as 4 cols, 2 rows)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.Black)
-                        .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                        .padding(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        for (idx in 0..3) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                SplicerSlotCell(
-                                    idx = idx,
-                                    slot = splicerSlots[idx],
-                                    isSelected = activeSlotSelection == idx,
-                                    onClick = { viewModel.selectSplicerSlot(idx) },
-                                    onEject = { viewModel.ejectGeneFromSlot(idx) }
-                                )
-                            }
-                        }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        for (idx in 4..7) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                SplicerSlotCell(
-                                    idx = idx,
-                                    slot = splicerSlots[idx],
-                                    isSelected = activeSlotSelection == idx,
-                                    onClick = { viewModel.selectSplicerSlot(idx) },
-                                    onEject = { viewModel.ejectGeneFromSlot(idx) }
-                                )
-                            }
-                        }
-                    }
-                }
+                    // Draw rotating 3D DNA Helix wireframe in the center
+                    val helixW = rPx * 0.3f
+                    val helixH = rPx * 0.6f
+                    val points = 24
+                    val step = helixH / points
+                    for (p in 0 until points) {
+                        val py = cy - helixH / 2f + p * step
+                        val angle = wavePhase + p * 0.4f
 
-                // Target genome required sequence
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF050C06))
-                        .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                        .padding(6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "REQUIRED TARGET SEQUENCE",
-                            color = CyberGreenDim,
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
+                        val px1 = cx + helixW * sin(angle)
+                        val px2 = cx - helixW * sin(angle)
+
+                        val alpha = 0.15f + 0.15f * cos(angle)
+                        drawLine(
+                            color = CyberGreen.copy(alpha = alpha),
+                            start = Offset(px1, py),
+                            end = Offset(px2, py),
+                            strokeWidth = 1.dp.toPx()
                         )
-                        Text(
-                            text = "64-CHAR GENOME GOAL",
-                            color = CyberGreenDim,
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Default,
-                            fontSize = 8.sp
+                        drawCircle(
+                            color = CyberGreen.copy(alpha = alpha + 0.3f),
+                            radius = 2.dp.toPx(),
+                            center = Offset(px1, py)
+                        )
+                        drawCircle(
+                            color = CyberGreen.copy(alpha = alpha + 0.3f),
+                            radius = 2.dp.toPx(),
+                            center = Offset(px2, py)
                         )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
 
-                    // Renders 8 blocks of 8 bases in a centered 2x4 grid
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        for (row in 0 until 2) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                for (col in 0 until 4) {
-                                    val i = row * 4 + col
-                                    val segment = targetSequence.substring(i * 8, (i + 1) * 8)
-                                    val isAnom = WaveMath.isAnomalousGene(segment)
-                                    val color = if (isAnom) {
-                                        Color(0xFFA855F7)
-                                    } else {
-                                        when (i % 4) {
-                                            0 -> CyberGreen
-                                            1 -> Color(0xFFFBBF24)
-                                            2 -> Color(0xFF60A5FA)
-                                            else -> Color(0xFFC084FC)
-                                        }
-                                    }
+                    // Spokes from central core to outer slots
+                    for (i in 0 until 8) {
+                        val slotGene = splicerSlots.getOrNull(i)
+                        val requiredSegment = targetSequence.substring(i * 8, (i + 1) * 8)
+                        val spokeColor = when {
+                            slotGene == null -> CyberBorder.copy(alpha = 0.2f)
+                            slotGene == requiredSegment -> CyberGreen.copy(alpha = 0.6f)
+                            else -> Color.Red.copy(alpha = 0.6f)
+                        }
 
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .background(
-                                                color = if (isAnom) Color(0x20A855F7) else Color.Transparent,
-                                                shape = RoundedCornerShape(4.dp)
-                                            )
-                                            .border(
-                                                width = if (isAnom) 1.dp else 0.dp,
-                                                color = if (isAnom) Color(0x30A855F7) else Color.Transparent,
-                                                shape = RoundedCornerShape(4.dp)
-                                            )
-                                            .padding(horizontal = 4.dp, vertical = 2.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = segment,
-                                            color = color,
-                                            style = Typography.bodySmall,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 10.sp,
-                                            letterSpacing = 1.sp,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                            }
+                        val angleRad = (i * 45 - 90) * Math.PI / 180.0 + currentSpin
+                        val sx = cx + (rPx * 0.3f) * cos(angleRad).toFloat()
+                        val sy = cy + (rPx * 0.3f) * sin(angleRad).toFloat()
+                        val ex = cx + rPx * cos(angleRad).toFloat()
+                        val ey = cy + rPx * sin(angleRad).toFloat()
+
+                        if (slotGene == null) {
+                            drawLine(
+                                color = spokeColor,
+                                start = Offset(sx, sy),
+                                end = Offset(ex, ey),
+                                strokeWidth = 1.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
+                            )
+                        } else {
+                            drawLine(
+                                color = spokeColor,
+                                start = Offset(sx, sy),
+                                end = Offset(ex, ey),
+                                strokeWidth = 1.2.dp.toPx()
+                            )
                         }
                     }
                 }
 
-                // Current spliced specimen DNA
+                // 2. Central coherence status telemetry readout
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF050C06))
-                        .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                        .padding(6.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
+                    val coherentCount = (0 until 8).count { i ->
+                        splicerSlots.getOrNull(i) == targetSequence.substring(i * 8, (i + 1) * 8)
+                    }
+                    val coherencePct = (coherentCount * 100) / 8
+
                     Text(
-                        text = "CURRENT SPLICED SEQUENCE",
+                        text = "COHERENCE",
                         color = CyberGreenDim,
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Default,
+                        fontSize = 7.sp,
+                        fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "$coherencePct%",
+                        color = if (coherencePct == 100) CyberGreen else if (coherencePct > 0) Color(0xFF22D3EE) else Color.Gray,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
 
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        for (row in 0 until 2) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                for (col in 0 until 4) {
-                                    val i = row * 4 + col
-                                    val slotGene = splicerSlots.getOrNull(i)
-                                    val segment = slotGene ?: "--------"
-                                    val isAnom = if (slotGene != null) {
-                                        val targetSegment = targetSequence.substring(i * 8, (i + 1) * 8)
-                                        WaveMath.isAnomalousGene(targetSegment)
-                                    } else false
-                                    
-                                    val color = if (slotGene == null) {
-                                        Color.Gray
-                                    } else if (isAnom) {
-                                        Color(0xFFA855F7)
-                                    } else {
-                                        when (i % 4) {
-                                            0 -> CyberGreen
-                                            1 -> Color(0xFFFBBF24)
-                                            2 -> Color(0xFF60A5FA)
-                                            else -> Color(0xFFC084FC)
-                                        }
-                                    }
+                // 3. Interactive circular slot nodes (diameter 40.dp, minimalist design, no text)
+                for (idx in 0 until 8) {
+                    val slotGene = splicerSlots.getOrNull(idx)
+                    val requiredSegment = targetSequence.substring(idx * 8, (idx + 1) * 8)
 
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .background(
-                                                color = if (isAnom) Color(0x20A855F7) else Color.Transparent,
-                                                shape = RoundedCornerShape(4.dp)
-                                            )
-                                            .border(
-                                                width = if (isAnom) 1.dp else 0.dp,
-                                                color = if (isAnom) Color(0x30A855F7) else Color.Transparent,
-                                                shape = RoundedCornerShape(4.dp)
-                                            )
-                                            .padding(horizontal = 4.dp, vertical = 2.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = segment,
-                                            color = color,
-                                            style = Typography.bodySmall,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 10.sp,
-                                            letterSpacing = 1.sp,
-                                            textAlign = TextAlign.Center
-                                        )
+                    val statusText = when {
+                        slotGene == null -> "EMPTY"
+                        slotGene == requiredSegment -> "COHERENT"
+                        else -> "MISMATCH"
+                    }
+                    val statusColor = when (statusText) {
+                        "COHERENT" -> CyberGreen
+                        "MISMATCH" -> Color.Red
+                        else -> Color.Gray
+                    }
+
+                    val angleRad = (idx * 45 - 90) * Math.PI / 180.0 + currentSpin
+                    val nodeX = centerX + radius * cos(angleRad).toFloat()
+                    val nodeY = centerY + radius * sin(angleRad).toFloat()
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .offset(
+                                x = (nodeX - 20f).dp,
+                                y = (nodeY - 20f).dp
+                            )
+                            .size(40.dp)
+                            .zIndex(if (activeSlotSelection == idx) 2f else 1f)
+                            .cyberglassCircle(
+                                borderColor = if (activeSlotSelection == idx) CyberGreen else if (slotGene != null) statusColor.copy(alpha = 0.6f) else CyberBorder.copy(alpha = 0.3f),
+                                backgroundColor = if (slotGene != null) statusColor.copy(alpha = 0.08f) else Color(0xFF030503)
+                            )
+                            .clickable {
+                                if (slotGene != null) {
+                                    onShowGeneDetails(slotGene) {
+                                        viewModel.ejectGeneFromSlot(idx)
                                     }
+                                } else {
+                                    viewModel.selectSplicerSlot(idx)
                                 }
-                            }
-                        }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Pulsing status dot core visualizer inside the circle
+                        val pulseAlpha by infiniteTransition.animateFloat(
+                            initialValue = 0.4f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Reverse
+                            ),
+                            label = "status_pulse"
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(
+                                    color = if (slotGene == null) Color.Gray.copy(alpha = 0.4f)
+                                            else statusColor.copy(alpha = if (statusText == "COHERENT") pulseAlpha else 1f)
+                                )
+                        )
                     }
                 }
             }
@@ -964,17 +934,9 @@ fun SplicerLeftPanel(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    PoxButton(
-                        modifier = Modifier.weight(1f),
-                        text = "AUTO-FILL SLOTS",
-                        onClick = { viewModel.autofillSplicerSlots() },
-                        buttonType = PoxButtonType.GREEN_MUTED,
-                        buttonSize = PoxButtonSize.STANDARD,
-                        sound = PoxButtonSound.COMBINATOR_TICK,
-                        viewModel = viewModel
-                    )
                     val hasEmpty = splicerSlots.contains(null)
                     PoxButton(
                         modifier = Modifier.weight(1f),
@@ -986,6 +948,22 @@ fun SplicerLeftPanel(
                         sound = PoxButtonSound.SUCCESS_CHIME,
                         viewModel = viewModel
                     )
+                    Box(
+                        modifier = Modifier
+                            .width(38.dp)
+                            .height(34.dp)
+                            .cyberglass(
+                                borderColor = CyberTheme.greenDim,
+                                backgroundColor = CyberTheme.greenPanel.copy(alpha = 0.5f)
+                            )
+                            .clickable {
+                                viewModel.synthManager.playCombinatorTick()
+                                viewModel.autofillSplicerSlots()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        HoloDnaAutoSlotIcon(color = CyberTheme.greenDim)
+                    }
                 }
 
                 Row(
@@ -1321,7 +1299,7 @@ fun SplicerRightPanel(
                 style = Typography.bodySmall,
                 fontFamily = FontFamily.Default,
                 fontWeight = FontWeight.Bold,
-                fontSize = 9.sp
+                fontSize = 8.5.sp
             )
         }
     }
@@ -1451,35 +1429,10 @@ fun SplicerTerminalLogView(
     activeBorder: Color
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .padding(8.dp),
+        modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "FORCED SEQUENCING LOG TERMINAL",
-                    color = Color(0xFFEF4444),
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "P.O.X. REACTOR TELEMETRY OVERRIDES",
-                color = Color.White,
-                style = Typography.bodyMedium,
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
 
             val listState = rememberLazyListState()
             LaunchedEffect(forcedConstructionLogs.size) {
@@ -1522,6 +1475,59 @@ fun SplicerTerminalLogView(
                 buttonSize = PoxButtonSize.STANDARD,
                 sound = PoxButtonSound.REJECT_BEEP,
                 viewModel = viewModel
+            )
+        }
+    }
+}
+
+@Composable
+fun BaseHexagon(
+    char: Char,
+    isPlaceholder: Boolean,
+    sizeDp: Dp,
+    modifier: Modifier = Modifier
+) {
+    val color = when (char) {
+        'A' -> Color(0xFF38BDF8) // Cyan
+        'G' -> Color(0xFF34D399) // Green
+        'T' -> Color(0xFFFB7185) // Rose/Red
+        'C' -> Color(0xFFFBBF24) // Yellow
+        else -> Color.Gray
+    }
+    val hexColor = if (isPlaceholder) Color.DarkGray.copy(alpha = 0.4f) else color
+
+    Box(
+        modifier = modifier.size(sizeDp),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val hexRadius = w / 2f
+            val center = Offset(w / 2f, h / 2f)
+            val path = Path().apply {
+                for (i in 0..5) {
+                    val angleRad = i * Math.PI / 3f - Math.PI / 6f
+                    val x = center.x + hexRadius * cos(angleRad).toFloat()
+                    val y = center.y + hexRadius * sin(angleRad).toFloat()
+                    if (i == 0) moveTo(x, y) else lineTo(x, y)
+                }
+                close()
+            }
+            if (!isPlaceholder) {
+                drawPath(path, color = hexColor.copy(alpha = 0.15f), style = Fill)
+                drawPath(path, color = hexColor, style = Stroke(width = 1.2.dp.toPx()))
+            } else {
+                drawPath(path, color = hexColor, style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)))
+            }
+        }
+        if (char != '-' && char != '.') {
+            Text(
+                text = char.toString(),
+                color = if (isPlaceholder) Color.Gray else hexColor,
+                fontSize = if (sizeDp < 20.dp) 7.sp else if (sizeDp > 26.dp) 11.sp else 10.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
             )
         }
     }

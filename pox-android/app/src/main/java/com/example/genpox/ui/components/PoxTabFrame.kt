@@ -42,6 +42,8 @@ fun PoxTabFrame(
     onSubTabClick: ((String, String) -> Unit)? = null,
     viewModel: MainViewModel? = null,
     drawSubTabs: Boolean = true,
+    drawFrame: Boolean = true,
+    showHeader: Boolean = true,
     content: (@Composable ColumnScope.() -> Unit)? = null
 ) {
     val scrollModifier = if (isScrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
@@ -49,80 +51,91 @@ fun PoxTabFrame(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .cyberglass(borderColor = borderColor, backgroundColor = backgroundColor)
-            .padding(12.dp)
+            .then(
+                if (drawFrame) {
+                    Modifier.cyberglass(borderColor = borderColor, backgroundColor = backgroundColor)
+                        .padding(12.dp)
+                } else Modifier
+            )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .then(scrollModifier)
-                .padding(bottom = if (subTabs.isNotEmpty()) 56.dp else 0.dp),
+                .padding(bottom = if (subTabs.isNotEmpty()) 56.dp else 0.dp)
+                .then(
+                    if (!drawFrame) {
+                        Modifier.padding(12.dp)
+                    } else Modifier
+                ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.Start
         ) {
-            // Top header row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            if (showHeader) {
+                // Top header row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                       text = flavorTitle.uppercase(),
+                       color = when (borderColor) {
+                           CyberBorder -> CyberGreenDim
+                           CyberTheme.purpleBorder -> CyberTheme.purpleDim
+                           CyberTheme.cyanBorder -> CyberTheme.cyanDim
+                           CyberTheme.redBorder -> CyberTheme.redDim
+                           else -> borderColor.copy(alpha = 0.6f)
+                       },
+                       fontSize = 9.sp,
+                       fontWeight = FontWeight.Bold,
+                       fontFamily = FontFamily.Default
+                    )
+                    Text(
+                        text = statusText.uppercase(),
+                        color = statusColor,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default,
+                        modifier = if (onStatusClick != null) Modifier.clickable(onClick = onStatusClick) else Modifier
+                    )
+                }
+
+                // Middle main title row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .requiredHeight(24.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = headerTitle.uppercase(),
+                        color = Color.White,
+                        style = Typography.bodyMedium,
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // Bottom flavor/description text
                 Text(
-                   text = flavorTitle.uppercase(),
-                   color = when (borderColor) {
-                       CyberBorder -> CyberGreenDim
-                       CyberTheme.purpleBorder -> CyberTheme.purpleDim
-                       CyberTheme.cyanBorder -> CyberTheme.cyanDim
-                       CyberTheme.redBorder -> CyberTheme.redDim
-                       else -> borderColor.copy(alpha = 0.6f)
-                   },
-                   fontSize = 9.sp,
-                   fontWeight = FontWeight.Bold,
-                   fontFamily = FontFamily.Default
-                )
-                Text(
-                    text = statusText.uppercase(),
-                    color = statusColor,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
+                    text = descriptionText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = when (borderColor) {
+                        CyberBorder -> CyberGreen.copy(alpha = 0.8f)
+                        CyberTheme.purpleBorder -> CyberTheme.purple.copy(alpha = 0.8f)
+                        CyberTheme.cyanBorder -> CyberTheme.cyan.copy(alpha = 0.8f)
+                        CyberTheme.redBorder -> CyberTheme.red.copy(alpha = 0.8f)
+                        else -> borderColor.copy(alpha = 0.8f)
+                    },
+                    fontSize = 10.sp,
                     fontFamily = FontFamily.Default,
-                    modifier = if (onStatusClick != null) Modifier.clickable(onClick = onStatusClick) else Modifier
+                    fontWeight = FontWeight.Normal,
+                    modifier = Modifier.padding(bottom = if (content != null) 4.dp else 0.dp)
                 )
             }
-
-            // Middle main title row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .requiredHeight(24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = headerTitle.uppercase(),
-                    color = Color.White,
-                    style = Typography.bodyMedium,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // Bottom flavor/description text
-            Text(
-                text = descriptionText,
-                style = MaterialTheme.typography.bodySmall,
-                color = when (borderColor) {
-                    CyberBorder -> CyberGreen.copy(alpha = 0.8f)
-                    CyberTheme.purpleBorder -> CyberTheme.purple.copy(alpha = 0.8f)
-                    CyberTheme.cyanBorder -> CyberTheme.cyan.copy(alpha = 0.8f)
-                    CyberTheme.redBorder -> CyberTheme.red.copy(alpha = 0.8f)
-                    else -> borderColor.copy(alpha = 0.8f)
-                },
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Normal,
-                modifier = Modifier.padding(bottom = if (content != null) 4.dp else 0.dp)
-            )
 
             // Optional slot for inner elements
             if (content != null) {

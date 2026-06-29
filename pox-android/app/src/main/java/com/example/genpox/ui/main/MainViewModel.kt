@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.genpox.audio.PoxSynthManager
 import com.example.genpox.data.*
+import com.example.genpox.data.network.PoxNetworkManager
+import com.example.genpox.data.network.HydraPacket
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import com.google.ai.client.generativeai.type.generationConfig
@@ -24,6 +26,196 @@ import kotlin.math.sin
 class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
     val synthManager = PoxSynthManager()
+    private val _networkManager = MutableStateFlow<PoxNetworkManager?>(null)
+    var networkManager: PoxNetworkManager?
+        get() = _networkManager.value
+        set(value) {
+            _networkManager.value = value
+        }
+
+    private val _inboxMessages = MutableStateFlow<List<MailMessage>>(
+        listOf(
+            MailMessage(
+                "msg_1",
+                "CONTAINMENT NODE #04",
+                "ATMOSPHERIC DENSITY ALARM",
+                "2 hours ago",
+                "ALERT: Synodic drift is generating a +0.31 density anomaly crosstalk near epicenter. Dispatch engines must equip COHERENCE_SHIELD constructs to bypass velocity degradation protocols immediately."
+            ),
+            MailMessage(
+                "msg_2",
+                "REACTOR CORE AGENT",
+                "CODON BLOCK COMPILE LOG",
+                "6 hours ago",
+                "TRANSMISSION: Batch 109 compiled successfully. 8 genetic telemetry sequences bound and cached to biological stockpiles. Synchronized signature hash aligns with deterministic calendar seed."
+            ),
+            MailMessage(
+                "msg_3",
+                "ANONYMOUS SPLICER",
+                "ENCRYPTED SIGNAL RECEPT",
+                "Yesterday",
+                "Snoop data intercepted from infection sector well: AGTCGTAC. Sequence successfully routed to player inventory registers. Decode via Bio-Lab Step-Search node compilation."
+            ),
+            MailMessage(
+                "msg_4",
+                "SYSTEM UPDATE",
+                "NTP CHANNELS RE-ALIGNED",
+                "2 days ago",
+                "NTP time servers successfully re-aligned with cosmic clock cycles. Harmonic coupling metrics reset to baseline 80.0% parameters."
+            )
+        )
+    )
+    val inboxMessages: StateFlow<List<MailMessage>> = _inboxMessages.asStateFlow()
+
+    private val _registeredPeers = MutableStateFlow<List<PeerNode>>(emptyList())
+    val registeredPeers: StateFlow<List<PeerNode>> = _registeredPeers.asStateFlow()
+
+    val localNodeName = "AGENT-NODE-${(100..999).random()}"
+
+
+    private val _isNetworkSimulationActive = MutableStateFlow(false)
+    val isNetworkSimulationActive: StateFlow<Boolean> = _isNetworkSimulationActive.asStateFlow()
+
+    fun toggleNetworkSimulation(enabled: Boolean) {
+        _isNetworkSimulationActive.value = enabled
+        networkManager?.toggleSimulation(enabled)
+
+        if (enabled) {
+            val current = _registeredPeers.value.toMutableList()
+            if (current.none { it.id == "mock_1" }) {
+                current.add(PeerNode("mock_1", "MOCK-PEER-ALPHA", "P2P Segment", "60ms", "ONLINE"))
+            }
+            if (current.none { it.id == "mock_2" }) {
+                current.add(PeerNode("mock_2", "MOCK-PEER-BETA", "P2P Segment", "---", "OFFLINE"))
+            }
+            _registeredPeers.value = current
+        } else {
+            _registeredPeers.value = _registeredPeers.value.filterNot { it.id == "mock_1" || it.id == "mock_2" }
+        }
+    }
+
+    fun registerPeerNode(name: String, sector: String) {
+        val nextId = "peer_${_registeredPeers.value.size + 1}"
+        val newPeer = PeerNode(nextId, name, sector, "---", "ONLINE")
+        _registeredPeers.value = _registeredPeers.value + newPeer
+    }
+
+    fun markMessageAsRead(messageId: String) {
+        val current = _inboxMessages.value.map { msg ->
+            if (msg.id == messageId) msg.copy(isRead = true) else msg
+        }
+        _inboxMessages.value = current
+    }
+
+    fun claimMessageAttachment(messageId: String) {
+        val msg = _inboxMessages.value.find { it.id == messageId } ?: return
+        if (msg.isClaimed) return
+
+        viewModelScope.launch {
+            if (msg.attachedCreatureDna != null && msg.attachedCreatureName != null) {
+                val newCreature = Creature(
+                    id = UUID.randomUUID().toString(),
+                    sequence = msg.attachedCreatureDna,
+                    name = msg.attachedCreatureName,
+                    faction = msg.attachedCreatureFaction ?: "Natural",
+                    type = "Spliced Hybrid",
+                    vitality = (80..180).random(),
+                    attack = (10..40).random(),
+                    defense = (10..40).random(),
+                    speed = (10..40).random(),
+                    primaryWeapon = "Organic Spikes",
+                    lore = "Received via peer network transmission from ${msg.from}.",
+                    asciiArt = " [P2P CODON LINK] ",
+                    discoveredAt = System.currentTimeMillis(),
+                    origin = msg.from
+                )
+                repository.insertCreature(newCreature)
+            }
+
+            if (msg.attachedGeneSequence != null) {
+                val newSeq = GeneSequence(
+                    sequence = msg.attachedGeneSequence,
+                    count = 1,
+                    discoveredAt = System.currentTimeMillis()
+                )
+                repository.insertGeneSequence(newSeq)
+            }
+
+            if (msg.transferGenes > 0 || msg.transferWaste > 0) {
+                val newA = _rawStockA.value + msg.transferGenes
+                val newG = _rawStockG.value + msg.transferGenes
+                val newT = _rawStockT.value + msg.transferGenes
+                val newC = _rawStockC.value + msg.transferGenes
+                _rawStockA.value = newA
+                _rawStockG.value = newG
+                _rawStockT.value = newT
+                _rawStockC.value = newC
+                repository.saveRawStocks(newA, newG, newT, newC)
+
+                _bioWaste.value = _bioWaste.value + msg.transferWaste
+            }
+
+            val updated = _inboxMessages.value.map { m ->
+                if (m.id == messageId) m.copy(isClaimed = true, isRead = true) else m
+            }
+            _inboxMessages.value = updated
+            synthManager.playSynthesisSuccess()
+        }
+    }
+
+    fun transmitP2PMessage(
+        endpointId: String,
+        text: String,
+        creature: Creature?,
+        gene: GeneSequence?,
+        transferResources: Boolean
+    ) {
+        val nm = networkManager ?: return
+        
+        viewModelScope.launch {
+            var transGenes = 0
+            var transWaste = 0
+
+            if (transferResources) {
+                if (_rawStockA.value >= 10 && _rawStockG.value >= 10 &&
+                    _rawStockT.value >= 10 && _rawStockC.value >= 10 &&
+                    _bioWaste.value >= 25
+                ) {
+                    val newA = _rawStockA.value - 10
+                    val newG = _rawStockG.value - 10
+                    val newT = _rawStockT.value - 10
+                    val newC = _rawStockC.value - 10
+                    _rawStockA.value = newA
+                    _rawStockG.value = newG
+                    _rawStockT.value = newT
+                    _rawStockC.value = newC
+                    repository.saveRawStocks(newA, newG, newT, newC)
+
+                    _bioWaste.value = _bioWaste.value - 25
+                    
+                    transGenes = 10
+                    transWaste = 25
+                }
+            }
+
+            val packet = HydraPacket.NetworkMessage(
+                senderName = "AGENT-NODE",
+                messageText = text.take(64),
+                attachedCreatureDna = creature?.sequence,
+                attachedCreatureName = creature?.name,
+                attachedCreatureFaction = creature?.faction,
+                attachedGeneSequence = gene?.sequence,
+                transferGenes = transGenes,
+                transferWaste = transWaste
+            )
+            
+            nm.sendPacket(endpointId, packet)
+            synthManager.playBeep(880f, 0.08f, "square")
+        }
+    }
+
+
+
 
     // State flows from Repository
     val creatures: StateFlow<List<Creature>> = repository.allCreatures
@@ -631,6 +823,15 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     init {
+        // Collect incoming P2P packets
+        viewModelScope.launch {
+            _networkManager.collectLatest { nm ->
+                nm?.incomingPackets?.collect { pair ->
+                    onIncomingPacket(pair.first, pair.second)
+                }
+            }
+        }
+
         // Observe database/repository stocks to initialize and keep in-sync
         viewModelScope.launch {
             repository.rawStockA.collect { value ->
@@ -716,6 +917,53 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             }
         }
     }
+
+    private fun onIncomingPacket(endpointId: String, packet: HydraPacket) {
+        if (packet is HydraPacket.NetworkMessage) {
+            val peerName = networkManager?.activeConnections?.value?.get(endpointId) ?: "Unknown Peer"
+            val text = packet.messageText
+            
+            val subject = when {
+                packet.attachedCreatureDna != null -> "CREATURE SECURED TRANSACTION"
+                packet.attachedGeneSequence != null -> "GENE SEQUENCE TRANSFERRED"
+                packet.transferGenes > 0 -> "RESOURCES DISPATCH RECEIVED"
+                else -> "PEER UPLINK MESSAGE"
+            }
+
+            val bodyBuilder = java.lang.StringBuilder()
+            bodyBuilder.append("PAYLOAD MESSAGE:\n\"$text\"\n\n")
+            if (packet.attachedCreatureDna != null) {
+                bodyBuilder.append("ATTACHED HYBRID: ${packet.attachedCreatureName} [FACTION: ${packet.attachedCreatureFaction}]\n")
+            }
+            if (packet.attachedGeneSequence != null) {
+                bodyBuilder.append("ATTACHED CODON BLOCK: ${packet.attachedGeneSequence}\n")
+            }
+            if (packet.transferGenes > 0 || packet.transferWaste > 0) {
+                bodyBuilder.append("ATTACHED RESOURCES:\n")
+                if (packet.transferGenes > 0) bodyBuilder.append("  +${packet.transferGenes} Stock of all Bases (A, G, T, C)\n")
+                if (packet.transferWaste > 0) bodyBuilder.append("  +${packet.transferWaste} Bio-Waste stockpile units\n")
+            }
+
+            val newMsg = MailMessage(
+                id = "msg_recv_${System.currentTimeMillis()}",
+                from = peerName,
+                subject = subject,
+                timestamp = "Just now",
+                body = bodyBuilder.toString(),
+                isRead = false,
+                attachedCreatureDna = packet.attachedCreatureDna,
+                attachedCreatureName = packet.attachedCreatureName,
+                attachedCreatureFaction = packet.attachedCreatureFaction,
+                attachedGeneSequence = packet.attachedGeneSequence,
+                transferGenes = packet.transferGenes,
+                transferWaste = packet.transferWaste
+            )
+
+            _inboxMessages.value = listOf(newMsg) + _inboxMessages.value
+            synthManager.playSynthesisSuccess()
+        }
+    }
+
 
 
     fun selectTab(tab: String) {

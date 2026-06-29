@@ -130,3 +130,23 @@ fun Modifier.cyberglass(
             drawLine(borderColor, Offset(w, h), Offset(w, h - tick), strokeWidth = stroke * 1.5f)
         }
 )
+
+fun Modifier.cyberglassCircle(
+    borderColor: Color,
+    glowColor: Color = borderColor.copy(alpha = 0.2f),
+    backgroundColor: Color = Color(0xFF0A0A0F).copy(alpha = 0.75f)
+): Modifier = this.then(
+    Modifier
+        .clip(androidx.compose.foundation.shape.CircleShape)
+        .background(backgroundColor)
+        .border(1.dp, borderColor.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape)
+        .drawBehind {
+            val w = size.width
+            drawCircle(
+                color = borderColor.copy(alpha = 0.15f),
+                radius = w / 2f - 3.dp.toPx(),
+                style = Stroke(width = 0.8.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f))
+            )
+        }
+)
+

@@ -32,6 +32,14 @@ import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import kotlin.math.cos
 import kotlin.math.sin
+import com.example.genpox.data.network.PoxNetworkManager
+import com.example.genpox.data.network.HydraPacket
+import com.example.genpox.data.MailMessage
+import com.example.genpox.data.Creature
+import com.example.genpox.data.GeneSequence
+import com.example.genpox.data.PeerNode
+import androidx.compose.ui.platform.LocalContext
+
 
 // ==========================================
 // HOLOGRAPHIC CANVAS ICON RENDERERS
@@ -177,27 +185,6 @@ fun HoloCautionIcon(color: Color, modifier: Modifier = Modifier) {
 }
 
 // ==========================================
-// DATA CLASS DEFINITIONS
-// ==========================================
-
-private data class MailMessage(
-    val id: String,
-    val from: String,
-    val subject: String,
-    val timestamp: String,
-    val body: String,
-    var isRead: Boolean = false
-)
-
-private data class PeerNode(
-    val id: String,
-    val name: String,
-    val sector: String,
-    val latency: String,
-    val status: String
-)
-
-// ==========================================
 // MAIN NETWORK SCREEN VIEW
 // ==========================================
 
@@ -206,7 +193,17 @@ fun NetworkView(viewModel: MainViewModel) {
     val coroutineScope = rememberCoroutineScope()
     var activeSubView by remember { mutableStateOf("hydranet") } // "hydranet", "diagnostics", "inbox", "friends"
 
-    // Unified logs cached in viewmodel logs or local console
+    val context = LocalContext.current
+    val networkManager = viewModel.networkManager
+
+    // Collect network manager flows if it is initialized
+    val isAdvertising by networkManager?.isAdvertising?.collectAsState(initial = false) ?: remember { mutableStateOf(false) }
+    val isDiscovering by networkManager?.isDiscovering?.collectAsState(initial = false) ?: remember { mutableStateOf(false) }
+    val discoveredPeers by networkManager?.discoveredPeers?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    val activeConnections by networkManager?.activeConnections?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
+    val networkLogs by networkManager?.connectionLogs?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+
+    // Fallback/Mock logs if networkManager is not available
     val diagnosticsLogs = remember {
         mutableStateListOf(
             "SYS: INIT NET INTERFACE DECK ON PORT 5005...",
@@ -227,48 +224,45 @@ fun NetworkView(viewModel: MainViewModel) {
         }
     }
 
-    // Inbox data state
-    val inboxMessages = remember {
-        mutableStateListOf(
-            MailMessage(
-                "msg_1",
-                "CONTAINMENT NODE #04",
-                "ATMOSPHERIC DENSITY ALARM",
-                "2 hours ago",
-                "ALERT: Synodic drift is generating a +0.31 density anomaly crosstalk near epicenter. Dispatch engines must equip COHERENCE_SHIELD constructs to bypass velocity degradation protocols immediately."
-            ),
-            MailMessage(
-                "msg_2",
-                "REACTOR CORE AGENT",
-                "CODON BLOCK COMPILE LOG",
-                "6 hours ago",
-                "TRANSMISSION: Batch 109 compiled successfully. 8 genetic telemetry sequences bound and cached to biological stockpiles. Synchronized signature hash aligns with deterministic calendar seed."
-            ),
-            MailMessage(
-                "msg_3",
-                "ANONYMOUS SPLICER",
-                "ENCRYPTED SIGNAL RECEPT",
-                "Yesterday",
-                "Snoop data intercepted from infection sector well: AGTCGTAC. Sequence successfully routed to player inventory registers. Decode via Bio-Lab Step-Search node compilation."
-            ),
-            MailMessage(
-                "msg_4",
-                "SYSTEM UPDATE",
-                "NTP CHANNELS RE-ALIGNED",
-                "2 days ago",
-                "NTP time servers successfully re-aligned with cosmic clock cycles. Harmonic coupling metrics reset to baseline 80.0% parameters."
-            )
+    // Permissions requesting launcher
+    val permissionsToRequest = remember {
+        val list = mutableListOf(
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            list.add(android.Manifest.permission.BLUETOOTH_SCAN)
+            list.add(android.Manifest.permission.BLUETOOTH_ADVERTISE)
+            list.add(android.Manifest.permission.BLUETOOTH_CONNECT)
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            list.add(android.Manifest.permission.NEARBY_WIFI_DEVICES)
+        }
+        list.toTypedArray()
+    }
+    
+    var hasPermissions by remember {
+        mutableStateOf(
+            permissionsToRequest.all {
+                androidx.core.content.ContextCompat.checkSelfPermission(context, it) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
         )
     }
 
-    // Friends list data state
-    val peerNodes = remember {
-        mutableStateListOf(
-            PeerNode("peer_1", "SPECIMEN-HUNTER-X", "Palo Alto Sector", "42ms", "ONLINE"),
-            PeerNode("peer_2", "CODON_SLICER_99", "Grid Sector 7", "120ms", "STANDBY"),
-            PeerNode("peer_3", "NUCLEOTIDE_DECK_42", "Unknown Orbit", "---", "OFFLINE")
-        )
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        hasPermissions = results.values.all { it }
+        if (hasPermissions) {
+            addDiagnosticLog("SYS: Radio/P2P permissions granted.")
+        } else {
+            addDiagnosticLog("SYS: Radio/P2P permissions denied.")
+        }
     }
+
+    val inboxMessages by viewModel.inboxMessages.collectAsState()
+
+    val peerNodes by viewModel.registeredPeers.collectAsState()
 
     val subTabs = listOf(
         PoxSubTab("hydranet", "HYDRA", icon = { iconColor -> HoloCautionIcon(iconColor) }),
@@ -277,12 +271,25 @@ fun NetworkView(viewModel: MainViewModel) {
         PoxSubTab("friends", "PEERS", icon = { iconColor -> HoloFriendsIcon(iconColor) })
     )
 
+    val activeConnectionsCount = if (networkManager != null) activeConnections.size else peerNodes.count { it.status != "OFFLINE" }
+    val activeStatusText = if (networkManager != null) {
+        if (isAdvertising || isDiscovering) "ACTIVE SCAN" else "STANDBY"
+    } else {
+        "ONLINE"
+    }
+    val activeStatusColor = if (networkManager != null) {
+        if (isAdvertising || isDiscovering) Color(0xFF22D3EE) else CyberGreen
+    } else {
+        CyberGreen
+    }
+
     PoxTabFrame(
         flavorTitle = "G.E.N. P.O.X. HYDRA-NET V0.7",
-        statusText = "ONLINE",
-        statusColor = CyberGreen,
+        statusText = activeStatusText,
+        statusColor = activeStatusColor,
         headerTitle = "MULTI-NODE COMMUNICATIONS",
-        descriptionText = "Manage your node contacts and communications here",
+        descriptionText = "Manager your node contacts and communications here.",
+
         subTabs = subTabs,
         activeSubTab = activeSubView,
         onSubTabClick = { id, tag ->
@@ -300,18 +307,29 @@ fun NetworkView(viewModel: MainViewModel) {
                         .padding(top = 10.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "HYDRA-NET CONNECTION SECURED. SYSTEMS NOMINAL.",
-                        color = CyberGreen.copy(alpha = 0.6f),
-                        style = Typography.labelSmall,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "HYDRA-NET CONNECTION SECURED. SYSTEMS NOMINAL.",
+                            color = CyberGreen.copy(alpha = 0.6f),
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "ACTIVE LINKS IN CLUSTER: $activeConnectionsCount",
+                            color = Color.White,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
             }
             "diagnostics" -> {
                 DiagnosticsContent(
                     viewModel = viewModel,
-                    diagnosticsLogs = diagnosticsLogs,
+                    diagnosticsLogs = if (networkManager != null) networkLogs else diagnosticsLogs,
                     logsListState = logsListState,
                     onAddLog = { addDiagnosticLog(it) }
                 )
@@ -327,12 +345,17 @@ fun NetworkView(viewModel: MainViewModel) {
                 FriendsListContent(
                     viewModel = viewModel,
                     peers = peerNodes,
-                    onAddLog = { addDiagnosticLog(it) }
+                    onAddLog = { addDiagnosticLog(it) },
+                    hasPermissions = hasPermissions,
+                    onRequestPermissions = {
+                        permissionLauncher.launch(permissionsToRequest)
+                    }
                 )
             }
         }
     }
 }
+
 
 // ==========================================
 // SUB-VIEW: DIAGNOSTICS
@@ -462,7 +485,70 @@ private fun DiagnosticsContent(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Radio Signal Emulation Toggle Card
+                    val isSimActive by viewModel.isNetworkSimulationActive.collectAsState()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, if (isSimActive) CyberCyan else CyberBorder, RoundedCornerShape(4.dp))
+                            .background(CyberPanel)
+                            .padding(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = "RADIO SIGNAL EMULATION",
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Default
+                                )
+                                Text(
+                                    text = if (isSimActive) "SIMULATOR ACTIVE: LOOPBACK MODE" else "SIMULATOR OFFLINE: NORMAL RADAR MODE",
+                                    color = if (isSimActive) CyberCyan else Color.Gray,
+                                    fontSize = 7.5.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                            Button(
+                                onClick = {
+                                    viewModel.synthManager.playBeep(640f, 0.05f, "sine")
+                                    viewModel.toggleNetworkSimulation(!isSimActive)
+                                    if (!isSimActive) {
+                                        onAddLog("SIMULATOR: Software loopback radio online. Mock endpoints configured.")
+                                    } else {
+                                        onAddLog("SIMULATOR: Loopback daemon shut down. Physical radio online.")
+                                    }
+                                },
+                                modifier = Modifier
+                                    .height(26.dp)
+                                    .width(90.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSimActive) Color.Red else CyberCyan,
+                                    contentColor = Color.Black
+                                ),
+                                shape = RoundedCornerShape(2.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = if (isSimActive) "DISABLE" else "ENABLE",
+                                    color = Color.Black,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Default
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -471,9 +557,22 @@ private fun DiagnosticsContent(
                         Button(
                             onClick = {
                                 viewModel.synthManager.playBeep(640f, 0.05f, "sine")
-                                onAddLog("PING: BROADCAST UDP DISPATCH TO $sectorIp...")
-                                val latency = (20..80).random()
-                                onAddLog("PING: GATEWAY RESPONDED (RTT: ${latency}ms)")
+                                val nm = viewModel.networkManager
+                                if (nm != null) {
+                                    val active = nm.activeConnections.value
+                                    if (active.isNotEmpty()) {
+                                        val dest = active.keys.first()
+                                        nm.sendPacket(dest, HydraPacket.Ping(System.currentTimeMillis()))
+                                        onAddLog("PING: Dispatched request to secure endpoint $dest.")
+                                    } else {
+                                        onAddLog("PING: No active secure connections. Activating scans...")
+                                        nm.startDiscovery()
+                                    }
+                                } else {
+                                    onAddLog("PING: BROADCAST UDP DISPATCH TO $sectorIp...")
+                                    val latency = (20..80).random()
+                                    onAddLog("PING: GATEWAY RESPONDED (RTT: ${latency}ms)")
+                                }
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -493,11 +592,15 @@ private fun DiagnosticsContent(
                                 fontFamily = FontFamily.Default
                             )
                         }
-
+ 
                         Button(
                             onClick = {
                                 viewModel.synthManager.playBeep(450f, 0.05f, "sine")
-                                onAddLog("SYS: LOG FLUSH DEPLOYED.")
+                                val nm = viewModel.networkManager
+                                if (nm != null) {
+                                    nm.stopAllEndpoints()
+                                }
+                                onAddLog("SYS: LOG FLUSH DEPLOYED. ALL P2P ENDPOINTS RESET.")
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -519,6 +622,7 @@ private fun DiagnosticsContent(
                             )
                         }
                     }
+
                 }
             }
         )
@@ -586,9 +690,10 @@ private fun InboxContent(
                         viewModel.synthManager.playBeep(if (isExpanded) 480f else 580f, 0.04f, "sine")
                         expandedMessageId = if (isExpanded) null else msg.id
                         if (!msg.isRead) {
-                            msg.isRead = true
+                            viewModel.markMessageAsRead(msg.id)
                             onAddLog("INBOX: Read message from ${msg.from}")
                         }
+
                     }
                     .padding(10.dp)
             ) {
@@ -641,6 +746,97 @@ private fun InboxContent(
                                 lineHeight = 12.sp
                             )
                         }
+
+                        val hasAttachment = msg.attachedCreatureDna != null || msg.attachedGeneSequence != null || msg.transferGenes > 0 || msg.transferWaste > 0
+                        if (hasAttachment) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, if (msg.isClaimed) Color.Gray else CyberCyan, RoundedCornerShape(4.dp))
+                                    .background(CyberPanel)
+                                    .padding(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            text = "INCOMING CARGO TRANSFERS:",
+                                            color = Color.White,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        if (msg.attachedCreatureDna != null) {
+                                            Text(
+                                                text = "• SPECIMEN: ${msg.attachedCreatureName} [${msg.attachedCreatureFaction}]",
+                                                color = CyberCyan,
+                                                fontSize = 7.5.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                        if (msg.attachedGeneSequence != null) {
+                                            Text(
+                                                text = "• CODON BLOCK: ${msg.attachedGeneSequence}",
+                                                color = CyberCyan,
+                                                fontSize = 7.5.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                        if (msg.transferGenes > 0 || msg.transferWaste > 0) {
+                                            Text(
+                                                text = "• RESOURCES: +10 All Bases / +25 Bio-Waste",
+                                                color = CyberCyan,
+                                                fontSize = 7.5.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                    }
+
+                                    if (msg.isClaimed) {
+                                        Box(
+                                            modifier = Modifier
+                                                .border(1.dp, Color.Gray, RoundedCornerShape(2.dp))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "EXTRACTED / SECURED",
+                                                color = Color.Gray,
+                                                fontSize = 7.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    } else {
+                                        Button(
+                                            onClick = {
+                                                viewModel.synthManager.playBeep(880f, 0.05f, "sine")
+                                                viewModel.claimMessageAttachment(msg.id)
+                                                onAddLog("CARGO: Decrypted and claimed transfer cargo from ${msg.from}.")
+                                            },
+                                            modifier = Modifier
+                                                .height(24.dp)
+                                                .width(105.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = CyberCyan,
+                                                contentColor = Color.Black
+                                            ),
+                                            shape = RoundedCornerShape(2.dp),
+                                            contentPadding = PaddingValues(0.dp)
+                                        ) {
+                                            Text(
+                                                text = "SECURE TRANSFERS",
+                                                color = Color.Black,
+                                                fontSize = 7.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "CLICK TO COLLAPSE PACKET",
@@ -666,19 +862,32 @@ private fun InboxContent(
     }
 }
 
-// ==========================================
-// SUB-VIEW: FRIENDS LIST
-// ==========================================
+private data class LivePeerDisplay(
+    val endpointId: String,
+    val name: String,
+    val isConnected: Boolean
+)
 
 @Composable
 private fun FriendsListContent(
+
     viewModel: MainViewModel,
-    peers: MutableList<PeerNode>,
-    onAddLog: (String) -> Unit
+    peers: List<PeerNode>,
+    onAddLog: (String) -> Unit,
+    hasPermissions: Boolean,
+    onRequestPermissions: () -> Unit
 ) {
     var showRegisterForm by remember { mutableStateOf(false) }
     var peerNameInput by remember { mutableStateOf("") }
     var peerSectorInput by remember { mutableStateOf("") }
+    var showComposerForPeer by remember { mutableStateOf<LivePeerDisplay?>(null) }
+
+
+    val nm = viewModel.networkManager
+    val isAdvertising by nm?.isAdvertising?.collectAsState(initial = false) ?: remember { mutableStateOf(false) }
+    val isDiscovering by nm?.isDiscovering?.collectAsState(initial = false) ?: remember { mutableStateOf(false) }
+    val discoveredPeers by nm?.discoveredPeers?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    val activeConnections by nm?.activeConnections?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
 
     Column(
         modifier = Modifier
@@ -686,34 +895,393 @@ private fun FriendsListContent(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // Local Node Information Display (Hierarchical Globally Unique IP Geocoder)
+        val userLat by viewModel.latitude.collectAsState()
+        val userLng by viewModel.longitude.collectAsState()
+        val sectorIp = remember(userLat, userLng) {
+            val latVal = userLat.coerceIn(-90.0, 90.0)
+            val lngVal = userLng.coerceIn(-180.0, 180.0)
+            val latIndex = (((latVal + 90.0) / 180.0) * 240.0).toInt().coerceIn(0, 239) + 10
+            val lngIndex = (((lngVal + 180.0) / 360.0) * 254.0).toInt().coerceIn(0, 253) + 1
+            val latFraction = (((latVal + 90.0) / 180.0) * 240.0) % 1.0
+            val lngFraction = (((lngVal + 180.0) / 360.0) * 254.0) % 1.0
+            val subLat = (latFraction * 16.0).toInt().coerceIn(0, 15)
+            val subLng = (lngFraction * 16.0).toInt().coerceIn(0, 15)
+            val octet4 = ((subLat * 16) + subLng + 1).coerceIn(1, 254)
+            "10.$latIndex.$lngIndex.$octet4"
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                .background(Color.Black.copy(alpha = 0.6f))
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "YOUR LOCAL NODE ID: ${viewModel.localNodeName}",
+                    color = CyberCyan,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = "SECTOR IP: $sectorIp",
+                    color = CyberGreen,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+        // Permission Warning or Radio Controls
+        if (!hasPermissions) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, Color.Yellow, RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .padding(10.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "WARNING: LOCAL RADIO HARDWARE SYSTEM OFFLINE",
+                        color = Color.Yellow,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "GENPOX requires location and Bluetooth/Nearby devices permissions to establish peer ad-hoc connection channels.",
+                        color = Color.Yellow.copy(alpha = 0.8f),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Default
+                    )
+                    Button(
+                        onClick = {
+                            viewModel.synthManager.playBeep(520f, 0.05f, "sine")
+                            onRequestPermissions()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(30.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Yellow, contentColor = Color.Black),
+                        shape = RoundedCornerShape(2.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = "AUTHORIZE P2P PERMISSIONS",
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Default
+                        )
+                    }
+                }
+            }
+        } else if (nm != null) {
+            // Radio Controls Panel
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                    .background(CyberPanel)
+                    .padding(10.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "AD-HOC TRANSCEIVER INTERFACE",
+                        color = CyberGreenDim,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "STATE: ",
+                            color = Color.Gray,
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        val statusLabel = when {
+                            isAdvertising && isDiscovering -> "ADV + DISCOVER"
+                            isAdvertising -> "BROADCAST BEACON ACTIVE"
+                            isDiscovering -> "SCANNING PEER SECTORS"
+                            else -> "STANDBY"
+                        }
+                        Text(
+                            text = statusLabel,
+                            color = if (isAdvertising || isDiscovering) Color(0xFF22D3EE) else CyberGreenDim,
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.synthManager.playBeep(520f, 0.04f, "sine")
+                                if (isDiscovering) {
+                                    nm.stopAllEndpoints()
+                                } else {
+                                    nm.startDiscovery()
+                                }
+                            },
+                            modifier = Modifier.weight(1f).height(28.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isDiscovering) Color.Red else CyberGreen,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(2.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(
+                                text = if (isDiscovering) "STOP SCAN" else "START SCAN",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Default
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.synthManager.playBeep(600f, 0.04f, "sine")
+                                if (isAdvertising) {
+                                    nm.stopAllEndpoints()
+                                } else {
+                                    nm.startAdvertising(viewModel.localNodeName)
+                                }
+                            },
+                            modifier = Modifier.weight(1f).height(28.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isAdvertising) Color.Red else CyberGreen,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(2.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(
+                                text = if (isAdvertising) "STOP BEACON" else "START BEACON",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Default
+                            )
+                        }
+                        if (isAdvertising || isDiscovering) {
+                            Button(
+                                onClick = {
+                                    nm.stopAllEndpoints()
+                                },
+                                modifier = Modifier.weight(0.8f).height(28.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Transparent,
+                                    contentColor = Color.Yellow
+                                ),
+                                border = BorderStroke(1.dp, Color.Yellow),
+                                shape = RoundedCornerShape(2.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = "OFF",
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Default
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Live Connected & Discovered Peers Section
+        val allLivePeers = remember(discoveredPeers, activeConnections) {
+            val list = mutableListOf<LivePeerDisplay>()
+            activeConnections.forEach { (endpointId, name) ->
+                list.add(LivePeerDisplay(endpointId, name, isConnected = true))
+            }
+            discoveredPeers.forEach { peer ->
+                if (!activeConnections.containsKey(peer.endpointId)) {
+                    list.add(LivePeerDisplay(peer.endpointId, peer.name, isConnected = false))
+                }
+            }
+            list
+        }
+
+        if (nm != null && allLivePeers.isNotEmpty()) {
+            Text(
+                text = "ACTIVE HYDRA-NET NODE CONNECTIONS:",
+                color = Color(0xFF22D3EE),
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Default
+            )
+            allLivePeers.forEach { peer ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, if (peer.isConnected) CyberGreen else Color(0xFF22D3EE), RoundedCornerShape(4.dp))
+                        .background(CyberPanel)
+                        .padding(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = peer.name,
+                                color = Color.White,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Default
+                            )
+                            Text(
+                                text = "CHANNEL ID: ${peer.endpointId}",
+                                color = Color.Gray,
+                                style = Typography.bodySmall,
+                                fontSize = 7.5.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(5.dp)
+                                        .background(
+                                            if (peer.isConnected) CyberGreen else Color(0xFF22D3EE),
+                                            RoundedCornerShape(2.5.dp)
+                                        )
+                                )
+                                Text(
+                                    text = if (peer.isConnected) "SECURED NODE LINK" else "DISCOVERED BEACON",
+                                    color = Color.LightGray,
+                                    style = Typography.bodySmall,
+                                    fontSize = 7.5.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (peer.isConnected) {
+                                Button(
+                                    onClick = {
+                                        viewModel.synthManager.playBeep(720f, 0.04f, "triangle")
+                                        nm.sendPacket(peer.endpointId, HydraPacket.Ping(System.currentTimeMillis()))
+                                        onAddLog("PING: Sent direct ping transaction package to ${peer.name}.")
+                                    },
+                                    modifier = Modifier
+                                        .height(26.dp)
+                                        .width(70.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.Transparent,
+                                        contentColor = CyberGreen
+                                    ),
+                                    border = BorderStroke(1.dp, CyberGreen),
+                                    shape = RoundedCornerShape(2.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(
+                                        text = "PING",
+                                        color = CyberGreen,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Default
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        viewModel.synthManager.playBeep(640f, 0.05f, "sine")
+                                        showComposerForPeer = peer
+                                    },
+                                    modifier = Modifier
+                                        .height(26.dp)
+                                        .width(70.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = CyberCyan,
+                                        contentColor = Color.Black
+                                    ),
+                                    shape = RoundedCornerShape(2.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(
+                                        text = "MESSAGE",
+                                        color = Color.Black,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Default
+                                    )
+                                }
+                            } else {
+                                Button(
+                                    onClick = {
+                                        viewModel.synthManager.playBeep(720f, 0.04f, "triangle")
+                                        onAddLog("DIAL: Requesting channel connection to ${peer.name}...")
+                                        nm.requestConnection(peer.endpointId, "AGENT-NODE")
+                                    },
+                                    modifier = Modifier
+                                        .height(26.dp)
+                                        .width(90.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.Transparent,
+                                        contentColor = Color(0xFF22D3EE)
+                                    ),
+                                    border = BorderStroke(1.dp, Color(0xFF22D3EE)),
+                                    shape = RoundedCornerShape(2.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(
+                                        text = "CONNECT",
+                                        color = Color(0xFF22D3EE),
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Default
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+
+        // Registry Directory Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "PEER DIRECTORY",
+                text = "REGISTERED OFFLINE DIRECTORY",
                 color = CyberGreenDim,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Default
             )
             Text(
-                text = "ACTIVE LINKS: ${peers.count { it.status != "OFFLINE" }}",
+                text = "TOTAL: ${peers.size}",
                 color = CyberGreenDim,
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Default
             )
         }
-
-        Text(
-            text = "HOLOGRAPHIC PEER NODE LINKAGES DETECTED IN LOCAL REGISTRY:",
-            color = CyberGreenDim,
-            fontSize = 8.sp,
-            fontFamily = FontFamily.Default,
-            lineHeight = 10.sp
-        )
 
         // peer lists
         peers.forEach { peer ->
@@ -879,7 +1447,7 @@ private fun FriendsListContent(
                                 if (peerNameInput.isNotBlank()) {
                                     val name = peerNameInput.uppercase().trim()
                                     val sector = if (peerSectorInput.isBlank()) "Default Grid Sector" else peerSectorInput.trim()
-                                    peers.add(PeerNode("peer_${peers.size + 1}", name, sector, "---", "ONLINE"))
+                                    viewModel.registerPeerNode(name, sector)
                                     onAddLog("PEER_REGISTRY: Established dynamic channel to $name in $sector.")
                                     viewModel.synthManager.playSynthesisSuccess()
                                     
@@ -936,6 +1504,318 @@ private fun FriendsListContent(
             }
         }
     }
+
+    if (showComposerForPeer != null) {
+        val peer = showComposerForPeer!!
+        androidx.compose.ui.window.Popup(
+            alignment = Alignment.Center,
+            onDismissRequest = { showComposerForPeer = null }
+        ) {
+            var msgText by remember { mutableStateOf("") }
+            var attachedCreature by remember { mutableStateOf<Creature?>(null) }
+            var attachedGene by remember { mutableStateOf<GeneSequence?>(null) }
+            var transferResources by remember { mutableStateOf(false) }
+
+            var showCreatureSelect by remember { mutableStateOf(false) }
+            var showGeneSelect by remember { mutableStateOf(false) }
+
+            val creatures by viewModel.creatures.collectAsState()
+            val geneSequences by viewModel.geneSequences.collectAsState()
+
+            Box(
+                modifier = Modifier
+                    .width(320.dp)
+                    .border(2.dp, CyberCyan, RoundedCornerShape(8.dp))
+                    .background(Color.Black)
+                    .padding(16.dp)
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "SECURE UPLINK MESSAGE COMPILER",
+                        color = CyberCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default
+                    )
+
+                    Text(
+                        text = "RECIPIENT: ${peer.name} [${peer.endpointId}]",
+                        color = Color.LightGray,
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().background(CyberCyan.copy(alpha = 0.3f)))
+
+                    // Attachment status indicators
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "ACTIVE ATTACHMENTS:",
+                            color = Color.Gray,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "• SPECIMEN: ${attachedCreature?.name ?: "NONE"}",
+                            color = if (attachedCreature != null) CyberGreen else Color.DarkGray,
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "• GENE SEQUENCE: ${attachedGene?.sequence ?: "NONE"}",
+                            color = if (attachedGene != null) CyberGreen else Color.DarkGray,
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "• QUANTUM SHIPMENT (10B/25W): ${if (transferResources) "ACTIVE" else "NONE"}",
+                            color = if (transferResources) CyberGreen else Color.DarkGray,
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    // Attachment Action Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                showCreatureSelect = true
+                            },
+                            modifier = Modifier.weight(1f).height(28.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberPanel, contentColor = Color.White),
+                            shape = RoundedCornerShape(2.dp),
+                            border = BorderStroke(1.dp, CyberBorder),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(text = "ATTACH SPECIMEN", fontSize = 7.5.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                showGeneSelect = true
+                            },
+                            modifier = Modifier.weight(1f).height(28.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberPanel, contentColor = Color.White),
+                            shape = RoundedCornerShape(2.dp),
+                            border = BorderStroke(1.dp, CyberBorder),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(text = "ATTACH GENE", fontSize = 7.5.sp)
+                        }
+                    }
+
+                    val rawStockA by viewModel.rawStockA.collectAsState()
+                    val rawStockG by viewModel.rawStockG.collectAsState()
+                    val rawStockT by viewModel.rawStockT.collectAsState()
+                    val rawStockC by viewModel.rawStockC.collectAsState()
+                    val bioWaste by viewModel.bioWaste.collectAsState()
+                    val hasEnoughResources = rawStockA >= 10 && rawStockG >= 10 && rawStockT >= 10 && rawStockC >= 10 && bioWaste >= 25
+
+                    Button(
+                        onClick = {
+                            viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                            if (hasEnoughResources) {
+                                transferResources = !transferResources
+                            } else {
+                                viewModel.synthManager.playReject()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(28.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (transferResources) CyberGreen else CyberPanel,
+                            contentColor = if (transferResources) Color.Black else Color.White
+                        ),
+                        shape = RoundedCornerShape(2.dp),
+                        border = BorderStroke(1.dp, if (hasEnoughResources) CyberBorder else Color.Red.copy(alpha = 0.5f)),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = if (hasEnoughResources) "ATTACH 10 BASES / 25 WASTE" else "INSUFFICIENT STOCK FOR RESOURCE ATTACHMENT",
+                            fontSize = 7.5.sp
+                        )
+                    }
+
+                    // Message text field
+                    OutlinedTextField(
+                        value = msgText,
+                        onValueChange = {
+                            if (it.length <= 64) {
+                                msgText = it
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(60.dp),
+                        placeholder = { Text(text = "Enter secure transmission log (max 64 chars)...", fontSize = 8.sp, color = Color.Gray) },
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 9.sp, color = Color.White, fontFamily = FontFamily.Monospace),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = CyberCyan,
+                            unfocusedBorderColor = CyberBorder,
+                            focusedContainerColor = Color.Black,
+                            unfocusedContainerColor = Color.Black
+                        )
+                    )
+                    Text(
+                        text = "${msgText.length}/64",
+                        color = if (msgText.length >= 64) Color.Red else Color.Gray,
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.align(Alignment.End)
+                    )
+
+                    // Action Controls
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.synthManager.playBeep(450f, 0.05f, "sine")
+                                showComposerForPeer = null
+                            },
+                            modifier = Modifier.weight(1f).height(32.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.Yellow),
+                            border = BorderStroke(1.dp, Color.Yellow),
+                            shape = RoundedCornerShape(4.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(text = "✕ CANCEL", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        val canTransmit = msgText.isNotBlank() || attachedCreature != null || attachedGene != null || transferResources
+                        Button(
+                            onClick = {
+                                viewModel.transmitP2PMessage(
+                                    endpointId = peer.endpointId,
+                                    text = msgText,
+                                    creature = attachedCreature,
+                                    gene = attachedGene,
+                                    transferResources = transferResources
+                                )
+                                onAddLog("TX: Dispatched payload block containing message: \"$msgText\" to ${peer.name}.")
+                                showComposerForPeer = null
+                            },
+                            enabled = canTransmit,
+                            modifier = Modifier.weight(1.5f).height(32.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (canTransmit) CyberCyan else Color.DarkGray,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(4.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(text = "TRANSMIT PROTOCOL", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = if (canTransmit) Color.Black else Color.Gray)
+                        }
+                    }
+                }
+
+                // Sub-Selector overlays
+                if (showCreatureSelect) {
+                    androidx.compose.ui.window.Popup(
+                        alignment = Alignment.Center,
+                        onDismissRequest = { showCreatureSelect = false }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(280.dp)
+                                .height(300.dp)
+                                .border(1.dp, CyberGreen, RoundedCornerShape(4.dp))
+                                .background(Color.Black)
+                                .padding(12.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+                                Text(text = "SELECT SPECIMEN TO ATTACH", color = CyberGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    items(creatures) { creature ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .border(1.dp, CyberBorder, RoundedCornerShape(2.dp))
+                                                .background(CyberPanel)
+                                                .clickable {
+                                                    viewModel.synthManager.playBeep(520f, 0.05f, "sine")
+                                                    attachedCreature = creature
+                                                    showCreatureSelect = false
+                                                }
+                                                .padding(6.dp)
+                                        ) {
+                                            Text(text = "${creature.name} [V: ${creature.vitality}]", color = Color.White, fontSize = 8.sp)
+                                        }
+                                    }
+                                }
+                                Button(
+                                    onClick = { showCreatureSelect = false },
+                                    modifier = Modifier.fillMaxWidth().height(26.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.Yellow),
+                                    border = BorderStroke(1.dp, Color.Yellow),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(text = "CANCEL", fontSize = 8.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (showGeneSelect) {
+                    androidx.compose.ui.window.Popup(
+                        alignment = Alignment.Center,
+                        onDismissRequest = { showGeneSelect = false }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(280.dp)
+                                .height(300.dp)
+                                .border(1.dp, CyberGreen, RoundedCornerShape(4.dp))
+                                .background(Color.Black)
+                                .padding(12.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+                                Text(text = "SELECT CODON TO ATTACH", color = CyberGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    items(geneSequences) { gene ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .border(1.dp, CyberBorder, RoundedCornerShape(2.dp))
+                                                .background(CyberPanel)
+                                                .clickable {
+                                                    viewModel.synthManager.playBeep(520f, 0.05f, "sine")
+                                                    attachedGene = gene
+                                                    showGeneSelect = false
+                                                }
+                                                .padding(6.dp)
+                                        ) {
+                                            Text(text = gene.sequence, color = Color.White, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                                        }
+                                    }
+                                }
+                                Button(
+                                    onClick = { showGeneSelect = false },
+                                    modifier = Modifier.fillMaxWidth().height(26.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.Yellow),
+                                    border = BorderStroke(1.dp, Color.Yellow),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(text = "CANCEL", fontSize = 8.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
+
+
 
 

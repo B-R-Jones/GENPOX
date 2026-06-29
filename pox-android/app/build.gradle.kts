@@ -99,7 +99,9 @@ dependencies {
 
   // Google Maps SDK
   implementation(libs.play.services.maps)
+  implementation(libs.play.services.nearby)
   implementation(libs.maps.compose)
+
 
   // CameraX
   implementation(libs.androidx.camera.core)

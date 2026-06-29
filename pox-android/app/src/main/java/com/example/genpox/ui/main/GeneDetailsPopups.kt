@@ -101,6 +101,7 @@ fun GeneDetailsPopup(
     gene: String,
     activeColor: Color,
     activePanel: Color,
+    onEject: (() -> Unit)? = null,
     onClose: () -> Unit
 ) {
     val isAnom = WaveMath.isAnomalousGene(gene)
@@ -115,32 +116,52 @@ fun GeneDetailsPopup(
         containerColor = Color.Transparent,
         title = {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                if (isAnom) {
-                    WireframeGalaxy(
-                        color = Color(0xFFD8B4FE),
-                        modifier = Modifier.size(16.dp)
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (isAnom) {
+                        WireframeGalaxy(
+                            color = Color(0xFFD8B4FE),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "ANOMALOUS GENE",
+                            style = Typography.titleMedium,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFD8B4FE)
+                        )
+                    } else {
+                        WireframeDna(
+                            color = activeColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "STANDARD GENE",
+                            style = Typography.titleMedium,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold,
+                            color = activeColor
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clickable { onClose() },
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        text = "ANOMALOUS GENE",
-                        style = Typography.titleMedium,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFD8B4FE)
-                    )
-                } else {
-                    WireframeDna(
-                        color = activeColor,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "STANDARD GENE",
-                        style = Typography.titleMedium,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold,
-                        color = activeColor
+                        text = "✕",
+                        color = Color.Gray,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -239,27 +260,34 @@ fun GeneDetailsPopup(
                         lineHeight = 12.sp
                     )
                 }
+
+                if (onEject != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    PoxButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = "✕ EJECT GENE BLOCK FROM SPLICER",
+                        onClick = {
+                            onEject()
+                            onClose()
+                        },
+                        buttonType = PoxButtonType.RED_DANGER,
+                        buttonSize = PoxButtonSize.STANDARD,
+                        sound = PoxButtonSound.REJECT_BEEP,
+                        viewModel = viewModel
+                    )
+                }
             }
         },
         confirmButton = {
             PoxButton(
-                text = "✕ CLOSE",
-                onClick = onClose,
-                buttonType = PoxButtonType.RED_DANGER,
-                buttonSize = PoxButtonSize.COMPACT,
-                sound = PoxButtonSound.BEEP_DEFAULT,
-                viewModel = viewModel
-            )
-        },
-        dismissButton = {
-            PoxButton(
+                modifier = Modifier.fillMaxWidth(),
                 text = "TARGET IN BIO-LAB",
                 onClick = {
                     viewModel.setTargetSynthesisSequence(gene)
                     onClose()
                 },
                 buttonType = PoxButtonType.CYAN_CELESTIAL,
-                buttonSize = PoxButtonSize.COMPACT,
+                buttonSize = PoxButtonSize.STANDARD,
                 sound = PoxButtonSound.BEEP_DEFAULT,
                 viewModel = viewModel
             )

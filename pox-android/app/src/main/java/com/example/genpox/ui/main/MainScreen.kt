@@ -27,7 +27,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import com.example.genpox.PoxApplication
 import com.example.genpox.data.WaveMath
+import com.example.genpox.data.network.PoxNetworkManager
 import com.example.genpox.theme.*
+
 import com.example.genpox.ui.components.PoxCameraScanner
 import com.example.genpox.ui.components.CloudChamberVisualizer
 import com.example.genpox.ui.components.PoxHoloNav
@@ -52,10 +54,12 @@ fun MainScreen(
         factory = MainViewModelFactory(app.repository)
     )
 
-    // Initialize synthManager context
+    // Initialize synthManager context and networkManager
     LaunchedEffect(viewModel) {
         viewModel.synthManager.initialize(context)
+        viewModel.networkManager = PoxNetworkManager(context.applicationContext, viewModel.synthManager)
     }
+
 
     // ------------------ GEOLOCATION CLIENT IMPLEMENTATION ------------------
     var locationPermissionGranted by remember {

@@ -1216,6 +1216,30 @@ fun HolographicRadarScanner(
     val trackedMission = remember(activeMissions, trackedMissionId) {
         activeMissions.find { it.id == trackedMissionId && !it.isReturned }
     }
+
+    val activeConnections by viewModel.networkManager?.activeConnections?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
+    val discoveredPeers by viewModel.networkManager?.discoveredPeers?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    
+    val activePeers = remember(activeConnections, discoveredPeers) {
+        val list = mutableListOf<String>()
+        activeConnections.forEach { (_, name) ->
+            if (!list.contains(name)) list.add(name)
+        }
+        discoveredPeers.forEach { peer ->
+            if (!list.contains(peer.name)) list.add(peer.name)
+        }
+        list
+    }
+    
+    val peerLocations = remember(activePeers, userLat, userLng) {
+        activePeers.mapIndexed { idx, name ->
+            val hash = name.hashCode().absoluteValue
+            val offsetLat = ((hash % 200) - 100) / 33000.0
+            val offsetLng = (((hash / 200) % 200) - 100) / 33000.0
+            LatLng(userLat + offsetLat, userLng + offsetLng)
+        }
+    }
+
     val density = androidx.compose.ui.platform.LocalDensity.current
     val infiniteTransition = rememberInfiniteTransition(label = "scanline_sweep")
     val scanlineFraction by infiniteTransition.animateFloat(
@@ -1904,8 +1928,36 @@ fun HolographicRadarScanner(
                     }
                 }
 
-                // 6. Draw player transceiver beacon center
-                drawCircle(CyberGreen, radius = 3.5f, center = Offset(playerX, playerY))
+                // 6. Draw other players (peers) as cyber cyan holo-diamonds
+                peerLocations.forEach { loc ->
+                    val offset = projectPoint(loc.latitude, loc.longitude)
+                    val px = offset.x + getGlitchOffsetX(offset.y, timeMs)
+                    val py = offset.y
+                    
+                    val sizePx = 5.dp.toPx()
+                    val diamondPath = Path().apply {
+                        moveTo(px, py - sizePx)
+                        lineTo(px + sizePx, py)
+                        lineTo(px, py + sizePx)
+                        lineTo(px - sizePx, py)
+                        close()
+                    }
+                    drawPath(path = diamondPath, color = CyberCyan, style = Stroke(width = 1.dp.toPx()))
+                    drawPath(path = diamondPath, color = CyberCyan.copy(alpha = 0.2f), style = Fill)
+                }
+
+                // 6. Draw player transceiver beacon center as a cyber green holo-diamond
+                val playerSizePx = 6.dp.toPx()
+                val playerDiamondPath = Path().apply {
+                    moveTo(playerX, playerY - playerSizePx)
+                    lineTo(playerX + playerSizePx, playerY)
+                    lineTo(playerX, playerY + playerSizePx)
+                    lineTo(playerX - playerSizePx, playerY)
+                    close()
+                }
+                drawPath(path = playerDiamondPath, color = CyberGreen, style = Stroke(width = 1.5.dp.toPx()))
+                drawPath(path = playerDiamondPath, color = CyberGreen.copy(alpha = 0.25f), style = Fill)
+
 
                 // 6b. Draw miniaturized active harvesting creatures traveling on the map
                 val precomputedMissionsSize = precomputedMissions.size

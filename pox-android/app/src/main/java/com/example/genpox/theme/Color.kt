@@ -117,10 +117,13 @@ object CyberTheme {
 
 val CyberGreen: Color get() = CyberTheme.green
 val CyberGreenDim: Color get() = CyberTheme.greenDim
+val CyberCyan: Color get() = CyberTheme.cyan
+val CyberCyanDim: Color get() = CyberTheme.cyanDim
 val CyberBackground: Color get() = CyberTheme.background
 val CyberBackgroundDark: Color get() = CyberTheme.backgroundDark
 val CyberPanel: Color get() = CyberTheme.greenPanel
 val CyberBorder: Color get() = CyberTheme.greenBorder
+
 
 val Purple80 = Color(0xFFD0BCFF)
 val PurpleGrey80 = Color(0xFFCCC2DC)

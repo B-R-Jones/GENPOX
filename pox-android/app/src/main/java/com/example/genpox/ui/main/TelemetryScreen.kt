@@ -19,6 +19,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import com.example.genpox.data.WaveMath
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.*
@@ -275,7 +281,8 @@ fun TelemetryView(viewModel: MainViewModel) {
                     modifier = Modifier.fillMaxSize(),
                     isMini = true,
                     rotationSpeedMs = 15000,
-                    activeCells = heatwaveCells
+                    activeCells = heatwaveCells,
+                    viewModel = viewModel
                 )
             }
         }
@@ -297,7 +304,8 @@ fun TelemetryView(viewModel: MainViewModel) {
                         .padding(32.dp),
                     isMini = false,
                     rotationSpeedMs = 30000, // slowly spinning
-                    activeCells = heatwaveCells
+                    activeCells = heatwaveCells,
+                    viewModel = viewModel
                 )
 
                 // Close overlay button
@@ -1274,13 +1282,20 @@ fun PhenotypeGeneDecoder() {
     }
 }
 
-@Composable
-fun WireframeGlobe(
+@Composable fun WireframeGlobe(
     modifier: Modifier = Modifier,
     isMini: Boolean = false,
     rotationSpeedMs: Int = 20000,
-    activeCells: List<String> = emptyList()
+    activeCells: List<String> = emptyList(),
+    viewModel: MainViewModel
 ) {
+    var zoomLevel by remember { mutableStateOf(0) }
+    
+    // Reset zoom when mini or expanded
+    LaunchedEffect(isMini) {
+        if (isMini) zoomLevel = 0
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "globe_rotation")
     val rotationAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -1292,7 +1307,7 @@ fun WireframeGlobe(
         label = "rotation"
     )
 
-val baseContinents = remember {
+    val baseContinents = remember {
         getGlobePart1() + getGlobePart2() + getGlobePart3() + getGlobePart4()
     }
 
@@ -1300,20 +1315,56 @@ val baseContinents = remember {
         baseContinents.map { loop -> interpolateClosedLoop(loop, stepsPerSegment = 1) }
     }
 
-    Canvas(modifier = modifier) {
+    // Collect user coordinates for centering zoom
+    val userLat by viewModel.latitude.collectAsState()
+    val userLng by viewModel.longitude.collectAsState()
+
+    val latVal = userLat.coerceIn(-90.0, 90.0)
+    val lngVal = userLng.coerceIn(-180.0, 180.0)
+    val latIndex = (((latVal + 90.0) / 180.0) * 240.0).toInt().coerceIn(0, 239) + 10
+    val lngIndex = (((lngVal + 180.0) / 360.0) * 254.0).toInt().coerceIn(0, 253) + 1
+    val latFraction = (((latVal + 90.0) / 180.0) * 240.0) % 1.0
+    val lngFraction = (((lngVal + 180.0) / 360.0) * 254.0) % 1.0
+    val subLat = (latFraction * 16.0).toInt().coerceIn(0, 15)
+    val subLng = (lngFraction * 16.0).toInt().coerceIn(0, 15)
+    val octet4 = ((subLat * 16) + subLng + 1).coerceIn(1, 254)
+
+    Canvas(
+        modifier = modifier
+            .then(
+                if (!isMini) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures {
+                            viewModel.synthManager.playCombinatorTick()
+                            zoomLevel = (zoomLevel + 1) % 4
+                        }
+                    }
+                } else Modifier
+            )
+    ) {
         val width = size.width
         val height = size.height
         val centerX = width / 2f
         val centerY = height / 2f
         val radius = min(width, height) / 2f * 0.9f
 
-        val tiltAngle = Math.toRadians(23.5) // Earth axis tilt in radians
-
-        // holographic blue/cyan theme
         val frontColor = Color(0xFF38BDF8)
         val strokeWidth = if (isMini) 1.dp.toPx() else 1.5.dp.toPx()
 
-        // 1. Draw outer boundary circle
+        // TILT and ROTATION configuration per zoom level
+        val tiltAngle = if (zoomLevel == 1) {
+            Math.toRadians(latVal)
+        } else {
+            Math.toRadians(23.5) // Standard Earth tilt
+        }
+
+        val currentRotation = if (zoomLevel == 1) {
+            Math.PI / 2.0 - Math.toRadians(lngVal)
+        } else {
+            rotationAngle.toDouble()
+        }
+
+        // Draw outer boundary circle
         drawCircle(
             color = frontColor.copy(alpha = 0.15f),
             radius = radius,
@@ -1321,234 +1372,385 @@ val baseContinents = remember {
             style = Stroke(width = strokeWidth)
         )
 
-        // 2. Draw meridians (lines of longitude)
-        val numMeridians = if (isMini) 6 else 12
-        val pointsPerLine = if (isMini) 15 else 30
-        for (m in 0 until numMeridians) {
-            val lon = (m.toFloat() / numMeridians) * 2.0 * Math.PI - Math.PI
-            val rotLon = lon + rotationAngle.toDouble()
+        if (zoomLevel == 0 || zoomLevel == 1) {
+            // Run global / regional 3D projection
+            val scaleFactor = if (zoomLevel == 1) 4.5f else 1.0f
+            
+            withTransform({
+                if (zoomLevel == 1) {
+                    this.scale(scaleFactor, scaleFactor, Offset(centerX, centerY))
+                }
+            }) {
+                val effStroke = strokeWidth / scaleFactor
 
-            var prevX = 0f
-            var prevY = 0f
-            var prevZ = 0.0
-            var hasPrev = false
+                // 1. Meridians
+                val numMeridians = if (isMini) 6 else 12
+                val pointsPerLine = if (isMini) 15 else 30
+                for (m in 0 until numMeridians) {
+                    val lon = (m.toFloat() / numMeridians) * 2.0 * Math.PI - Math.PI
+                    val rotLon = lon + currentRotation
 
-            for (p in 0..pointsPerLine) {
-                val lat = (p.toFloat() / pointsPerLine) * Math.PI - Math.PI / 2.0
+                    var prevX = 0f
+                    var prevY = 0f
+                    var prevZ = 0.0
+                    var hasPrev = false
 
-                // 3D sphere coordinate mapping
-                val x = -radius.toDouble() * cos(lat) * cos(rotLon)
-                val y = radius.toDouble() * sin(lat)
-                val z = radius.toDouble() * cos(lat) * sin(rotLon)
+                    for (p in 0..pointsPerLine) {
+                        val lat = (p.toFloat() / pointsPerLine) * Math.PI - Math.PI / 2.0
 
-                // Rotate around X-axis by tilt angle
-                val yt = y * cos(tiltAngle) - z * sin(tiltAngle)
-                val zt = y * sin(tiltAngle) + z * cos(tiltAngle)
-                val xt = x
+                        val x = -radius.toDouble() * cos(lat) * cos(rotLon)
+                        val y = radius.toDouble() * sin(lat)
+                        val z = radius.toDouble() * cos(lat) * sin(rotLon)
 
-                val screenX = (centerX + xt).toFloat()
-                val screenY = (centerY - yt).toFloat()
+                        val yt = y * cos(tiltAngle) - z * sin(tiltAngle)
+                        val zt = y * sin(tiltAngle) + z * cos(tiltAngle)
+                        val xt = x
 
-                if (hasPrev) {
-                    val avgZ = (zt + prevZ) / 2.0
-                    val depthPct = ((avgZ / radius.toDouble()).coerceIn(-1.0, 1.0) + 1.0) / 2.0
-                    val alpha = (0.2f + 0.8f * depthPct).toFloat()
-                    val stroke = if (isMini) {
-                        (0.6f + 0.6f * depthPct).toFloat().dp.toPx()
-                    } else {
-                        (0.8f + 1.2f * depthPct).toFloat().dp.toPx()
+                        val screenX = (centerX + xt).toFloat()
+                        val screenY = (centerY - yt).toFloat()
+
+                        if (hasPrev) {
+                            val avgZ = (zt + prevZ) / 2.0
+                            val depthPct = ((avgZ / radius.toDouble()).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                            val alpha = (0.15f + 0.5f * depthPct).toFloat()
+
+                            drawLine(
+                                color = frontColor.copy(alpha = alpha),
+                                start = Offset(prevX, prevY),
+                                end = Offset(screenX, screenY),
+                                strokeWidth = effStroke
+                            )
+                        }
+                        prevX = screenX
+                        prevY = screenY
+                        prevZ = zt
+                        hasPrev = true
                     }
-
-                    drawLine(
-                        color = frontColor.copy(alpha = alpha),
-                        start = Offset(prevX, prevY),
-                        end = Offset(screenX, screenY),
-                        strokeWidth = stroke
-                    )
                 }
 
-                prevX = screenX
-                prevY = screenY
-                prevZ = zt
-                hasPrev = true
-            }
-        }
+                // 2. Parallels
+                val numParallels = if (isMini) 5 else 9
+                val pointsPerParallel = if (isMini) 20 else 40
+                for (pa in 1 until numParallels) {
+                    val lat = (pa.toFloat() / numParallels) * Math.PI - Math.PI / 2.0
 
-        // 3. Draw parallels (lines of latitude)
-        val numParallels = if (isMini) 5 else 9
-        val pointsPerParallel = if (isMini) 20 else 40
-        for (pa in 1 until numParallels) {
-            val lat = (pa.toFloat() / numParallels) * Math.PI - Math.PI / 2.0
+                    var prevX = 0f
+                    var prevY = 0f
+                    var prevZ = 0.0
+                    var hasPrev = false
 
-            var prevX = 0f
-            var prevY = 0f
-            var prevZ = 0.0
-            var hasPrev = false
+                    for (p in 0..pointsPerParallel) {
+                        val lon = (p.toFloat() / pointsPerParallel) * 2.0 * Math.PI - Math.PI
+                        val rotLon = lon + currentRotation
 
-            for (p in 0..pointsPerParallel) {
-                val lon = (p.toFloat() / pointsPerParallel) * 2.0 * Math.PI - Math.PI
-                val rotLon = lon + rotationAngle.toDouble()
+                        val x = -radius.toDouble() * cos(lat) * cos(rotLon)
+                        val y = radius.toDouble() * sin(lat)
+                        val z = radius.toDouble() * cos(lat) * sin(rotLon)
 
-                val x = -radius.toDouble() * cos(lat) * cos(rotLon)
-                val y = radius.toDouble() * sin(lat)
-                val z = radius.toDouble() * cos(lat) * sin(rotLon)
+                        val yt = y * cos(tiltAngle) - z * sin(tiltAngle)
+                        val zt = y * sin(tiltAngle) + z * cos(tiltAngle)
+                        val xt = x
 
-                val yt = y * cos(tiltAngle) - z * sin(tiltAngle)
-                val zt = y * sin(tiltAngle) + z * cos(tiltAngle)
-                val xt = x
+                        val screenX = (centerX + xt).toFloat()
+                        val screenY = (centerY - yt).toFloat()
 
-                val screenX = (centerX + xt).toFloat()
-                val screenY = (centerY - yt).toFloat()
+                        if (hasPrev) {
+                            val avgZ = (zt + prevZ) / 2.0
+                            val depthPct = ((avgZ / radius.toDouble()).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                            val alpha = (0.15f + 0.5f * depthPct).toFloat()
 
-                if (hasPrev) {
-                    val avgZ = (zt + prevZ) / 2.0
-                    val depthPct = ((avgZ / radius.toDouble()).coerceIn(-1.0, 1.0) + 1.0) / 2.0
-                    val alpha = (0.2f + 0.8f * depthPct).toFloat()
-                    val stroke = if (isMini) {
-                        (0.6f + 0.6f * depthPct).toFloat().dp.toPx()
-                    } else {
-                        (0.8f + 1.2f * depthPct).toFloat().dp.toPx()
+                            drawLine(
+                                color = frontColor.copy(alpha = alpha),
+                                start = Offset(prevX, prevY),
+                                end = Offset(screenX, screenY),
+                                strokeWidth = effStroke
+                            )
+                        }
+                        prevX = screenX
+                        prevY = screenY
+                        prevZ = zt
+                        hasPrev = true
                     }
-
-                    drawLine(
-                        color = frontColor.copy(alpha = alpha),
-                        start = Offset(prevX, prevY),
-                        end = Offset(screenX, screenY),
-                        strokeWidth = stroke
-                    )
                 }
 
-                prevX = screenX
-                prevY = screenY
-                prevZ = zt
-                hasPrev = true
+                // 3. Continents
+                for (continent in smoothedContinents) {
+                    val cSize = continent.size
+                    for (i in 0 until cSize) {
+                        val pt1 = continent[i]
+                        val pt2 = continent[(i + 1) % cSize]
+
+                        val lat1 = pt1.first
+                        val lon1 = pt1.second + currentRotation
+                        val x1 = -radius.toDouble() * cos(lat1) * cos(lon1)
+                        val y1 = radius.toDouble() * sin(lat1)
+                        val z1 = radius.toDouble() * cos(lat1) * sin(lon1)
+                        val yt1 = y1 * cos(tiltAngle) - z1 * sin(tiltAngle)
+                        val zt1 = y1 * sin(tiltAngle) + z1 * cos(tiltAngle)
+                        val xt1 = x1
+                        val screenX1 = (centerX + xt1).toFloat()
+                        val screenY1 = (centerY - yt1).toFloat()
+
+                        val lat2 = pt2.first
+                        val lon2 = pt2.second + currentRotation
+                        val x2 = -radius.toDouble() * cos(lat2) * cos(lon2)
+                        val y2 = radius.toDouble() * sin(lat2)
+                        val z2 = radius.toDouble() * cos(lat2) * sin(lon2)
+                        val yt2 = y2 * cos(tiltAngle) - z2 * sin(tiltAngle)
+                        val zt2 = y2 * sin(tiltAngle) + z2 * cos(tiltAngle)
+                        val xt2 = x2
+                        val screenX2 = (centerX + xt2).toFloat()
+                        val screenY2 = (centerY - yt2).toFloat()
+
+                        val avgZ = (zt1 + zt2) / 2.0
+                        val depthPct = ((avgZ / radius.toDouble()).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                        val alpha = (0.28f + 0.72f * depthPct).toFloat()
+
+                        drawLine(
+                            color = frontColor.copy(alpha = alpha),
+                            start = Offset(screenX1, screenY1),
+                            end = Offset(screenX2, screenY2),
+                            strokeWidth = effStroke * 1.2f
+                        )
+                    }
+                }
+
+                // 4. Tactical Dots
+                activeCells.forEach { cellKey ->
+                    try {
+                        val parts = cellKey.split(",")
+                        val cellX = parts[0].toInt()
+                        val cellY = parts[1].toInt()
+                        val cellLatDeg = (cellX + 0.5) * 0.015
+                        val cellLngDeg = (cellY + 0.5) * 0.015
+                        val latRad = Math.toRadians(cellLatDeg)
+                        val lonRad = Math.toRadians(cellLngDeg)
+                        val rotLon = lonRad + currentRotation
+
+                        val x = -radius.toDouble() * cos(latRad) * cos(rotLon)
+                        val y = radius.toDouble() * sin(latRad)
+                        val z = radius.toDouble() * cos(latRad) * sin(rotLon)
+
+                        val yt = y * cos(tiltAngle) - z * sin(tiltAngle)
+                        val zt = y * sin(tiltAngle) + z * cos(tiltAngle)
+                        val xt = x
+
+                        val screenX = (centerX + xt).toFloat()
+                        val screenY = (centerY - yt).toFloat()
+
+                        val isFront = zt >= 0
+                        val depthPct = ((zt / radius.toDouble()).coerceIn(-1.0, 1.0) + 1.0) / 2.0
+                        val baseColor = if (cellKey.contains("-")) Color(0xFFF43F5E) else Color(0xFFD946EF)
+                        val alpha = if (isFront) (0.5f + 0.5f * depthPct.toFloat()) else (0.05f + 0.15f * depthPct.toFloat())
+                        val sizeRadius = (if (isFront) 5.dp.toPx() else 3.dp.toPx()) / scaleFactor
+
+                        drawCircle(
+                            color = baseColor.copy(alpha = alpha),
+                            radius = sizeRadius,
+                            center = Offset(screenX, screenY)
+                        )
+                    } catch (e: Exception) {}
+                }
             }
-        }
 
-        // 4. Draw continents (pre-computed and spline-smoothed loops)
-        for (continent in smoothedContinents) {
-            val size = continent.size
-            for (i in 0 until size) {
-                val pt1 = continent[i]
-                val pt2 = continent[(i + 1) % size]
-
-                // Point 1
-                val lat1 = pt1.first
-                val lon1 = pt1.second + rotationAngle.toDouble()
-                val x1 = -radius.toDouble() * cos(lat1) * cos(lon1)
-                val y1 = radius.toDouble() * sin(lat1)
-                val z1 = radius.toDouble() * cos(lat1) * sin(lon1)
-                val yt1 = y1 * cos(tiltAngle) - z1 * sin(tiltAngle)
-                val zt1 = y1 * sin(tiltAngle) + z1 * cos(tiltAngle)
-                val xt1 = x1
-                val screenX1 = (centerX + xt1).toFloat()
-                val screenY1 = (centerY - yt1).toFloat()
-
-                // Point 2
-                val lat2 = pt2.first
-                val lon2 = pt2.second + rotationAngle.toDouble()
-                val x2 = -radius.toDouble() * cos(lat2) * cos(lon2)
-                val y2 = radius.toDouble() * sin(lat2)
-                val z2 = radius.toDouble() * cos(lat2) * sin(lon2)
-                val yt2 = y2 * cos(tiltAngle) - z2 * sin(tiltAngle)
-                val zt2 = y2 * sin(tiltAngle) + z2 * cos(tiltAngle)
-                val xt2 = x2
-                val screenX2 = (centerX + xt2).toFloat()
-                val screenY2 = (centerY - yt2).toFloat()
-
-                val avgZ = (zt1 + zt2) / 2.0
-                val depthPct = ((avgZ / radius.toDouble()).coerceIn(-1.0, 1.0) + 1.0) / 2.0
-
-                val alpha = (0.28f + 0.72f * depthPct).toFloat()
-                val stroke = if (isMini) {
-                    (0.8f + 0.8f * depthPct).toFloat().dp.toPx()
-                } else {
-                    (1.0f + 1.5f * depthPct).toFloat().dp.toPx()
-                }
-
-                drawLine(
-                    color = frontColor.copy(alpha = alpha),
-                    start = Offset(screenX1, screenY1),
-                    end = Offset(screenX2, screenY2),
-                    strokeWidth = stroke
-                )
-            }
-        }
-
-        // 5. Draw active grid/heatwave cells on the spinning globe
-        activeCells.forEach { cellKey ->
-            try {
-                val parts = cellKey.split(",")
-                val cellX = parts[0].toInt()
-                val cellY = parts[1].toInt()
-
-                // Calculate center coordinates of the cell in degrees
-                val cellLatDeg = (cellX + 0.5) * 0.015
-                val cellLngDeg = (cellY + 0.5) * 0.015
-
-                // Convert to radians
-                val latRad = Math.toRadians(cellLatDeg)
-                val lonRad = Math.toRadians(cellLngDeg)
-
-                // Rotate longitude according to the globe rotation angle
-                val rotLon = lonRad + rotationAngle.toDouble()
-
-                // 3D spherical projection
-                val x = -radius.toDouble() * cos(latRad) * cos(rotLon)
-                val y = radius.toDouble() * sin(latRad)
-                val z = radius.toDouble() * cos(latRad) * sin(rotLon)
-
-                // Apply Earth axis tilt (23.5 degrees)
-                val yt = y * cos(tiltAngle) - z * sin(tiltAngle)
-                val zt = y * sin(tiltAngle) + z * cos(tiltAngle)
-                val xt = x
-
-                // Map to screen coordinates
-                val screenX = (centerX + xt).toFloat()
-                val screenY = (centerY - yt).toFloat()
-
-                // Determine depth and transparency depending on side (front or back of the sphere)
-                val isFront = zt >= 0
-                val depthPct = ((zt / radius.toDouble()).coerceIn(-1.0, 1.0) + 1.0) / 2.0
-                
-                // Color choices: Pink/Red/Purple tactical indicators
-                val baseColor = if (cellKey.contains("-")) {
-                    Color(0xFFF43F5E) // Hot rose/red for cached cells or negative coords
-                } else {
-                    Color(0xFFD946EF) // Magenta/purple for heatwave cells
-                }
-
-                // Front side is very bright, back side is faded and subtle
-                val alpha = if (isFront) {
-                    (0.5f + 0.5f * depthPct.toFloat())
-                } else {
-                    (0.05f + 0.15f * depthPct.toFloat())
-                }
-
-                val sizeRadius = if (isMini) {
-                    if (isFront) 2.dp.toPx() else 1.dp.toPx()
-                } else {
-                    if (isFront) 5.dp.toPx() else 3.dp.toPx()
-                }
-
-                // Draw filled circle
+            // Draw center coordinate beacon when zoomed to Level 1
+            if (zoomLevel == 1) {
+                // Flash core player coordinates in center of screen
+                val pulse = (System.currentTimeMillis() % 1500) / 1500f
                 drawCircle(
-                    color = baseColor.copy(alpha = alpha),
-                    radius = sizeRadius,
-                    center = Offset(screenX, screenY)
+                    color = CyberGreen.copy(alpha = 1f - pulse),
+                    radius = 24.dp.toPx() * pulse,
+                    center = Offset(centerX, centerY),
+                    style = Stroke(width = 1.dp.toPx())
                 )
+                drawCircle(
+                    color = CyberGreen,
+                    radius = 4.dp.toPx(),
+                    center = Offset(centerX, centerY)
+                )
+            }
+        } else if (zoomLevel == 2) {
+            // Draw 2D Tactical mesh grid
+            val gridSize = 10
+            val cellSize = radius * 1.5f / gridSize
+            val startX = centerX - (gridSize * cellSize) / 2f
+            val startY = centerY - (gridSize * cellSize) / 2f
 
-                // For front-side cells, draw a nice tactical glowing ring around the circle
-                if (isFront && !isMini) {
-                    drawCircle(
-                        color = baseColor.copy(alpha = alpha * 0.5f),
-                        radius = sizeRadius * 2.2f,
-                        center = Offset(screenX, screenY),
-                        style = Stroke(width = 1.dp.toPx())
+            for (i in 0..gridSize) {
+                drawLine(
+                    color = frontColor.copy(alpha = 0.25f),
+                    start = Offset(startX + i * cellSize, startY),
+                    end = Offset(startX + i * cellSize, startY + gridSize * cellSize),
+                    strokeWidth = 1.dp.toPx()
+                )
+                drawLine(
+                    color = frontColor.copy(alpha = 0.25f),
+                    start = Offset(startX, startY + i * cellSize),
+                    end = Offset(startX + gridSize * cellSize, startY + i * cellSize),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+
+            val playerX = startX + 5.5f * cellSize
+            val playerY = startY + 5.5f * cellSize
+            val pulse = (System.currentTimeMillis() % 2000) / 2000f
+
+            drawCircle(
+                color = CyberGreen.copy(alpha = 1f - pulse),
+                radius = cellSize * 2.5f * pulse,
+                center = Offset(playerX, playerY),
+                style = Stroke(width = 1.5.dp.toPx())
+            )
+
+            // Draw Player Diamond
+            val pPath = Path().apply {
+                moveTo(playerX, playerY - 8.dp.toPx())
+                lineTo(playerX + 8.dp.toPx(), playerY)
+                lineTo(playerX, playerY + 8.dp.toPx())
+                lineTo(playerX - 8.dp.toPx(), playerY)
+                close()
+            }
+            drawPath(pPath, color = CyberGreen)
+
+            // Draw mock nodes & anomalies in nearby sectors
+            val peer1X = startX + 3.5f * cellSize
+            val peer1Y = startY + 7.5f * cellSize
+            drawCircle(color = CyberCyan, radius = 5.dp.toPx(), center = Offset(peer1X, peer1Y))
+
+            val peer2X = startX + 7.5f * cellSize
+            val peer2Y = startY + 4.5f * cellSize
+            drawCircle(color = CyberCyan, radius = 5.dp.toPx(), center = Offset(peer2X, peer2Y))
+
+            val anomX = startX + 6.5f * cellSize
+            val anomY = startY + 8.5f * cellSize
+            val anomPath = Path().apply {
+                moveTo(anomX, anomY - 6.dp.toPx())
+                lineTo(anomX + 6.dp.toPx(), anomY + 6.dp.toPx())
+                lineTo(anomX - 6.dp.toPx(), anomY + 6.dp.toPx())
+                close()
+            }
+            drawPath(anomPath, color = Color(0xFFF97316))
+        } else if (zoomLevel == 3) {
+            // Draw 3D Crystal Core Blueprint
+            val crystalRadius = radius * 0.45f
+            val rotationVal = rotationAngle.toDouble() * 1.5
+            val tiltVal = Math.toRadians(35.0)
+
+            val vertices = listOf(
+                doubleArrayOf(0.0, crystalRadius.toDouble(), 0.0), // 0: Top
+                doubleArrayOf(0.0, -crystalRadius.toDouble(), 0.0), // 1: Bottom
+                doubleArrayOf(crystalRadius.toDouble() * cos(rotationVal), 0.0, crystalRadius.toDouble() * sin(rotationVal)), // 2
+                doubleArrayOf(crystalRadius.toDouble() * cos(rotationVal + Math.PI/2), 0.0, crystalRadius.toDouble() * sin(rotationVal + Math.PI/2)), // 3
+                doubleArrayOf(crystalRadius.toDouble() * cos(rotationVal + Math.PI), 0.0, crystalRadius.toDouble() * sin(rotationVal + Math.PI)), // 4
+                doubleArrayOf(crystalRadius.toDouble() * cos(rotationVal + 3*Math.PI/2), 0.0, crystalRadius.toDouble() * sin(rotationVal + 3*Math.PI/2)) // 5
+            )
+
+            val projected = vertices.map { pt ->
+                val x = pt[0]
+                val y = pt[1]
+                val z = pt[2]
+                val yt = y * cos(tiltVal) - z * sin(tiltVal)
+                Offset((centerX + x).toFloat(), (centerY - yt).toFloat())
+            }
+
+            for (i in 2..5) {
+                drawLine(color = CyberCyan, start = projected[0], end = projected[i], strokeWidth = 1.5.dp.toPx())
+                drawLine(color = CyberCyan, start = projected[1], end = projected[i], strokeWidth = 1.5.dp.toPx())
+            }
+            for (i in 2..5) {
+                val next = if (i == 5) 2 else i + 1
+                drawLine(color = CyberCyan.copy(alpha = 0.6f), start = projected[i], end = projected[next], strokeWidth = 1.5.dp.toPx())
+            }
+
+            val corePulse = 0.8f + 0.2f * sin(System.currentTimeMillis() / 150f).toFloat()
+            drawCircle(
+                color = CyberGreen.copy(alpha = 0.25f),
+                radius = crystalRadius * 0.25f * corePulse,
+                center = Offset(centerX, centerY)
+            )
+            drawCircle(
+                color = CyberGreen,
+                radius = crystalRadius * 0.08f,
+                center = Offset(centerX, centerY)
+            )
+
+            // Radiating signal rings
+            val wavePulse = (System.currentTimeMillis() % 1600) / 1600f
+            drawCircle(
+                color = CyberCyan.copy(alpha = 0.8f * (1f - wavePulse)),
+                radius = crystalRadius * 1.5f * wavePulse,
+                center = Offset(centerX, centerY),
+                style = Stroke(width = 1.dp.toPx())
+            )
+        }
+
+        // Draw Telemetry overlays using Native Canvas
+        if (!isMini) {
+            drawIntoCanvas { canvas ->
+                val paint = android.graphics.Paint().apply {
+                    color = frontColor.toArgb()
+                    textSize = 8.5.sp.toPx()
+                    typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                    isAntiAlias = true
+                }
+                val titlePaint = android.graphics.Paint().apply {
+                    color = Color.White.toArgb()
+                    textSize = 10.sp.toPx()
+                    typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                    isAntiAlias = true
+                }
+
+                // Render Top Title based on zoom level
+                val titleText = when (zoomLevel) {
+                    0 -> "HOLOGRAPHIC SATELLITE GLOBE (GLOBAL)"
+                    1 -> "METROPOLITAN REGION UPLINK (ZOOM +1)"
+                    2 -> "LOCAL MESH SECTOR GRID (ZOOM +2)"
+                    else -> "PINPOINT NODE TRANSCEIVER CORE (ZOOM +3)"
+                }
+                canvas.nativeCanvas.drawText(titleText, 16.dp.toPx(), 24.dp.toPx(), titlePaint)
+
+                // Render Bottom info details
+                val infoLines = when (zoomLevel) {
+                    0 -> listOf(
+                        "SCALE: 1:40,000,000",
+                        "GRID RESOLUTION: 1000 KM (GLOBAL)",
+                        "CORE LATITUDE: ${"%.4f".format(latVal)}",
+                        "CORE LONGITUDE: ${"%.4f".format(lngVal)}"
+                    )
+                    1 -> listOf(
+                        "CURRENT REGION ID: 10.$latIndex.$lngIndex.x",
+                        "SCALE: 1:1,500,000",
+                        "GRID RESOLUTION: 80 KM",
+                        "SURFACE POSITION: CENTERED"
+                    )
+                    2 -> listOf(
+                        "CURRENT SECTOR ID: 10.$latIndex.$lngIndex.$octet4",
+                        "SCALE: 1:50,000",
+                        "GRID RANGE: 5 KM",
+                        "ACTIVE MESH: 3 NODES DETECTED"
+                    )
+                    else -> listOf(
+                        "NODE IDENTIFIER: ${viewModel.localNodeName}",
+                        "IP SUITE: 10.$latIndex.$lngIndex.$octet4",
+                        "UPLINK RATING: SECURE MESH",
+                        "SYSTEM HARMONICS: 924.8 MHZ"
                     )
                 }
-            } catch (e: Exception) {
-                // Safe guard against splits / number parsing exceptions
+
+                var yPos = height - 16.dp.toPx() - (infoLines.size * 14.dp.toPx())
+                infoLines.forEach { line ->
+                    canvas.nativeCanvas.drawText(line, 16.dp.toPx(), yPos, paint)
+                    yPos += 12.dp.toPx()
+                }
+
+                // Draw Zoom Instructions Hint at top-right
+                val hintPaint = android.graphics.Paint().apply {
+                    color = CyberGreen.toArgb()
+                    textSize = 8.sp.toPx()
+                    typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                    isAntiAlias = true
+                }
+                canvas.nativeCanvas.drawText("TAP TO ZOOM UPLINK (LEVEL $zoomLevel/3)", width - 180.dp.toPx(), 24.dp.toPx(), hintPaint)
             }
         }
     }
