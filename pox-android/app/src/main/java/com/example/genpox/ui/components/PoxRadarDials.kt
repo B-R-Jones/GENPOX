@@ -108,14 +108,14 @@ fun PoxRadarDials(
         )
 
         // New Layout Spacing Standards:
-        // - Base bottom at bottom = 198.dp (floats exactly 8.dp above PoxHoloNav top boundary of 190.dp)
-        val baseBottom = 198.dp
+        // - Base bottom at bottom = 202.dp (floats exactly 8.dp above PoxHoloNav top boundary of 194.dp inside parent padding)
+        val baseBottom = 202.dp
 
-        // - Rotation (collapsed) end = 12.dp.
-        // - Zoom (collapsed) end = 66.dp.
-        // - When Rotation expands, it pushes Zoom end by 44.dp to 110.dp to maintain exactly 8.dp gap.
-        val animatedZoomEnd = (66f + 44f * rotationExpansionFraction).dp
-        val animatedRotEnd = 12.dp
+        // - Rotation (collapsed) end = 22.dp.
+        // - Zoom (collapsed) end = 76.dp.
+        // - When Rotation expands, it pushes Zoom end by 44.dp to 120.dp to maintain exactly 8.dp gap.
+        val animatedZoomEnd = (76f + 44f * rotationExpansionFraction).dp
+        val animatedRotEnd = 22.dp
 
         ZoomScrollCircle(
             sliderValue = state.sliderValue,

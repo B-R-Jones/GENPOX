@@ -101,6 +101,9 @@ fun VaultView(viewModel: MainViewModel) {
     val openedFrom by viewModel.creatureCardOpenedFrom.collectAsState()
     val harvestingCreatureIds by viewModel.harvestingCreatureIds.collectAsState()
     val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
+    val activeTags = remember(activeCreature, targetSequence, defenderId, harvestingCreatureIds) {
+        activeCreature?.let { getCreatureTags(it, targetSequence, defenderId, harvestingCreatureIds) } ?: emptyList()
+    }
 
     // Local UI states
     var applyLibFilters by remember { mutableStateOf(true) }
@@ -164,19 +167,45 @@ fun VaultView(viewModel: MainViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        val isCloseActive = activeCreature != null || viewingArchiveSearch || openedFrom == "message_creature" || openedFrom == "message_gene"
         PoxTabFrame(
             flavorTitle = "G.E.N. P.O.X. SEABED VAULT V0.4",
-            statusText = "SYSTEMS ON",
-            statusColor = CyberGreen,
+            statusText = if (isCloseActive) "CLOSE" else "SYSTEMS ON",
+            statusColor = if (isCloseActive) CyberRed else CyberGreen,
+            onStatusClick = if (isCloseActive) {
+                {
+                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                    if (activeCreature != null) {
+                        val prevOpenedFrom = openedFrom
+                        viewModel.setActiveCreature(null)
+                        if (prevOpenedFrom == "splicer") {
+                            viewModel.selectTab("splicer")
+                        } else if (prevOpenedFrom == "scanner") {
+                            viewModel.selectTab("scanner")
+                        } else if (prevOpenedFrom == "message_creature" || prevOpenedFrom == "message_gene") {
+                            viewModel.selectTab("network")
+                        }
+                    } else if (viewingArchiveSearch) {
+                        viewingArchiveSearch = false
+                    } else if (openedFrom == "message_creature" || openedFrom == "message_gene") {
+                        viewModel.setActiveCreature(null, "vault")
+                        viewModel.selectTab("network")
+                    }
+                }
+            } else null,
             headerTitle = if (activeCreature != null) {
-                activeCreature!!.name.uppercase()
+                "${activeCreature!!.name.uppercase()} [${activeCreature!!.id}]"
+            } else if (viewingArchiveSearch) {
+                "ARCHIVE SEARCH RESULTS"
             } else if (vaultTab == "creatures") {
                 "NODE P.O.X. SEQUENCES REGISTRY"
             } else {
                 "MOLECULAR STEP-SEARCH DIRECTORY"
             },
             descriptionText = if (activeCreature != null) {
-                "Detailed biological telemetry and genome layout."
+                "${activeCreature!!.type.uppercase()} : Detailed biological telemetry and genome layout."
+            } else if (viewingArchiveSearch) {
+                "System target matches for active search parameters."
             } else if (vaultTab == "creatures") {
                 "Registry of harvested species and custom step-search DNA databanks."
             } else {
@@ -191,12 +220,172 @@ fun VaultView(viewModel: MainViewModel) {
                 if (activeCreature != null) {
                     viewModel.setActiveCreature(null)
                 }
+                if (viewingArchiveSearch) {
+                    viewingArchiveSearch = false
+                }
                 viewModel.setVaultSubTab(id)
             },
-            viewModel = viewModel
+            viewModel = viewModel,
+            headerBadges = if (activeCreature != null) {
+                {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val factionColor = when (activeCreature!!.faction) {
+                            "Infection" -> Color(0xFFEF4444)
+                            "Mech" -> Color(0xFF60A5FA)
+                            "Parasite" -> Color(0xFFA855F7)
+                            else -> Color(0xFF00FF41)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .background(factionColor, RoundedCornerShape(2.dp))
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = activeCreature!!.faction.uppercase(),
+                                color = Color.Black,
+                                style = Typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                fontSize = 8.5.sp
+                            )
+                        }
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            activeTags.forEach { tag ->
+                                TagBadge(tag = tag)
+                            }
+                        }
+                    }
+                }
+            } else null
         ) {
             if (activeCreature != null) {
                 CreatureDetailCard(c = activeCreature!!, viewModel = viewModel)
+            } else if (viewingArchiveSearch) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Summary metrics header
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "SYSTEM TARGET MATCHES: ",
+                                color = CyberGreen,
+                                fontSize = 9.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "${filteredSortedCreatures.size}",
+                                color = CyberGreen,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = " SPECIMENS",
+                                color = CyberGreen,
+                                fontSize = 9.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = "STATUS: GEN-VAULT OPEN",
+                            color = Color.Gray,
+                            fontSize = 9.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                        )
+                    }
+
+                    // List Area
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .padding(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(filteredSortedCreatures) { item ->
+                            val currentTags = remember(item, targetSequence, defenderId, harvestingCreatureIds) {
+                                getCreatureTags(item, targetSequence, defenderId, harvestingCreatureIds)
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                                    .background(CyberPanel)
+                                    .clickable {
+                                        viewModel.synthManager.playBeep(700f, 0.05f, "sine")
+                                        viewModel.setActiveCreature(item, openedFrom ?: "vault")
+                                    }
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                                        .background(Color.Black.copy(alpha = 0.4f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    com.example.genpox.ui.components.CreatureWireframeView(
+                                        dna = item.sequence,
+                                        faction = item.faction,
+                                        modifier = Modifier.fillMaxSize().padding(4.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.name.uppercase(),
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        currentTags.forEach { tag ->
+                                            TagBadge(tag = tag)
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    text = "DECRYPT >",
+                                    color = CyberGreen,
+                                    fontSize = 9.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
             } else {
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -239,7 +428,7 @@ fun VaultView(viewModel: MainViewModel) {
 
                                             Box(
                                                 modifier = Modifier
-                                                    .border(1.dp, CyberBorder, RoundedCornerShape(2.dp))
+                                                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                                                     .background(Color.Black)
                                                     .clickable {
                                                         viewModel.synthManager.playBeep(520f, 0.05f, "sine")
@@ -384,7 +573,7 @@ fun VaultView(viewModel: MainViewModel) {
                                                     ) {
                                                         Box(
                                                             modifier = Modifier
-                                                                .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(2.dp))
+                                                                .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(4.dp))
                                                                 .background(Color.Black)
                                                                 .clickable {
                                                                     viewModel.synthManager.playBeep(420f, 0.1f, "sine")
@@ -559,197 +748,67 @@ fun VaultView(viewModel: MainViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            PoxButton(
-                                modifier = Modifier.weight(1f),
-                                text = "CLEAR STOCK",
-                                onClick = { viewModel.clearDevBases() },
-                                buttonType = PoxButtonType.RED_MUTED,
-                                buttonSize = PoxButtonSize.COMPACT,
-                                sound = PoxButtonSound.COMBINATOR_TICK,
-                                viewModel = viewModel
-                            )
-                            PoxButton(
-                                modifier = Modifier.weight(1f),
-                                text = "CLEAR GENES",
-                                onClick = { viewModel.clearDevGenes() },
-                                buttonType = PoxButtonType.RED_MUTED,
-                                buttonSize = PoxButtonSize.COMPACT,
-                                sound = PoxButtonSound.COMBINATOR_TICK,
-                                viewModel = viewModel
-                            )
-                            PoxButton(
-                                modifier = Modifier.weight(1f),
-                                text = "CLEAR CREATURES",
-                                onClick = { viewModel.clearDevCreatures() },
-                                buttonType = PoxButtonType.RED_MUTED,
-                                buttonSize = PoxButtonSize.COMPACT,
-                                sound = PoxButtonSound.COMBINATOR_TICK,
-                                viewModel = viewModel
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Overlay is drawn on top when viewingArchiveSearch is true and activeCreature is null
-        if (viewingArchiveSearch && activeCreature == null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.95f))
-                    .border(2.2.dp, CyberGreen, RoundedCornerShape(4.dp))
-                    .padding(8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, CyberBorder.copy(alpha = 0.2f), RoundedCornerShape(2.dp))
-                            .background(Color.Black.copy(alpha = 0.3f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "G.E.N. P.O.X. SEABED VAULT v0.4",
-                            color = CyberGreenDim,
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(2.dp))
-                                .background(Color.Transparent)
-                                .clickable {
-                                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                    viewingArchiveSearch = false
-                                }
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "✕ CLOSE",
-                                color = Color(0xFFEF4444),
-                                fontSize = 8.sp,
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    // Summary metrics header
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "SYSTEM TARGET MATCHES: ",
-                                color = CyberGreen,
-                                fontSize = 9.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "${filteredSortedCreatures.size}",
-                                color = CyberGreen,
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = " SPECIMENS",
-                                color = CyberGreen,
-                                fontSize = 9.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Text(
-                            text = "STATUS: GEN-VAULT OPEN",
-                            color = Color.Gray,
-                            fontSize = 9.sp,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
-                        )
-                    }
-
-                    // List Area
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .border(1.dp, CyberBorder)
-                            .background(Color.Black.copy(alpha = 0.6f))
-                            .padding(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        items(filteredSortedCreatures) { item ->
-                            val currentTags = remember(item, targetSequence, defenderId, harvestingCreatureIds) {
-                                getCreatureTags(item, targetSequence, defenderId, harvestingCreatureIds)
-                            }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(1.dp, CyberBorder, RoundedCornerShape(2.dp))
-                                    .background(CyberPanel)
-                                    .clickable {
-                                        viewModel.synthManager.playBeep(700f, 0.05f, "sine")
-                                        viewModel.setActiveCreature(item, openedFrom ?: "vault")
-                                    }
-                                    .padding(10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Button(
+                                onClick = {
+                                    viewModel.synthManager.playCombinatorTick()
+                                    viewModel.clearDevBases()
+                                },
+                                modifier = Modifier.weight(1f).height(28.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Red,
+                                    contentColor = Color.Black
+                                ),
+                                shape = RoundedCornerShape(4.dp),
+                                contentPadding = PaddingValues(0.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
-                                        .background(Color.Black.copy(alpha = 0.4f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    com.example.genpox.ui.components.CreatureWireframeView(
-                                        dna = item.sequence,
-                                        faction = item.faction,
-                                        modifier = Modifier.fillMaxSize().padding(4.dp)
-                                    )
-                                }
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = item.name.uppercase(),
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        currentTags.forEach { tag ->
-                                            TagBadge(tag = tag)
-                                        }
-                                    }
-                                }
-
                                 Text(
-                                    text = "DECRYPT >",
-                                    color = CyberGreen,
-                                    fontSize = 9.sp,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                    fontWeight = FontWeight.Bold
+                                    text = "CLEAR STOCK",
+                                    color = Color.Black,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Default
+                                )
+                            }
+                            Button(
+                                onClick = {
+                                    viewModel.synthManager.playCombinatorTick()
+                                    viewModel.clearDevGenes()
+                                },
+                                modifier = Modifier.weight(1f).height(28.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Red,
+                                    contentColor = Color.Black
+                                ),
+                                shape = RoundedCornerShape(4.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = "CLEAR GENES",
+                                    color = Color.Black,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Default
+                                )
+                            }
+                            Button(
+                                onClick = {
+                                    viewModel.synthManager.playCombinatorTick()
+                                    viewModel.clearDevCreatures()
+                                },
+                                modifier = Modifier.weight(1f).height(28.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Red,
+                                    contentColor = Color.Black
+                                ),
+                                shape = RoundedCornerShape(4.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = "CLEAR CREATURES",
+                                    color = Color.Black,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Default
                                 )
                             }
                         }
@@ -757,6 +816,7 @@ fun VaultView(viewModel: MainViewModel) {
                 }
             }
         }
+
 
         // Step Search Gene Details Popup
         stepSearchSelectedGene?.let { gene ->
@@ -824,126 +884,7 @@ fun CreatureDetailCard(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // New top-row flavor header with close button
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, CyberBorder.copy(alpha = 0.2f), RoundedCornerShape(2.dp))
-                .background(Color.Black.copy(alpha = 0.3f))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "G.E.N. P.O.X. SEABED VAULT v0.4",
-                color = CyberGreenDim,
-                fontSize = 9.sp,
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Bold
-            )
 
-            Box(
-                modifier = Modifier
-                    .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(2.dp))
-                    .background(Color.Transparent)
-                    .clickable {
-                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                        viewModel.setActiveCreature(null)
-                        if (openedFrom == "splicer") {
-                            viewModel.selectTab("splicer")
-                        } else if (openedFrom == "scanner") {
-                            viewModel.selectTab("scanner")
-                        }
-                    }
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text = "✕ CLOSE",
-                    color = Color(0xFFEF4444),
-                    fontSize = 8.sp,
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        // Sub-container with name, type, and badges
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 2.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = c.name.uppercase(),
-                    style = Typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                    color = Color.White,
-                    fontSize = 15.sp
-                )
-                Text(
-                    text = c.id,
-                    style = Typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = CyberGreen,
-                    fontSize = 9.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            // Creature Type
-            Text(
-                text = c.type.uppercase(),
-                style = Typography.bodySmall,
-                color = CyberGreenDim,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                fontSize = 9.5.sp
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Badges
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                val factionColor = when (c.faction) {
-                    "Infection" -> Color(0xFFEF4444)
-                    "Mech" -> Color(0xFF60A5FA)
-                    "Parasite" -> Color(0xFFA855F7)
-                    else -> Color(0xFF00FF41)
-                }
-                Box(
-                    modifier = Modifier
-                        .background(factionColor, RoundedCornerShape(2.dp))
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = c.faction.uppercase(),
-                        color = Color.Black,
-                        style = Typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                        fontSize = 8.5.sp
-                    )
-                }
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    activeTags.forEach { tag ->
-                        TagBadge(tag = tag)
-                    }
-                }
-            }
-        }
 
         // Sub-panel layout: Side-by-side ASCII art and QR code
         Row(
@@ -954,7 +895,7 @@ fun CreatureDetailCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .border(1.dp, CyberBorder.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                     .background(Color.Black)
                     .clickable {
                         viewModel.synthManager.playBeep(520f, 0.05f, "sine")
@@ -990,7 +931,7 @@ fun CreatureDetailCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .border(1.dp, CyberBorder.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                     .background(Color.Black)
                     .clickable {
                         viewModel.synthManager.playBeep(880f, 0.05f, "sine")
@@ -1032,7 +973,7 @@ fun CreatureDetailCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, CyberBorder.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.6f))
                 .padding(10.dp)
         ) {
@@ -1071,12 +1012,60 @@ fun CreatureDetailCard(
 
         if (isHarvesting) {
             HarvestingCountdownTimer(viewModel = viewModel, creatureId = c.id)
+        } else if (openedFrom == "message_creature") {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+                    .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .padding(10.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "SECURE MESSAGE ATTACHMENT UPLINK",
+                        color = CyberCyan,
+                        style = Typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "ATTACH SPECIMEN ${c.name} TO ACTIVE TRANSMISSION COMPILER.",
+                        color = Color.LightGray,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Default
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Button(
+                        onClick = {
+                            viewModel.synthManager.playBeep(600f, 0.05f, "sine")
+                            viewModel.setComposerAttachedCreature(c)
+                            viewModel.setActiveCreature(null, "vault")
+                            viewModel.selectTab("network")
+                        },
+                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = CyberCyan,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "ATTACH SPECIMEN",
+                            color = Color.Black,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Default
+                        )
+                    }
+                }
+            }
         } else if (openedFrom == "scanner") {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 8.dp)
-                    .border(1.dp, Color(0xFFA855F7).copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .border(1.dp, Color(0xFFA855F7), RoundedCornerShape(4.dp))
                     .background(Color.Black.copy(alpha = 0.4f))
                     .padding(10.dp)
             ) {
@@ -1098,20 +1087,29 @@ fun CreatureDetailCard(
                             fontFamily = FontFamily.Default
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        PoxButton(
-                            modifier = Modifier.fillMaxWidth(),
-                            text = "DISPATCH SEQUENCE TO ANOMALY",
+                        Button(
                             onClick = {
+                                viewModel.synthManager.playBeep(600f, 0.05f, "sine")
                                 viewModel.dispatchMission(c, lockedAnom)
                                 viewModel.setSelectedAnomalyId(null)
                                 viewModel.setActiveCreature(null)
                                 viewModel.selectTab("scanner")
                             },
-                            buttonType = PoxButtonType.PURPLE_ANOMALY,
-                            buttonSize = PoxButtonSize.LARGE,
-                            sound = PoxButtonSound.BEEP_HIGH,
-                            viewModel = viewModel
-                        )
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFA855F7), // Purple
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "DISPATCH SEQUENCE TO ANOMALY",
+                                color = Color.Black,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Default
+                            )
+                        }
                     } else {
                         Text(
                             text = "NO ANOMALY TARGET LOCKED. SCAN FOR ANOMALIES FIRST.",
@@ -1128,7 +1126,7 @@ fun CreatureDetailCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, CyberBorder.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.4f))
                 .padding(10.dp)
         ) {
@@ -1366,7 +1364,7 @@ fun CreatureDetailCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, CyberBorder.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.6f))
                 .padding(8.dp)
         ) {
@@ -1408,7 +1406,7 @@ fun CreatureDetailCard(
                                 val bg = if (isAnom) Color(0xFF1E0B36) else Color.Transparent
                                 Box(
                                     modifier = Modifier
-                                        .then(if (borderStroke != null) Modifier.border(borderStroke, RoundedCornerShape(2.dp)) else Modifier)
+                                        .then(if (borderStroke != null) Modifier.border(borderStroke, RoundedCornerShape(4.dp)) else Modifier)
                                         .background(bg, RoundedCornerShape(2.dp))
                                         .padding(horizontal = 4.dp, vertical = 2.dp)
                                 ) {
@@ -1440,7 +1438,7 @@ fun CreatureDetailCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color(0xFF7F1D1D).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                .border(1.dp, Color(0xFF7F1D1D), RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.6f))
                 .padding(10.dp)
         ) {
@@ -1597,7 +1595,7 @@ fun CreatureDetailCard(
                             },
                             modifier = Modifier.fillMaxWidth().height(36.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C), contentColor = Color.White),
-                            shape = RoundedCornerShape(2.dp)
+                            shape = RoundedCornerShape(4.dp)
                         ) {
                             Text(
                                 text = "ACTIVATE HARVEST INCINERATION",
@@ -1618,7 +1616,7 @@ fun CreatureDetailCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color(0xFF78350F).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                .border(1.dp, Color(0xFF78350F), RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.6f))
                 .padding(10.dp)
         ) {
@@ -1664,7 +1662,7 @@ fun CreatureDetailCard(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, Color(0xFF78350F).copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                                .border(1.dp, Color(0xFF78350F), RoundedCornerShape(4.dp))
                                 .background(Color(0xFF78350F).copy(alpha = 0.1f))
                                 .padding(8.dp)
                         ) {
@@ -1699,8 +1697,8 @@ fun CreatureDetailCard(
                                             .weight(1f)
                                             .border(
                                                 1.dp,
-                                                if (isActive) Color(0xFFFBBF24) else if (isCompleted) Color(0xFF78350F).copy(alpha = 0.5f) else Color.DarkGray,
-                                                RoundedCornerShape(2.dp)
+                                                if (isActive) Color(0xFFFBBF24) else if (isCompleted) Color(0xFF78350F) else Color.DarkGray,
+                                                RoundedCornerShape(4.dp)
                                             )
                                             .background(if (isActive) Color(0xFFFBBF24).copy(alpha = 0.15f) else Color.Transparent)
                                             .padding(vertical = 4.dp),
@@ -1721,7 +1719,7 @@ fun CreatureDetailCard(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .border(1.dp, Color(0xFF78350F).copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                                    .border(1.dp, Color(0xFF78350F), RoundedCornerShape(4.dp))
                                     .background(Color.Black)
                                     .padding(8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1741,7 +1739,7 @@ fun CreatureDetailCard(
                                         val color = if (isFilled) Color(0xFFFBBF24) else Color.DarkGray
                                         Box(
                                             modifier = Modifier
-                                                .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+                                                .border(1.dp, color, RoundedCornerShape(4.dp))
                                                 .background(if (isFilled) Color(0xFF78350F).copy(alpha = 0.15f) else Color.Transparent)
                                                 .padding(horizontal = 6.dp, vertical = 4.dp)
                                         ) {
@@ -1765,8 +1763,8 @@ fun CreatureDetailCard(
                                             },
                                             modifier = Modifier.height(28.dp),
                                             colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color(0xFFFBBF24)),
-                                            border = BorderStroke(1.dp, Color(0xFF78350F)),
-                                            shape = RoundedCornerShape(2.dp),
+                                            border = BorderStroke(1.dp, Color(0xFFFBBF24)),
+                                            shape = RoundedCornerShape(4.dp),
                                             contentPadding = PaddingValues(horizontal = 8.dp)
                                         ) {
                                             Text(
@@ -1783,8 +1781,8 @@ fun CreatureDetailCard(
                                             },
                                             modifier = Modifier.height(28.dp),
                                             colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.Red),
-                                            border = BorderStroke(1.dp, Color(0xFF78350F)),
-                                            shape = RoundedCornerShape(2.dp),
+                                            border = BorderStroke(1.dp, Color.Red),
+                                            shape = RoundedCornerShape(4.dp),
                                             contentPadding = PaddingValues(horizontal = 8.dp)
                                         ) {
                                             Text(
@@ -1872,7 +1870,7 @@ fun CreatureDetailCard(
                                         },
                                         modifier = Modifier.fillMaxWidth().height(36.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706), contentColor = Color.Black),
-                                        shape = RoundedCornerShape(2.dp)
+                                        shape = RoundedCornerShape(4.dp)
                                     ) {
                                         Text(
                                             text = "APPLY EXTENSION",
@@ -1908,7 +1906,7 @@ fun CreatureDetailCard(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, Color(0xFF065F46).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                            .border(1.dp, Color(0xFF065F46), RoundedCornerShape(4.dp))
                             .background(Color(0xFF065F46).copy(alpha = 0.15f))
                             .padding(10.dp),
                         contentAlignment = Alignment.Center
@@ -1940,7 +1938,7 @@ fun CreatureDetailCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, Color(0xFF78350F).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                    .border(1.dp, Color(0xFF78350F), RoundedCornerShape(4.dp))
                     .background(Color(0xFF78350F).copy(alpha = 0.1f))
                     .padding(10.dp)
             ) {
@@ -1963,7 +1961,7 @@ fun CreatureDetailCard(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .border(1.dp, Color(0xFF78350F).copy(alpha = 0.2f))
+                                    .border(1.dp, Color(0xFF78350F), RoundedCornerShape(4.dp))
                                     .background(Color.Black.copy(alpha = 0.4f))
                                     .padding(6.dp)
                             ) {
@@ -2020,11 +2018,11 @@ fun CreatureDetailCard(
                     onClick = { viewModel.toggleDefenderCreature(c.id) },
                     modifier = Modifier.weight(1f).height(38.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isDefender) Color(0xFF1E3A8A).copy(alpha = 0.6f) else Color.Black,
-                        contentColor = if (isDefender) Color(0xFF60A5FA) else Color.Gray
+                        containerColor = if (isDefender) Color(0xFF3B82F6) else Color.Transparent,
+                        contentColor = if (isDefender) Color.Black else Color.Gray
                     ),
-                    border = BorderStroke(1.dp, if (isDefender) Color(0xFF3B82F6) else Color(0xFF262626)),
-                    shape = RoundedCornerShape(2.dp),
+                    border = if (isDefender) null else BorderStroke(1.dp, CyberBorder),
+                    shape = RoundedCornerShape(4.dp),
                     contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
                     Row(
@@ -2032,7 +2030,7 @@ fun CreatureDetailCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         WireframeShield(
-                            color = if (isDefender) Color(0xFF60A5FA) else Color.Gray,
+                            color = if (isDefender) Color.Black else Color.Gray,
                             modifier = Modifier.size(10.dp)
                         )
                         Text(
@@ -2049,11 +2047,11 @@ fun CreatureDetailCard(
                     onClick = { viewModel.toggleAutoHackerCreature(c) },
                     modifier = Modifier.weight(1f).height(38.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (c.isAutoHacker) Color(0xFF78350F).copy(alpha = 0.6f) else Color.Black,
-                        contentColor = if (c.isAutoHacker) Color(0xFFFBBF24) else Color.Gray
+                        containerColor = if (c.isAutoHacker) Color(0xFFD97706) else Color.Transparent,
+                        contentColor = if (c.isAutoHacker) Color.Black else Color.Gray
                     ),
-                    border = BorderStroke(1.dp, if (c.isAutoHacker) Color(0xFFD97706) else Color(0xFF262626)),
-                    shape = RoundedCornerShape(2.dp),
+                    border = if (c.isAutoHacker) null else BorderStroke(1.dp, CyberBorder),
+                    shape = RoundedCornerShape(4.dp),
                     contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
                     Row(
@@ -2061,7 +2059,7 @@ fun CreatureDetailCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         WireframeClaws(
-                            color = if (c.isAutoHacker) Color(0xFFFBBF24) else Color.Gray,
+                            color = if (c.isAutoHacker) Color.Black else Color.Gray,
                             modifier = Modifier.size(10.dp)
                         )
                         Text(
@@ -2083,11 +2081,11 @@ fun CreatureDetailCard(
                     onClick = { viewModel.toggleFavoriteCreature(c) },
                     modifier = Modifier.weight(1f).height(38.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (c.isFavorite) Color(0xFF713F12).copy(alpha = 0.6f) else Color.Black,
-                        contentColor = if (c.isFavorite) Color(0xFFEAB308) else Color.Gray
+                        containerColor = if (c.isFavorite) Color(0xFFEAB308) else Color.Transparent,
+                        contentColor = if (c.isFavorite) Color.Black else Color.Gray
                     ),
-                    border = BorderStroke(1.dp, if (c.isFavorite) Color(0xFFCA8A04) else Color(0xFF262626)),
-                    shape = RoundedCornerShape(2.dp),
+                    border = if (c.isFavorite) null else BorderStroke(1.dp, CyberBorder),
+                    shape = RoundedCornerShape(4.dp),
                     contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
                     Row(
@@ -2095,7 +2093,7 @@ fun CreatureDetailCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         WireframeStar(
-                            color = if (c.isFavorite) Color(0xFFEAB308) else Color.Gray,
+                            color = if (c.isFavorite) Color.Black else Color.Gray,
                             filled = c.isFavorite
                         )
                         Text(
@@ -2112,11 +2110,11 @@ fun CreatureDetailCard(
                     onClick = { viewModel.synthManager.playCreatureSequenceAudio(c.sequence) },
                     modifier = Modifier.weight(1f).height(38.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF00FF41).copy(alpha = 0.1f),
-                        contentColor = Color(0xFF00FF41)
+                        containerColor = Color.Transparent,
+                        contentColor = CyberGreen
                     ),
-                    border = BorderStroke(1.dp, CyberBorder),
-                    shape = RoundedCornerShape(2.dp)
+                    border = BorderStroke(1.dp, CyberGreen),
+                    shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
                         text = "AUDIO EMIT",
@@ -2157,14 +2155,20 @@ fun CreatureDetailCard(
                         content = qrContent,
                         sizeDp = 180
                     )
-                    Text(
-                        text = "CLOSE",
-                        color = Color.Red,
-                        style = Typography.labelSmall,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { showEnlargedQr = false }
-                    )
+                    Box(
+                        modifier = Modifier
+                            .background(CyberRed, RoundedCornerShape(4.dp))
+                            .clickable { showEnlargedQr = false }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "CLOSE",
+                            color = Color.Black,
+                            style = Typography.labelSmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -2210,14 +2214,20 @@ fun CreatureDetailCard(
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
-                    Text(
-                        text = "CLOSE",
-                        color = Color.Red,
-                        style = Typography.labelSmall,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { showWireframeModel = false }
-                    )
+                    Box(
+                        modifier = Modifier
+                            .background(CyberRed, RoundedCornerShape(4.dp))
+                            .clickable { showWireframeModel = false }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "CLOSE",
+                            color = Color.Black,
+                            style = Typography.labelSmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

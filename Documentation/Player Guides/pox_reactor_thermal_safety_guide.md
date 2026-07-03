@@ -90,3 +90,52 @@ Use the following hot and cold runs to test the reactor's biophysical responses.
 3.  Set **Temperature** to `30°C`.
 4.  Tap **INITIATE SYNTHESIS**.
 5.  *Observation*: The synthesis compiles successfully. DMSO destabilized the GC folds and allowed transcription in the cold, high-salt chamber.
+
+---
+
+### TEST CASE C: Mixed Sequence Tuning (The GCAATAGC Dilemma)
+*   **Target Sequence**: `GCAATAGC` (Balanced GC/AT content: 4 GC, 4 AT)
+*   **Ideal Temperature ($T_m$)**: $24.0^\circ\text{C}$ (at $0.05\text{ M}$ salt)
+*   **Initial Setup**: Polymerase = Pfu.
+
+This sequence presents a unique thermodynamic challenge. During transcription:
+1.  At **Step 6** (`GCAATA`), GC content drops to $33.3\%$ (making it vulnerable to **AT Denaturation** if the chamber is too hot).
+2.  At **Step 8** (`GCAATAGC`), Nussinov folding energy reaches $-6.0\text{ kcal/mol}$ (making it vulnerable to **GC Hairpin Stalling** if the chamber is too cold).
+
+Because $T_{\text{stall}}$ is always $6^\circ\text{C}$ higher than $T_{\text{denature}}$, they form mutually exclusive temperature bounds. Without a protective solute, the reaction is mathematically guaranteed to collapse.
+
+#### Run C1: Hot Run with DMSO (Expected: Fail)
+1.  Set **Salt** to `0.15 M` ($T_{\text{denature}} = 26.5^\circ\text{C}$).
+2.  Inject **DMSO** solute.
+3.  Set **Temperature** to `31.9°C`.
+4.  Tap **INITIATE SYNTHESIS**.
+5.  *Observation*: The reaction collapses at **Step 6**. Since the temperature ($31.9^\circ\text{C}$) exceeds $T_{\text{denature}}$ ($26.5^\circ\text{C}$), the AT bonds denature. DMSO only prevents stalling and does not protect against denaturation.
+
+#### Run C2: Low Temp Run with DMSO (Expected: Fail)
+1.  Lower **Salt** to `0.05 M` ($T_{\text{denature}} = 23.5^\circ\text{C}$).
+2.  Inject **DMSO** solute.
+3.  Set **Temperature** to `23.9°C`.
+4.  Tap **INITIATE SYNTHESIS**.
+5.  *Observation*: The reaction still collapses at **Step 6**. Despite lowering the temperature to $23.9^\circ\text{C}$, it is still above the low-salt denaturation limit of $23.5^\circ\text{C}$.
+
+#### Run C3: Hot Run with Netropsin (Expected: Fail)
+1.  Raise **Salt** back to `0.15 M` ($T_{\text{stall}} = 32.5^\circ\text{C}$).
+2.  Inject **Netropsin** solute.
+3.  Set **Temperature** to `31.9°C`.
+4.  Tap **INITIATE SYNTHESIS**.
+5.  *Observation*: Netropsin protects the AT bonds, allowing the strand to successfully clear Step 6. However, the reaction collapses at **Step 8**. Since the temperature ($31.9^\circ\text{C}$) is below $T_{\text{stall}}$ ($32.5^\circ\text{C}$), the final strand folds into a hairpin ($MFE = -6.0\text{ kcal/mol}$) and stalls because Netropsin does not prevent GC folding.
+
+#### Run C4: Successful Tuning Strategy (Expected: Pass)
+To compile this sequence, you must choose one of two strategies to align the safe ranges:
+
+*   **Strategy A (The Netropsin Route)**:
+    1.  Lower **Salt** to `0.05 M` ($T_{\text{stall}} = 29.5^\circ\text{C}$).
+    2.  Inject **Netropsin** solute (protects AT denaturation at Step 6).
+    3.  Set **Temperature** to `30.0°C` (above $T_{\text{stall}}$ to prevent hairpin stalling at Step 8).
+    4.  *Result*: Pass.
+*   **Strategy B (The DMSO Route)**:
+    1.  Raise **Salt** to `0.15 M` ($T_{\text{denature}} = 26.5^\circ\text{C}$).
+    2.  Inject **DMSO** solute (prevents GC hairpin stalling at Step 8).
+    3.  Set **Temperature** to `25.0°C` (below $T_{\text{denature}}$ to prevent AT denaturation at Step 6).
+    4.  *Result*: Pass.
+

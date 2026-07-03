@@ -149,6 +149,10 @@ class PoxNetworkManager(
         _connectionLogs.value = currentLogs.takeLast(100)
     }
 
+    fun clearLogs() {
+        _connectionLogs.value = emptyList()
+    }
+
     private var inactivityTimeoutJob: Job? = null
 
     private fun resetInactivityTimeout() {
@@ -308,13 +312,53 @@ class PoxNetworkManager(
             } else if (packet is HydraPacket.NetworkMessage) {
                 mainScope.launch {
                     delay(2000)
-                    val mockReply = HydraPacket.NetworkMessage(
-                        senderName = "MOCK-PEER-ALPHA",
-                        messageText = "ECHO RESOLVED. SENSOR MATRIX SHOWS OPTIMAL LINK COHERENCE.",
-                        attachedGeneSequence = "GATTACA",
-                        transferGenes = 10,
-                        transferWaste = 25
-                    )
+                    val senderName = _activeConnections.value[endpointId] ?: "MOCK-PEER-ALPHA"
+                    val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+                    
+                    val requestText = packet.messageText.trim().lowercase()
+                    val mockReply = when (requestText) {
+                        "test specimen" -> {
+                            val randomDna = (1..64).map { listOf('A', 'G', 'T', 'C').random() }.joinToString("")
+                            val faction = when {
+                                randomDna.count { it == 'A' } >= maxOf(randomDna.count { it == 'G' }, randomDna.count { it == 'T' }, randomDna.count { it == 'C' }) -> "Containment"
+                                randomDna.count { it == 'G' } >= maxOf(randomDna.count { it == 'A' }, randomDna.count { it == 'T' }, randomDna.count { it == 'C' }) -> "Infection"
+                                randomDna.count { it == 'T' } >= maxOf(randomDna.count { it == 'A' }, randomDna.count { it == 'G' }, randomDna.count { it == 'C' }) -> "Mech"
+                                else -> "Parasite"
+                            }
+                            val prefixes = listOf("Alpha", "Beta", "Gamma", "Delta", "Omega", "Prime", "Zeta", "Sigma", "Nebula", "Apex", "Hydra", "Xeno")
+                            val suffixes = listOf("Beast", "Stalker", "Ravager", "Sentinel", "Colossus", "Fiend", "Specter", "Leviathan", "Titan", "Drone", "Reaper", "Viper")
+                            val name = "${prefixes.random()}-${suffixes.random()}"
+                            HydraPacket.NetworkMessage(
+                                senderName = senderName,
+                                messageText = "Here is your specimen! [$timeStr]",
+                                attachedCreatureDna = randomDna,
+                                attachedCreatureName = name,
+                                attachedCreatureFaction = faction
+                            )
+                        }
+                        "test gs" -> {
+                            val randomGene = (1..8).map { listOf('A', 'G', 'T', 'C').random() }.joinToString("")
+                            HydraPacket.NetworkMessage(
+                                senderName = senderName,
+                                messageText = "Here is your gene sequence! [$timeStr]",
+                                attachedGeneSequence = randomGene
+                            )
+                        }
+                        "test qs" -> {
+                            HydraPacket.NetworkMessage(
+                                senderName = senderName,
+                                messageText = "Quantum shipment dispatched! [$timeStr]",
+                                transferGenes = 10,
+                                transferWaste = 25
+                            )
+                        }
+                        else -> {
+                            HydraPacket.NetworkMessage(
+                                senderName = senderName,
+                                messageText = "Hello player! [$timeStr]"
+                            )
+                        }
+                    }
                     val jsonStr = Json.encodeToString<HydraPacket>(mockReply)
                     log("PACKET RECV: Decrypting simulated response packet")
                     handleIncomingPacket(endpointId, jsonStr)

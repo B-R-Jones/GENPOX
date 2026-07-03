@@ -313,8 +313,7 @@ fun TelemetryView(viewModel: MainViewModel) {
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp)
-                        .border(1.dp, Color(0xFF22D3EE), RoundedCornerShape(2.dp))
-                        .background(Color.Black.copy(alpha = 0.6f))
+                        .background(CyberRed, RoundedCornerShape(2.dp))
                         .clickable {
                             viewModel.synthManager.playBeep(400f, 0.08f, "sine")
                             isGlobeExpanded = false
@@ -322,8 +321,8 @@ fun TelemetryView(viewModel: MainViewModel) {
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "✕ CLOSE",
-                        color = Color(0xFF22D3EE),
+                        text = "CLOSE",
+                        color = Color.Black,
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Default

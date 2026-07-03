@@ -79,4 +79,21 @@ class BiophysicsEngineTest {
         val yield1Sigma = Math.exp(-(diff1Sigma * diff1Sigma) / (2.0 * sigma * sigma))
         assertEquals(Math.exp(-0.5), yield1Sigma, 0.0001)
     }
+
+    @Test
+    fun testAnomalousGeneMath() {
+        val seqAnomalous = "X?Z!$@#%"
+        assertTrue("Sequence with anomalous characters should be anomalous", com.example.genpox.data.WaveMath.isAnomalousGene(seqAnomalous))
+        
+        val seqNormal = "ATCGATCG"
+        org.junit.Assert.assertFalse("Normal sequence should not be anomalous", com.example.genpox.data.WaveMath.isAnomalousGene(seqNormal))
+        
+        val generated = com.example.genpox.data.WaveMath.generateAnomalousGene()
+        assertTrue("Generated anomalous gene should contain anomalous characters", com.example.genpox.data.WaveMath.isAnomalousGene(generated))
+        
+        val fullSeq = "ATCGATCG" + "X?Z!$@#%" + "ATCGATCG"
+        val benefits = com.example.genpox.data.WaveMath.getAnomalousBenefits(fullSeq)
+        assertEquals("Should detect exactly 1 anomalous benefit", 1, benefits.size)
+    }
 }
+

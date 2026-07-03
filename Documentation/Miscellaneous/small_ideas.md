@@ -43,4 +43,21 @@ The rotating double-helix DNA graphic (rendered dynamically using trigonometric 
 *   **Solid Cyber-Color Backgrounds for Active Button States**:
     *   *Idea*: Expand the styling used on the active Network holo-nav buttons (applying a filled solid cyber-color background with a contrasting dark icon/text) to other navigation deck keys and subtab toggle states across the application (e.g. Splicer slot activations, Bio-Lab subtabs, or Scanner modes). This provides higher contrast and a more tactile, premium interactive feel.
 
+---
+
+## 5. Custom-Built Genomes
+*   **Concept**: Allow players to fill genome slots with their own selected genes (rather than only scanning/acquiring fixed pre-set targets).
+*   **Discussion Points**:
+    - How does custom splicing affect gene synthesis? E.g., custom genomes could influence or alter how genes are produced/harvested for standard provided target genomes.
+    - Splicing screen UI updates: custom slot selectors where players can choose which genes to insert, and real-time visualization of the resulting genome composition.
+
+---
+
+## 6. Creature Type & Wireframe Overhaul
+*   **Concept**: Overhaul the creature types and move towards a dedicated creature wireframe aesthetic review.
+*   **Discussion Points**:
+    - Re-examine existing creature classes and their functional roles.
+    - Differentiate visual aesthetics significantly: e.g., representing a *swarm* (many micro particles or clustered shapes) vs. a *solo* creature (a singular large complex mesh), or *barriers* (defensive structure wireframes) vs. other active creature classes.
+    - Wireframe rendering: utilize vector-like grid lines or rotating geometric skeletons to display creature taxonomy in the scanner/sequencer interfaces.
+
 

@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "pox_settings")
 
@@ -19,6 +21,10 @@ class PoxSettings(private val context: Context) {
         val RAW_STOCK_G = longPreferencesKey("raw_stock_g")
         val RAW_STOCK_T = longPreferencesKey("raw_stock_t")
         val RAW_STOCK_C = longPreferencesKey("raw_stock_c")
+        val BIO_WASTE = longPreferencesKey("bio_waste")
+        val SPLICER_SLOTS = stringPreferencesKey("splicer_slots")
+        val SPLICER_Q_SCORES = stringPreferencesKey("splicer_q_scores")
+        val SPLICER_SIGNATURES = stringPreferencesKey("splicer_signatures")
     }
 
     val geminiApiKey: Flow<String> = context.dataStore.data.map { preferences ->
@@ -53,6 +59,49 @@ class PoxSettings(private val context: Context) {
         preferences[RAW_STOCK_C] ?: 10000L
     }
 
+    val bioWaste: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[BIO_WASTE] ?: 0L
+    }
+
+    val splicerSlots: Flow<List<String?>> = context.dataStore.data.map { preferences ->
+        val json = preferences[SPLICER_SLOTS] ?: ""
+        if (json.isEmpty()) {
+            List<String?>(8) { null }
+        } else {
+            try {
+                Json.decodeFromString<List<String?>>(json)
+            } catch (e: Exception) {
+                List<String?>(8) { null }
+            }
+        }
+    }
+
+    val splicerQScores: Flow<List<Double>> = context.dataStore.data.map { preferences ->
+        val json = preferences[SPLICER_Q_SCORES] ?: ""
+        if (json.isEmpty()) {
+            List(8) { 25.0 }
+        } else {
+            try {
+                Json.decodeFromString<List<Double>>(json)
+            } catch (e: Exception) {
+                List(8) { 25.0 }
+            }
+        }
+    }
+
+    val splicerSignatures: Flow<List<String>> = context.dataStore.data.map { preferences ->
+        val json = preferences[SPLICER_SIGNATURES] ?: ""
+        if (json.isEmpty()) {
+            List(8) { "TAQ" }
+        } else {
+            try {
+                Json.decodeFromString<List<String>>(json)
+            } catch (e: Exception) {
+                List(8) { "TAQ" }
+            }
+        }
+    }
+
     suspend fun saveGeminiApiKey(apiKey: String) {
         context.dataStore.edit { preferences ->
             preferences[GEMINI_API_KEY] = apiKey
@@ -83,6 +132,20 @@ class PoxSettings(private val context: Context) {
             preferences[RAW_STOCK_G] = g
             preferences[RAW_STOCK_T] = t
             preferences[RAW_STOCK_C] = c
+        }
+    }
+
+    suspend fun saveBioWaste(waste: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[BIO_WASTE] = waste
+        }
+    }
+
+    suspend fun saveSplicerState(slots: List<String?>, qScores: List<Double>, signatures: List<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[SPLICER_SLOTS] = Json.encodeToString(slots)
+            preferences[SPLICER_Q_SCORES] = Json.encodeToString(qScores)
+            preferences[SPLICER_SIGNATURES] = Json.encodeToString(signatures)
         }
     }
 }

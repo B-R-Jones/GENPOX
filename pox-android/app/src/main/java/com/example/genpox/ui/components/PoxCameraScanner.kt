@@ -22,8 +22,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.BorderStroke
 import com.example.genpox.theme.CyberGreen
 import com.example.genpox.theme.CyberPanel
+import com.example.genpox.theme.CyberRed
 import com.example.genpox.theme.Typography
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -127,7 +129,8 @@ fun PoxCameraScanner(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 24.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = CyberPanel, contentColor = CyberGreen)
+                colors = ButtonDefaults.buttonColors(containerColor = CyberRed, contentColor = Color.Black),
+                shape = RoundedCornerShape(4.dp)
             ) {
                 Text("CLOSE SCANNER", style = Typography.labelSmall)
             }

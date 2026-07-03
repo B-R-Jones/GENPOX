@@ -23,6 +23,7 @@ import kotlinx.coroutines.delay
 data class PoxSubTab(
     val id: String,
     val tag: String,
+    val bounce: Boolean = false,
     val icon: @Composable (Color) -> Unit
 )
 
@@ -36,6 +37,7 @@ data class HoloNavButton(
     val backgroundColor: Color = Color(0xFF0F172A).copy(alpha = 0.85f),
     val enabled: Boolean = true,
     val onClick: () -> Unit,
+    val bounce: Boolean = false,
     val content: @Composable (Color) -> Unit
 )
 
@@ -111,6 +113,18 @@ fun PoxUnifiedHoloNav(
     }
     val verticalBounceOffset = verticalBounceAnimatable.value
 
+    // Infinite bouncing animation for buttons that have bounce enabled
+    val btnBounceTransition = rememberInfiniteTransition(label = "btnBounce")
+    val btnBounceOffset by btnBounceTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = -4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "btnBounceVal"
+    )
+
     val maxRowSize = rows.maxOfOrNull { it.size } ?: 0
     val containerWidth = (maxRowSize * 54 - 8).dp
 
@@ -164,7 +178,6 @@ fun PoxUnifiedHoloNav(
                 val scale = 0.85f + 0.15f * isActiveProgress
                 val baseOffsetY = -24f * (1f - isActiveProgress)
                 val currentBounceY = verticalBounceOffset * (1f - isActiveProgress)
-                val offsetY = (baseOffsetY + currentBounceY).dp
 
                 val alpha = if (isActive) 1f else 0.6f * (1f - stackedProgress)
                 val zIndex = if (isActive) 1f else 0f
@@ -183,12 +196,15 @@ fun PoxUnifiedHoloNav(
                     val buttonAlphaFactor = if (isStacked && buttonIndex < M - 1) 0.5f else 1f
                     val finalAlpha = alpha * buttonAlphaFactor
 
+                    val buttonBounceY = if (button.bounce) btnBounceOffset else 0f
+                    val finalOffsetY = (baseOffsetY + currentBounceY + buttonBounceY).dp
+
                     PoxHoloButton(
                         borderColor = button.borderColor,
                         glowColor = button.glowColor,
                         backgroundColor = button.backgroundColor,
                         modifier = Modifier
-                            .offset(x = finalX.dp, y = offsetY)
+                            .offset(x = finalX.dp, y = finalOffsetY)
                             .graphicsLayer {
                                 this.alpha = finalAlpha
                                 this.scaleX = scale
@@ -257,6 +273,7 @@ fun PoxHoloNav(
                     onSubTabClick(tab.id, tab.tag)
                 }
             },
+            bounce = tab.bounce,
             content = { iconColor ->
                 tab.icon(iconColor)
             }

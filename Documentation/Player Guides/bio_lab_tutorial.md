@@ -30,11 +30,12 @@ This document serves as an interactive tutorial skeleton designed to be translat
 ### Step 1.3: Feedstock Cost Verification
 * **Objective**: Check feedstock reserves prior to ignition.
 * **Concept**: Synthesis consumes raw base nucleotides (A, G, T, C) depending on the target sequence and selected enzyme. Under standard conditions:
-  - **Taq** consumes **25 units** of each base present in the sequence.
-  - Synthesis also requires a base fee of **Bio-Waste** (Taq = $0$, Tth = $0$, Pfu = $150$ units).
+  - **Taq** is free (consumes **0 units** of base feedstock and **0 Bio-Waste**).
+  - **Tth** consumes **25 units** of each base, and **30 Bio-Waste**.
+  - **Pfu** consumes **50 units** of each base, and **1000 Bio-Waste**.
 * **Tutorial Action**:
   1. Inspect the feedstock inventory indicators at the bottom left of the Reactor panel.
-  2. Confirm you have at least $25 \times 8 = 200$ units of **A** (Adenine) feedstock.
+  2. Confirm you have at least $0$ units of **A** (Adenine) feedstock for Taq (or $25$ per base for Tth).
   3. Verify that the **Bio-Waste** level meets the requirement ($0$ for Taq).
 
 ---
@@ -70,12 +71,12 @@ This document serves as an interactive tutorial skeleton designed to be translat
 * **Objective**: Leverage high-fidelity enzymes to secure superior Phred Q-scores.
 * **Concept**: The active polymerase dictates both baseline transcription accuracy ($Q_{\text{base}}$) and speed:
   - **Taq**: $Q_{\text{base}} \in [15.0, 25.0]$ (Fast, 8s cycle)
-  - **Tth**: $Q_{\text{base}} \in [25.0, 33.0]$ (Medium, 16s cycle)
+  - **Tth**: $Q_{\text{base}} \in [25.0, 33.0]$ (Medium-Fast, 12s cycle)
   - **Pfu**: $Q_{\text{base}} \in [35.0, 40.0]$ (Slow, 32s cycle, proofreading active)
   A higher final average Q-score directly boosts creature stats: Starting Telomeres (lifespan) $= Q \times 2.5$, and Max HP $= \text{Base HP} \times (0.5 + 0.5 \times \frac{Q}{40.0})$.
 * **Tutorial Action**:
   1. Locate the **Enzyme Chamber Selector** row.
-  2. Select **Pfu Polymerase**. (Note the cost changes: Pfu consumes $50$ of each sequence base and $150$ Bio-Waste).
+  2. Select **Pfu Polymerase**. (Note the cost changes: Pfu consumes $50$ of each sequence base and $1000$ Bio-Waste).
   3. Pfu's built-in proofreading mechanism is now active, raising baseline accuracy to a minimum of $Q35$.
 
 ---

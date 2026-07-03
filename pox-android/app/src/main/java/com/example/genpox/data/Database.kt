@@ -105,9 +105,19 @@ interface PoxDao {
 
     @Query("DELETE FROM cached_building_cells")
     suspend fun clearCachedBuildingCells()
+
+    // Reagent Stockpile
+    @Query("SELECT * FROM reagent_stock ORDER BY name ASC")
+    fun getAllReagentStock(): Flow<List<ReagentStock>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReagentStock(reagents: List<ReagentStock>)
+
+    @Query("UPDATE reagent_stock SET count = max(0, count - 1) WHERE id = :id")
+    suspend fun decrementReagentStock(id: String)
 }
 
-@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class, CachedRoadCell::class, CachedBuildingCell::class], version = 12, exportSchema = false)
+@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class, CachedRoadCell::class, CachedBuildingCell::class, ReagentStock::class], version = 17, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class PoxDatabase : RoomDatabase() {
     abstract fun poxDao(): PoxDao

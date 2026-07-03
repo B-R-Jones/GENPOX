@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.annotation.Keep
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.pager.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -109,6 +110,7 @@ fun StepSearchView(
     onDeconstructGene: ((GeneSequence) -> Unit)? = null
 ) {
     val geneSequences by viewModel.geneSequences.collectAsState()
+    val openedFrom by viewModel.creatureCardOpenedFrom.collectAsState()
     
     var stepSearchPrefix by remember { mutableStateOf("") }
     var viewStepSearchMatchesOnly by remember { mutableStateOf(false) }
@@ -127,11 +129,18 @@ fun StepSearchView(
         listOf("1-2bp", "3-4bp", "5-6bp", "7-8bp")
     }
 
-    val uniqueGenesSize = remember(geneSequences) { geneSequences.size }
-    val multiCountGenesSize = remember(geneSequences) { geneSequences.count { it.count > 1 } }
+    val uniqueGenesSize = remember(geneSequences) { geneSequences.map { it.sequence }.distinct().size }
+    val multiCountGenesSize = remember(geneSequences) {
+        geneSequences.groupBy { it.sequence }.count { it.value.size > 1 }
+    }
+
+    val isDone = activeStep == maxSteps
+    val scrollState = rememberScrollState()
 
     Column(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .then(if (isDone) Modifier.verticalScroll(scrollState) else Modifier),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // Header
@@ -148,7 +157,7 @@ fun StepSearchView(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .cyberglass(borderColor = activeBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
+                .border(1.dp, activeBorder, RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                 .padding(vertical = 10.dp, horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -241,9 +250,14 @@ fun StepSearchView(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .cyberglass(
-                            borderColor = if (isActive) activeColor else if (isCompleted) activeColorDim.copy(alpha = 0.5f) else Color.DarkGray,
-                            backgroundColor = if (isActive) activeColor.copy(alpha = 0.15f) else Color.Transparent
+                        .border(
+                            1.dp,
+                            if (isActive) activeColor else if (isCompleted) activeColorDim else Color.DarkGray,
+                            RoundedCornerShape(4.dp)
+                        )
+                        .background(
+                            if (isActive) activeColor.copy(alpha = 0.15f) else Color.Transparent,
+                            RoundedCornerShape(4.dp)
                         )
                         .padding(vertical = 10.dp),
                     contentAlignment = Alignment.Center
@@ -264,7 +278,7 @@ fun StepSearchView(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .cyberglass(borderColor = activeBorder, backgroundColor = activePanel)
+                .border(1.dp, activeBorder, RoundedCornerShape(4.dp)).background(activePanel, RoundedCornerShape(4.dp))
                 .padding(8.dp)
         ) {
             Row(
@@ -274,59 +288,88 @@ fun StepSearchView(
             ) {
                 // Button 1: UNDO
                 val undoEnabled = activeStep > 0
-                PoxButton(
-                    modifier = Modifier.weight(1f),
-                    text = "↶ UNDO",
+                Button(
                     onClick = {
+                        viewModel.synthManager.playCombinatorTick()
                         stepSearchPrefix = stepSearchPrefix.dropLast(stepSize)
                         viewStepSearchMatchesOnly = false
                     },
                     enabled = undoEnabled,
-                    buttonType = PoxButtonType.YELLOW_WARNING,
-                    buttonSize = PoxButtonSize.STANDARD,
-                    sound = PoxButtonSound.COMBINATOR_TICK,
-                    viewModel = viewModel
-                )
+                    modifier = Modifier.weight(1f).height(34.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (undoEnabled) Color(0xFFFBBF24) else Color.Transparent,
+                        contentColor = if (undoEnabled) Color.Black else Color.Gray
+                    ),
+                    border = if (undoEnabled) null else BorderStroke(1.dp, CyberBorder),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        text = "↶ UNDO",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default
+                    )
+                }
 
                 // Button 2: RESET
                 val resetEnabled = stepSearchPrefix.isNotEmpty()
-                PoxButton(
-                    modifier = Modifier.weight(1f),
-                    text = "✕ RESET",
+                Button(
                     onClick = {
+                        viewModel.synthManager.playReject()
                         stepSearchPrefix = ""
                         viewStepSearchMatchesOnly = false
                     },
                     enabled = resetEnabled,
-                    buttonType = PoxButtonType.YELLOW_WARNING,
-                    buttonSize = PoxButtonSize.STANDARD,
-                    sound = PoxButtonSound.REJECT_BEEP,
-                    viewModel = viewModel
-                )
+                    modifier = Modifier.weight(1f).height(34.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (resetEnabled) Color(0xFFFBBF24) else Color.Transparent,
+                        contentColor = if (resetEnabled) Color.Black else Color.Gray
+                    ),
+                    border = if (resetEnabled) null else BorderStroke(1.dp, CyberBorder),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        text = "✕ RESET",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default
+                    )
+                }
 
                 // Button 3: RECYCLE
                 val recycleEnabled = stepSearchPrefix.isNotEmpty() && matchCount > 0
                 val wasteYield = matchCount * 8
-                PoxButton(
-                    modifier = Modifier.weight(1f),
-                    text = "♺ RECYCLE (+$wasteYield W)",
+                Button(
                     onClick = {
+                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
                         viewModel.recycleMatchingGenes(stepSearchPrefix)
                         stepSearchPrefix = ""
                         viewStepSearchMatchesOnly = false
                     },
                     enabled = recycleEnabled,
-                    buttonType = PoxButtonType.PURPLE_ANOMALY,
-                    buttonSize = PoxButtonSize.STANDARD,
-                    sound = PoxButtonSound.BEEP_DEFAULT,
-                    viewModel = viewModel
-                )
+                    modifier = Modifier.weight(1f).height(34.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (recycleEnabled) Color(0xFFA855F7) else Color.Transparent,
+                        contentColor = if (recycleEnabled) Color.Black else Color.Gray
+                    ),
+                    border = if (recycleEnabled) null else BorderStroke(1.dp, CyberBorder),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        text = "♺ RECYCLE (+$wasteYield W)",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default
+                    )
+                }
             }
         }
 
         // Main display area: Grid or list of matches
-        val allInventoryGenes = remember(geneSequences) { geneSequences.map { it.sequence } }
-        val isDone = activeStep == maxSteps
+        val allInventoryGenes = remember(geneSequences) { geneSequences.map { it.sequence }.distinct() }
 
         if (isDone) {
             // Detailed Inline Analysis Card
@@ -335,26 +378,26 @@ fun StepSearchView(
             val benefit = if (isAnom) WaveMath.getBenefitForAnomalousGene(gene) else null
 
             // Biophysical parameters
-            val geneSequence = remember(gene, geneSequences) {
-                geneSequences.find { it.sequence == gene }
+            val copies = remember(gene, geneSequences) {
+                geneSequences.filter { it.sequence == gene }
             }
-            val tm = remember(gene, geneSequence, viewModel.reactorSalt) {
-                geneSequence?.meltingTemp ?: BiophysicsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
-            }
-            val mfe = remember(gene, geneSequence) {
-                geneSequence?.minimumFreeEnergy ?: BiophysicsEngine.calculateMinimumFreeEnergy(gene)
-            }
-            val qScore = remember(gene, geneSequence) {
-                geneSequence?.averageQScore ?: 30.0
-            }
-            val count = geneSequence?.count ?: 0
+            val count = copies.size
+
+            val pageCount = if (count > 0) count else 1
+            val pagerState = rememberPagerState(initialPage = 0, pageCount = { pageCount })
+            val currentPage = pagerState.currentPage
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .cyberglass(
-                        borderColor = if (isAnom) Color(0xFFA855F7) else activeBorder,
-                        backgroundColor = if (isAnom) Color(0xFF1E0B36) else activePanel
+                    .border(
+                        1.dp,
+                        (if (isAnom) Color(0xFFA855F7) else activeColor).copy(alpha = 0.35f),
+                        RoundedCornerShape(4.dp)
+                    )
+                    .background(
+                        if (isAnom) Color(0xFF1E0B36) else activePanel,
+                        RoundedCornerShape(4.dp)
                     )
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -364,28 +407,20 @@ fun StepSearchView(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     if (isAnom) {
-                        WireframeGalaxy(
-                            color = Color(0xFFD8B4FE),
-                            modifier = Modifier.size(16.dp)
-                        )
                         Text(
                             text = "DECRYPTED ANOMALY MOLECULE",
-                            style = Typography.titleSmall,
+                            fontSize = 9.sp,
                             fontFamily = FontFamily.Default,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFD8B4FE)
+                            color = CyberTheme.purpleDim
                         )
                     } else {
-                        WireframeDna(
-                            color = activeColor,
-                            modifier = Modifier.size(16.dp)
-                        )
                         Text(
                             text = "MOLECULAR ANALYSIS SUMMARY",
-                            style = Typography.titleSmall,
+                            fontSize = 9.sp,
                             fontFamily = FontFamily.Default,
                             fontWeight = FontWeight.Bold,
-                            color = activeColor
+                            color = activeColorDim
                         )
                     }
                 }
@@ -398,35 +433,45 @@ fun StepSearchView(
                     color = if (isAnom) Color(0xFFD8B4FE) else activeColor
                 )
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, (if (isAnom) Color(0xFFD8B4FE) else activeColor).copy(alpha = 0.3f), RoundedCornerShape(2.dp))
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "THERMODYNAMIC Tm: " + String.format(Locale.US, "%.2f°C", tm),
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "MIN FREE ENERGY: " + String.format(Locale.US, "%.2f kcal/mol", mfe),
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "ACCURATE Q-SCORE: " + String.format(Locale.US, "%.1f (Phred)", qScore),
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxWidth()
+                ) { page ->
+                    val pageCopy = copies.getOrNull(page)
+                    val tm = pageCopy?.meltingTemp ?: BiophysicsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
+                    val mfe = pageCopy?.minimumFreeEnergy ?: BiophysicsEngine.calculateMinimumFreeEnergy(gene)
+                    val qScore = pageCopy?.averageQScore ?: 30.0
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, (if (isAnom) Color(0xFFD8B4FE) else activeColor).copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "THERMODYNAMIC Tm: " + String.format(Locale.US, "%.2f°C", tm),
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "MIN FREE ENERGY: " + String.format(Locale.US, "%.2f kcal/mol", mfe),
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "AVERAGE Q-SCORE: " + String.format(Locale.US, "%.1f PHRED", qScore),
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 Row(
@@ -439,10 +484,10 @@ fun StepSearchView(
                         style = Typography.bodySmall,
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight.Bold,
-                        color = if (isAnom) Color(0xFFD8B4FE) else activeColor
+                        color = if (isAnom) CyberTheme.purpleDim else activeColorDim
                     )
                     Text(
-                        text = "x$count",
+                        text = if (count > 0) "(${currentPage + 1}/$count)" else "(0/0)",
                         style = Typography.bodyMedium,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
@@ -475,25 +520,64 @@ fun StepSearchView(
                     )
                 }
 
-                if (geneSequence != null && count > 0) {
+                val currentCopy = copies.getOrNull(currentPage)
+                val currentTm = currentCopy?.meltingTemp ?: BiophysicsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
+                val currentMfe = currentCopy?.minimumFreeEnergy ?: BiophysicsEngine.calculateMinimumFreeEnergy(gene)
+                val currentQScore = currentCopy?.averageQScore ?: 30.0
+
+                val resolvedGeneSeq = currentCopy ?: GeneSequence(
+                    sequence = gene,
+                    count = 1,
+                    discoveredAt = System.currentTimeMillis(),
+                    averageQScore = currentQScore,
+                    meltingTemp = currentTm,
+                    minimumFreeEnergy = currentMfe
+                )
+
+                if (openedFrom == "message_gene") {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .cyberglass(
-                                borderColor = Color(0xFFEF4444),
-                                backgroundColor = Color(0xFF7F1D1D).copy(alpha = 0.15f)
-                            )
-                            .clickable {
-                                viewModel.synthManager.playBeep(600f, 0.05f, "sine")
-                                onDeconstructGene?.invoke(geneSequence)
-                            }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
+                    Button(
+                        onClick = {
+                            viewModel.synthManager.playBeep(600f, 0.05f, "sine")
+                            viewModel.setComposerAttachedGene(resolvedGeneSeq)
+                            viewModel.setActiveCreature(null, "vault")
+                            viewModel.selectTab("network")
+                        },
+                        modifier = Modifier.fillMaxWidth().height(32.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = CyberCyan,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(4.dp),
+                        contentPadding = PaddingValues(0.dp)
                     ) {
                         Text(
-                            text = "♺ DECONSTRUCT GENE BLOCK",
-                            color = Color(0xFFFCA5A5),
+                            text = "ATTACH GENE BLOCK",
+                            color = Color.Black,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else if (count > 0) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Button(
+                        onClick = {
+                            viewModel.synthManager.playBeep(600f, 0.05f, "sine")
+                            onDeconstructGene?.invoke(resolvedGeneSeq)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(32.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = CyberRed
+                        ),
+                        border = BorderStroke(1.dp, CyberRed),
+                        shape = RoundedCornerShape(4.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = "DECONSTRUCT GENE BLOCK",
+                            color = CyberRed,
                             style = Typography.labelSmall,
                             fontFamily = FontFamily.Default,
                             fontWeight = FontWeight.Bold
@@ -515,15 +599,19 @@ fun StepSearchView(
                         fontFamily = FontFamily.Default,
                         color = activeColorDim
                     )
-                    Box(
-                        modifier = Modifier
-                            .cyberglass(borderColor = Color.Yellow, backgroundColor = Color.Transparent)
-                            .clickable {
-                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                viewStepSearchMatchesOnly = false
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
+                    Button(
+                        onClick = {
+                            viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                            viewStepSearchMatchesOnly = false
+                        },
+                        modifier = Modifier.height(28.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color.Yellow
+                        ),
+                        border = BorderStroke(1.dp, Color.Yellow),
+                        shape = RoundedCornerShape(4.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
                         Text(
                             text = "✕ BACK",
@@ -560,9 +648,14 @@ fun StepSearchView(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .cyberglass(
-                                        borderColor = if (isAnom) Color(0xFFA855F7).copy(alpha = 0.5f) else activeBorder,
-                                        backgroundColor = if (isAnom) Color(0xFF1E0B36) else activePanel
+                                    .border(
+                                        1.dp,
+                                        if (isAnom) Color(0xFFA855F7) else activeBorder,
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .background(
+                                        if (isAnom) Color(0xFF1E0B36) else activePanel,
+                                        RoundedCornerShape(4.dp)
                                     )
                                     .clickable {
                                         onSelectGene(matchSeq)
@@ -628,14 +721,26 @@ fun StepSearchView(
                     ) {
                         items(options) { base ->
                             val tentative = stepSearchPrefix + base
+                            val isFinalStep = tentative.length == 8
                             val matchCount = allInventoryGenes.count { it.startsWith(tentative) }
+                            val displayCount = if (isFinalStep) {
+                                geneSequences.filter { it.sequence.startsWith(tentative) }.sumOf { it.count }
+                            } else {
+                                matchCount
+                            }
+                            val displayLabel = if (isFinalStep) " STOCK" else " TYPES"
                             val isEnabled = matchCount > 0
                             
                             Box(
                                 modifier = Modifier
-                                    .cyberglass(
-                                        borderColor = if (isEnabled) activeColor else Color.DarkGray.copy(alpha = 0.2f),
-                                        backgroundColor = if (isEnabled) activePanel else Color.Transparent
+                                    .border(
+                                        1.dp,
+                                        if (isEnabled) activeColor else Color.DarkGray,
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .background(
+                                        if (isEnabled) activePanel else Color.Transparent,
+                                        RoundedCornerShape(4.dp)
                                     )
                                     .clickable(enabled = isEnabled) {
                                         stepSearchPrefix = tentative
@@ -663,7 +768,7 @@ fun StepSearchView(
                                                 color = activeColor
                                             )
                                             Text(
-                                                text = "$matchCount",
+                                                text = "$displayCount",
                                                 style = Typography.labelSmall,
                                                 fontFamily = FontFamily.Monospace,
                                                 fontSize = 9.5.sp,
@@ -671,7 +776,7 @@ fun StepSearchView(
                                                 color = activeColor
                                             )
                                             Text(
-                                                text = " TYPES",
+                                                text = displayLabel,
                                                 style = Typography.labelSmall,
                                                 fontFamily = FontFamily.Default,
                                                 fontSize = 9.5.sp,
@@ -703,14 +808,26 @@ fun StepSearchView(
                     ) {
                         items(couples) { couple ->
                             val tentative = stepSearchPrefix + couple
+                            val isFinalStep = tentative.length == 8
                             val matchCount = allInventoryGenes.count { it.startsWith(tentative) }
+                            val displayCount = if (isFinalStep) {
+                                geneSequences.filter { it.sequence.startsWith(tentative) }.sumOf { it.count }
+                            } else {
+                                matchCount
+                            }
+                            val displayLabel = if (isFinalStep) " STOCK" else " TYPES"
                             val isEnabled = matchCount > 0
                             
                             Box(
                                 modifier = Modifier
-                                    .cyberglass(
-                                        borderColor = if (isEnabled) activeColor else Color.DarkGray.copy(alpha = 0.2f),
-                                        backgroundColor = if (isEnabled) activePanel else Color.Transparent
+                                    .border(
+                                        1.dp,
+                                        if (isEnabled) activeColor else Color.DarkGray,
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .background(
+                                        if (isEnabled) activePanel else Color.Transparent,
+                                        RoundedCornerShape(4.dp)
                                     )
                                     .clickable(enabled = isEnabled) {
                                         stepSearchPrefix = tentative
@@ -738,7 +855,7 @@ fun StepSearchView(
                                                 color = activeColor
                                             )
                                             Text(
-                                                text = "$matchCount",
+                                                text = "$displayCount",
                                                 style = Typography.labelSmall,
                                                 fontFamily = FontFamily.Monospace,
                                                 fontSize = 9.5.sp,
@@ -746,7 +863,7 @@ fun StepSearchView(
                                                 color = activeColor
                                             )
                                             Text(
-                                                text = " TYPES",
+                                                text = displayLabel,
                                                 style = Typography.labelSmall,
                                                 fontFamily = FontFamily.Default,
                                                 fontSize = 9.5.sp,
@@ -774,24 +891,23 @@ fun StepSearchView(
 
         // Intermediate matches shortcut button
         if (!isDone && stepSearchPrefix.isNotEmpty() && !viewStepSearchMatchesOnly) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(36.dp)
-                    .cyberglass(
-                        borderColor = activeColorDim.copy(alpha = 0.5f),
-                        backgroundColor = activeColorDim.copy(alpha = 0.15f)
-                    )
-                    .clickable {
-                        viewStepSearchMatchesOnly = true
-                        viewModel.synthManager.playCombinatorTick()
-                    },
-                contentAlignment = Alignment.Center
+            Button(
+                onClick = {
+                    viewStepSearchMatchesOnly = true
+                    viewModel.synthManager.playCombinatorTick()
+                },
+                modifier = Modifier.fillMaxWidth().height(36.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = activeColor
+                ),
+                border = BorderStroke(1.dp, activeColor),
+                shape = RoundedCornerShape(4.dp)
             ) {
                 Text(
                     text = "VIEW INTERMEDIATE MATCHES",
-                    style = Typography.labelSmall,
                     color = activeColor,
+                    style = Typography.labelSmall,
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight.Bold
                 )

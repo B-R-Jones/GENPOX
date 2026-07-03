@@ -1,6 +1,6 @@
 package com.example.genpox.ui.main
 
-import android.content.Context
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -8,6 +8,7 @@ import com.example.genpox.audio.PoxSynthManager
 import com.example.genpox.data.*
 import com.example.genpox.data.network.PoxNetworkManager
 import com.example.genpox.data.network.HydraPacket
+import com.example.genpox.ui.components.MapProfilerState
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import com.google.ai.client.generativeai.type.generationConfig
@@ -15,267 +16,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.delay
 import kotlinx.serialization.json.*
-import kotlinx.serialization.encodeToString
 import java.util.UUID
 import java.util.Locale
-import kotlin.math.sin
 
-class MainViewModel(private val repository: DataRepository) : ViewModel() {
+class MainViewModel(
+    private val repository: DataRepository,
+    val synthManager: PoxSynthManager = PoxSynthManager()
+) : ViewModel() {
 
-    val synthManager = PoxSynthManager()
-    private val _networkManager = MutableStateFlow<PoxNetworkManager?>(null)
-    var networkManager: PoxNetworkManager?
-        get() = _networkManager.value
-        set(value) {
-            _networkManager.value = value
-        }
+    // Backing flows for unit test reflection access
+    private val _bioWaste = MutableStateFlow(0L)
+    private val _targetSynthesisSequence = MutableStateFlow("GCAATAGC")
 
-    private val _inboxMessages = MutableStateFlow<List<MailMessage>>(
-        listOf(
-            MailMessage(
-                "msg_1",
-                "CONTAINMENT NODE #04",
-                "ATMOSPHERIC DENSITY ALARM",
-                "2 hours ago",
-                "ALERT: Synodic drift is generating a +0.31 density anomaly crosstalk near epicenter. Dispatch engines must equip COHERENCE_SHIELD constructs to bypass velocity degradation protocols immediately."
-            ),
-            MailMessage(
-                "msg_2",
-                "REACTOR CORE AGENT",
-                "CODON BLOCK COMPILE LOG",
-                "6 hours ago",
-                "TRANSMISSION: Batch 109 compiled successfully. 8 genetic telemetry sequences bound and cached to biological stockpiles. Synchronized signature hash aligns with deterministic calendar seed."
-            ),
-            MailMessage(
-                "msg_3",
-                "ANONYMOUS SPLICER",
-                "ENCRYPTED SIGNAL RECEPT",
-                "Yesterday",
-                "Snoop data intercepted from infection sector well: AGTCGTAC. Sequence successfully routed to player inventory registers. Decode via Bio-Lab Step-Search node compilation."
-            ),
-            MailMessage(
-                "msg_4",
-                "SYSTEM UPDATE",
-                "NTP CHANNELS RE-ALIGNED",
-                "2 days ago",
-                "NTP time servers successfully re-aligned with cosmic clock cycles. Harmonic coupling metrics reset to baseline 80.0% parameters."
-            )
-        )
-    )
-    val inboxMessages: StateFlow<List<MailMessage>> = _inboxMessages.asStateFlow()
+    // Feature ViewModels Instantiation
+    val reactor = ReactorViewModel(repository, synthManager, _bioWaste, _targetSynthesisSequence)
+    val splicer = SplicerViewModel(repository, synthManager, reactor.reactorSalt)
+    val network = NetworkViewModel(repository, synthManager, reactor.reactorSalt)
+    val scanner = ScannerViewModel(repository, synthManager, reactor.reactorSalt)
 
-    private val _registeredPeers = MutableStateFlow<List<PeerNode>>(emptyList())
-    val registeredPeers: StateFlow<List<PeerNode>> = _registeredPeers.asStateFlow()
-
-    val localNodeName = "AGENT-NODE-${(100..999).random()}"
-
-
-    private val _isNetworkSimulationActive = MutableStateFlow(false)
-    val isNetworkSimulationActive: StateFlow<Boolean> = _isNetworkSimulationActive.asStateFlow()
-
-    fun toggleNetworkSimulation(enabled: Boolean) {
-        _isNetworkSimulationActive.value = enabled
-        networkManager?.toggleSimulation(enabled)
-
-        if (enabled) {
-            val current = _registeredPeers.value.toMutableList()
-            if (current.none { it.id == "mock_1" }) {
-                current.add(PeerNode("mock_1", "MOCK-PEER-ALPHA", "P2P Segment", "60ms", "ONLINE"))
-            }
-            if (current.none { it.id == "mock_2" }) {
-                current.add(PeerNode("mock_2", "MOCK-PEER-BETA", "P2P Segment", "---", "OFFLINE"))
-            }
-            _registeredPeers.value = current
-        } else {
-            _registeredPeers.value = _registeredPeers.value.filterNot { it.id == "mock_1" || it.id == "mock_2" }
-        }
-    }
-
-    fun registerPeerNode(name: String, sector: String) {
-        val nextId = "peer_${_registeredPeers.value.size + 1}"
-        val newPeer = PeerNode(nextId, name, sector, "---", "ONLINE")
-        _registeredPeers.value = _registeredPeers.value + newPeer
-    }
-
-    fun markMessageAsRead(messageId: String) {
-        val current = _inboxMessages.value.map { msg ->
-            if (msg.id == messageId) msg.copy(isRead = true) else msg
-        }
-        _inboxMessages.value = current
-    }
-
-    fun claimMessageAttachment(messageId: String) {
-        val msg = _inboxMessages.value.find { it.id == messageId } ?: return
-        if (msg.isClaimed) return
-
-        viewModelScope.launch {
-            if (msg.attachedCreatureDna != null && msg.attachedCreatureName != null) {
-                val newCreature = Creature(
-                    id = UUID.randomUUID().toString(),
-                    sequence = msg.attachedCreatureDna,
-                    name = msg.attachedCreatureName,
-                    faction = msg.attachedCreatureFaction ?: "Natural",
-                    type = "Spliced Hybrid",
-                    vitality = (80..180).random(),
-                    attack = (10..40).random(),
-                    defense = (10..40).random(),
-                    speed = (10..40).random(),
-                    primaryWeapon = "Organic Spikes",
-                    lore = "Received via peer network transmission from ${msg.from}.",
-                    asciiArt = " [P2P CODON LINK] ",
-                    discoveredAt = System.currentTimeMillis(),
-                    origin = msg.from
-                )
-                repository.insertCreature(newCreature)
-            }
-
-            if (msg.attachedGeneSequence != null) {
-                val newSeq = GeneSequence(
-                    sequence = msg.attachedGeneSequence,
-                    count = 1,
-                    discoveredAt = System.currentTimeMillis()
-                )
-                repository.insertGeneSequence(newSeq)
-            }
-
-            if (msg.transferGenes > 0 || msg.transferWaste > 0) {
-                val newA = _rawStockA.value + msg.transferGenes
-                val newG = _rawStockG.value + msg.transferGenes
-                val newT = _rawStockT.value + msg.transferGenes
-                val newC = _rawStockC.value + msg.transferGenes
-                _rawStockA.value = newA
-                _rawStockG.value = newG
-                _rawStockT.value = newT
-                _rawStockC.value = newC
-                repository.saveRawStocks(newA, newG, newT, newC)
-
-                _bioWaste.value = _bioWaste.value + msg.transferWaste
-            }
-
-            val updated = _inboxMessages.value.map { m ->
-                if (m.id == messageId) m.copy(isClaimed = true, isRead = true) else m
-            }
-            _inboxMessages.value = updated
-            synthManager.playSynthesisSuccess()
-        }
-    }
-
-    fun transmitP2PMessage(
-        endpointId: String,
-        text: String,
-        creature: Creature?,
-        gene: GeneSequence?,
-        transferResources: Boolean
-    ) {
-        val nm = networkManager ?: return
-        
-        viewModelScope.launch {
-            var transGenes = 0
-            var transWaste = 0
-
-            if (transferResources) {
-                if (_rawStockA.value >= 10 && _rawStockG.value >= 10 &&
-                    _rawStockT.value >= 10 && _rawStockC.value >= 10 &&
-                    _bioWaste.value >= 25
-                ) {
-                    val newA = _rawStockA.value - 10
-                    val newG = _rawStockG.value - 10
-                    val newT = _rawStockT.value - 10
-                    val newC = _rawStockC.value - 10
-                    _rawStockA.value = newA
-                    _rawStockG.value = newG
-                    _rawStockT.value = newT
-                    _rawStockC.value = newC
-                    repository.saveRawStocks(newA, newG, newT, newC)
-
-                    _bioWaste.value = _bioWaste.value - 25
-                    
-                    transGenes = 10
-                    transWaste = 25
-                }
-            }
-
-            val packet = HydraPacket.NetworkMessage(
-                senderName = "AGENT-NODE",
-                messageText = text.take(64),
-                attachedCreatureDna = creature?.sequence,
-                attachedCreatureName = creature?.name,
-                attachedCreatureFaction = creature?.faction,
-                attachedGeneSequence = gene?.sequence,
-                transferGenes = transGenes,
-                transferWaste = transWaste
-            )
-            
-            nm.sendPacket(endpointId, packet)
-            synthManager.playBeep(880f, 0.08f, "square")
-        }
-    }
-
-
-
-
-    // State flows from Repository
-    val creatures: StateFlow<List<Creature>> = repository.allCreatures
-        .flowOn(Dispatchers.IO)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val geneSequences: StateFlow<List<GeneSequence>> = repository.allGeneSequences
-        .flowOn(Dispatchers.IO)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val activeMissions: StateFlow<List<HarvestMission>> = repository.activeMissions
-        .flowOn(Dispatchers.IO)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val harvestingCreatureIds: StateFlow<Set<String>> = repository.activeMissions
-        .map { missions -> missions.filter { !it.isReturned }.map { it.creatureId }.toSet() }
-        .flowOn(Dispatchers.IO)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
-
-    val activeMissionCoords: StateFlow<Set<String>> = repository.activeMissions
-        .map { missions -> missions.filter { !it.isReturned }.map { "${it.lat},${it.lng}" }.toSet() }
-        .flowOn(Dispatchers.IO)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
-
-    val allMissions: StateFlow<List<HarvestMission>> = repository.allMissions
-        .flowOn(Dispatchers.IO)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val depletedAnomalyCoords: StateFlow<Set<String>> = repository.allMissions
-        .map { missions -> missions.filter { it.isReturned }.map { "${it.lat},${it.lng}" }.toSet() }
-        .flowOn(Dispatchers.IO)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
-
-    val geminiApiKey: StateFlow<String> = repository.geminiApiKey
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-
-    val muteSound: StateFlow<Boolean> = repository.muteSound
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
-    val scanRadius: StateFlow<Float> = repository.scanRadius
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 55f)
-
-
-
-    private val _showScanner = MutableStateFlow(false)
-    val showScanner: StateFlow<Boolean> = _showScanner.asStateFlow()
-
-    private val _trackedMissionId = MutableStateFlow<String?>(null)
-    val trackedMissionId: StateFlow<String?> = _trackedMissionId.asStateFlow()
-
-    fun setTrackedMissionId(id: String?) {
-        _trackedMissionId.value = id
-        if (id != null) {
-            _scannerSubTab.value = "radar"
-            _selectedAnomalyId.value = null
-            selectTab("scanner")
-        }
-    }
-
-    // UI Local State Flow
+    // Navigation and tab states
     private val _selectedTab = MutableStateFlow("combinator")
     val selectedTab: StateFlow<String> = _selectedTab.asStateFlow()
 
@@ -291,616 +51,335 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     private val _disintegratedModal = MutableStateFlow<DisintegratedModalData?>(null)
     val disintegratedModal: StateFlow<DisintegratedModalData?> = _disintegratedModal.asStateFlow()
 
-    fun clearDisintegratedModal() {
-        _disintegratedModal.value = null
-    }
-
     private val _terminalLogs = MutableStateFlow<List<String>>(listOf("GENPOX COMPILER SYSTEM v2.0 READY."))
     val terminalLogs: StateFlow<List<String>> = _terminalLogs.asStateFlow()
 
-    private val _selectedSplicerCreature = MutableStateFlow<Creature?>(null)
-    val selectedSplicerCreature: StateFlow<Creature?> = _selectedSplicerCreature.asStateFlow()
-
-    private val _selectedGeneToAppend = MutableStateFlow<String?>(null)
-    val selectedGeneToAppend: StateFlow<String?> = _selectedGeneToAppend.asStateFlow()
+    private val _logFlashTrigger = MutableSharedFlow<String>(extraBufferCapacity = 16)
+    val logFlashTrigger: SharedFlow<String> = _logFlashTrigger.asSharedFlow()
+    private val lastMessageFlashTime = mutableMapOf<String, Long>()
 
     private val _isCompiling = MutableStateFlow(false)
     val isCompiling: StateFlow<Boolean> = _isCompiling.asStateFlow()
+
+    private val _showScanner = MutableStateFlow(false)
+    val showScanner: StateFlow<Boolean> = _showScanner.asStateFlow()
+
+    private val _vaultSubTab = MutableStateFlow("creatures")
+    val vaultSubTab: StateFlow<String> = _vaultSubTab.asStateFlow()
+
+    private val _splicerSubTab = MutableStateFlow("splicer")
+    val splicerSubTab: StateFlow<String> = _splicerSubTab.asStateFlow()
+
+    private val _networkSubTab = MutableStateFlow("hydranet")
+    val networkSubTab: StateFlow<String> = _networkSubTab.asStateFlow()
+
+    private val _settingsSubTab = MutableStateFlow("general")
+    val settingsSubTab: StateFlow<String> = _settingsSubTab.asStateFlow()
 
     // Bio-Lab Subtab Navigation State
     private val _bioLabSubTab = MutableStateFlow("pox")
     val bioLabSubTab: StateFlow<String> = _bioLabSubTab.asStateFlow()
 
-    // Scanner Subtab Hoisted Navigation State
-    private val _scannerSubTab = MutableStateFlow("list")
-    val scannerSubTab: StateFlow<String> = _scannerSubTab.asStateFlow()
-
-    fun setScannerSubTab(subTab: String) {
-        _scannerSubTab.value = subTab
+    fun setBioLabSubTab(subTab: String) {
+        _bioLabSubTab.value = subTab
     }
 
-    // Gen-Vault Subtab Hoisted Navigation State
-    private val _vaultSubTab = MutableStateFlow("creatures")
-    val vaultSubTab: StateFlow<String> = _vaultSubTab.asStateFlow()
+    // Local Node Name
+    val localNodeName = "AGENT-NODE-417"
 
+    // Profiler States
+    private val _isProfilerEnabled = MutableStateFlow(false)
+    val isProfilerEnabled: StateFlow<Boolean> = _isProfilerEnabled.asStateFlow()
+    val profilerState = MapProfilerState()
+
+    fun toggleProfiler() {
+        _isProfilerEnabled.value = !_isProfilerEnabled.value
+        addLog("PROFILER: Frame rate stats overlay set to: ${if (_isProfilerEnabled.value) "ACTIVE" else "OFFLINE"}")
+    }
+
+    // Daily Bounty Sequences
+    val dailyBounties: StateFlow<List<String>> = flow {
+        emit(generateDailyBounties())
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    private fun generateDailyBounties(): List<String> {
+        val list = mutableListOf<String>()
+        val bases = listOf("A", "G", "T", "C")
+        val random = java.util.Random(1337)
+        for (i in 0 until 128) {
+            var seq = ""
+            for (j in 0 until 64) {
+                seq += bases[random.nextInt(4)]
+            }
+            list.add(seq)
+        }
+        return list
+    }
+
+    // Gemini API keys and mute settings collected from DB
+    val geminiApiKey: StateFlow<String> = repository.geminiApiKey
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    val muteSound: StateFlow<Boolean> = repository.muteSound
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    // Observe database/repository stocks to initialize and keep in-sync
+    val creatures: StateFlow<List<Creature>> = repository.allCreatures
+        .flowOn(Dispatchers.IO)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val geneSequences: StateFlow<List<GeneSequence>> = repository.allGeneSequences
+        .flowOn(Dispatchers.IO)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val inventoryMetrics: StateFlow<DnaMetricsCalculator.GeneInventoryMetrics> = geneSequences.map { list ->
+        DnaMetricsCalculator.calculateInventoryMetrics(list)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DnaMetricsCalculator.GeneInventoryMetrics())
+
+    val grandTotalStandardNucleotides: StateFlow<Long> = inventoryMetrics
+        .map { it.grandTotalStandardNucleotides }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    private val _networkManager = MutableStateFlow<PoxNetworkManager?>(null)
+    var networkManager: PoxNetworkManager?
+        get() = _networkManager.value
+        set(value) {
+            _networkManager.value = value
+            network.networkManager = value
+        }
+
+    // REACTOR VIEWMODEL DELEGATES
+    val poxReactorActive get() = reactor.poxReactorActive
+    val reactorTemperature get() = reactor.reactorTemperature
+    val reactorSalt get() = reactor.reactorSalt
+    val activePolymerase get() = reactor.activePolymerase
+    val activeChemicalSolute get() = reactor.activeChemicalSolute
+    val inletRatioA get() = reactor.inletRatioA
+    val inletRatioG get() = reactor.inletRatioG
+    val inletRatioT get() = reactor.inletRatioT
+    val inletRatioC get() = reactor.inletRatioC
+    val rawStockA get() = reactor.rawStockA
+    val rawStockG get() = reactor.rawStockG
+    val rawStockT get() = reactor.rawStockT
+    val rawStockC get() = reactor.rawStockC
+    val bioWaste get() = reactor.bioWaste
+    val poxIdleTime get() = reactor.poxIdleTime
+    val anomalyIdleTime get() = reactor.anomalyIdleTime
+    val boostSecondsLeft get() = reactor.boostSecondsLeft
+    val anomalyEngineActive get() = reactor.anomalyEngineActive
+    val anomalyConsumedBases get() = reactor.anomalyConsumedBases
+    val discoveredPacketsLog get() = reactor.discoveredPacketsLog
+    val scrollingGene get() = reactor.scrollingGene
+    val activeSynthesisStrand get() = reactor.activeSynthesisStrand
+    val activeSynthesisStep get() = reactor.activeSynthesisStep
+    val activeSynthesisQScore get() = reactor.activeSynthesisQScore
+    val activeSynthesisTm get() = reactor.activeSynthesisTm
+    val activeSynthesisMfe get() = reactor.activeSynthesisMfe
+    val targetSynthesisSequence get() = reactor.targetSynthesisSequence
+    val isSynthesisActive get() = reactor.isSynthesisActive
+    val isReactionCollapsed get() = reactor.isReactionCollapsed
+    val isLoopActive get() = reactor.isLoopActive
+    val selectedReagent get() = reactor.selectedReagent
+    val reagents get() = reactor.reagents
+    val devForceAnomaly get() = reactor.devForceAnomaly
+    val baseFonts get() = reactor.baseFonts
+    val nearestFontDistance get() = reactor.nearestFontDistance
+    val activeSiphonedFont get() = reactor.activeSiphonedFont
+    val siphonedRate get() = reactor.siphonedRate
+    val celestialWells get() = reactor.celestialWells
+
+    fun setReactorTemperature(value: Float) = reactor.setReactorTemperature(value)
+    fun setReactorSalt(value: Float) = reactor.setReactorSalt(value)
+    fun setActivePolymerase(value: String) = reactor.setActivePolymerase(value)
+    fun setActiveChemicalSolute(value: String) = reactor.setActiveChemicalSolute(value)
+    fun setInletRatioA(value: Float) = reactor.setInletRatioA(value)
+    fun setInletRatioG(value: Float) = reactor.setInletRatioG(value)
+    fun setInletRatioT(value: Float) = reactor.setInletRatioT(value)
+    fun setInletRatioC(value: Float) = reactor.setInletRatioC(value)
+    fun setReactorDialIndex(index: Int) = reactor.setReactorDialIndex(index)
+    fun toggleLoopActive() = reactor.toggleLoopActive()
+    fun selectReagent(reagentId: String?) = reactor.selectReagent(reagentId)
+    fun toggleDevForceAnomaly() = reactor.toggleDevForceAnomaly()
+    fun addDevBases() = reactor.addDevBases()
+    fun clearDevBases() = reactor.clearDevBases()
+    fun clearDevGenes() = reactor.clearDevGenes()
+    fun clearDevCreatures() = reactor.clearDevCreatures()
+    fun cycleTargetBase(index: Int) = reactor.cycleTargetBase(index)
+    fun setTargetSynthesisSequence(sequence: String) = reactor.setTargetSynthesisSequence(sequence)
+    fun recycleMatchingGenes(prefix: String) = reactor.recycleMatchingGenes(prefix)
+    fun decomposeGeneBlock(sequence: String, countToDecompose: Int) = reactor.decomposeGeneBlock(sequence, countToDecompose)
+    fun initiateStandardSynthesis() = reactor.initiateStandardSynthesis()
+    fun setPoxReactorActive(active: Boolean) = reactor.setPoxReactorActive(active)
+    fun setAnomalyEngineActive(active: Boolean) = reactor.setAnomalyEngineActive(active)
+    fun triggerManualAcceleration() = reactor.triggerManualAcceleration()
+    fun addBoosterTime(seconds: Int) = reactor.addBoosterTime(seconds)
+    fun clearDiscoveredPacketsLog() = reactor.clearDiscoveredPacketsLog()
+
+    // SPLICER VIEWMODEL DELEGATES
+    val targetSequence get() = splicer.targetSequence
+    val splicerSlots get() = splicer.splicerSlots
+    val splicerQScores get() = splicer.splicerQScores
+    val splicerSignatures get() = splicer.splicerSignatures
+    val activeSlotSelection get() = splicer.activeSlotSelection
+    val slotSequenceFilter get() = splicer.slotSequenceFilter
+    val isReactorFrozen get() = splicer.isReactorFrozen
+    val reactorFreezeTimeLeft get() = splicer.reactorFreezeTimeLeft
+    val isForcedConstructionActive get() = splicer.isForcedConstructionActive
+    val isForcedLoopActive get() = splicer.isForcedLoopActive
+    val forcedConstructionLogs get() = splicer.forcedConstructionLogs
+    val isSplicing get() = splicer.isSplicing
+    val splicingProgress get() = splicer.splicingProgress
+    val sequencedBasesCount get() = splicer.sequencedBasesCount
+    val newlySplicedCreature get() = splicer.newlySplicedCreature
+    val isCustomScaffoldMode get() = splicer.isCustomScaffoldMode
+    val selectedSplicerCreature get() = splicer.selectedSplicerCreature
+    val selectedGeneToAppend get() = splicer.selectedGeneToAppend
+
+    fun selectSplicerSlot(idx: Int?) = splicer.selectSplicerSlot(idx)
+    fun setCustomScaffoldMode(active: Boolean) = splicer.setCustomScaffoldMode(active)
+    fun setSlotSequenceFilter(query: String) = splicer.setSlotSequenceFilter(query)
+    fun assignGeneToSlot(seq: String) = splicer.assignGeneToSlot(seq)
+    fun ejectGeneFromSlot(slotIdx: Int) = splicer.ejectGeneFromSlot(slotIdx)
+    fun autofillSplicerSlots() = splicer.autofillSplicerSlots()
+    fun devInjectMissingTargetGenes() = splicer.devInjectMissingTargetGenes()
+    fun setSplicerCreature(creature: Creature?) = splicer.setSplicerCreature(creature)
+    fun selectGeneToAppend(gene: String?) = splicer.selectGeneToAppend(gene)
+    fun weldGeneToCreature() = splicer.weldGeneToCreature()
+    fun constructSplicedCreature() = splicer.constructSplicedCreature(selectedReagent.value)
+    fun completeSplicingAndViewInVault() = splicer.completeSplicingAndViewInVault()
+    fun completeSplicingAndReturnToSplicer() = splicer.completeSplicingAndReturnToSplicer()
+    fun setIsForcedLoopActive(active: Boolean) = splicer.setIsForcedLoopActive(active)
+    fun startForcedConstruction(customSequence: String? = null) = splicer.startForcedConstruction(customSequence, selectedReagent.value)
+
+    // NETWORK VIEWMODEL DELEGATES
+    val inboxMessages get() = network.inboxMessages
+    val selectedInboxMessageId get() = network.selectedInboxMessageId
+    val registeredPeers get() = network.registeredPeers
+    val isNetworkSimulationActive get() = network.isNetworkSimulationActive
+    val composerRecipientId get() = network.composerRecipientId
+    val composerRecipientName get() = network.composerRecipientName
+    val composerRecipientIsConnected get() = network.composerRecipientIsConnected
+    val composerMessageText get() = network.composerMessageText
+    val composerAttachedCreature get() = network.composerAttachedCreature
+    val composerAttachedGene get() = network.composerAttachedGene
+    val composerTransferResources get() = network.composerTransferResources
+
+    fun selectInboxMessage(id: String?) = network.selectInboxMessage(id)
+    fun toggleNetworkSimulation(enabled: Boolean) = network.toggleNetworkSimulation(enabled)
+    fun registerPeerNode(name: String, sector: String) = network.registerPeerNode(name, sector)
+    fun markMessageAsRead(messageId: String) = network.markMessageAsRead(messageId)
+    fun claimMessageAttachment(messageId: String) = network.claimMessageAttachment(messageId)
+    fun transmitP2PMessage(endpointId: String, text: String, creature: Creature?, gene: GeneSequence?, transferResources: Boolean) =
+        network.transmitP2PMessage(endpointId, text, creature, gene, transferResources)
+    fun setComposerRecipient(id: String?, name: String?, isConnected: Boolean) = network.setComposerRecipient(id, name, isConnected)
+    fun setComposerMessageText(text: String) = network.setComposerMessageText(text)
+    fun setComposerAttachedCreature(creature: Creature?) = network.setComposerAttachedCreature(creature)
+    fun setComposerAttachedGene(gene: GeneSequence?) = network.setComposerAttachedGene(gene)
+    fun setComposerTransferResources(active: Boolean) = network.setComposerTransferResources(active)
+    fun clearComposer() = network.clearComposer()
+
+    // SCANNER VIEWMODEL DELEGATES
+    val activeMissions get() = scanner.activeMissions
+    val harvestingCreatureIds get() = scanner.harvestingCreatureIds
+    val activeMissionCoords get() = scanner.activeMissionCoords
+    val allMissions get() = scanner.allMissions
+    val depletedAnomalyCoords get() = scanner.depletedAnomalyCoords
+    val scanRadius get() = scanner.scanRadius
+    val trackedMissionId get() = scanner.trackedMissionId
+    val selectedAnomalyId get() = scanner.selectedAnomalyId
+    val scannerSubTab get() = scanner.scannerSubTab
+    val latitude get() = scanner.latitude
+    val longitude get() = scanner.longitude
+    val zoomMultiplier get() = scanner.zoomMultiplier
+    val roads get() = scanner.roads
+    val buildings get() = scanner.buildings
+    val proceduralHeatwaves get() = scanner.proceduralHeatwaves
+    val rawAnomalies get() = scanner.rawAnomalies
+    val anomalies get() = scanner.anomalies
+    val selectedAnomaly get() = scanner.selectedAnomaly
+    val heatwaveCells get() = scanner.proceduralHeatwaves
+
+    fun setTrackedMissionId(id: String?) {
+        scanner.setTrackedMissionId(id)
+        if (id != null) {
+            _selectedTab.value = "scanner"
+        }
+    }
+    fun setSelectedAnomalyId(id: String?) = scanner.setSelectedAnomalyId(id)
+    fun setScannerSubTab(subTab: String) = scanner.setScannerSubTab(subTab)
+    fun updateLocation(lat: Double, lng: Double) {
+        reactor.updateLocation(lat, lng)
+        scanner.updateLocation(lat, lng)
+    }
+    fun updateZoom(zoom: Float) = scanner.updateZoom(zoom)
+    fun refreshMap() = scanner.refreshMap()
+    fun dispatchMission(creature: Creature, anomaly: PoxAnomaly) = scanner.dispatchMission(creature, anomaly)
+    fun recallMission(mission: HarvestMission) = scanner.recallMission(mission)
+    fun recallAllActiveMissions() = scanner.recallAllActiveMissions()
+    fun getSynodicResonanceMod(faction: String, phaseName: String): Int = scanner.getSynodicResonanceMod(faction, phaseName)
+
+    // Distance computation delegate helper
+    fun calculateDistanceInFeet(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLng = Math.toRadians(lng2 - lng1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2)
+        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        val earthRadiusFeet = 20902231.0
+        return earthRadiusFeet * c
+    }
+
+    // Vault, Splicer, Network, Settings Tab setters
     fun setVaultSubTab(subTab: String) {
         _vaultSubTab.value = subTab
         synthManager.playBeep(if (subTab == "creatures") 440f else 587f, 0.05f, "sine")
     }
-
-    // Splicer Subtab Hoisted Navigation State
-    private val _splicerSubTab = MutableStateFlow("splicer")
-    val splicerSubTab: StateFlow<String> = _splicerSubTab.asStateFlow()
 
     fun setSplicerSubTab(subTab: String) {
         _splicerSubTab.value = subTab
         synthManager.playBeep(if (subTab == "splicer") 440f else 587f, 0.05f, "sine")
     }
 
-    // P.O.X. Reactor active state
-    private val _poxReactorActive = MutableStateFlow(true)
-    val poxReactorActive: StateFlow<Boolean> = _poxReactorActive.asStateFlow()
-
-    // Raw nucleotide stocks (in-memory MutableStateFlows backed by repository updates)
-    private val _rawStockA = MutableStateFlow(10000L)
-    val rawStockA: StateFlow<Long> = _rawStockA.asStateFlow()
-
-    private val _rawStockG = MutableStateFlow(10000L)
-    val rawStockG: StateFlow<Long> = _rawStockG.asStateFlow()
-
-    private val _rawStockT = MutableStateFlow(10000L)
-    val rawStockT: StateFlow<Long> = _rawStockT.asStateFlow()
-
-    private val _rawStockC = MutableStateFlow(10000L)
-    val rawStockC: StateFlow<Long> = _rawStockC.asStateFlow()
-
-    // Biophysics reactor parameters
-    private val _reactorTemperature = MutableStateFlow(37.0f)
-    val reactorTemperature: StateFlow<Float> = _reactorTemperature.asStateFlow()
-
-    private val _reactorSalt = MutableStateFlow(0.05f)
-    val reactorSalt: StateFlow<Float> = _reactorSalt.asStateFlow()
-
-    private val _activePolymerase = MutableStateFlow("Taq")
-    val activePolymerase: StateFlow<String> = _activePolymerase.asStateFlow()
-
-    private val _activeChemicalSolute = MutableStateFlow("None")
-    val activeChemicalSolute: StateFlow<String> = _activeChemicalSolute.asStateFlow()
-
-    private val _inletRatioA = MutableStateFlow(0.25f)
-    val inletRatioA: StateFlow<Float> = _inletRatioA.asStateFlow()
-
-    private val _inletRatioG = MutableStateFlow(0.25f)
-    val inletRatioG: StateFlow<Float> = _inletRatioG.asStateFlow()
-
-    private val _inletRatioT = MutableStateFlow(0.25f)
-    val inletRatioT: StateFlow<Float> = _inletRatioT.asStateFlow()
-
-    private val _inletRatioC = MutableStateFlow(0.25f)
-    val inletRatioC: StateFlow<Float> = _inletRatioC.asStateFlow()
-
-    fun setReactorTemperature(value: Float) {
-        _reactorTemperature.value = value
+    fun setNetworkSubTab(subTab: String) {
+        _networkSubTab.value = subTab
     }
 
-    fun setReactorSalt(value: Float) {
-        _reactorSalt.value = value
+    fun setSettingsSubTab(subTab: String) {
+        _settingsSubTab.value = subTab
     }
 
-    fun setActivePolymerase(value: String) {
-        val current = _activePolymerase.value
-        if (current.equals(value, ignoreCase = true)) return
-        
-        val valueUpper = value.uppercase()
-        val reqBase = when (valueUpper) {
-            "TTH" -> 25L
-            "PFU" -> 50L
-            else -> 0L
-        }
-        val reqWaste = when (valueUpper) {
-            "TTH" -> 50L
-            "PFU" -> 150L
-            else -> 0L
-        }
-        
-        if (_rawStockA.value < reqBase || _rawStockG.value < reqBase || _rawStockT.value < reqBase || _rawStockC.value < reqBase || _bioWaste.value < reqWaste) {
-            addLog("SELECTION ERROR: Insufficient stocks to engage $value ($value requires $reqBase of each base & $reqWaste Bio-Waste).")
-            synthManager.playReject()
-            return
-        }
-        
-        _activePolymerase.value = value
-        
-        val costMsg = when (valueUpper) {
-            "TAQ" -> "Baseline enzyme selected (Free)."
-            "TTH" -> "Tth selected (Cost: 25 of all bases & 50 Bio-Waste deducted upon ignition)."
-            "PFU" -> "Pfu selected (Cost: 50 of all bases & 150 Bio-Waste deducted upon ignition)."
-            else -> ""
-        }
-        addLog("ENGAGED $value POLYMERASE: $costMsg")
-        synthManager.playBeep(440f, 0.1f, "sine")
+    fun clearDisintegratedModal() {
+        _disintegratedModal.value = null
     }
-
-    fun setActiveChemicalSolute(value: String) {
-        _activeChemicalSolute.value = value
-    }
-
-    fun setInletRatioA(value: Float) {
-        _inletRatioA.value = value.coerceIn(0.05f, 0.90f)
-    }
-
-    fun setInletRatioG(value: Float) {
-        _inletRatioG.value = value.coerceIn(0.05f, 0.90f)
-    }
-
-    fun setInletRatioT(value: Float) {
-        _inletRatioT.value = value.coerceIn(0.05f, 0.90f)
-    }
-
-    fun setInletRatioC(value: Float) {
-        _inletRatioC.value = value.coerceIn(0.05f, 0.90f)
-    }
-
-    // Countdown remaining (seconds) until next synthesis cycle for standard P.O.X. reactor
-    private val _poxIdleTime = MutableStateFlow(16)
-    val poxIdleTime: StateFlow<Int> = _poxIdleTime.asStateFlow()
-
-    // Countdown remaining (seconds) until next synthesis cycle for Anomaly Engine
-    private val _anomalyIdleTime = MutableStateFlow(16)
-    val anomalyIdleTime: StateFlow<Int> = _anomalyIdleTime.asStateFlow()
-
-    // Active reactor boost seconds remaining
-    private val _boostSecondsLeft = MutableStateFlow(0)
-    val boostSecondsLeft: StateFlow<Int> = _boostSecondsLeft.asStateFlow()
-
-    // Anomaly engine unstable fusion state switch
-    private val _anomalyEngineActive = MutableStateFlow(false)
-    val anomalyEngineActive: StateFlow<Boolean> = _anomalyEngineActive.asStateFlow()
-
-    // Cumulative standard nucleotides consumed during the current active anomaly run
-    private val _anomalyConsumedBases = MutableStateFlow(0L)
-    val anomalyConsumedBases: StateFlow<Long> = _anomalyConsumedBases.asStateFlow()
-
-    // Chronological log of past synthesized gene packets
-    private val _discoveredPacketsLog = MutableStateFlow<List<GenePacket>>(emptyList())
-    val discoveredPacketsLog: StateFlow<List<GenePacket>> = _discoveredPacketsLog.asStateFlow()
-
-    // 8-character string mimicking visual synthesizer readout scrolling
-    private val _scrollingGene = MutableStateFlow("--------")
-    val scrollingGene: StateFlow<String> = _scrollingGene.asStateFlow()
-
-    // Real-time single-gene stepped synthesis states
-    private val _activeSynthesisStrand = MutableStateFlow("")
-    val activeSynthesisStrand: StateFlow<String> = _activeSynthesisStrand.asStateFlow()
-
-    private val _activeSynthesisStep = MutableStateFlow(0)
-    val activeSynthesisStep: StateFlow<Int> = _activeSynthesisStep.asStateFlow()
-
-    private val _activeSynthesisQScore = MutableStateFlow(0.0)
-    val activeSynthesisQScore: StateFlow<Double> = _activeSynthesisQScore.asStateFlow()
-
-    private val _activeSynthesisTm = MutableStateFlow(0.0)
-    val activeSynthesisTm: StateFlow<Double> = _activeSynthesisTm.asStateFlow()
-
-    private val _activeSynthesisMfe = MutableStateFlow(0.0)
-    val activeSynthesisMfe: StateFlow<Double> = _activeSynthesisMfe.asStateFlow()
-
-    private val _targetSynthesisSequence = MutableStateFlow("AAAAAAAA")
-    val targetSynthesisSequence: StateFlow<String> = _targetSynthesisSequence.asStateFlow()
-
-    private val _isSynthesisActive = MutableStateFlow(false)
-    val isSynthesisActive: StateFlow<Boolean> = _isSynthesisActive.asStateFlow()
-
-    private val _isReactionCollapsed = MutableStateFlow(false)
-    val isReactionCollapsed: StateFlow<Boolean> = _isReactionCollapsed.asStateFlow()
-
-    private val _bioWaste = MutableStateFlow(0L)
-    val bioWaste: StateFlow<Long> = _bioWaste.asStateFlow()
-
-    private val _isLoopActive = MutableStateFlow(false)
-    val isLoopActive: StateFlow<Boolean> = _isLoopActive.asStateFlow()
-
-    fun toggleLoopActive() {
-        _isLoopActive.value = !_isLoopActive.value
-        synthManager.playBeep(if (_isLoopActive.value) 600f else 400f, 0.1f, "sine")
-    }
-
-    // Splicer/Constructor State Flows
-    private val _targetSequence = MutableStateFlow("")
-    val targetSequence: StateFlow<String> = _targetSequence.asStateFlow()
-
-    private val _splicerSlots = MutableStateFlow<List<String?>>(List<String?>(8) { null })
-    val splicerSlots: StateFlow<List<String?>> = _splicerSlots.asStateFlow()
-
-    private val _splicerQScores = MutableStateFlow<List<Double>>(List(8) { 25.0 })
-    val splicerQScores: StateFlow<List<Double>> = _splicerQScores.asStateFlow()
-
-    private val _activeSlotSelection = MutableStateFlow<Int?>(null)
-    val activeSlotSelection: StateFlow<Int?> = _activeSlotSelection.asStateFlow()
-
-    private val _slotSequenceFilter = MutableStateFlow("")
-    val slotSequenceFilter: StateFlow<String> = _slotSequenceFilter.asStateFlow()
-
-    private val _isReactorFrozen = MutableStateFlow(false)
-    val isReactorFrozen: StateFlow<Boolean> = _isReactorFrozen.asStateFlow()
-
-    private val _reactorFreezeTimeLeft = MutableStateFlow(0f)
-    val reactorFreezeTimeLeft: StateFlow<Float> = _reactorFreezeTimeLeft.asStateFlow()
-
-    private val _isForcedConstructionActive = MutableStateFlow(false)
-    val isForcedConstructionActive: StateFlow<Boolean> = _isForcedConstructionActive.asStateFlow()
-
-    private val _isForcedLoopActive = MutableStateFlow(false)
-    val isForcedLoopActive: StateFlow<Boolean> = _isForcedLoopActive.asStateFlow()
-
-    private val _forcedConstructionLogs = MutableStateFlow<List<String>>(emptyList())
-    val forcedConstructionLogs: StateFlow<List<String>> = _forcedConstructionLogs.asStateFlow()
-
-    private val _isSplicing = MutableStateFlow(false)
-    val isSplicing: StateFlow<Boolean> = _isSplicing.asStateFlow()
-
-    private val _splicingProgress = MutableStateFlow(0)
-    val splicingProgress: StateFlow<Int> = _splicingProgress.asStateFlow()
-
-    private val _devForceAnomaly = MutableStateFlow(false)
-    val devForceAnomaly: StateFlow<Boolean> = _devForceAnomaly.asStateFlow()
-
-    fun toggleDevForceAnomaly() {
-        _devForceAnomaly.value = !_devForceAnomaly.value
-        addLog("DEV: GNPX Mode toggled to ${_devForceAnomaly.value}")
-        synthManager.playBeep(650f, 0.05f, "sine")
-    }
-
-    fun addDevBases() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val a = _rawStockA.value + 10000L
-            val g = _rawStockG.value + 10000L
-            val t = _rawStockT.value + 10000L
-            val c = _rawStockC.value + 10000L
-            val waste = _bioWaste.value + 10000L
-            
-            _rawStockA.value = a
-            _rawStockG.value = g
-            _rawStockT.value = t
-            _rawStockC.value = c
-            _bioWaste.value = waste
-            repository.saveRawStocks(a, g, t, c)
-            addLog("DEV: Injected 10,000 units of all raw bases (A, G, T, C) and 10,000 Bio-Waste.")
-            synthManager.playSynthesisSuccess()
-        }
-    }
-
-    fun clearDevBases() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _rawStockA.value = 0L
-            _rawStockG.value = 0L
-            _rawStockT.value = 0L
-            _rawStockC.value = 0L
-            _bioWaste.value = 0L
-            repository.saveRawStocks(0L, 0L, 0L, 0L)
-            
-            val currentPoly = _activePolymerase.value.uppercase()
-            if (currentPoly == "TTH" || currentPoly == "PFU") {
-                _activePolymerase.value = "Taq"
-                addLog("SYS WARNING: Selected enzyme reset to Taq due to stock depletion.")
-            }
-            
-            addLog("DEV: Raw stockpiles and Bio-Waste cleared to 0.")
-            synthManager.playReject()
-        }
-    }
-
-    fun clearDevGenes() {
-        viewModelScope.launch(Dispatchers.IO) {
-            repository.deleteAllGeneSequences()
-            addLog("DEV: Cleared all Gene Sequences from database.")
-            synthManager.playReject()
-        }
-    }
-
-    fun clearDevCreatures() {
-        viewModelScope.launch(Dispatchers.IO) {
-            repository.deleteAllCreatures()
-            addLog("DEV: Cleared all Creature specimens from database.")
-            synthManager.playReject()
-        }
-    }
-
-    // Unified metrics model to compute inventory statistics in a single pass on a background thread
-    data class GeneInventoryMetrics(
-        val geneSequenceStrings: List<String> = emptyList(),
-        val uniqueGenesSize: Int = 0,
-        val multiCountGenesSize: Int = 0,
-        val anomalousGenesList: List<GeneSequence> = emptyList(),
-        val grandTotalStandardNucleotides: Long = 0L,
-        val countA: Int = 0,
-        val countG: Int = 0,
-        val countT: Int = 0,
-        val countC: Int = 0
-    )
-
-    val inventoryMetrics: StateFlow<GeneInventoryMetrics> = geneSequences
-        .map { list ->
-            var countA = 0
-            var countG = 0
-            var countT = 0
-            var countC = 0
-            var grandTotal = 0L
-            var multiCount = 0
-            val strings = ArrayList<String>(list.size)
-            val anomalousList = ArrayList<GeneSequence>()
-
-            for (i in 0 until list.size) {
-                val gene = list[i]
-                val seq = gene.sequence
-                strings.add(seq)
-                if (gene.count > 1) {
-                    multiCount++
-                }
-
-                val isAnomalous = WaveMath.isAnomalousGene(seq)
-                if (isAnomalous) {
-                    anomalousList.add(gene)
-                } else {
-                    if (gene.count > 0) {
-                        grandTotal += seq.length
-                        for (cIdx in 0 until seq.length) {
-                            when (seq[cIdx]) {
-                                'A', 'a' -> countA += gene.count
-                                'G', 'g' -> countG += gene.count
-                                'T', 't' -> countT += gene.count
-                                'C', 'c' -> countC += gene.count
-                            }
-                        }
-                    }
-                }
-            }
-
-            GeneInventoryMetrics(
-                geneSequenceStrings = strings,
-                uniqueGenesSize = list.size,
-                multiCountGenesSize = multiCount,
-                anomalousGenesList = anomalousList,
-                grandTotalStandardNucleotides = grandTotal,
-                countA = countA,
-                countG = countG,
-                countT = countT,
-                countC = countC
-            )
-        }
-        .flowOn(Dispatchers.Default)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GeneInventoryMetrics())
-
-    val grandTotalStandardNucleotides: StateFlow<Long> = inventoryMetrics
-        .map { it.grandTotalStandardNucleotides }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
-
-    val geneSequenceStrings: StateFlow<List<String>> = inventoryMetrics
-        .map { it.geneSequenceStrings }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val uniqueGenesSize: StateFlow<Int> = inventoryMetrics
-        .map { it.uniqueGenesSize }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    val multiCountGenesSize: StateFlow<Int> = inventoryMetrics
-        .map { it.multiCountGenesSize }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    val anomalousGenesList: StateFlow<List<GeneSequence>> = inventoryMetrics
-        .map { it.anomalousGenesList }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val countA: StateFlow<Int> = inventoryMetrics
-        .map { it.countA }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    val countG: StateFlow<Int> = inventoryMetrics
-        .map { it.countG }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    val countT: StateFlow<Int> = inventoryMetrics
-        .map { it.countT }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    val countC: StateFlow<Int> = inventoryMetrics
-        .map { it.countC }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    // Map location and anomalies
-    private val _latitude = MutableStateFlow(37.4220) // Default Palo Alto coordinates
-    val latitude: StateFlow<Double> = _latitude.asStateFlow()
-
-    private val _longitude = MutableStateFlow(-122.0841)
-    val longitude: StateFlow<Double> = _longitude.asStateFlow()
-
-    private val _baseFonts = MutableStateFlow<List<PoxBaseFont>>(emptyList())
-    val baseFonts: StateFlow<List<PoxBaseFont>> = _baseFonts.asStateFlow()
-
-    private val _nearestFontDistance = MutableStateFlow<Double?>(null)
-    val nearestFontDistance: StateFlow<Double?> = _nearestFontDistance.asStateFlow()
-
-    private val _activeSiphonedFont = MutableStateFlow<PoxBaseFont?>(null)
-    val activeSiphonedFont: StateFlow<PoxBaseFont?> = _activeSiphonedFont.asStateFlow()
-
-    private val _siphonedRate = MutableStateFlow(0L)
-    val siphonedRate: StateFlow<Long> = _siphonedRate.asStateFlow()
-
-
-    private val _roads = MutableStateFlow<List<List<Pair<Double, Double>>>>(emptyList())
-    val roads: StateFlow<List<List<Pair<Double, Double>>>> = _roads.asStateFlow()
-
-    private val _buildings = MutableStateFlow<List<BuildingStructure>>(emptyList())
-    val buildings: StateFlow<List<BuildingStructure>> = _buildings.asStateFlow()
-
-    private val _cachedCells = MutableStateFlow<List<String>>(emptyList())
-    val cachedCells: StateFlow<List<String>> = _cachedCells.asStateFlow()
-
-    private val _proceduralHeatwaves = MutableStateFlow<List<String>>(emptyList())
-
-    val heatwaveCells: StateFlow<List<String>> = combine(_cachedCells, _proceduralHeatwaves) { cached, heatwaves ->
-        (cached + heatwaves).distinct()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    private val _zoomMultiplier = MutableStateFlow(1.0f)
-    val zoomMultiplier: StateFlow<Float> = _zoomMultiplier.asStateFlow()
-
-    private val _isProfilerEnabled = MutableStateFlow(false)
-    val isProfilerEnabled: StateFlow<Boolean> = _isProfilerEnabled.asStateFlow()
-
-    val profilerState = com.example.genpox.ui.components.MapProfilerState()
-
-    fun toggleProfiler() {
-        _isProfilerEnabled.value = !_isProfilerEnabled.value
-        if (_isProfilerEnabled.value) {
-            synthManager.playBeep(520f, 0.1f, "square")
-        } else {
-            synthManager.playBeep(330f, 0.1f, "sine")
-        }
-    }
-
-    private var lastCheckedCellKey: String? = null
-    private var fetchRoadsJob: kotlinx.coroutines.Job? = null
-
-
-
-    private fun calculateDistanceInFeet(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val dx = (lng2 - lng1) * 111000.0 * kotlin.math.cos(Math.toRadians(lat1))
-        val dy = (lat2 - lat1) * 111000.0
-        val distMeters = kotlin.math.sqrt(dx * dx + dy * dy)
-        return distMeters * 3.28084
-    }
-
-    // Anomalies (Procedural nearby points)
-    private val _rawAnomalies = MutableStateFlow<List<PoxAnomaly>>(emptyList())
-    val anomalies: StateFlow<List<PoxAnomaly>> = combine(
-        _rawAnomalies, activeMissions, _latitude, _longitude
-    ) { rawList, missions, userLat, userLng ->
-        val activeMissionsList = missions.filter { !it.isReturned }
-        val pinnedAnomalies = activeMissionsList.map { m ->
-            val existing = rawList.find { Math.abs(it.lat - m.lat) < 0.0001 && Math.abs(it.lng - m.lng) < 0.0001 }
-            if (existing != null) {
-                existing
-            } else {
-                val animId = "ANM-ACTIVE-${m.creatureId}"
-                val animName = "Active Anomaly"
-                val dist = calculateDistanceInFeet(userLat, userLng, m.lat, m.lng)
-                PoxAnomaly(
-                    id = animId,
-                    name = animName,
-                    lat = m.lat,
-                    lng = m.lng,
-                    gene = m.harvestedGenes.firstOrNull() ?: "AGTCGTAC",
-                    faction = m.creatureFaction,
-                    distance = dist,
-                    heatZoneDiameter = 500.0 * 3.28084,
-                    density = 0.0
-                )
-            }
-        }
-        val remaining = rawList.filter { raw -> pinnedAnomalies.none { pinned -> Math.abs(pinned.lat - raw.lat) < 0.0001 && Math.abs(pinned.lng - raw.lng) < 0.0001 } }
-        
-        val updatedPinned = pinnedAnomalies.map {
-            it.copy(distance = calculateDistanceInFeet(userLat, userLng, it.lat, it.lng))
-        }
-        val updatedRemaining = remaining.map {
-            it.copy(distance = calculateDistanceInFeet(userLat, userLng, it.lat, it.lng))
-        }
-        
-        updatedPinned + updatedRemaining
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    private val _selectedAnomalyId = MutableStateFlow<String?>(null)
-    val selectedAnomalyId: StateFlow<String?> = _selectedAnomalyId.asStateFlow()
-
-    val selectedAnomaly: StateFlow<PoxAnomaly?> = combine(selectedAnomalyId, anomalies) { id, list ->
-        list.find { it.id == id }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    // Daily Bounty Sequences
-    val dailyBounties = flow {
-        emit(generateDailyBounties())
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     init {
+        // Tie logs together
+        reactor.onLog = { addLog(it) }
+        splicer.onLog = { addLog(it) }
+        splicer.onSetActiveCreature = { creature, openedFrom -> setActiveCreature(creature, openedFrom) }
+        splicer.onSelectTab = { selectTab(it) }
+        network.onLog = { addLog(it) }
+        scanner.onLog = { addLog(it) }
+
+        splicer.devForceAnomalyState = reactor.devForceAnomaly
+        splicer.onResetSelectedReagent = { reactor.selectReagent(null) }
+
         // Collect incoming P2P packets
         viewModelScope.launch {
             _networkManager.collectLatest { nm ->
                 nm?.incomingPackets?.collect { pair ->
-                    onIncomingPacket(pair.first, pair.second)
-                }
-            }
-        }
+                    val endpointId = pair.first
+                    val packet = pair.second
+                    val peerName = nm.activeConnections.value[endpointId] ?: "Unknown Peer"
+                    network.receiveIncomingPacket(peerName, packet)
 
-        // Observe database/repository stocks to initialize and keep in-sync
-        viewModelScope.launch {
-            repository.rawStockA.collect { value ->
-                _rawStockA.value = value
-            }
-        }
-        viewModelScope.launch {
-            repository.rawStockG.collect { value ->
-                _rawStockG.value = value
-            }
-        }
-        viewModelScope.launch {
-            repository.rawStockT.collect { value ->
-                _rawStockT.value = value
-            }
-        }
-        viewModelScope.launch {
-            repository.rawStockC.collect { value ->
-                _rawStockC.value = value
-            }
-        }
-
-        // Observe mute settings and sync to synthesizer
-        viewModelScope.launch {
-            muteSound.collect { mute ->
-                synthManager.isMuted = mute
-            }
-        }
-        // Observe and load target sequence
-        viewModelScope.launch {
-            repository.targetSequence.collect { seq ->
-                if (seq.isEmpty()) {
-                    val initialSeq = generateRandom64Sequence()
-                    repository.saveTargetSequence(initialSeq)
-                    _targetSequence.value = initialSeq
-                } else {
-                    _targetSequence.value = seq
-                }
-            }
-        }
-        // Generate anomalies on initialization
-        generateNearbyAnomalies(37.4220, -122.0841)
-
-        // Start Periodic Reactor Heartbeat (Tick Engine)
-        startReactorHeartbeat()
-
-        // Start scrolling visual effect
-        startScrollingGeneTicker()
-
-        // Load initial cached cells from database
-        loadCachedCells()
-
-        // Start dynamic heatwave simulation
-        startHeatwaveSimulation()
-
-        // Start Geiger counter clicks loop when on radar map near a font
-        viewModelScope.launch {
-            combine(selectedTab, scannerSubTab, nearestFontDistance) { tab, subTab, distance ->
-                Triple(tab, subTab, distance)
-            }.collectLatest { (tab, subTab, distance) ->
-                if (tab == "scanner" && subTab == "radar" && distance != null && distance <= 500.0) {
-                    while (true) {
-                        val d = nearestFontDistance.value ?: 500.0
-                        if (d > 500.0) break
-                        val lambda = 0.4 + 5.6 * Math.pow(1.0 - (d / 500.0), 2.0)
-                        val intervalMs = (1000.0 / lambda).toLong()
-                        val volume = (1.0f - (d / 500.0).toFloat()).coerceIn(0.1f, 1.0f)
-                        synthManager.playGeigerClick(volume)
-                        delay(intervalMs)
+                    val now = System.currentTimeMillis()
+                    val lastFlash = lastMessageFlashTime[peerName] ?: 0L
+                    if (now - lastFlash >= 5 * 60 * 1000L) {
+                        lastMessageFlashTime[peerName] = now
+                        _logFlashTrigger.emit(peerName)
+                        addLog("message received from $peerName")
                     }
                 }
             }
@@ -916,70 +395,20 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 }
             }
         }
-    }
 
-    private fun onIncomingPacket(endpointId: String, packet: HydraPacket) {
-        if (packet is HydraPacket.NetworkMessage) {
-            val peerName = networkManager?.activeConnections?.value?.get(endpointId) ?: "Unknown Peer"
-            val text = packet.messageText
-            
-            val subject = when {
-                packet.attachedCreatureDna != null -> "CREATURE SECURED TRANSACTION"
-                packet.attachedGeneSequence != null -> "GENE SEQUENCE TRANSFERRED"
-                packet.transferGenes > 0 -> "RESOURCES DISPATCH RECEIVED"
-                else -> "PEER UPLINK MESSAGE"
+        // Synchronize mute sound changes to synthesis manager
+        viewModelScope.launch {
+            muteSound.collect { mute ->
+                synthManager.isMuted = mute
             }
-
-            val bodyBuilder = java.lang.StringBuilder()
-            bodyBuilder.append("PAYLOAD MESSAGE:\n\"$text\"\n\n")
-            if (packet.attachedCreatureDna != null) {
-                bodyBuilder.append("ATTACHED HYBRID: ${packet.attachedCreatureName} [FACTION: ${packet.attachedCreatureFaction}]\n")
-            }
-            if (packet.attachedGeneSequence != null) {
-                bodyBuilder.append("ATTACHED CODON BLOCK: ${packet.attachedGeneSequence}\n")
-            }
-            if (packet.transferGenes > 0 || packet.transferWaste > 0) {
-                bodyBuilder.append("ATTACHED RESOURCES:\n")
-                if (packet.transferGenes > 0) bodyBuilder.append("  +${packet.transferGenes} Stock of all Bases (A, G, T, C)\n")
-                if (packet.transferWaste > 0) bodyBuilder.append("  +${packet.transferWaste} Bio-Waste stockpile units\n")
-            }
-
-            val newMsg = MailMessage(
-                id = "msg_recv_${System.currentTimeMillis()}",
-                from = peerName,
-                subject = subject,
-                timestamp = "Just now",
-                body = bodyBuilder.toString(),
-                isRead = false,
-                attachedCreatureDna = packet.attachedCreatureDna,
-                attachedCreatureName = packet.attachedCreatureName,
-                attachedCreatureFaction = packet.attachedCreatureFaction,
-                attachedGeneSequence = packet.attachedGeneSequence,
-                transferGenes = packet.transferGenes,
-                transferWaste = packet.transferWaste
-            )
-
-            _inboxMessages.value = listOf(newMsg) + _inboxMessages.value
-            synthManager.playSynthesisSuccess()
         }
     }
-
-
 
     fun selectTab(tab: String) {
         if (_selectedTab.value != tab) {
             _selectedTab.value = tab
             addLog("NAV: Transition to section [${tab.uppercase()}]")
             synthManager.playCombinatorTick()
-        }
-    }
-
-    fun setSelectedAnomalyId(id: String?) {
-        _selectedAnomalyId.value = id
-        if (id != null) {
-            addLog("LOCKED_TARGET: Coupled target ID $id")
-        } else {
-            addLog("LOCKED_TARGET: Released lock channels.")
         }
     }
 
@@ -1021,12 +450,19 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     fun incinerateCreature(creature: Creature, harvestedGene: String) {
         viewModelScope.launch {
             repository.deleteCreature(creature)
-            val existing = geneSequences.value.find { it.sequence == harvestedGene }
-            if (existing != null) {
-                repository.insertGeneSequence(existing.copy(count = existing.count + 1))
-            } else {
-                repository.insertGeneSequence(GeneSequence(harvestedGene, 1, System.currentTimeMillis()))
-            }
+            val tm = BiophysicsEngine.calculateMeltingTemperature(harvestedGene, reactorSalt.value.toDouble())
+            val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(harvestedGene)
+            val qScore = (creature.telomeres / 2.5).coerceIn(10.0, 45.0)
+            repository.insertGeneSequence(
+                GeneSequence(
+                    sequence = harvestedGene,
+                    count = 1,
+                    discoveredAt = System.currentTimeMillis(),
+                    averageQScore = qScore,
+                    meltingTemp = tm,
+                    minimumFreeEnergy = mfe
+                )
+            )
             addLog("PURGE: Purged specimen \"${creature.name}\". Segment cached in stock: $harvestedGene")
             synthManager.playBeep(400f, 0.4f, "sawtooth")
             setActiveCreature(null)
@@ -1038,7 +474,6 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             val creature = repository.getCreatureById(creatureId) ?: return@launch
             val nextT = (creature.telomeres - amount).coerceAtLeast(0)
             if (nextT <= 0) {
-                // Creature is completely destroyed!
                 val genome = creature.sequence
                 val blocks = mutableListOf<String>()
                 for (i in 0 until 8) {
@@ -1052,21 +487,26 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                     }
                 }
 
-                // Return a portion (50%, rounded up) and permanently destroy the rest:
                 val returnCount = (blocks.size + 1) / 2
                 val shuffled = blocks.shuffled()
                 val returnedBlocks = shuffled.take(returnCount)
                 val destroyedBlocks = shuffled.drop(returnCount)
 
-                // Add returned blocks to player's sequences pool
                 returnedBlocks.forEach { seq ->
                     val upper = seq.uppercase()
-                    val existing = geneSequences.value.find { it.sequence == upper }
-                    if (existing != null) {
-                        repository.insertGeneSequence(existing.copy(count = existing.count + 1))
-                    } else {
-                        repository.insertGeneSequence(GeneSequence(upper, 1, System.currentTimeMillis()))
-                    }
+                    val tm = BiophysicsEngine.calculateMeltingTemperature(upper, reactorSalt.value.toDouble())
+                    val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(upper)
+                    val qScore = (creature.telomeres / 2.5).coerceIn(10.0, 45.0)
+                    repository.insertGeneSequence(
+                        GeneSequence(
+                            sequence = upper,
+                            count = 1,
+                            discoveredAt = System.currentTimeMillis(),
+                            averageQScore = qScore,
+                            meltingTemp = tm,
+                            minimumFreeEnergy = mfe
+                        )
+                    )
                 }
 
                 repository.deleteCreature(creature)
@@ -1106,13 +546,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             }
 
             val weldedGeneQ = match.averageQScore
-
-            val updatedGene = match.copy(count = match.count - 1)
-            if (updatedGene.count == 0) {
-                repository.deleteGeneSequence(match)
-            } else {
-                repository.insertGeneSequence(updatedGene)
-            }
+            repository.deleteGeneSequence(match)
 
             val newSeq = creature.sequence + gene
             val newAppended = creature.appendedGenes + gene
@@ -1121,10 +555,10 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             val prevAvgQ = creature.telomeres / 2.5
             val prevBlocks = creature.sequence.length / 8
             val avgQ = (prevAvgQ * prevBlocks + weldedGeneQ) / (prevBlocks + 1)
-            
+
             val scaledTelomeres = (avgQ * 2.5).toInt().coerceIn(10, 100)
             val scaledVitality = (details.vitality * (0.5 + 0.5 * (avgQ / 40.0))).toInt()
-            
+
             val updatedCreature = creature.copy(
                 sequence = newSeq,
                 appendedGenes = newAppended,
@@ -1159,7 +593,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 'C' -> countC++
             }
         }
-        
+
         var faction = "Infection"
         val maxB = maxOf(countA, countG, countT, countC)
         if (maxB == countA) faction = "Containment"
@@ -1315,7 +749,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
     fun encodeCreatureToBase64(creature: Creature): String {
         val sound = getEmotSoundDetails(creature.sequence)
         val moves = getUnlockedMoves(creature.sequence).map { it.name }
-        
+
         val compact = buildJsonObject {
             put("id", creature.id)
             put("sequence", creature.sequence)
@@ -1352,21 +786,6 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         return android.util.Base64.encodeToString(jsonStr.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
     }
 
-    fun setSplicerCreature(creature: Creature?) {
-        _selectedSplicerCreature.value = creature
-        _selectedGeneToAppend.value = null
-        if (creature != null) {
-            synthManager.playBeep(660f, 0.05f, "triangle")
-        }
-    }
-
-    fun selectGeneToAppend(gene: String?) {
-        _selectedGeneToAppend.value = gene
-        if (gene != null) {
-            synthManager.playBeep(880f, 0.04f, "sine")
-        }
-    }
-
     fun addLog(log: String) {
         val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
         _terminalLogs.update { current ->
@@ -1393,694 +812,96 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         }
     }
 
-    // Geolocation sync
-    fun updateLocation(lat: Double, lng: Double) {
-        _latitude.value = lat
-        _longitude.value = lng
-        generateNearbyAnomalies(lat, lng)
-        fetchRoadsIfNeeded(lat, lng)
+    fun toggleScanner(show: Boolean) {
+        _showScanner.value = show
+        synthManager.playCombinatorTick()
     }
 
-    fun updateZoom(zoom: Float) {
-        if (_zoomMultiplier.value != zoom) {
-            _zoomMultiplier.value = zoom
-            fetchRoadsIfNeeded(_latitude.value, _longitude.value)
-        }
-    }
+    fun processScannedBarcode(data: String) {
+        viewModelScope.launch {
+            _showScanner.value = false
+            addLog("SCAN: Decoded transponder sequence.")
+            synthManager.playSynthesisSuccess()
 
-    fun refreshMap() {
-        viewModelScope.launch(Dispatchers.IO) {
-            repository.clearMapCache()
-            fetchRoads(_latitude.value, _longitude.value)
-        }
-    }
-
-    private fun getCellKey(lat: Double, lng: Double): String {
-        val cellX = Math.floor(lat / 0.015).toInt()
-        val cellY = Math.floor(lng / 0.015).toInt()
-        return "$cellX,$cellY"
-    }
-
-    private fun addCachedCellToState(cellKey: String) {
-        _cachedCells.value = (_cachedCells.value + cellKey).distinct()
-    }
-
-    private fun loadCachedCells() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val list = repository.getAllCachedRoadCells()
-            _cachedCells.value = list.map { it.cellKey }
-        }
-    }
-
-    private fun startHeatwaveSimulation() {
-        viewModelScope.launch(Dispatchers.Default) {
-            val baseCities = listOf(
-                Pair(37.4220, -122.0841), // Palo Alto
-                Pair(40.7128, -74.0060),  // New York
-                Pair(51.5074, -0.1278),   // London
-                Pair(35.6762, 139.6503),  // Tokyo
-                Pair(-33.8688, 151.2093)  // Sydney
-            )
-            var ticks = 0L
-            while (isActive) {
-                val list = mutableListOf<String>()
-                baseCities.forEach { (baseLat, baseLng) ->
-                    val cellX = Math.floor(baseLat / 0.015).toInt()
-                    val cellY = Math.floor(baseLng / 0.015).toInt()
-                    
-                    list.add("$cellX,$cellY")
-                    
-                    val offset1X = (kotlin.math.sin(ticks * 0.1 + cellX) * 2).toInt()
-                    val offset1Y = (kotlin.math.cos(ticks * 0.1 + cellY) * 2).toInt()
-                    list.add("${cellX + offset1X},${cellY + offset1Y}")
-
-                    val offset2X = (kotlin.math.cos(ticks * 0.07 - cellX) * 3).toInt()
-                    val offset2Y = (kotlin.math.sin(ticks * 0.07 - cellY) * 3).toInt()
-                    list.add("${cellX + offset2X},${cellY + offset2Y}")
-                }
-                _proceduralHeatwaves.value = list
-                ticks++
-                delay(3000)
-            }
-        }
-    }
-
-    private fun fetchRoadsIfNeeded(lat: Double, lng: Double) {
-        val cellKey = getCellKey(lat, lng)
-        if (cellKey != lastCheckedCellKey) {
-            lastCheckedCellKey = cellKey
-            fetchRoads(lat, lng)
-        }
-    }
-
-    private fun generateFallbackRoads(lat: Double, lng: Double): List<List<RoadPoint>> {
-        val result = mutableListOf<List<RoadPoint>>()
-        val latStep = 0.00135
-        val lngStep = 0.00135 / kotlin.math.cos(Math.toRadians(lat))
-        
-        val startLat = Math.floor(lat / latStep) * latStep - 37.0 * latStep
-        val startLng = Math.floor(lng / lngStep) * lngStep - 37.0 * lngStep
-        
-        // Horizontal roads
-        for (i in 0..74) {
-            val rLat = startLat + i * latStep
-            val path = mutableListOf<RoadPoint>()
-            for (j in 0..74) {
-                val rLng = startLng + j * lngStep
-                path.add(RoadPoint(rLat, rLng))
-            }
-            result.add(path)
-        }
-        // Vertical roads
-        for (j in 0..74) {
-            val rLng = startLng + j * lngStep
-            val path = mutableListOf<RoadPoint>()
-            for (i in 0..74) {
-                val rLat = startLat + i * latStep
-                path.add(RoadPoint(rLat, rLng))
-            }
-            result.add(path)
-        }
-        return result
-    }
-
-    private fun generateFallbackBuildings(lat: Double, lng: Double): List<List<RoadPoint>> {
-        val result = mutableListOf<List<RoadPoint>>()
-        val random = java.util.Random((lat.hashCode() + lng.hashCode()).toLong())
-        val latStep = 0.00135
-        val lngStep = 0.00135 / kotlin.math.cos(Math.toRadians(lat))
-        
-        val startLat = Math.floor(lat / latStep) * latStep - 15.0 * latStep
-        val startLng = Math.floor(lng / lngStep) * lngStep - 15.0 * lngStep
-        
-        for (i in 0..30 step 2) {
-            for (j in 0..30 step 2) {
-                if (random.nextFloat() < 0.4f) { // 40% chance of building at intersection cell
-                    val bLat = startLat + i * latStep + 0.0003
-                    val bLng = startLng + j * lngStep + 0.0003
-                    
-                    val w = 0.0002
-                    val h = 0.0002 / kotlin.math.cos(Math.toRadians(lat))
-                    
-                    val polygon = listOf(
-                        RoadPoint(bLat, bLng),
-                        RoadPoint(bLat + w, bLng),
-                        RoadPoint(bLat + w, bLng + h),
-                        RoadPoint(bLat, bLng + h),
-                        RoadPoint(bLat, bLng) // close polygon
+            val creature = decodeCreatureFromBase64(data)
+            if (creature != null) {
+                val transferredCreature = creature.copy(telomeres = 99)
+                repository.insertCreature(transferredCreature)
+                addLog("SCAN: Compiled creature \"${creature.name}\" [Telomeres: 99%]")
+                setActiveCreature(transferredCreature, "scanner")
+                _selectedTab.value = "vault"
+            } else if (data.length == 64 && data.matches(Regex("[AGTCagtc]+"))) {
+                addLog("SCAN: Scanned raw DNA sequence. Compiling...")
+                compileCreature(data)
+            } else if (data.length == 8 && data.all { it.uppercaseChar() in "AGTCXZYW?!$%&@#" }) {
+                val upper = data.uppercase()
+                val tm = BiophysicsEngine.calculateMeltingTemperature(upper, reactorSalt.value.toDouble())
+                val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(upper)
+                repository.insertGeneSequence(
+                    GeneSequence(
+                        sequence = upper,
+                        count = 1,
+                        discoveredAt = System.currentTimeMillis(),
+                        averageQScore = 30.0,
+                        meltingTemp = tm,
+                        minimumFreeEnergy = mfe
                     )
-                    result.add(polygon)
-                }
-            }
-        }
-        return result
-    }
-
-    private fun fetchRoads(lat: Double, lng: Double) {
-        android.util.Log.d("PoxRadar", "fetchRoads called for lat=$lat lng=$lng")
-        val oldJob = fetchRoadsJob
-        fetchRoadsJob = viewModelScope.launch(Dispatchers.IO) {
-            oldJob?.let {
-                it.cancel()
-                try {
-                    it.join()
-                } catch (e: Exception) {
-                    // Ignore join exceptions
-                }
-            }
-            if (!isActive) return@launch
-            
-            val cellX = Math.floor(lat / 0.015).toInt()
-            val cellY = Math.floor(lng / 0.015).toInt()
-
-            val zoom = _zoomMultiplier.value
-            val radius = 3
-
-            val cellsToQuery = mutableListOf<String>()
-            for (dx in -radius..radius) {
-                for (dy in -radius..radius) {
-                    cellsToQuery.add("${cellX + dx},${cellY + dy}")
-                }
-            }
-
-            val cachedRoadCells = mutableListOf<CachedRoadCell>()
-            val cachedBuildingCells = mutableListOf<CachedBuildingCell>()
-            val now = System.currentTimeMillis()
-            var allCachedAndValid = true
-
-            for (key in cellsToQuery) {
-                val dbRoadCell = repository.getCachedRoadCell(key)
-                val dbBuildingCell = repository.getCachedBuildingCell(key)
-                if (dbRoadCell != null && dbBuildingCell != null && 
-                    (now - dbRoadCell.fetchedAt) < 24 * 60 * 60 * 1000L && 
-                    (now - dbBuildingCell.fetchedAt) < 24 * 60 * 60 * 1000L) {
-                    cachedRoadCells.add(dbRoadCell)
-                    cachedBuildingCells.add(dbBuildingCell)
-                } else {
-                    allCachedAndValid = false
-                }
-            }
-
-            if (allCachedAndValid) {
-                android.util.Log.d("PoxRadar", "Active neighborhood cells valid. Populating map from DB cache.")
-                addLog("SYS: Loaded map grid from local cache.")
-                val maxCellsToLoad = mutableListOf<String>()
-                for (dx in -radius..radius) {
-                    for (dy in -radius..radius) {
-                        maxCellsToLoad.add("${cellX + dx},${cellY + dy}")
-                    }
-                }
-                val allRoads = mutableListOf<List<Pair<Double, Double>>>()
-                val allBuildings = mutableListOf<BuildingStructure>()
-                maxCellsToLoad.forEach { key ->
-                    val roadCell = repository.getCachedRoadCell(key)
-                    val buildingCell = repository.getCachedBuildingCell(key)
-                    if (roadCell != null && (now - roadCell.fetchedAt) < 24 * 60 * 60 * 1000L) {
-                        try {
-                            val roadsList = Json.decodeFromString<List<List<RoadPoint>>>(roadCell.roadsJson)
-                            roadsList.forEach { road ->
-                                allRoads.add(road.map { Pair(it.lat, it.lng) })
-                            }
-                        } catch (e: Exception) {}
-                    }
-                    if (buildingCell != null && (now - buildingCell.fetchedAt) < 24 * 60 * 60 * 1000L) {
-                        try {
-                            val buildingsList = Json.decodeFromString<List<BuildingStructure>>(buildingCell.buildingsJson)
-                            allBuildings.addAll(buildingsList)
-                        } catch (e: Exception) {}
-                    }
-                }
-                _roads.value = allRoads.distinct()
-                if (allRoads.isNotEmpty() && allBuildings.isEmpty()) {
-                    android.util.Log.d("PoxRadar", "DB cache valid but buildings are empty. Generating fallback buildings.")
-                    val fallback = generateFallbackBuildings(lat, lng)
-                    val fallbackStructures = fallback.map { BuildingStructure(points = it, isFallback = true) }
-                    _buildings.value = fallbackStructures.distinct()
-                } else {
-                    _buildings.value = allBuildings.distinct()
-                }
-                return@launch
-            }
-
-            // At least one cell is missing or expired, fetch bounding box from Overpass
-            val minLat = (cellX - radius) * 0.015
-            val maxLat = (cellX + radius + 1) * 0.015
-            val minLng = (cellY - radius) * 0.015
-            val maxLng = (cellY + radius + 1) * 0.015
-            
-            val endpoints = listOf(
-                "https://overpass-api.de/api/interpreter",
-                "https://lz4.overpass-api.de/api/interpreter",
-                "https://overpass.osm.ch/api/interpreter",
-                "https://overpass.openstreetmap.fr/api/interpreter",
-                "https://overpass.kumi.systems/api/interpreter"
-            )
-            
-            var success = false
-            // Always query both roads and buildings to ensure the local cache is fully populated for zooming
-            val query = "[out:json];(way($minLat,$minLng,$maxLat,$maxLng)[highway~\"motorway|trunk|primary|secondary|tertiary|unclassified|residential\"];way($minLat,$minLng,$maxLat,$maxLng)[building];);out geom;"
-            var fetchedRoads: List<List<RoadPoint>> = emptyList()
-            var fetchedBuildings: List<BuildingStructure> = emptyList()
-            var femaBuildings: List<BuildingStructure> = emptyList()
-            var usgsBuildings: List<BuildingStructure> = emptyList()
-
-            // 1. Query FEMA USA Structures REST API first as the primary building footprints source
-            if (isActive) {
-                try {
-                    android.util.Log.d("PoxRadar", "Querying FEMA USA Structures as primary...")
-                    addLog("SYS: Querying FEMA USA Structures (Primary)...")
-                    val femaUrl = "https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/USA_Structures_View/FeatureServer/0/query" +
-                            "?geometry=$minLng,$minLat,$maxLng,$maxLat" +
-                            "&geometryType=esriGeometryEnvelope" +
-                            "&spatialRel=esriSpatialRelIntersects" +
-                            "&inSR=4326" +
-                            "&outSR=4326" +
-                            "&returnGeometry=true" +
-                            "&outFields=OBJECTID" +
-                            "&f=json"
-                    
-                    val url = java.net.URL(femaUrl)
-                    val connection = url.openConnection() as java.net.HttpURLConnection
-                    connection.requestMethod = "GET"
-                    connection.setRequestProperty("User-Agent", "GenPoxRadar/1.0 (brent@example.com)")
-                    connection.connectTimeout = 10000
-                    connection.readTimeout = 10000
-                    
-                    val responseCode = connection.responseCode
-                    if (responseCode == 200) {
-                        val text = connection.inputStream.bufferedReader().use { it.readText() }
-                        femaBuildings = parseArcgisJson(text)
-                        android.util.Log.d("PoxRadar", "FEMA primary returned ${femaBuildings.size} buildings.")
-                        addLog("SYS: Loaded ${femaBuildings.size} buildings from FEMA.")
-                    } else {
-                        android.util.Log.w("PoxRadar", "FEMA endpoint returned HTTP $responseCode")
-                        addLog("SYS: FEMA query failed: HTTP $responseCode")
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.e("PoxRadar", "FEMA query failed", e)
-                    addLog("SYS: FEMA query error: ${e.message}")
-                }
-            }
-
-            // 1b. Query USGS National Structures REST API as the secondary building footprints source
-            if (isActive) {
-                try {
-                    android.util.Log.d("PoxRadar", "Querying USGS National Structures...")
-                    addLog("SYS: Querying USGS Structures (Secondary)...")
-                    val usgsUrl = "https://carto.nationalmap.gov/arcgis/rest/services/structures/FeatureServer/0/query" +
-                            "?geometry=$minLng,$minLat,$maxLng,$maxLat" +
-                            "&geometryType=esriGeometryEnvelope" +
-                            "&spatialRel=esriSpatialRelIntersects" +
-                            "&inSR=4326" +
-                            "&outSR=4326" +
-                            "&returnGeometry=true" +
-                            "&outFields=OBJECTID" +
-                            "&f=json"
-                    
-                    val url = java.net.URL(usgsUrl)
-                    val connection = url.openConnection() as java.net.HttpURLConnection
-                    connection.requestMethod = "GET"
-                    connection.setRequestProperty("User-Agent", "GenPoxRadar/1.0 (brent@example.com)")
-                    connection.connectTimeout = 10000
-                    connection.readTimeout = 10000
-                    
-                    val responseCode = connection.responseCode
-                    if (responseCode == 200) {
-                        val text = connection.inputStream.bufferedReader().use { it.readText() }
-                        usgsBuildings = parseArcgisJson(text)
-                        android.util.Log.d("PoxRadar", "USGS returned ${usgsBuildings.size} buildings.")
-                        addLog("SYS: Loaded ${usgsBuildings.size} buildings from USGS.")
-                    } else {
-                        android.util.Log.w("PoxRadar", "USGS endpoint returned HTTP $responseCode")
-                        addLog("SYS: USGS query failed: HTTP $responseCode")
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.e("PoxRadar", "USGS query failed", e)
-                    addLog("SYS: USGS query error: ${e.message}")
-                }
-            }
-
-            // 2. Query OSM for Roads and secondary Buildings
-            var osmBuildings: List<BuildingStructure> = emptyList()
-
-            for (baseUrl in endpoints) {
-                if (!isActive) return@launch
-                try {
-                    android.util.Log.d("PoxRadar", "Querying OpenStreetMap from $baseUrl...")
-                    addLog("SYS: Querying OpenStreetMap ($baseUrl)...")
-                    val url = java.net.URL(baseUrl)
-                    val connection = url.openConnection() as java.net.HttpURLConnection
-                    connection.requestMethod = "POST"
-                    connection.setRequestProperty("User-Agent", "GenPoxRadar/1.0 (brent@example.com)")
-                    connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                    connection.setRequestProperty("Accept", "*/*")
-                    connection.connectTimeout = 15000
-                    connection.readTimeout = 15000
-                    connection.doOutput = true
-                    
-                    val postData = "data=" + java.net.URLEncoder.encode(query, "UTF-8")
-                    connection.outputStream.use { os ->
-                        val input = postData.toByteArray(java.nio.charset.StandardCharsets.UTF_8)
-                        os.write(input, 0, input.size)
-                    }
-                    
-                    if (!isActive) return@launch
-                    val responseCode = connection.responseCode
-                    if (responseCode == 200) {
-                        val text = connection.inputStream.bufferedReader().use { it.readText() }
-                        if (!isActive) return@launch
-                        
-                        fetchedRoads = parseOverpassJson(text, "highway")
-                        val rawBuildings = parseOverpassJson(text, "building")
-                        osmBuildings = rawBuildings.map { BuildingStructure(points = it, isFallback = false) }
-                        
-                        if (fetchedRoads.isNotEmpty() || osmBuildings.isNotEmpty()) {
-                            android.util.Log.d("PoxRadar", "Loaded map segments from $baseUrl.")
-                            addLog("SYS: Loaded map data from $baseUrl.")
-                            success = true
-                            break
-                        } else {
-                            android.util.Log.w("PoxRadar", "Parsed 0 map features from $baseUrl response.")
-                        }
-                    } else {
-                        android.util.Log.w("PoxRadar", "Endpoint $baseUrl returned HTTP $responseCode")
-                        addLog("SYS: Endpoint $baseUrl failed: HTTP $responseCode")
-                    }
-                } catch (e: Exception) {
-                    if (!isActive) return@launch
-                    android.util.Log.e("PoxRadar", "Endpoint $baseUrl threw exception", e)
-                    addLog("SYS: Endpoint $baseUrl error: ${e.message}")
-                }
-            }
-
-            // 3. Method C: Merge FEMA (primary), USGS (secondary), and OSM (tertiary) buildings (avoiding duplicates)
-            // 3. Method C: Merge FEMA (primary), USGS (secondary), and OSM (tertiary) buildings (avoiding duplicates)
-            if (isActive) {
-                fun getBBox(building: BuildingStructure): BuildingBBox {
-                    var minL = Double.MAX_VALUE
-                    var maxL = -Double.MAX_VALUE
-                    var minLn = Double.MAX_VALUE
-                    var maxLn = -Double.MAX_VALUE
-                    building.points.forEach { pt ->
-                        if (pt.lat < minL) minL = pt.lat
-                        if (pt.lat > maxL) maxL = pt.lat
-                        if (pt.lng < minLn) minLn = pt.lng
-                        if (pt.lng > maxLn) maxLn = pt.lng
-                    }
-                    return BuildingBBox(minL, maxL, minLn, maxLn)
-                }
-
-                val mergedBuildings = femaBuildings.toMutableList()
-                val mergedBoxes = mutableListOf<BuildingBBox>()
-
-                femaBuildings.forEach { b ->
-                    val box = getBBox(b)
-                    val dLat = box.maxLat - box.minLat
-                    val dLng = box.maxLng - box.minLng
-                    if (dLat in 0.0..0.005 && dLng in 0.0..0.005) {
-                        mergedBoxes.add(box)
-                    } else {
-                        android.util.Log.w("PoxRadar", "FEMA building filtered from merge check (too large/corrupt): dLat=$dLat, dLng=$dLng")
-                    }
-                }
-
-                // Add USGS buildings if they don't overlap with already merged buildings
-                usgsBuildings.forEach { usgs ->
-                    val usgsBox = getBBox(usgs)
-                    val dLat = usgsBox.maxLat - usgsBox.minLat
-                    val dLng = usgsBox.maxLng - usgsBox.minLng
-                    val intersects = mergedBoxes.any { box -> usgsBox.intersects(box) }
-                    if (!intersects) {
-                        mergedBuildings.add(usgs)
-                        if (dLat in 0.0..0.005 && dLng in 0.0..0.005) {
-                            mergedBoxes.add(usgsBox)
-                        } else {
-                            android.util.Log.w("PoxRadar", "USGS building filtered from merge check (too large/corrupt): dLat=$dLat, dLng=$dLng")
-                        }
-                    }
-                }
-
-                // Add OSM buildings if they don't overlap with already merged buildings
-                var loggedIntersections = 0
-                if (success && osmBuildings.isNotEmpty()) {
-                    osmBuildings.forEach { osm ->
-                        val osmBox = getBBox(osm)
-                        val dLat = osmBox.maxLat - osmBox.minLat
-                        val dLng = osmBox.maxLng - osmBox.minLng
-                        val intersectingBox = mergedBoxes.find { box -> osmBox.intersects(box) }
-                        if (intersectingBox == null) {
-                            mergedBuildings.add(osm)
-                            if (dLat in 0.0..0.005 && dLng in 0.0..0.005) {
-                                mergedBoxes.add(osmBox)
-                            }
-                        } else {
-                            if (loggedIntersections < 5) {
-                                android.util.Log.d("PoxRadar", "Intersection Found! OSM Box: minLat=${osmBox.minLat}, maxLat=${osmBox.maxLat}, minLng=${osmBox.minLng}, maxLng=${osmBox.maxLng} overlapped with FEMA Box: minLat=${intersectingBox.minLat}, maxLat=${intersectingBox.maxLat}, minLng=${intersectingBox.minLng}, maxLng=${intersectingBox.maxLng}")
-                                loggedIntersections++
-                            }
-                        }
-                    }
-                }
-                fetchedBuildings = mergedBuildings
-                android.util.Log.d("PoxRadar", "Sequential Merge: FEMA count=${femaBuildings.size}, USGS count=${usgsBuildings.size}, OSM count=${osmBuildings.size}, Merged total=${fetchedBuildings.size}")
-            }
-            
-            if (!success && isActive) {
-                android.util.Log.w("PoxRadar", "All OSM endpoints failed/empty. Generating fallback grid.")
-                addLog("SYS: All OpenStreetMap endpoints failed. Generating fallback grid.")
-                fetchedRoads = generateFallbackRoads(lat, lng)
-                if (fetchedBuildings.isEmpty()) {
-                    fetchedBuildings = generateFallbackBuildings(lat, lng).map { BuildingStructure(points = it, isFallback = true) }
-                }
-            }
-
-            if (success && fetchedBuildings.isEmpty() && isActive) {
-                android.util.Log.d("PoxRadar", "OSM, FEMA, and USGS returned 0 buildings. Generating fallback structures.")
-                fetchedBuildings = generateFallbackBuildings(lat, lng).map { BuildingStructure(points = it, isFallback = true) }
-            }
-
-            if (isActive) {
-                // Distribute fetched roads into the cells
-                val cellRoadsMap = mutableMapOf<String, MutableList<List<RoadPoint>>>()
-                val cellBuildingsMap = mutableMapOf<String, MutableList<BuildingStructure>>()
-                cellsToQuery.forEach { key ->
-                    cellRoadsMap[key] = mutableListOf()
-                    cellBuildingsMap[key] = mutableListOf()
-                }
-
-                // Caching whole roads in cells they touch to prevent segment cutoffs at boundary edges
-                fetchedRoads.forEach { way ->
-                    if (way.size >= 2) {
-                        val cellsForThisRoad = mutableSetOf<String>()
-                        way.forEach { pt ->
-                            val cx = Math.floor(pt.lat / 0.015).toInt()
-                            val cy = Math.floor(pt.lng / 0.015).toInt()
-                            val key = "$cx,$cy"
-                            if (cellsToQuery.contains(key)) {
-                                cellsForThisRoad.add(key)
-                            }
-                        }
-                        cellsForThisRoad.forEach { key ->
-                            cellRoadsMap[key]?.add(way)
-                        }
-                    }
-                }
-
-                fetchedBuildings.forEach { way ->
-                    if (way.points.size >= 2) {
-                        val cellsForThisBuilding = mutableSetOf<String>()
-                        way.points.forEach { pt ->
-                            val cx = Math.floor(pt.lat / 0.015).toInt()
-                            val cy = Math.floor(pt.lng / 0.015).toInt()
-                            val key = "$cx,$cy"
-                            if (cellsToQuery.contains(key)) {
-                                cellsForThisBuilding.add(key)
-                            }
-                        }
-                        cellsForThisBuilding.forEach { key ->
-                            cellBuildingsMap[key]?.add(way)
-                        }
-                    }
-                }
-
-                // Cache all fetched cells in Room
-                for ((key, roadsList) in cellRoadsMap) {
-                    val roadsJson = Json.encodeToString(roadsList)
-                    val cachedCell = CachedRoadCell(
-                        cellKey = key,
-                        roadsJson = roadsJson,
-                        fetchedAt = now
-                    )
-                    repository.insertCachedRoadCell(cachedCell)
-                    addCachedCellToState(key)
-                }
-
-                for ((key, buildingsList) in cellBuildingsMap) {
-                    val buildingsJson = Json.encodeToString(buildingsList)
-                    val cachedCell = CachedBuildingCell(
-                        cellKey = key,
-                        buildingsJson = buildingsJson,
-                        fetchedAt = now
-                    )
-                    repository.insertCachedBuildingCell(cachedCell)
-                }
-
-                // Expose all valid cells from the neighborhood to the UI flow
-                val maxCellsToLoad = mutableListOf<String>()
-                for (dx in -radius..radius) {
-                    for (dy in -radius..radius) {
-                        maxCellsToLoad.add("${cellX + dx},${cellY + dy}")
-                    }
-                }
-                val allRoads = mutableListOf<List<Pair<Double, Double>>>()
-                val allBuildings = mutableListOf<BuildingStructure>()
-                maxCellsToLoad.forEach { key ->
-                    val roadCell = repository.getCachedRoadCell(key)
-                    val buildingCell = repository.getCachedBuildingCell(key)
-                    if (roadCell != null && (now - roadCell.fetchedAt) < 24 * 60 * 60 * 1000L) {
-                        try {
-                            val roadsList = Json.decodeFromString<List<List<RoadPoint>>>(roadCell.roadsJson)
-                            roadsList.forEach { road ->
-                                allRoads.add(road.map { Pair(it.lat, it.lng) })
-                            }
-                        } catch (e: Exception) {}
-                    }
-                    if (buildingCell != null && (now - buildingCell.fetchedAt) < 24 * 60 * 60 * 1000L) {
-                        try {
-                            val buildingsList = Json.decodeFromString<List<BuildingStructure>>(buildingCell.buildingsJson)
-                            allBuildings.addAll(buildingsList)
-                        } catch (e: Exception) {}
-                    }
-                }
-                _roads.value = allRoads.distinct()
-                _buildings.value = allBuildings.distinct()
-            }
-        }
-    }
-
-    private fun parseOverpassJson(jsonStr: String, type: String): List<List<RoadPoint>> {
-        val result = mutableListOf<List<RoadPoint>>()
-        try {
-            val root = org.json.JSONObject(jsonStr)
-            val elements = root.optJSONArray("elements") ?: return emptyList()
-            for (i in 0 until elements.length()) {
-                val element = elements.getJSONObject(i)
-                val tags = element.optJSONObject("tags")
-                val isBuilding = tags?.has("building") == true
-                val isHighway = tags?.has("highway") == true
-                
-                val matches = if (type == "building") isBuilding else isHighway
-                if (!matches) continue
-                
-                val geometry = element.optJSONArray("geometry") ?: continue
-                val path = mutableListOf<RoadPoint>()
-                for (j in 0 until geometry.length()) {
-                    val pt = geometry.getJSONObject(j)
-                    val ptLat = pt.getDouble("lat")
-                    val ptLon = pt.getDouble("lon")
-                    path.add(RoadPoint(ptLat, ptLon))
-                }
-                if (path.size >= 2) {
-                    result.add(path)
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        return result
-    }
-
-    private fun parseArcgisJson(jsonStr: String): List<BuildingStructure> {
-        val result = mutableListOf<BuildingStructure>()
-        try {
-            val root = org.json.JSONObject(jsonStr)
-            val features = root.optJSONArray("features") ?: return emptyList()
-            for (i in 0 until features.length()) {
-                val feature = features.getJSONObject(i)
-                val geometry = feature.optJSONObject("geometry") ?: continue
-                val rings = geometry.optJSONArray("rings") ?: continue
-                if (rings.length() > 0) {
-                    val ring = rings.getJSONArray(0)
-                    val points = mutableListOf<RoadPoint>()
-                    for (j in 0 until ring.length()) {
-                        val pt = ring.getJSONArray(j)
-                        val lng = pt.getDouble(0)
-                        val lat = pt.getDouble(1)
-                        points.add(RoadPoint(lat, lng))
-                    }
-                    if (points.size >= 2) {
-                        result.add(BuildingStructure(points = points, isFallback = false))
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        return result
-    }
-
-    // Anomaly Scanner trigger
-    private fun generateNearbyAnomalies(lat: Double, lng: Double) {
-        // Base seed grid scaled from 1000 to 100 to greatly lengthen spatial lifespan of anomalies
-        val baseSeed = (lat * 100).toInt() + (lng * 100).toInt()
-        val random = java.util.Random(baseSeed.toLong())
-        val factions = listOf("Infection", "Mech", "Parasite", "Containment")
-        
-        val list = mutableListOf<PoxAnomaly>()
-        for (i in 0 until 5) {
-            var dLat = 0.0
-            var dLng = 0.0
-            var distMeters = 0.0
-            var attempts = 0
-            
-            while (attempts < 100) {
-                // Semi-random angle (0 to 2*PI)
-                val angle = random.nextDouble() * 2.0 * Math.PI
-                // Spacing within 4km (4000 meters)
-                distMeters = 200.0 + random.nextDouble() * 3800.0
-                
-                dLat = (distMeters * kotlin.math.cos(angle)) / 111000.0
-                dLng = (distMeters * kotlin.math.sin(angle)) / (111000.0 * kotlin.math.cos(Math.toRadians(lat)))
-                
-                // Avoid overlap: allow closer proximity (at least 200m instead of 600m) to create overlapping regions
-                val candidateLat = lat + dLat
-                val candidateLng = lng + dLng
-                val overlaps = list.any { existing ->
-                    val dx = (existing.lng - candidateLng) * 111000.0 * kotlin.math.cos(Math.toRadians(lat))
-                    val dy = (existing.lat - candidateLat) * 111000.0
-                    val dist = kotlin.math.sqrt(dx * dx + dy * dy)
-                    dist < 200.0
-                }
-                if (!overlaps) break
-                attempts++
-            }
-            
-            val distanceInFeet = distMeters * 3.28084
-            
-            // Build an anomalous gene
-            val gene = WaveMath.generateAnomalousGene(random)
-            
-            val densityRaw = (random.nextDouble() * 0.66) - 0.33
-            val density = Math.round(densityRaw * 100.0) / 100.0
-            
-            list.add(
-                PoxAnomaly(
-                    id = "ANM-$i-$baseSeed",
-                    name = "Anomaly #${baseSeed % 100 + i}",
-                    lat = lat + dLat,
-                    lng = lng + dLng,
-                    gene = gene,
-                    faction = factions[random.nextInt(4)],
-                    distance = distanceInFeet,
-                    heatZoneDiameter = 500.0 * 3.28084, // 500 meters in feet
-                    density = density
                 )
-            )
+                addLog("SCAN: Registered gene block $upper in inventory.")
+            } else {
+                addLog("SCAN ERR: Data format invalid or unaligned.")
+                synthManager.playReject()
+            }
         }
-        _rawAnomalies.value = list
     }
 
-    // Direct Gemini Client compilation
+    private fun decodeCreatureFromBase64(base64String: String): Creature? {
+        return try {
+            val decodedBytes = android.util.Base64.decode(base64String.trim(), android.util.Base64.DEFAULT)
+            val jsonStr = String(decodedBytes, Charsets.UTF_8)
+            val element = Json.parseToJsonElement(jsonStr).jsonObject
+            val id = element["id"]?.jsonPrimitive?.content ?: UUID.randomUUID().toString()
+            val sequence = element["sequence"]?.jsonPrimitive?.content ?: return null
+            val name = element["name"]?.jsonPrimitive?.content ?: return null
+            val faction = element["faction"]?.jsonPrimitive?.content ?: "Infection"
+            val type = element["type"]?.jsonPrimitive?.content ?: "Unknown Mutant"
+            val vitality = element["vitality"]?.jsonPrimitive?.intOrNull ?: 100
+            val attack = element["attack"]?.jsonPrimitive?.intOrNull ?: 50
+            val defense = element["defense"]?.jsonPrimitive?.intOrNull ?: 50
+            val speed = element["spd"]?.jsonPrimitive?.intOrNull ?: element["speed"]?.jsonPrimitive?.intOrNull ?: 50
+            val weapon = element["weapon"]?.jsonPrimitive?.content ?: element["primaryWeapon"]?.jsonPrimitive?.content ?: "None"
+            val lore = element["lore"]?.jsonPrimitive?.content ?: "Imported specimen."
+            val ascii = element["ascii"]?.jsonPrimitive?.content ?: element["asciiArt"]?.jsonPrimitive?.content ?: "o.x.o\n.###.\nx.o.x"
+            val appended = element["appended"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+            val telomeres = element["telomeres"]?.jsonPrimitive?.intOrNull ?: 100
+            val isFullCoherence = element["isFullCoherence"]?.jsonPrimitive?.booleanOrNull ?: false
+            val coherenceType = element["coherenceType"]?.jsonPrimitive?.content
+
+            Creature(
+                id = id,
+                sequence = sequence,
+                name = name,
+                faction = faction,
+                type = type,
+                vitality = vitality,
+                attack = attack,
+                defense = defense,
+                speed = speed,
+                primaryWeapon = weapon,
+                lore = lore,
+                asciiArt = ascii,
+                discoveredAt = System.currentTimeMillis(),
+                origin = "Scanned transponder",
+                appendedGenes = appended,
+                telomeres = telomeres,
+                isFullCoherence = isFullCoherence,
+                coherenceType = coherenceType
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun compileCreature(sequence: String) {
         if (sequence.length != 64 || !sequence.matches(Regex("[AGTCagtc]+"))) {
             addLog("ERR: Telemetry mismatch. Sequence must be 64 bases of AGTC.")
@@ -2094,8 +915,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             synthManager.playBeep(330f, 0.5f, "sawtooth")
 
             val apiKey = geminiApiKey.value.trim()
-
-            val matchesTarget = getCoherence(sequence, _targetSequence.value) == "full"
+            val matchesTarget = getCoherence(sequence, targetSequence.value) == "full"
             val creature = if (apiKey.isNotEmpty()) {
                 try {
                     compileWithGemini(sequence, apiKey)
@@ -2115,8 +935,6 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
             if (creature != null) {
                 repository.insertCreature(creature)
-                // Consume 8-char blocks if they exist in inventory
-                // For simplicity, compilation costs 8 random genes
                 addLog("OK: Compiled creature \"${creature.name}\" of Sector [${creature.faction}]")
                 synthManager.playSynthesisSuccess()
                 setActiveCreature(creature, "combinator")
@@ -2135,7 +953,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
                 responseMimeType = "application/json"
             }
             val model = GenerativeModel(
-                modelName = "gemini-3.5-flash",
+                modelName = "gemini-1.5-flash",
                 apiKey = apiKey,
                 generationConfig = config,
                 systemInstruction = content {
@@ -2195,7 +1013,7 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         }
     }
 
-    private fun compileDeterministicOffline(sequence: String): Creature {
+    private fun compileDeterministicOffline(sequence: String, reagent: String? = null): Creature {
         val upperSeq = sequence.uppercase()
         var aCount = 0
         var gCount = 0
@@ -2210,10 +1028,22 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
             }
         }
 
-        val faction = when (maxOf(aCount, gCount, tCount, cCount)) {
-            aCount -> "Infection"
-            gCount -> "Mech"
-            tCount -> "Parasite"
+        var aCountFaction = aCount
+        var gCountFaction = gCount
+        var tCountFaction = tCount
+        var cCountFaction = cCount
+
+        when (reagent) {
+            "REAGENT_ALIGN_CONTAINMENT" -> cCountFaction += 15
+            "REAGENT_ALIGN_INFECTION" -> aCountFaction += 15
+            "REAGENT_ALIGN_MECH" -> gCountFaction += 15
+            "REAGENT_ALIGN_PARASITE" -> tCountFaction += 15
+        }
+
+        val faction = when (maxOf(aCountFaction, gCountFaction, tCountFaction, cCountFaction)) {
+            aCountFaction -> "Infection"
+            gCountFaction -> "Mech"
+            tCountFaction -> "Parasite"
             else -> "Containment"
         }
 
@@ -2248,7 +1078,6 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
 
         val lore = "Deterministic offline specimen. Gene sequence frequencies reveal highly stable $faction bindings, evolving standard operational designation as a $type."
 
-        // Generate abstract 5x5 ASCII art grid
         val grid = StringBuilder()
         for (r in 0 until 5) {
             for (col in 0 until 5) {
@@ -2282,1987 +1111,6 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         )
     }
 
-    // Appending genes in Splicer
-    fun weldGeneToCreature() {
-        val creature = _selectedSplicerCreature.value ?: return
-        val gene = _selectedGeneToAppend.value ?: return
-
-        viewModelScope.launch {
-            // Check if gene is in inventory and has count > 0
-            val currentGenes = geneSequences.value
-            val match = currentGenes.find { it.sequence == gene && it.count > 0 }
-            if (match == null) {
-                addLog("ERR: Gene $gene not in inventory.")
-                synthManager.playReject()
-                return@launch
-            }
-
-            // Deduct gene count from inventory
-            val updatedGene = match.copy(count = match.count - 1)
-            if (updatedGene.count == 0) {
-                repository.deleteGeneSequence(match)
-            } else {
-                repository.insertGeneSequence(updatedGene)
-            }
-
-            // Weld gene
-            val newAppended = creature.appendedGenes + gene
-            // welding restores 10% telomeres, capping at 100
-            val restoredTelomeres = creature.telomeres + 10
-            val updatedCreature = creature.copy(
-                appendedGenes = newAppended,
-                telomeres = restoredTelomeres.coerceAtMost(100)
-            )
-            repository.insertCreature(updatedCreature)
-
-            _selectedSplicerCreature.value = updatedCreature
-            _selectedGeneToAppend.value = null
-            addLog("WELD: Gene $gene bonded. Telomeres reinforced to ${updatedCreature.telomeres}%.")
-            synthManager.playSynthesisSuccess()
-        }
-    }
-
-    fun getSynodicResonanceMod(faction: String, phaseName: String): Int {
-        return when (faction) {
-            "Infection" -> {
-                if (phaseName == "Waxing Crescent" || phaseName == "Waxing Gibbous") 15
-                else if (phaseName == "Waning Crescent" || phaseName == "Waning Gibbous") -10
-                else 0
-            }
-            "Mech" -> {
-                if (phaseName == "First Quarter" || phaseName == "Third Quarter") 15
-                else if (phaseName == "New Moon" || phaseName == "Full Moon") -10
-                else 0
-            }
-            "Parasite" -> {
-                if (phaseName == "Full Moon") 15
-                else if (phaseName == "New Moon") -10
-                else 0
-            }
-            "Containment" -> {
-                if (phaseName == "New Moon") 15
-                else if (phaseName == "Full Moon") -10
-                else 0
-            }
-            else -> 0
-        }
-    }
-
-    private fun hasCoherenceShield(creature: Creature): Boolean {
-        if (WaveMath.getAnomalousBenefits(creature.sequence).any { it.id == "COHERENCE_SHIELD" }) {
-            return true
-        }
-        creature.appendedGenes.forEach { gene ->
-            if (WaveMath.isAnomalousGene(gene) && WaveMath.getBenefitForAnomalousGene(gene).id == "COHERENCE_SHIELD") {
-                return true
-            }
-        }
-        return false
-    }
-
-    // Harvest dispatch from map
-    fun dispatchMission(creature: Creature, anomaly: PoxAnomaly) {
-        viewModelScope.launch {
-            val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
-            val phaseFraction = wave.lunarAge / WaveMath.LUNAR_MONTH_DAYS
-            val lunarPhaseScale = (1.0 - kotlin.math.cos(phaseFraction * 2.0 * Math.PI)) / 2.0
-            val lunarResistanceMod = 0.7 + 0.6 * lunarPhaseScale
-            val lunarMutationMod = 0.5 + 1.0 * lunarPhaseScale
-
-            val boundaryRadius = anomaly.getBoundaryRadiusForPlayer(_latitude.value, _longitude.value)
-            // Normalized R_base by dividing by 60.0 to align GPS physical feet scale with [10-99] creature stats
-            val R_base = boundaryRadius * 0.1
-            val R_anom = R_base * lunarResistanceMod
-
-            val resonanceMod = getSynodicResonanceMod(creature.faction, wave.phaseName)
-            val effectiveDefense = creature.defense + resonanceMod
-
-            val stalledDepth = (effectiveDefense.toDouble() / R_anom * 100.0).coerceIn(0.0, 100.0)
-            val dispatchDistance = boundaryRadius * (1.0 - stalledDepth / 100.0)
-            
-            // Scaled mutation interval on mobile by dividing by 16
-            val mutationInterval = Math.round((480.0 * Math.pow(2.0, -stalledDepth / 25.0)) / lunarMutationMod / 16.0).coerceAtLeast(1L)
-
-            // Calculate precise touchdown coordinate along the vector from player to epicenter
-            val t = if (anomaly.distance > 0.0) (dispatchDistance / anomaly.distance).coerceIn(0.0, 1.0) else 0.0
-            val landingLat = anomaly.lat + t * (_latitude.value - anomaly.lat)
-            val landingLng = anomaly.lng + t * (_longitude.value - anomaly.lng)
-
-            // Compute wave interference density from all overlapping anomalies
-            var combinedDensity = 0.0
-            _rawAnomalies.value.forEach { anom ->
-                val distFromAnom = calculateDistanceInFeet(landingLat, landingLng, anom.lat, anom.lng)
-                val boundRad = anom.getBoundaryRadiusForPlayer(landingLat, landingLng)
-                if (distFromAnom <= boundRad) {
-                    val seed = anom.id.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
-                    val phi = (seed % 360) * (Math.PI / 180.0)
-                    val omega = 0.02
-                    val alpha = 0.002
-                    val waveTerm = kotlin.math.cos(omega * distFromAnom + phi) * kotlin.math.exp(-alpha * distFromAnom)
-                    combinedDensity += anom.density * waveTerm
-                }
-            }
-
-            val descentDistance = boundaryRadius * (stalledDepth / 100.0)
-            val densityShift = 0.2 * (lunarPhaseScale - 0.5)
-            val effectiveDensity = (combinedDensity + densityShift).coerceIn(-0.33, 0.33)
-            
-            val hasCoherenceShield = hasCoherenceShield(creature)
-            val finalDensity = if (hasCoherenceShield && effectiveDensity > 0.0) 0.0 else effectiveDensity
-
-            // Speed-based calculations (scaled up by a speedFactor of 1350.0 so speed=1 takes ~16 min at max distance)
-            val travelTimeComponent = 32.0
-            val travelDistanceComponent = 16.0
-            val speedFactor = 1350.0
-            val V_travel_base = (((creature.speed.toDouble() / 50.0) * travelDistanceComponent) / travelTimeComponent) * speedFactor
-            
-            val V_travel = V_travel_base
-            
-            val travelDistance = maxOf(0.0, anomaly.distance - boundaryRadius)
-            val travelDuration = if (V_travel > 0.0) {
-                Math.round(travelDistance / V_travel).coerceAtLeast(1L)
-            } else {
-                32L
-            }
-
-            val V_descent = V_travel_base * (1.0 - 2.0 * finalDensity).coerceAtLeast(0.1) * 0.024
-            
-            val descentDuration = if (V_descent > 0.0) {
-                Math.round(descentDistance / V_descent).coerceAtLeast(1L)
-            } else {
-                32L
-            }
-
-            val harvestDuration = 60L // Fixed harvesting duration
-            val ascentDuration = descentDuration
-            val transitBackDuration = travelDuration
-            val calculatedDuration = travelDuration + descentDuration + harvestDuration + ascentDuration + transitBackDuration
-
-            val densityVal = Math.round(combinedDensity * 100.0).toInt()
-            val effDensityVal = Math.round(effectiveDensity * 100.0).toInt()
-            val missionLogsList = listOf(
-                "[LAUNCH] Specimen \"${creature.name}\" dispatched to Anomaly ${anomaly.id}.",
-                "[LANDING_COORD] $landingLat,$landingLng",
-                "[TELEMETRY] Synodic Resonance: ${if (resonanceMod >= 0) "+" else ""}$resonanceMod DEF (${wave.phaseName}).",
-                "[TELEMETRY] Effective Defense: $effectiveDefense | Anomaly Resistance: ${String.format(java.util.Locale.US, "%.1f", R_anom)} (Base: ${R_base.toInt()}, Lunar: ${String.format(java.util.Locale.US, "%.2f", lunarResistanceMod)}x).",
-                "[TELEMETRY] Stalled Depth resolved: ${stalledDepth.toInt()}% (${String.format(java.util.Locale.US, "%.1f", dispatchDistance)}ft from epicenter).",
-                "[TELEMETRY] Combined Wave Density -> Base: ${if (densityVal >= 0) "+" else ""}$densityVal% | Active Shifted: ${if (effDensityVal >= 0) "+" else ""}$effDensityVal%.",
-                "[TELEMETRY] Coherence Shield status: ${if (hasCoherenceShield) "ACTIVE (Drag Imm.)" else "INACTIVE"}.",
-                "[TELEMETRY] Durations -> Travel: ${travelDuration}s | Descent: ${descentDuration}s | Harvest: ${harvestDuration}s | Ascent: ${ascentDuration}s | Return: ${transitBackDuration}s.",
-                "[TELEMETRY] Mutation Well active. Expected base decay: every ${mutationInterval}s."
-            )
-
-            val mission = HarvestMission(
-                id = "MSN-" + UUID.randomUUID().toString().take(6),
-                creatureId = creature.id,
-                creatureName = creature.name,
-                creatureFaction = creature.faction,
-                lat = anomaly.lat,
-                lng = anomaly.lng,
-                startTime = System.currentTimeMillis(),
-                totalDuration = calculatedDuration,
-                harvestedGenes = listOf(anomaly.gene),
-                isCompleted = false,
-                isReturned = false,
-                dispatchDistance = dispatchDistance,
-                stalledDepth = stalledDepth,
-                originalSequence = creature.sequence,
-                elapsedSeconds = 0L,
-                missionLogs = missionLogsList,
-                phase = "TRAVEL",
-                travelDuration = travelDuration,
-                descentDuration = descentDuration,
-                harvestDuration = harvestDuration,
-                ascentDuration = ascentDuration,
-                transitBackDuration = transitBackDuration,
-                currentPhaseElapsed = 0L
-            )
-            repository.insertMission(mission)
-            setTrackedMissionId(mission.id)
-            addLog("DSP: Dispatched \"${creature.name}\" to harvest spot [${anomaly.gene}]")
-            synthManager.playBeep(520f, 0.3f, "triangle")
-        }
-    }
-
-    fun recallMission(mission: HarvestMission) {
-        viewModelScope.launch {
-            val landingLog = mission.missionLogs.find { it.startsWith("[LANDING_COORD] ") }
-            val (landingLat, landingLng) = if (landingLog != null) {
-                val coords = landingLog.substringAfter("[LANDING_COORD] ").split(",")
-                coords[0].toDouble() to coords[1].toDouble()
-            } else {
-                mission.lat to mission.lng
-            }
-
-            // Find overlapping adjacent anomaly if any
-            val otherAnom = _rawAnomalies.value.find { anom ->
-                (Math.abs(anom.lat - mission.lat) > 0.0001 || Math.abs(anom.lng - mission.lng) > 0.0001) &&
-                calculateDistanceInFeet(landingLat, landingLng, anom.lat, anom.lng) <= anom.getBoundaryRadiusForPlayer(landingLat, landingLng)
-            }
-
-            val primaryGene = mission.harvestedGenes.firstOrNull() ?: "AGTCGTAC"
-            var updatedPrimaryGene = primaryGene
-            var spilloverSuccess = false
-            var hybridGene: String? = null
-            val finalLogs = mission.missionLogs.toMutableList()
-
-            if (otherAnom != null) {
-                val dA = calculateDistanceInFeet(landingLat, landingLng, mission.lat, mission.lng)
-                val dB = calculateDistanceInFeet(landingLat, landingLng, otherAnom.lat, otherAnom.lng)
-                
-                val baseSpilloverChance = 0.125
-                val factor = 1.0 - (dB / (dA + dB)).coerceIn(0.0, 1.0)
-                val spilloverChance = baseSpilloverChance * factor
-                
-                val roll = Math.random()
-                finalLogs.add("[TELEMETRY] Adjacent anomaly boundary overlap: ${otherAnom.id} (crosstalk active).")
-                if (roll <= spilloverChance) {
-                    spilloverSuccess = true
-                    val targetGene = primaryGene
-                    val overlapGene = otherAnom.gene
-                    if (targetGene.length == 8 && overlapGene.length == 8) {
-                        hybridGene = targetGene.substring(0, 4) + overlapGene.substring(4, 8)
-                        updatedPrimaryGene = hybridGene
-                        finalLogs.add("[TELEMETRY] Hybridization success: $hybridGene (Target $targetGene Weld Overlap $overlapGene).")
-                    } else {
-                        updatedPrimaryGene = overlapGene
-                        finalLogs.add("[TELEMETRY] Crosstalk spillover: Harvested adjacent gene $overlapGene.")
-                    }
-                } else {
-                    finalLogs.add("[TELEMETRY] Crosstalk failed. Target signature remains dominant.")
-                }
-            }
-
-            val bonusGene = WaveMath.generateAnomalousGene()
-            val rewardedGenes = listOf(updatedPrimaryGene) + bonusGene
-            val updated = mission.copy(isReturned = true, harvestedGenes = rewardedGenes, missionLogs = finalLogs)
-            repository.insertMission(updated)
-
-            if (_trackedMissionId.value == mission.id) {
-                _trackedMissionId.value = null
-            }
-
-            // Add harvested genes to inventory using a batch insert
-            val toInsertOrUpdate = mutableListOf<GeneSequence>()
-            val currentList = geneSequences.value
-            val groupedRewards = rewardedGenes.groupingBy { it }.eachCount()
-            
-            groupedRewards.forEach { (gene, count) ->
-                val existing = currentList.find { it.sequence == gene }
-                if (existing != null) {
-                    toInsertOrUpdate.add(existing.copy(count = existing.count + count))
-                } else {
-                    toInsertOrUpdate.add(GeneSequence(gene, count, System.currentTimeMillis()))
-                }
-            }
-            repository.insertGeneSequences(toInsertOrUpdate)
-
-            addLog("RCL: Mission returned. Genes cached: ${rewardedGenes.joinToString()}")
-            synthManager.playSynthesisSuccess()
-        }
-    }
-
-    fun recallAllActiveMissions() {
-        viewModelScope.launch {
-            try {
-                val active = repository.activeMissions.first()
-                val ongoing = active.filter { !it.isReturned }
-                if (ongoing.isEmpty()) {
-                    addLog("DEV: No active harvesters found to recall.")
-                    return@launch
-                }
-                ongoing.forEach { m ->
-                    val updated = m.copy(
-                        isCompleted = true,
-                        phase = "COMPLETED",
-                        currentPhaseElapsed = 0L
-                    )
-                    recallMission(updated)
-                }
-                addLog("DEV: Recalled ${ongoing.size} active harvesters.")
-            } catch (e: Exception) {
-                addLog("DEV ERROR: Failed to recall harvesters: ${e.message}")
-            }
-        }
-    }
-
-    fun toggleScanner(show: Boolean) {
-        _showScanner.value = show
-        synthManager.playCombinatorTick()
-    }
-
-    fun processScannedBarcode(data: String) {
-        viewModelScope.launch {
-            _showScanner.value = false
-            addLog("SCAN: Decoded transponder sequence.")
-            synthManager.playSynthesisSuccess()
-
-            val creature = decodeCreatureFromBase64(data)
-            if (creature != null) {
-                val transferredCreature = creature.copy(telomeres = 99)
-                repository.insertCreature(transferredCreature)
-                addLog("SCAN: Compiled creature \"${creature.name}\" [Telomeres: 99%]")
-                setActiveCreature(transferredCreature, "scanner")
-                _selectedTab.value = "vault"
-            } else if (data.length == 64 && data.matches(Regex("[AGTCagtc]+"))) {
-                addLog("SCAN: Scanned raw DNA sequence. Compiling...")
-                compileCreature(data)
-            } else if (data.length == 8 && data.all { it.uppercaseChar() in "AGTCXZYW?!$%&@#" }) {
-                val upper = data.uppercase()
-                val existing = geneSequences.value.find { it.sequence == upper }
-                if (existing != null) {
-                    repository.insertGeneSequence(existing.copy(count = existing.count + 1))
-                } else {
-                    repository.insertGeneSequence(GeneSequence(upper, 1, System.currentTimeMillis()))
-                }
-                addLog("SCAN: Registered gene block $upper in inventory.")
-            } else {
-                addLog("SCAN ERR: Data format invalid or unaligned.")
-                synthManager.playReject()
-            }
-        }
-    }
-
-    private fun decodeCreatureFromBase64(base64String: String): Creature? {
-        return try {
-            val decodedBytes = android.util.Base64.decode(base64String.trim(), android.util.Base64.DEFAULT)
-            val jsonStr = String(decodedBytes, Charsets.UTF_8)
-            val element = Json.parseToJsonElement(jsonStr).jsonObject
-            val id = element["id"]?.jsonPrimitive?.content ?: UUID.randomUUID().toString()
-            val sequence = element["sequence"]?.jsonPrimitive?.content ?: return null
-            val name = element["name"]?.jsonPrimitive?.content ?: return null
-            val faction = element["faction"]?.jsonPrimitive?.content ?: "Infection"
-            val type = element["type"]?.jsonPrimitive?.content ?: "Unknown Mutant"
-            val vitality = element["vitality"]?.jsonPrimitive?.intOrNull ?: 100
-            val attack = element["attack"]?.jsonPrimitive?.intOrNull ?: 50
-            val defense = element["defense"]?.jsonPrimitive?.intOrNull ?: 50
-            val speed = element["spd"]?.jsonPrimitive?.intOrNull ?: element["speed"]?.jsonPrimitive?.intOrNull ?: 50
-            val weapon = element["weapon"]?.jsonPrimitive?.content ?: element["primaryWeapon"]?.jsonPrimitive?.content ?: "None"
-            val lore = element["lore"]?.jsonPrimitive?.content ?: "Imported specimen."
-            val ascii = element["ascii"]?.jsonPrimitive?.content ?: element["asciiArt"]?.jsonPrimitive?.content ?: "o.x.o\n.###.\nx.o.x"
-            val appended = element["appended"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
-            val telomeres = element["telomeres"]?.jsonPrimitive?.intOrNull ?: 100
-            val isFullCoherence = element["isFullCoherence"]?.jsonPrimitive?.booleanOrNull ?: false
-            val coherenceType = element["coherenceType"]?.jsonPrimitive?.content
-
-            Creature(
-                id = id,
-                sequence = sequence,
-                name = name,
-                faction = faction,
-                type = type,
-                vitality = vitality,
-                attack = attack,
-                defense = defense,
-                speed = speed,
-                primaryWeapon = weapon,
-                lore = lore,
-                asciiArt = ascii,
-                discoveredAt = System.currentTimeMillis(),
-                origin = "Scanned transponder",
-                appendedGenes = appended,
-                telomeres = telomeres,
-                isFullCoherence = isFullCoherence,
-                coherenceType = coherenceType
-            )
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    // Deterministic 128 daily bounty sequences
-    private fun generateDailyBounties(): List<String> {
-        val list = mutableListOf<String>()
-        val bases = listOf("A", "G", "T", "C")
-        val random = java.util.Random(1337) // Stable seed
-        for (i in 0 until 128) {
-            var seq = ""
-            for (j in 0 until 64) {
-                seq += bases[random.nextInt(4)]
-            }
-            list.add(seq)
-        }
-        return list
-    }
-
-    // Bio-Lab Reactor and Anomaly controls
-    fun setBioLabSubTab(subTab: String) {
-        _bioLabSubTab.value = subTab
-        synthManager.playBeep(if (subTab == "pox") 440f else 587f, 0.05f, "sine")
-    }
-
-    fun setPoxReactorActive(active: Boolean) {
-        if (active) {
-            _poxReactorActive.value = true
-            _anomalyEngineActive.value = false
-            addLog("P.O.X. REACTOR ACTIVE: Standard gene synthesis engaged.")
-            synthManager.playBeep(440f, 0.15f, "sine")
-        } else {
-            _poxReactorActive.value = false
-            addLog("P.O.X. Reactor disengaged. Reactor power offline.")
-            synthManager.playBeep(350f, 0.15f, "sine")
-        }
-    }
-
-    fun setAnomalyEngineActive(active: Boolean) {
-        if (active) {
-            if (grandTotalStandardNucleotides.value < 250000L) {
-                addLog("CANNOT ACTIVATE ANOMALY ENGINE: Requires a massive stockpile of minimum 250k total nucleotides.")
-                synthManager.playReject()
-                return
-            }
-            _anomalyEngineActive.value = true
-            _poxReactorActive.value = false
-            _anomalyConsumedBases.value = 0L // Reset cumulative run counter on start
-            addLog("ANOMALY ENGINE ENGAGED! Cosmic gene hunting activated!")
-            synthManager.playBeep(120f, 0.6f, "sawtooth")
-        } else {
-            _anomalyEngineActive.value = false
-            _anomalyConsumedBases.value = 0L // Clear cumulative run counter
-            addLog("Anomaly Engine disengaged. Reactor power normalized. Standard Bio-Lab Reactor active.")
-            synthManager.playBeep(350f, 0.15f, "sine")
-        }
-    }
-
-    fun triggerManualAcceleration() {
-        if (!_poxReactorActive.value) {
-            synthManager.playReject()
-            return
-        }
-        val current = _poxIdleTime.value
-        if (current > 2) {
-            _poxIdleTime.value = current - 2
-        } else {
-            _poxIdleTime.value = 1
-        }
-        synthManager.playBeep(880f, 0.05f, "sine")
-    }
-
-    fun addBoosterTime(seconds: Int) {
-        _boostSecondsLeft.value = (_boostSecondsLeft.value + seconds).coerceAtLeast(0)
-        addLog("REACTOR BOOST ENABLED: Cycle acceleration active for $seconds seconds.")
-        synthManager.playBeep(520f, 0.2f, "sine")
-    }
-
-    fun selectSplicerSlot(idx: Int?) {
-        _activeSlotSelection.value = idx
-        _slotSequenceFilter.value = ""
-        if (idx != null) {
-            synthManager.playBeep(440f, 0.05f, "sine")
-        }
-    }
-
-    fun setSlotSequenceFilter(query: String) {
-        _slotSequenceFilter.value = query.uppercase()
-    }
-
-    fun assignGeneToSlot(seq: String) {
-        val slotIdx = _activeSlotSelection.value ?: return
-        viewModelScope.launch {
-            val target = _targetSequence.value
-            val expected = target.substring(slotIdx * 8, (slotIdx + 1) * 8)
-            if (seq != expected) {
-                addLog("GENOME MISMATCH: Gene does not match required slot sequence $expected")
-                synthManager.playReject()
-                return@launch
-            }
-
-            val currentGenes = geneSequences.value
-            val match = currentGenes.find { it.sequence == seq && it.count > 0 }
-            if (match == null) {
-                addLog("ERR: Gene $seq not in inventory.")
-                synthManager.playReject()
-                return@launch
-            }
-
-            // Deduct gene count from inventory
-            val updatedGene = match.copy(count = match.count - 1)
-            if (updatedGene.count <= 0) {
-                repository.deleteGeneSequence(match)
-            } else {
-                repository.insertGeneSequence(updatedGene)
-            }
-
-            // Return existing gene to inventory if any
-            val existing = _splicerSlots.value[slotIdx]
-            if (existing != null) {
-                val existingMatch = geneSequences.value.find { it.sequence == existing }
-                if (existingMatch != null) {
-                    repository.insertGeneSequence(existingMatch.copy(count = existingMatch.count + 1))
-                } else {
-                    repository.insertGeneSequence(GeneSequence(existing, 1, System.currentTimeMillis()))
-                }
-            }
-
-            // Update slot and cache Q-score
-            val updatedSlots = _splicerSlots.value.toMutableList()
-            updatedSlots[slotIdx] = seq
-            _splicerSlots.value = updatedSlots
-
-            val updatedQScores = _splicerQScores.value.toMutableList()
-            updatedQScores[slotIdx] = match.averageQScore
-            _splicerQScores.value = updatedQScores
-
-            _activeSlotSelection.value = null
-            _slotSequenceFilter.value = ""
-
-            synthManager.playBeep(440f, 0.1f, "triangle")
-            addLog("Assigned matching gene block to slot #${slotIdx + 1}")
-
-        }
-    }
-
-    fun ejectGeneFromSlot(slotIdx: Int) {
-        val existing = _splicerSlots.value.getOrNull(slotIdx) ?: return
-        viewModelScope.launch {
-            synthManager.playBeep(330f, 0.1f, "sawtooth")
-
-            // Return to inventory
-            val existingMatch = geneSequences.value.find { it.sequence == existing }
-            if (existingMatch != null) {
-                repository.insertGeneSequence(existingMatch.copy(count = existingMatch.count + 1))
-            } else {
-                repository.insertGeneSequence(GeneSequence(existing, 1, System.currentTimeMillis()))
-            }
-
-            val updatedSlots = _splicerSlots.value.toMutableList()
-            updatedSlots[slotIdx] = null
-            _splicerSlots.value = updatedSlots
-
-            val updatedQScores = _splicerQScores.value.toMutableList()
-            updatedQScores[slotIdx] = 25.0
-            _splicerQScores.value = updatedQScores
-
-            addLog("Returned gene segment #${slotIdx + 1} to archive stock")
-        }
-    }
-
-    fun autofillSplicerSlots() {
-        synthManager.playBeep(880f, 0.05f, "sine")
-        viewModelScope.launch(Dispatchers.Default) {
-            val target = _targetSequence.value
-            if (target.length != 64) return@launch
-
-            val updatedSlots = _splicerSlots.value.toMutableList()
-            val updatedQScores = _splicerQScores.value.toMutableList()
-            val currentStockMap = geneSequences.value.associateBy { it.sequence }.toMutableMap()
-            val modifiedSequences = mutableSetOf<String>()
-
-            var didChanges = false
-            var autoFilledCount = 0
-
-            for (i in 0 until 8) {
-                if (updatedSlots[i] == null) {
-                    val requiredGene = target.substring(i * 8, (i + 1) * 8)
-                    val matchedGene = currentStockMap[requiredGene]
-                    if (matchedGene != null && matchedGene.count > 0) {
-                        val updatedGene = matchedGene.copy(count = matchedGene.count - 1)
-                        currentStockMap[requiredGene] = updatedGene
-                        updatedSlots[i] = requiredGene
-                        updatedQScores[i] = matchedGene.averageQScore
-                        modifiedSequences.add(requiredGene)
-                        didChanges = true
-                        autoFilledCount++
-                    }
-                }
-            }
-
-            if (didChanges) {
-                val toUpdate = mutableListOf<GeneSequence>()
-                val toDelete = mutableListOf<GeneSequence>()
-
-                for (seq in modifiedSequences) {
-                    val originalGene = geneSequences.value.find { it.sequence == seq }
-                    val updatedGene = currentStockMap[seq]!!
-                    if (originalGene != null) {
-                        if (updatedGene.count <= 0) {
-                            toDelete.add(originalGene)
-                        } else {
-                            toUpdate.add(updatedGene)
-                        }
-                    }
-                }
-
-                withContext(Dispatchers.IO) {
-                    repository.updateGeneStock(toUpdate, toDelete)
-                }
-
-                _splicerSlots.value = updatedSlots
-                _splicerQScores.value = updatedQScores
-                addLog("AUTO GENE: Filled $autoFilledCount matching slots with verified stock segments.")
-            } else {
-                addLog("AUTO GENE: No matching segments found in stock for any unfilled slots.")
-            }
-        }
-    }
-
-    fun devInjectMissingTargetGenes() {
-        if (!_devForceAnomaly.value) return
-        val target = _targetSequence.value
-        if (target.length != 64) return
-        
-        viewModelScope.launch(Dispatchers.IO) {
-            val basesList = (0 until 8).map { target.substring(it * 8, (it + 1) * 8) }
-            val existingList = geneSequences.value.toMutableList()
-            var addedAny = false
-            
-            basesList.forEach { seq ->
-                val matchIdx = existingList.indexOfFirst { it.sequence == seq }
-                if (matchIdx >= 0) {
-                    val match = existingList[matchIdx]
-                    if (match.count <= 0) {
-                        existingList[matchIdx] = match.copy(count = 1)
-                        addedAny = true
-                    }
-                } else {
-                    existingList.add(GeneSequence(seq, 1, System.currentTimeMillis()))
-                    addedAny = true
-                }
-            }
-            
-            if (addedAny) {
-                repository.insertGeneSequences(existingList)
-                addLog("DEV: Injected missing target genes into stock archive.")
-                synthManager.playSynthesisSuccess()
-            } else {
-                addLog("DEV: All required target genes already exist in stock.")
-                synthManager.playBeep(440f, 0.1f, "sine")
-            }
-        }
-    }
-
-    fun constructSplicedCreature() {
-        val slots = _splicerSlots.value
-        if (slots.contains(null)) return
-        val fullDNASeq = slots.filterNotNull().joinToString("")
-        if (fullDNASeq.length != 64) return
-
-        viewModelScope.launch {
-            _isSplicing.value = true
-            _splicingProgress.value = 0
-            synthManager.playBeep(300f, 0.3f, "sawtooth")
-            addLog("INITIATING MORPHOGENESIS THERMALS...")
-
-            for (prg in 10..100 step 10) {
-                kotlinx.coroutines.delay(200L)
-                _splicingProgress.value = prg
-                synthManager.playBeep(250f + prg * 5, 0.04f, "sine")
-            }
-
-            // Wait 1.5s at 100% progress to appreciate the completed matrix/helix
-            kotlinx.coroutines.delay(1500L)
-
-            val avgQ = _splicerQScores.value.average()
-            val scaledTelomeres = (avgQ * 2.5).toInt().coerceIn(10, 100)
-
-            val spawned = compileDeterministicOffline(fullDNASeq)
-            val scaledVitality = (spawned.vitality * (0.5 + 0.5 * (avgQ / 40.0))).toInt()
-            
-            val matchesTarget = getCoherence(fullDNASeq, _targetSequence.value) == "full"
-            val idSuffix = UUID.randomUUID().toString().take(6).uppercase()
-            val finalCreature = spawned.copy(
-                id = "PX-$idSuffix",
-                name = spawned.name,
-                lore = spawned.lore,
-                origin = "Spliced Gene",
-                isFullCoherence = matchesTarget,
-                coherenceType = if (matchesTarget) "Natural" else null,
-                telomeres = scaledTelomeres,
-                vitality = scaledVitality
-            )
-
-            repository.insertCreature(finalCreature)
-            addLog("SUCCESSFUL ASSEMBLY OF ${finalCreature.name}!")
-            synthManager.playSynthesisSuccess()
-
-            if (matchesTarget) {
-                val nextTarget = generateRandom64Sequence()
-                repository.saveTargetSequence(nextTarget)
-                addLog("GEN-NET: Target sequence fully compiled! Generating new Synodic Sequence matrix.")
-            }
-
-            _splicerSlots.value = List<String?>(8) { null }
-            _splicerQScores.value = List(8) { 25.0 }
-            _isSplicing.value = false
-            _splicingProgress.value = 0
-
-            setActiveCreature(finalCreature, "splicer")
-            _selectedTab.value = "vault"
-        }
-    }
-
-    fun setIsForcedLoopActive(active: Boolean) {
-        _isForcedLoopActive.value = active
-    }
-
-    fun startForcedConstruction(customSequence: String? = null) {
-        if (_isSplicing.value || _isForcedConstructionActive.value) return
-
-        val targetSeq = if (customSequence != null && customSequence.length == 64) {
-            customSequence
-        } else {
-            _targetSequence.value
-        }
-
-        val isCustom = customSequence != null
-
-        synthManager.playBeep(220f, 0.4f, "sawtooth")
-        _isForcedConstructionActive.value = true
-        _isReactorFrozen.value = true
-
-        runForcedConstructionCycle(targetSeq, isCustom)
-    }
-
-    private var forcedLoopJob: kotlinx.coroutines.Job? = null
-
-    private fun runForcedConstructionCycle(dnaSeq: String, isCustom: Boolean) {
-        forcedLoopJob?.cancel()
-        forcedLoopJob = viewModelScope.launch(Dispatchers.Default) {
-            val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
-            _reactorFreezeTimeLeft.value = 8.0f
-
-            var failureChance = 37.5
-            var moonStatusLog = "None / Baseline"
-            if (wave.isNewMoon) {
-                failureChance += 3.75
-                moonStatusLog = "New Moon (+3.75% Debuff on construction)"
-            } else if (wave.isFullMoon) {
-                failureChance -= 3.75
-                moonStatusLog = "Full Moon (-3.75% Buff on construction)"
-            }
-
-            val isLooping = _isForcedLoopActive.value
-            val initialLogs = mutableListOf(
-                "[INIT] >> FORCING TARGET SEQUENCE COMPILATION...",
-                if (isLooping) {
-                    "[STATUS: FREEZE ACTIVE] >> TARGET SEQUENCE UNDERGOING FORCED SEQUENCING."
-                } else {
-                    "[WARNING] >> G.E.N. NETWORK TAGS ALL FORCED SEQUENCES!"
-                },
-                if (isLooping) {
-                    "[REASON] >> SYSTEMS RUNNING UNDER ABNORMAL STRESS."
-                } else {
-                    "[WARNING] >> P.O.X. REACTOR LOCKED FOR SEQUENCING."
-                },
-                "[LUNAR STATUS] >> Phase: ${wave.phaseName} | Effective Debuff Mod: $moonStatusLog"
-            ).filterNotNull().toMutableList()
-
-            val currentStock = geneSequences.value.map { it.copy() }.toMutableList()
-
-            initialLogs.add(
-                "[CALCULATION] >> Base: 64 | Stock: ${currentStock.sumOf { it.count }} | Fail Chance: ${String.format("%.2f", failureChance)}%"
-            )
-
-            _forcedConstructionLogs.value = initialLogs.toList()
-
-            val deductFromStock = { seq: String ->
-                val idx = currentStock.indexOfFirst { it.sequence == seq && it.count > 0 }
-                if (idx >= 0) {
-                    val gene = currentStock[idx]
-                    if (gene.count > 1) {
-                        currentStock[idx] = gene.copy(count = gene.count - 1)
-                    } else {
-                        currentStock.removeAt(idx)
-                    }
-                    true
-                } else {
-                    false
-                }
-            }
-
-            var tempRawA = rawStockA.value
-            var tempRawG = rawStockG.value
-            var tempRawT = rawStockT.value
-            var tempRawC = rawStockC.value
-
-            data class StepLog(val second: Int, val text: String)
-            val stepLogs = mutableListOf<StepLog>()
-
-            val activeSplicerSlots = _splicerSlots.value
-            val activeSplicerQScores = _splicerQScores.value
-            var failedAtSecond = -1
-            val recruitedQScores = mutableListOf<Double>()
-
-            for (i in 0 until 8) {
-                val expectedGene = dnaSeq.substring(i * 8, (i + 1) * 8)
-                val isManualMatch = !isCustom && activeSplicerSlots.getOrNull(i) == expectedGene
-
-                // Scaffold checks (100% success or unstable base/void)
-                var scaffoldStr = ""
-                var scaffoldType = ""
-                var qScore = 25.0
-
-                if (isManualMatch) {
-                    scaffoldStr = expectedGene
-                    scaffoldType = "PRE-ALIGNED MANUAL GENE"
-                    qScore = activeSplicerQScores.getOrNull(i) ?: 25.0
-                } else {
-                    val matchedGene = currentStock.find { it.sequence == expectedGene && it.count > 0 }
-                    if (matchedGene != null) {
-                        deductFromStock(expectedGene)
-                        scaffoldStr = expectedGene
-                        scaffoldType = "MATCH STOCK RECRUITED"
-                        qScore = matchedGene.averageQScore
-                    } else {
-                        val anyGene = currentStock.find { it.count > 0 }
-                        if (anyGene != null) {
-                            deductFromStock(anyGene.sequence)
-                            scaffoldStr = anyGene.sequence
-                            scaffoldType = "ANY GENE UNSTABLE BASE [${anyGene.sequence.take(4)}...]"
-                            qScore = anyGene.averageQScore
-                        } else {
-                            scaffoldStr = "--------"
-                            scaffoldType = "VOID SYNTHESIS SCAFFOLD"
-                            qScore = 25.0
-                        }
-                    }
-                }
-                recruitedQScores.add(qScore)
-
-                stepLogs.add(StepLog(
-                    second = minOf(7, i + 1),
-                    text = "Slot #${i + 1} processing using scaffold: $scaffoldType"
-                ))
-
-                // Apply MFE fold stalling penalty
-                val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(expectedGene)
-                val isFoldStalled = mfe <= -5.0
-                val slotFailureChance = failureChance + (if (isFoldStalled) 10.0 else 0.0)
-                if (isFoldStalled) {
-                    stepLogs.add(StepLog(
-                        second = minOf(7, i + 1),
-                        text = "  ➔ [WARNING] >> Fold Stalling Penalty active (+10.0% failure chance)"
-                    ))
-                }
-
-                for (j in 0 until 8) {
-                    val expectedChar = expectedGene.getOrNull(j) ?: 'A'
-                    val scaffoldChar = scaffoldStr.getOrNull(j) ?: '-'
-
-                    val roll = java.util.Random().nextDouble() * 100.0
-                    if (scaffoldChar == expectedChar && roll >= slotFailureChance) {
-                        // Success
-                    } else {
-                        // Failed append (Sacrifice required)
-                        var sacrificeSuccess = false
-                        var logText = ""
-                        
-                        // 1. Try Targeted Sacrifice
-                        var available = false
-                        when (expectedChar) {
-                            'A' -> if (tempRawA > 0) { tempRawA--; available = true }
-                            'G' -> if (tempRawG > 0) { tempRawG--; available = true }
-                            'T' -> if (tempRawT > 0) { tempRawT--; available = true }
-                            'C' -> if (tempRawC > 0) { tempRawC--; available = true }
-                        }
-                        
-                        if (available) {
-                            sacrificeSuccess = true
-                            logText = "  ➔ FAILED APPEND (pos ${j + 1}). Sacrificed raw $expectedChar base (A:$tempRawA, G:$tempRawG, T:$tempRawT, C:$tempRawC)"
-                        } else {
-                            // 2. Try Transmutation Sacrifice (requires 2 other bases)
-                            val candidatesForDeduction = mutableListOf<Char>()
-                            for (rep in 1..2) {
-                                when {
-                                    tempRawA > 0 -> { tempRawA--; candidatesForDeduction.add('A') }
-                                    tempRawG > 0 -> { tempRawG--; candidatesForDeduction.add('G') }
-                                    tempRawT > 0 -> { tempRawT--; candidatesForDeduction.add('T') }
-                                    tempRawC > 0 -> { tempRawC--; candidatesForDeduction.add('C') }
-                                }
-                            }
-                            
-                            if (candidatesForDeduction.size == 2) {
-                                sacrificeSuccess = true
-                                logText = "  ➔ FAILED APPEND (pos ${j + 1}). Transmuted expected $expectedChar by sacrificing: ${candidatesForDeduction.joinToString(", ")}"
-                            }
-                        }
-                        
-                        if (sacrificeSuccess) {
-                            stepLogs.add(StepLog(
-                                second = minOf(7, i + 1),
-                                text = logText
-                            ))
-                        } else {
-                            // Depleted raw bases stockpile!
-                            if (failedAtSecond == -1) {
-                                failedAtSecond = i + 1
-                                stepLogs.add(StepLog(
-                                    second = i + 1,
-                                    text = "  ➔ [FATAL] >> SPLICING PROTOCOL ABORTED: Raw nucleotide stockpile fully depleted."
-                                ))
-                            }
-                        }
-                        failureChance = maxOf(0.0, failureChance - 3.25)
-                    }
-                }
-
-                if (failedAtSecond != -1) break
-            }
-
-            val maxTenths = if (failedAtSecond != -1) failedAtSecond * 10 else 80
-
-            for (tenths in 1..maxTenths) {
-                kotlinx.coroutines.delay(100L)
-                _reactorFreezeTimeLeft.value = ((maxTenths - tenths) / 10.0f)
-
-                val lastWholeSec = (tenths - 1) / 10
-                val currWholeSec = tenths / 10
-
-                if (currWholeSec > lastWholeSec && currWholeSec <= 8) {
-                    val currentLogs = _forcedConstructionLogs.value.toMutableList()
-                    currentLogs.add("[SEQUENCE PROGRESS] >> ${((currWholeSec / 8.0) * 100).toInt()}% Complete")
-                    val matching = stepLogs.filter { it.second == currWholeSec }
-                    for (log in matching) {
-                        currentLogs.add("  ${log.text}")
-                    }
-                    _forcedConstructionLogs.value = currentLogs
-                }
-            }
-
-            if (failedAtSecond != -1) {
-                _isReactorFrozen.value = false
-                _isForcedConstructionActive.value = false
-                _isForcedLoopActive.value = false
-                _selectedTab.value = "splicer"
-                synthManager.playReject()
-                addLog("FORCED CONSTRUCTION FAILED: Raw nucleotide stockpile depleted!")
-            } else {
-                val oldStock = geneSequences.value.associateBy { it.sequence }
-                val newStockMap = currentStock.associateBy { it.sequence }
-
-                val toDelete = mutableListOf<GeneSequence>()
-                val toUpdate = mutableListOf<GeneSequence>()
-
-                for ((seq, oldGene) in oldStock) {
-                    val newGene = newStockMap[seq]
-                    if (newGene == null) {
-                        toDelete.add(oldGene)
-                    } else if (newGene.count != oldGene.count) {
-                        toUpdate.add(newGene)
-                    }
-                }
-
-                if (toDelete.isNotEmpty() || toUpdate.isNotEmpty()) {
-                    repository.updateGeneStock(toUpdate, toDelete)
-                }
-
-                _splicerSlots.value = List<String?>(8) { null }
-                _splicerQScores.value = List(8) { 25.0 }
-                
-                // Save updated raw stocks on success
-                repository.saveRawStocks(tempRawA, tempRawG, tempRawT, tempRawC)
-
-                val avgQ = recruitedQScores.average()
-                val scaledTelomeres = (avgQ * 2.5).toInt().coerceIn(10, 100)
-
-                val spawned = compileDeterministicOffline(dnaSeq)
-                val scaledVitality = (spawned.vitality * (0.5 + 0.5 * (avgQ / 40.0))).toInt()
-                val matchesTarget = getCoherence(dnaSeq, _targetSequence.value) == "full"
-                val idSuffix = UUID.randomUUID().toString().take(6).uppercase()
-                
-                // Calculate CAI
-                val cai = BiophysicsEngine.calculateCodonAdaptationIndex(dnaSeq, spawned.faction)
-                
-                val finalCreature = spawned.copy(
-                    id = "PX-$idSuffix",
-                    name = "${spawned.name} [FORCED]",
-                    lore = "This hybrid genome was forced together in the bio-lab reactor. ${spawned.lore}",
-                    origin = "Forced Synthesis",
-                    isFullCoherence = matchesTarget,
-                    coherenceType = if (matchesTarget) "Forced" else null,
-                    codonAdaptationIndex = cai,
-                    telomeres = scaledTelomeres,
-                    vitality = scaledVitality
-                )
-
-                repository.insertCreature(finalCreature)
-                synthManager.playSynthesisSuccess()
-
-                if (_isForcedLoopActive.value) {
-                    addLog("[FORCED LOOP] Specimen \"${finalCreature.name}\" assembled successfully! Continuing loop iteration...")
-
-                    var nextDna = dnaSeq
-                    if (!isCustom) {
-                        nextDna = generateRandom64Sequence()
-                        repository.saveTargetSequence(nextDna)
-                    }
-
-                    kotlinx.coroutines.delay(1000L)
-                    if (_isForcedLoopActive.value) {
-                        runForcedConstructionCycle(nextDna, isCustom)
-                    } else {
-                        _isReactorFrozen.value = false
-                        _isForcedConstructionActive.value = false
-                        addLog("FORCED LOOP ENDED. Reactor is now available for normal sequencing.")
-                    }
-                } else {
-                    _isReactorFrozen.value = false
-                    _isForcedConstructionActive.value = false
-                    _activeCreature.value = finalCreature
-                    _selectedTab.value = "splicer"
-
-                    if (!isCustom) {
-                        val nextTarget = generateRandom64Sequence()
-                        repository.saveTargetSequence(nextTarget)
-                    }
-
-                    addLog("FORCED CONSTRUCTION COMPLETED. Produced sequence: \"${finalCreature.name}\"!")
-                }
-            }
-        }
-    }
-
-    fun generateRandom64Sequence(): String {
-        val bases = listOf('A', 'G', 'T', 'C')
-        val random = java.util.Random()
-        return (1..64).map { bases[random.nextInt(4)] }.joinToString("")
-    }
-
-    private var heartbeatJob: kotlinx.coroutines.Job? = null
-    private var scrollingTickerJob: kotlinx.coroutines.Job? = null
-    private var ticksSinceLastSave = 0
- 
-    private fun startReactorHeartbeat() {
-        heartbeatJob?.cancel()
-        heartbeatJob = viewModelScope.launch(Dispatchers.Default) {
-            var siphonTick = 0
-            var siphonLogTicks = 0
-            while (true) {
-                kotlinx.coroutines.delay(1000L)
-
-                val now = System.currentTimeMillis()
-                var currentFonts = _baseFonts.value.filter { !it.isExpired(now) }
-                val pLat = _latitude.value
-                val pLng = _longitude.value
-
-                if (currentFonts.size < 3) {
-                    val updatedFonts = currentFonts.toMutableList()
-                    val random = java.util.Random()
-                    while (updatedFonts.size < 5) {
-                        val distFeet = 150.0 + random.nextDouble() * 650.0
-                        val angle = random.nextDouble() * 2.0 * Math.PI
-                        val dLat = (distFeet * Math.cos(angle)) / 364000.0
-                        val dLng = (distFeet * Math.sin(angle)) / (364000.0 * Math.cos(Math.toRadians(pLat)))
-
-                        val fontId = "FNT-" + UUID.randomUUID().toString().take(6).uppercase()
-                        val bases = listOf('A', 'G', 'T', 'C')
-                        val fontBase = bases[random.nextInt(4)]
-                        val lifetime = 60000L + random.nextInt(60).toLong() * 1000L // 60s to 120s
-
-                        updatedFonts.add(PoxBaseFont(fontId, pLat + dLat, pLng + dLng, fontBase, now, lifetime))
-                    }
-                    currentFonts = updatedFonts
-                    _baseFonts.value = currentFonts
-                } else {
-                    _baseFonts.value = currentFonts
-                }
-
-                var nearestDist: Double? = null
-                var activeSiphonFont: PoxBaseFont? = null
-                var gatherRate = 0L
-
-                for (font in currentFonts) {
-                    val dist = calculateDistanceInFeet(pLat, pLng, font.lat, font.lng)
-                    val currentNearest = nearestDist
-                    if (currentNearest == null || dist < currentNearest) {
-                        nearestDist = dist
-                    }
-                    if (dist <= font.maxRadiusFeet) {
-                        activeSiphonFont = font
-                        gatherRate = font.getGatherAmount(dist)
-                    }
-                }
-
-                _nearestFontDistance.value = nearestDist
-                _activeSiphonedFont.value = activeSiphonFont
-                _siphonedRate.value = gatherRate
-
-                val currentSiphonFont = activeSiphonFont
-                if (gatherRate > 0 && currentSiphonFont != null) {
-                    val base = currentSiphonFont.baseType
-                    when (base) {
-                        'A' -> _rawStockA.value += gatherRate
-                        'G' -> _rawStockG.value += gatherRate
-                        'T' -> _rawStockT.value += gatherRate
-                        'C' -> _rawStockC.value += gatherRate
-                    }
-                    repository.saveRawStocks(_rawStockA.value, _rawStockG.value, _rawStockT.value, _rawStockC.value)
-                    siphonLogTicks++
-                    if (siphonLogTicks >= 3) {
-                        siphonLogTicks = 0
-                        val baseName = when (currentSiphonFont.baseType) {
-                            'A' -> "Adenine"
-                            'G' -> "Guanine"
-                            'T' -> "Thymine"
-                            'C' -> "Cytosine"
-                            else -> "Unknown"
-                        }
-                        addLog("[SIPHON] Siphoned +$gatherRate $baseName units from Font.")
-                    }
-                } else {
-                    siphonLogTicks = 0
-                }
-
-                
-                siphonTick++
-                if (siphonTick >= 5) {
-                    siphonTick = 0
-                    // 0. Passive siphoning accumulation
-                    val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
-                    var incA = 1L
-                    var incG = 1L
-                    var incT = 1L
-                    var incC = 1L
-                    
-                    if (!wave.isSuppressed) {
-                        val p = wave.primary
-                        val s = wave.secondary
-                        val pm = wave.primaryMultiplier
-                        val sm = wave.secondaryMultiplier
-                        
-                        if (p == "A") incA = Math.round(1.0 * pm)
-                        if (p == "G") incG = Math.round(1.0 * pm)
-                        if (p == "T") incT = Math.round(1.0 * pm)
-                        if (p == "C") incC = Math.round(1.0 * pm)
-                        
-                        if (s == "A") incA = Math.round(1.0 * sm)
-                        if (s == "G") incG = Math.round(1.0 * sm)
-                        if (s == "T") incT = Math.round(1.0 * sm)
-                        if (s == "C") incC = Math.round(1.0 * sm)
-                    }
-                    
-                    val nextA = _rawStockA.value + incA
-                    val nextG = _rawStockG.value + incG
-                    val nextT = _rawStockT.value + incT
-                    val nextC = _rawStockC.value + incC
-                    _rawStockA.value = nextA
-                    _rawStockG.value = nextG
-                    _rawStockT.value = nextT
-                    _rawStockC.value = nextC
-                    
-                    ticksSinceLastSave++
-                    if (ticksSinceLastSave >= 10) {
-                        ticksSinceLastSave = 0
-                        repository.saveRawStocks(nextA, nextG, nextT, nextC)
-                    }
-                }
-                
-                
-                if (!_isReactorFrozen.value) {
-                    // Decrement active booster timers
-                    if (_boostSecondsLeft.value > 0) {
-                        _boostSecondsLeft.value -= 1
-                        if (_boostSecondsLeft.value == 0) {
-                            addLog("REACTOR BOOSTER EXPIRED: Splicing cycle returned to standard duration.")
-                        }
-                    }
-                    
-                    // 2. Tick Anomaly Engine is disabled (anomalous features decoupled)
-                    
-                    // 3. Tick active harvest missions in database
-                    val activeMissionsList = activeMissions.value
-                    if (activeMissionsList.isNotEmpty()) {
-                        activeMissionsList.forEach { m ->
-                            if (!m.isReturned) {
-                                val nextElapsed = m.elapsedSeconds + 1
-                                val currentPhaseElapsed = m.currentPhaseElapsed + 1
-                                
-                                var nextPhase = m.phase
-                                var nextPhaseElapsed = currentPhaseElapsed
-                                val phaseLogs = mutableListOf<String>()
-
-                                when (m.phase) {
-                                    "TRAVEL" -> {
-                                        if (currentPhaseElapsed >= m.travelDuration) {
-                                            nextPhase = "DESCENT"
-                                            nextPhaseElapsed = 0L
-                                            phaseLogs.add("[TELEMETRY] Arrived at boundary. Initiating descent.")
-                                        }
-                                    }
-                                    "DESCENT" -> {
-                                        if (currentPhaseElapsed >= m.descentDuration) {
-                                            nextPhase = "HARVESTING"
-                                            nextPhaseElapsed = 0L
-                                            phaseLogs.add("[TELEMETRY] Depth reached. Initiating extraction.")
-                                        }
-                                    }
-                                    "HARVESTING" -> {
-                                        if (currentPhaseElapsed >= m.harvestDuration) {
-                                            nextPhase = "ASCENT"
-                                            nextPhaseElapsed = 0L
-                                            phaseLogs.add("[TELEMETRY] Extraction complete. Commencing ascent.")
-                                        }
-                                    }
-                                    "ASCENT" -> {
-                                        if (currentPhaseElapsed >= m.ascentDuration) {
-                                            nextPhase = "TRANST_BACK"
-                                            nextPhaseElapsed = 0L
-                                            phaseLogs.add("[TELEMETRY] Boundary reached. Transitioning to transit.")
-                                        }
-                                    }
-                                    "TRANST_BACK" -> {
-                                        if (currentPhaseElapsed >= m.transitBackDuration) {
-                                            nextPhase = "COMPLETED"
-                                            nextPhaseElapsed = 0L
-                                            phaseLogs.add("[COMPLETE] Payload returned.")
-                                        }
-                                    }
-                                }
-
-                                val isCompleted = nextPhase == "COMPLETED"
-                                
-                                val waveConfig = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
-                                val phaseFraction = waveConfig.lunarAge / WaveMath.LUNAR_MONTH_DAYS
-                                val lunarPhaseScale = (1.0 - kotlin.math.cos(phaseFraction * 2.0 * Math.PI)) / 2.0
-                                val lunarMutationMod = 0.5 + 1.0 * lunarPhaseScale
-                                val mutationInterval = Math.round((480.0 * Math.pow(2.0, -m.stalledDepth / 25.0)) / lunarMutationMod / 16.0).coerceAtLeast(1L)
-                                
-                                val newLogs = m.missionLogs.toMutableList()
-                                phaseLogs.forEach { log ->
-                                    newLogs.add(log)
-                                }
-                                
-                                // Check for mutation (only allowed while inside the boundary: DESCENT, HARVESTING, ASCENT)
-                                if (!isCompleted && (m.phase == "DESCENT" || m.phase == "HARVESTING" || m.phase == "ASCENT") && nextElapsed % mutationInterval == 0L) {
-                                    val creature = repository.getCreatureById(m.creatureId)
-                                    if (creature != null) {
-                                        val bases = listOf("A", "G", "T", "C")
-                                        val chars = creature.sequence.toCharArray()
-                                        val mutationIndex = (Math.random() * chars.size).toInt()
-                                        val oldBase = chars[mutationIndex].toString()
-                                        val choices = bases.filter { it != oldBase }
-                                        val newBase = choices[(Math.random() * choices.size).toInt()]
-                                        chars[mutationIndex] = newBase[0]
-                                        val mutatedSequence = String(chars)
-                                         
-                                        val proc = compileDeterministicOffline(mutatedSequence)
-                                        val updatedCreature = creature.copy(
-                                            sequence = mutatedSequence,
-                                            vitality = proc.vitality,
-                                            attack = proc.attack,
-                                            defense = proc.defense,
-                                            speed = proc.speed,
-                                            faction = proc.faction,
-                                            type = proc.type,
-                                            primaryWeapon = proc.primaryWeapon,
-                                            lore = proc.lore,
-                                            isMutated = true,
-                                            originalSequence = creature.originalSequence ?: m.originalSequence ?: creature.sequence
-                                        )
-                                        repository.insertCreature(updatedCreature)
-                                        newLogs.add("[MUTATION] Pos $mutationIndex: $oldBase -> $newBase. Stats re-calculated.")
-                                    }
-                                }
-                                
-                                val updatedMission = m.copy(
-                                    elapsedSeconds = nextElapsed,
-                                    isCompleted = isCompleted,
-                                    missionLogs = newLogs,
-                                    phase = nextPhase,
-                                    currentPhaseElapsed = nextPhaseElapsed
-                                )
-                                if (isCompleted) {
-                                    recallMission(updatedMission)
-                                } else {
-                                    repository.insertMission(updatedMission)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun startScrollingGeneTicker() {
-        scrollingTickerJob?.cancel()
-        scrollingTickerJob = viewModelScope.launch(Dispatchers.Default) {
-            val bases = listOf("A", "G", "T", "C")
-            val rand = java.util.Random()
-            while (true) {
-                kotlinx.coroutines.delay(110L)
-                var temp = ""
-                for (i in 0 until 8) {
-                    temp += bases[rand.nextInt(bases.size)]
-                }
-                _scrollingGene.value = temp
-            }
-        }
-    }
-
-    private fun generateBiophysicalGeneBlock(
-        wave: WaveMath.WaveConfig?,
-        inletA: Float, inletG: Float, inletT: Float, inletC: Float,
-        random: java.util.Random = java.util.Random()
-    ): String {
-        val bases = listOf("A", "G", "T", "C")
-        val b1 = wave?.primary ?: "A"
-        val b2 = wave?.secondary ?: "G"
-        val m1 = wave?.primaryMultiplier ?: 1.0
-        val m2 = wave?.secondaryMultiplier ?: 1.0
-        val isSuppressed = wave?.isSuppressed ?: true
-
-        var res = ""
-        for (i in 0 until 8) {
-            val prevChar = if (i > 0) res[i - 1].toString() else ""
-            val weights = mutableMapOf("A" to 1.0, "G" to 1.0, "T" to 1.0, "C" to 1.0)
-            
-            if (!isSuppressed) {
-                if (prevChar == b1) {
-                    weights[b2] = m2
-                } else {
-                    weights[b1] = m1
-                }
-            }
-
-            // Multiply by inlet ratio biases
-            weights["A"] = (weights["A"] ?: 1.0) * inletA.toDouble()
-            weights["G"] = (weights["G"] ?: 1.0) * inletG.toDouble()
-            weights["T"] = (weights["T"] ?: 1.0) * inletT.toDouble()
-            weights["C"] = (weights["C"] ?: 1.0) * inletC.toDouble()
-
-            val sum = weights.values.sum()
-            val r = random.nextDouble() * sum
-            var acc = 0.0
-            var selected = "A"
-            for ((base, w) in weights) {
-                acc += w
-                if (r < acc) {
-                    selected = base
-                    break
-                }
-            }
-            res += selected
-        }
-        return res
-    }
-
-    fun decomposeGeneBlock(sequence: String, countToDecompose: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val match = geneSequences.value.find { it.sequence == sequence } ?: return@launch
-            val actualCount = Math.min(match.count, countToDecompose)
-            if (actualCount <= 0) return@launch
-            
-            val newCount = match.count - actualCount
-            if (newCount <= 0) {
-                repository.deleteGeneSequence(match)
-            } else {
-                repository.updateGeneSequence(match.copy(count = newCount))
-            }
-            
-            var localA = 0L
-            var localG = 0L
-            var localT = 0L
-            var localC = 0L
-            
-            sequence.forEach { char ->
-                when (char) {
-                    'A' -> localA++
-                    'G' -> localG++
-                    'T' -> localT++
-                    'C' -> localC++
-                    else -> {
-                        // Transmute anomalous characters into random standard bases
-                        val roll = (Math.random() * 4).toInt()
-                        when (roll) {
-                            0 -> localA++
-                            1 -> localG++
-                            2 -> localT++
-                            3 -> localC++
-                        }
-                    }
-                }
-            }
-            
-            val yieldA = localA * actualCount
-            val yieldG = localG * actualCount
-            val yieldT = localT * actualCount
-            val yieldC = localC * actualCount
-            
-            val newA = _rawStockA.value + yieldA
-            val newG = _rawStockG.value + yieldG
-            val newT = _rawStockT.value + yieldT
-            val newC = _rawStockC.value + yieldC
-            _rawStockA.value = newA
-            _rawStockG.value = newG
-            _rawStockT.value = newT
-            _rawStockC.value = newC
-            repository.saveRawStocks(newA, newG, newT, newC)
-            
-            addLog("RECYCLED: Deconstructed $actualCount blocks of $sequence into raw bases: +$yieldA A, +$yieldG G, +$yieldT T, +$yieldC C.")
-            synthManager.playCombinatorTick()
-        }
-    }
-
-    fun recycleMatchingGenes(prefix: String) {
-        if (prefix.isEmpty()) return
-        viewModelScope.launch {
-            val matches = geneSequences.value.filter { it.sequence.startsWith(prefix, ignoreCase = true) }
-            if (matches.isEmpty()) return@launch
-            
-            var totalCount = 0L
-            matches.forEach { gene ->
-                totalCount += gene.count
-                repository.deleteGeneSequence(gene)
-            }
-            
-            val wasteYield = totalCount * 8
-            val newWaste = _bioWaste.value + wasteYield
-            _bioWaste.value = newWaste
-            
-            addLog("VAULT RECYCLING: Bulk deconstructed $totalCount matching gene blocks. Recovered +$wasteYield Bio-Waste.")
-            synthManager.playSynthesisSuccess()
-        }
-    }
-
-    fun cycleTargetBase(index: Int) {
-        if (index !in 0..7) return
-        val current = _targetSynthesisSequence.value
-        val bases = listOf('A', 'G', 'T', 'C')
-        val charArray = current.toCharArray()
-        val currChar = charArray[index]
-        val nextIdx = (bases.indexOf(currChar) + 1) % bases.size
-        charArray[index] = bases[nextIdx]
-        _targetSynthesisSequence.value = String(charArray)
-        synthManager.playCombinatorTick()
-    }
-
-    fun setTargetSynthesisSequence(sequence: String) {
-        if (sequence.length == 8) {
-            _targetSynthesisSequence.value = sequence.uppercase()
-            selectTab("combinator")
-            addLog("SYS: Set Bio-Lab synthesis target sequence to ${sequence.uppercase()}")
-            synthManager.playCombinatorTick()
-        }
-    }
-
-    fun initiateStandardSynthesis() {
-        if (_isSynthesisActive.value) return
-        
-        viewModelScope.launch {
-            val target = _targetSynthesisSequence.value
-            val random = java.util.Random()
-            val temp = _reactorTemperature.value
-            val salt = _reactorSalt.value.toDouble()
-            val poly = _activePolymerase.value
-            val solute = _activeChemicalSolute.value
-            
-            // Count bases in target sequence
-            var reqA = 0L
-            var reqG = 0L
-            var reqT = 0L
-            var reqC = 0L
-            target.forEach { char ->
-                when (char) {
-                    'A' -> reqA++
-                    'G' -> reqG++
-                    'T' -> reqT++
-                    'C' -> reqC++
-                }
-            }
-
-            // Pre-flight inlet validation: required bases must have open inlets (> 5%)
-            val hasInletAError = reqA > 0 && _inletRatioA.value <= 0.05f
-            val hasInletGError = reqG > 0 && _inletRatioG.value <= 0.05f
-            val hasInletTError = reqT > 0 && _inletRatioT.value <= 0.05f
-            val hasInletCError = reqC > 0 && _inletRatioC.value <= 0.05f
-            
-            if (hasInletAError || hasInletGError || hasInletTError || hasInletCError) {
-                addLog("SYNTHESIS BLOCKED: Feedstock inlets for required bases must be open to at least 5% to charge chamber.")
-                synthManager.playReject()
-                return@launch
-            }
-            
-            // Add cofactor costs if active
-            var soluteCost = 0L
-            var actualSolute = solute
-            if (actualSolute == "DMSO" || actualSolute == "Netropsin") {
-                soluteCost = 100L
-            }
-            
-            // Enzyme swap costs determined at start
-            val enzymeBaseCost = when (poly.uppercase()) {
-                "TTH" -> 25L
-                "PFU" -> 50L
-                else -> 0L
-            }
-            val enzymeWasteCost = when (poly.uppercase()) {
-                "TTH" -> 50L
-                "PFU" -> 150L
-                else -> 0L
-            }
-            
-            val totalReqA = reqA + soluteCost + enzymeBaseCost
-            val totalReqG = reqG + soluteCost + enzymeBaseCost
-            val totalReqT = reqT + soluteCost + enzymeBaseCost
-            val totalReqC = reqC + soluteCost + enzymeBaseCost
-            val currentWaste = _bioWaste.value
-            
-            val currentA = _rawStockA.value
-            val currentG = _rawStockG.value
-            val currentT = _rawStockT.value
-            val currentC = _rawStockC.value
-            
-            if (currentA < totalReqA || currentG < totalReqG || currentT < totalReqT || currentC < totalReqC || currentWaste < enzymeWasteCost) {
-                addLog("SYNTHESIS RUNTIME ERROR: Insufficient stocks for sequence, solutes, or enzyme swap cost ($poly requires $enzymeBaseCost bases & $enzymeWasteCost waste).")
-                _isLoopActive.value = false
-                synthManager.playReject()
-                return@launch
-            }
-            
-            // Calculate Stoichiometric Deviation and Q-score Penalty
-            val targetLen = target.length.toDouble()
-            val ratioA = target.count { it == 'A' }.toDouble() / targetLen
-            val ratioG = target.count { it == 'G' }.toDouble() / targetLen
-            val ratioT = target.count { it == 'T' }.toDouble() / targetLen
-            val ratioC = target.count { it == 'C' }.toDouble() / targetLen
-
-            val sumInlets = _inletRatioA.value + _inletRatioG.value + _inletRatioT.value + _inletRatioC.value
-            val normI_A = if (sumInlets > 0) _inletRatioA.value / sumInlets else 0.25f
-            val normI_G = if (sumInlets > 0) _inletRatioG.value / sumInlets else 0.25f
-            val normI_T = if (sumInlets > 0) _inletRatioT.value / sumInlets else 0.25f
-            val normI_C = if (sumInlets > 0) _inletRatioC.value / sumInlets else 0.25f
-
-            val deviation = Math.abs(normI_A - ratioA) +
-                            Math.abs(normI_G - ratioG) +
-                            Math.abs(normI_T - ratioT) +
-                            Math.abs(normI_C - ratioC)
-            val penalty = (deviation * 15.0).coerceAtMost(15.0)
-
-            // Lock reactor and deduct stocks
-            _isSynthesisActive.value = true
-            _isReactionCollapsed.value = false
-            _activeSynthesisStep.value = 0
-            _activeSynthesisStrand.value = ""
-            _activeSynthesisQScore.value = 0.0
-            
-            val afterA = currentA - totalReqA
-            val afterG = currentG - totalReqG
-            val afterT = currentT - totalReqT
-            val afterC = currentC - totalReqC
-            val afterWaste = currentWaste - enzymeWasteCost
-            
-            _rawStockA.value = afterA
-            _rawStockG.value = afterG
-            _rawStockT.value = afterT
-            _rawStockC.value = afterC
-            _bioWaste.value = afterWaste
-            repository.saveRawStocks(afterA, afterG, afterT, afterC)
-            
-            if (soluteCost > 0) {
-                addLog("SOLUTE INJECTION: Consumed 100 units of each base for active chemical solute buffer ($actualSolute).")
-            }
-            if (enzymeBaseCost > 0 || enzymeWasteCost > 0) {
-                addLog("ENZYME CHARGE: Consumed $enzymeBaseCost of all bases & $enzymeWasteCost Bio-Waste for $poly.")
-            }
-            
-            addLog("REACTOR: Initializing stepped transcription of target sequence \"$target\"...")
-            
-            val baseCycle = when (poly.uppercase()) {
-                "TAQ" -> 8
-                "PFU" -> 32
-                "TTH" -> 16
-                else -> 16
-            }
-            val isBoostActive = _boostSecondsLeft.value > 0
-            val cycleDuration = if (isBoostActive) baseCycle / 2 else baseCycle
-            
-            // Salt speed multiplier: 1.0 at 0.05M (standard), faster at higher salt, slower at lower salt.
-            val saltSpeedMultiplier = 1.0 + (salt - 0.05) * 2.0
-            val adjustedCycleDuration = cycleDuration / saltSpeedMultiplier
-            
-            // Calculate interval per step in ms (minimum 100ms per step)
-            val stepIntervalMs = ((adjustedCycleDuration * 1000L) / 8).toLong().coerceAtLeast(100L)
-            
-            var collapsed = false
-            var finalStrand = ""
-            
-            for (step in 1..8) {
-                kotlinx.coroutines.delay(stepIntervalMs)
-                
-                val expectedChar = target[step - 1]
-                var incorporatedChar = expectedChar
-                
-                // Crosstalk Mutation Roll (proofreading bypassed if using PFU)
-                if (!poly.equals("PFU", ignoreCase = true)) {
-                    val inletRatio = when (expectedChar) {
-                        'A' -> normI_A
-                        'G' -> normI_G
-                        'T' -> normI_T
-                        'C' -> normI_C
-                        else -> 1.0f
-                    }
-                    val roll = random.nextDouble()
-                    if (roll > inletRatio) {
-                        // Mutation triggered! Select a random base weighted by other inlets
-                        val options = listOf('A', 'G', 'T', 'C').filter { it != expectedChar }
-                        val otherWeights = options.map { o ->
-                            when (o) {
-                                'A' -> normI_A.toDouble()
-                                'G' -> normI_G.toDouble()
-                                'T' -> normI_T.toDouble()
-                                'C' -> normI_C.toDouble()
-                                else -> 0.0
-                            }
-                        }
-                        val sumOthers = otherWeights.sum()
-                        incorporatedChar = if (sumOthers > 0.0) {
-                            val rOthers = random.nextDouble() * sumOthers
-                            var accOthers = 0.0
-                            var sel = options.first()
-                            for (idx in options.indices) {
-                                accOthers += otherWeights[idx]
-                                if (rOthers < accOthers) {
-                                    sel = options[idx]
-                                    break
-                                }
-                            }
-                            sel
-                        } else {
-                            options[random.nextInt(options.size)]
-                        }
-                        
-                        addLog("CROSSTALK INTRUSION: Mismatched inlet ratios caused mutation at step $step! Incorporated $incorporatedChar instead of $expectedChar.")
-                    }
-                }
-                
-                finalStrand += incorporatedChar
-                _activeSynthesisStrand.value = finalStrand
-                _activeSynthesisStep.value = step
-                
-                // Biophysics calculations
-                val tm = BiophysicsEngine.calculateMeltingTemperature(finalStrand, salt)
-                val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(finalStrand)
-                _activeSynthesisTm.value = tm
-                _activeSynthesisMfe.value = mfe
-                
-                // Phred Q Score tracking
-                val baseQ = BiophysicsEngine.calculatePhredQScore(poly, random)
-                val targetTmVal = BiophysicsEngine.calculateMeltingTemperature(target, salt)
-                val diff = temp.toDouble() - targetTmVal
-                val sigma = when (poly.uppercase()) {
-                    "TAQ" -> 15.0
-                    "PFU" -> 5.0
-                    "TTH" -> 25.0
-                    else -> 15.0
-                }
-                val eta = Math.exp(-(diff * diff) / (2.0 * sigma * sigma))
-                
-                val baseStepQ = (baseQ * eta - penalty).coerceIn(5.0, 40.0)
-                val prevQ = _activeSynthesisQScore.value
-                val newQ = if (step == 1) baseStepQ else (prevQ * (step - 1) + baseStepQ) / step
-                _activeSynthesisQScore.value = newQ.coerceIn(5.0, 40.0)
-                
-                // Biophysical failure checks
-                var failureTriggered = false
-                var collapseReason = ""
-                
-                // Inlet flow deprivation check
-                val inletVal = when (expectedChar) {
-                    'A' -> _inletRatioA.value
-                    'G' -> _inletRatioG.value
-                    'T' -> _inletRatioT.value
-                    'C' -> _inletRatioC.value
-                    else -> 0f
-                }
-                if (inletVal <= 0.05f) {
-                    failureTriggered = true
-                    collapseReason = "inlet deprivation ($expectedChar flow restricted to ${String.format(java.util.Locale.US, "%.0f%%", inletVal * 100)})"
-                }
-                
-                // GC Hairpin Stalling (Salt-dependent)
-                val stallThreshold = 28.0f + (salt.toFloat() * 30.0f)
-                if (!failureTriggered && finalStrand.length >= 4 && temp < stallThreshold && mfe <= -5.0 && actualSolute != "DMSO") {
-                    failureTriggered = true
-                    collapseReason = "stalling (GC hairpin secondary fold stabilized by salt at ${String.format(java.util.Locale.US, "%.1f", stallThreshold)}°C)"
-                }
-                
-                // AT Denaturation (Salt-dependent)
-                val denatureThreshold = 22.0f + (salt.toFloat() * 30.0f)
-                val currentGcPercent = finalStrand.count { it == 'G' || it == 'C' }.toDouble() / finalStrand.length.toDouble()
-                if (!failureTriggered && finalStrand.length >= 4 && temp > denatureThreshold && currentGcPercent < 0.40 && actualSolute != "Netropsin") {
-                    failureTriggered = true
-                    collapseReason = "denaturation (AT bonds denatured due to low salt stabilization at ${String.format(java.util.Locale.US, "%.1f", denatureThreshold)}°C)"
-                }
-                
-                if (failureTriggered) {
-                    collapsed = true
-                    _isReactionCollapsed.value = true
-                    _bioWaste.value += step
-                    addLog("CRITICAL COLLAPSE: Polymerase halted at step $step due to unstabilized $collapseReason. $step raw bases converted to bio-waste.")
-                    synthManager.playReject()
-                    break
-                }
-            }
-            
-            if (!collapsed) {
-                // Success: persist sequence to database
-                val qScore = _activeSynthesisQScore.value
-                val currentList = geneSequences.value
-                val newGenesList = mutableListOf<String>()
-                val toInsertOrUpdate = mutableListOf<GeneSequence>()
-                
-                val match = currentList.find { it.sequence == finalStrand }
-                if (match != null) {
-                    val newQ = (match.averageQScore * match.count + qScore) / (match.count + 1)
-                    toInsertOrUpdate.add(match.copy(
-                        count = match.count + 1,
-                        averageQScore = newQ,
-                        meltingTemp = _activeSynthesisTm.value,
-                        minimumFreeEnergy = _activeSynthesisMfe.value
-                    ))
-                } else {
-                    newGenesList.add(finalStrand)
-                    toInsertOrUpdate.add(GeneSequence(
-                        sequence = finalStrand,
-                        count = 1,
-                        discoveredAt = System.currentTimeMillis(),
-                        averageQScore = qScore,
-                        meltingTemp = _activeSynthesisTm.value,
-                        minimumFreeEnergy = _activeSynthesisMfe.value
-                    ))
-                }
-                
-                repository.insertGeneSequences(toInsertOrUpdate)
-                
-                val packet = GenePacket(
-                    id = "PKT-" + UUID.randomUUID().toString().take(6).uppercase(),
-                    genes = listOf(finalStrand),
-                    timestamp = System.currentTimeMillis(),
-                    isAnomalous = false,
-                    newGenes = newGenesList
-                )
-                _discoveredPacketsLog.update { current ->
-                    (listOf(packet) + current).take(50)
-                }
-                
-                addLog("REACTOR SYNTHESIS: Compiled gene block $finalStrand (Q-Score: ${String.format(java.util.Locale.US, "%.1f", qScore)}).")
-                synthManager.playSynthesisSuccess()
-            }
-            
-            // Unlock reactor
-            _isSynthesisActive.value = false
-
-            // Check remaining resources for current enzyme
-            val remA = _rawStockA.value
-            val remG = _rawStockG.value
-            val remT = _rawStockT.value
-            val remC = _rawStockC.value
-            val remWaste = _bioWaste.value
-            val currentEnz = _activePolymerase.value.uppercase()
-            
-            val costBase = when (currentEnz) {
-                "TTH" -> 25L
-                "PFU" -> 50L
-                else -> 0L
-            }
-            val costWaste = when (currentEnz) {
-                "TTH" -> 50L
-                "PFU" -> 150L
-                else -> 0L
-            }
-            
-            if (remA < costBase || remG < costBase || remT < costBase || remC < costBase || remWaste < costWaste) {
-                _activePolymerase.value = "Taq"
-                addLog("SYS WARNING: Selected enzyme reset to Taq due to stock depletion.")
-                synthManager.playReject()
-            }
-            
-            // Loop synthesis handling
-            if (_isLoopActive.value) {
-                val nextEnz = _activePolymerase.value.uppercase()
-                val nextEnzBaseCost = when (nextEnz) {
-                    "TTH" -> 25L
-                    "PFU" -> 50L
-                    else -> 0L
-                }
-                val nextEnzWasteCost = when (nextEnz) {
-                    "TTH" -> 50L
-                    "PFU" -> 150L
-                    else -> 0L
-                }
-                
-                var nextReqA = 0L
-                var nextReqG = 0L
-                var nextReqT = 0L
-                var nextReqC = 0L
-                target.forEach { char ->
-                    when (char) {
-                        'A' -> nextReqA++
-                        'G' -> nextReqG++
-                        'T' -> nextReqT++
-                        'C' -> nextReqC++
-                    }
-                }
-                
-                var nextSoluteCost = 0L
-                val nextSolute = _activeChemicalSolute.value
-                if (nextSolute == "DMSO" || nextSolute == "Netropsin") {
-                    nextSoluteCost = 100L
-                }
-                
-                val nextTotalA = nextReqA + nextSoluteCost + nextEnzBaseCost
-                val nextTotalG = nextReqG + nextSoluteCost + nextEnzBaseCost
-                val nextTotalT = nextReqT + nextSoluteCost + nextEnzBaseCost
-                val nextTotalC = nextReqC + nextSoluteCost + nextEnzBaseCost
-                
-                val nextRemA = _rawStockA.value
-                val nextRemG = _rawStockG.value
-                val nextRemT = _rawStockT.value
-                val nextRemC = _rawStockC.value
-                val nextRemWaste = _bioWaste.value
-                
-                if (nextRemA >= nextTotalA && nextRemG >= nextTotalG && nextRemT >= nextTotalT && nextRemC >= nextTotalC && nextRemWaste >= nextEnzWasteCost) {
-                    kotlinx.coroutines.delay(500L)
-                    initiateStandardSynthesis()
-                } else {
-                    _isLoopActive.value = false
-                    addLog("SYS: Synthesis loop halted due to insufficient feedstock/biowaste.")
-                    synthManager.playReject()
-                }
-            }
-        }
-    }
-
-    private suspend fun triggerAnomalousSynthesis() {
-        val isDevMode = _devForceAnomaly.value
-        var rollChance = 0.0
-        val isSuccess = if (isDevMode) {
-            true
-        } else {
-             // Consume 2,500 of each raw base from stocks (total 10,000 nucleotides)
-             val currentA = (_rawStockA.value - 2500L).coerceAtLeast(0L)
-             val currentG = (_rawStockG.value - 2500L).coerceAtLeast(0L)
-             val currentT = (_rawStockT.value - 2500L).coerceAtLeast(0L)
-             val currentC = (_rawStockC.value - 2500L).coerceAtLeast(0L)
-             _rawStockA.value = currentA
-             _rawStockG.value = currentG
-             _rawStockT.value = currentT
-             _rawStockC.value = currentC
-             repository.saveRawStocks(currentA, currentG, currentT, currentC)
-            
-             _anomalyConsumedBases.value += 10000L // Increment the consumed bases in this run
-
-             val currentEnz = _activePolymerase.value.uppercase()
-             val costBase = when (currentEnz) {
-                 "TTH" -> 25L
-                 "PFU" -> 50L
-                 else -> 0L
-             }
-             val costWaste = when (currentEnz) {
-                 "TTH" -> 50L
-                 "PFU" -> 150L
-                 else -> 0L
-             }
-             if (currentA < costBase || currentG < costBase || currentT < costBase || currentC < costBase || _bioWaste.value < costWaste) {
-                 _activePolymerase.value = "Taq"
-                 addLog("SYS WARNING: Selected enzyme reset to Taq due to stock depletion from anomalous synthesis.")
-             }
-
-            val coupling = WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis())
-            // Calculate success chance based on cumulative bases consumed during this active run
-            val chanceMetrics = WaveMath.getAnomalyEngineSuccessChance(_anomalyConsumedBases.value, coupling)
-            rollChance = chanceMetrics.finalChance
-            val roll = java.util.Random().nextDouble() * 100.0
-
-            roll <= chanceMetrics.finalChance
-        }
-
-        val currentList = geneSequences.value
-        val newGenesList = mutableListOf<String>()
-
-        val generated = if (isSuccess) {
-            val anomalousGene = WaveMath.generateAnomalousGene()
-            
-            // Calculate Tm, MFE, and Phred Q-score for the anomalous gene
-            val tm = BiophysicsEngine.calculateMeltingTemperature(anomalousGene, _reactorSalt.value.toDouble())
-            val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(anomalousGene)
-            val q = 40.0 // Anomalous fusion achieves perfect base call accuracy
-            
-            val match = currentList.find { it.sequence == anomalousGene }
-            if (match != null) {
-                repository.insertGeneSequence(match.copy(
-                    count = match.count + 1,
-                    averageQScore = (match.averageQScore * match.count + q) / (match.count + 1),
-                    meltingTemp = tm,
-                    minimumFreeEnergy = mfe
-                ))
-            } else {
-                newGenesList.add(anomalousGene)
-                repository.insertGeneSequence(GeneSequence(
-                    sequence = anomalousGene, 
-                    count = 1, 
-                    discoveredAt = System.currentTimeMillis(),
-                    averageQScore = q,
-                    meltingTemp = tm,
-                    minimumFreeEnergy = mfe
-                ))
-            }
-            anomalousGene
-        } else {
-            "DECAYED!"
-        }
-
-        val packet = GenePacket(
-            id = "ANM-" + UUID.randomUUID().toString().take(6).uppercase(),
-            genes = listOf(generated),
-            timestamp = System.currentTimeMillis(),
-            isAnomalous = true,
-            newGenes = newGenesList
-        )
-        _discoveredPacketsLog.update { current ->
-            (listOf(packet) + current).take(50)
-        }
-
-        if (isSuccess) {
-            if (isDevMode) {
-                addLog("[DEV MODE FUSION] Force-triggered successfully (Zero resources consumed). Generated anomalous block $generated.")
-            } else {
-                addLog("[ANOMALY ENGINE] Unstable Fusion Success! Formed anomalous block $generated after consuming ${_anomalyConsumedBases.value} bases.")
-            }
-            synthManager.playSynthesisSuccess()
-            _anomalyConsumedBases.value = 0L // Reset cumulative run counter on success
-
-            // Auto-shutoff if remaining bases are below 250k activation threshold (active run is finished)
-            val rawTotal = rawStockA.value + rawStockG.value + rawStockT.value + rawStockC.value
-            if (rawTotal < 250000L) {
-                _anomalyEngineActive.value = false
-                addLog("[ANOMALY ENGINE] Engine disengaged: Success achieved. Nucleotide reserves are below 250k threshold for starting a new run.")
-            }
-        } else {
-            val formattedChance = String.format(Locale.US, "%.2f%%", rollChance)
-            addLog("[ANOMALY ENGINE] Fusion decay: 10,000 standard raw nucleotides decomposed in buffer (Success Chance: $formattedChance, Total Consumed: ${_anomalyConsumedBases.value} bases).")
-            synthManager.playBeep(220f, 0.35f, "sawtooth")
-        }
-    }
-
-    private suspend fun consumeNucleotides(amount: Int) {
-        var remaining = Math.ceil(amount.toDouble() / 8.0).toInt()
-        val standardGenes = geneSequences.value.filter { !WaveMath.isAnomalousGene(it.sequence) }
-        val toUpdate = mutableListOf<GeneSequence>()
-        val toDelete = mutableListOf<GeneSequence>()
-
-        for (gene in standardGenes) {
-            if (remaining <= 0) break
-            val toTake = Math.min(gene.count, remaining)
-            remaining -= toTake
-            val newCount = gene.count - toTake
-            if (newCount <= 0) {
-                toDelete.add(gene)
-            } else {
-                toUpdate.add(gene.copy(count = newCount))
-            }
-        }
-
-        if (toUpdate.isNotEmpty() || toDelete.isNotEmpty()) {
-            repository.updateGeneStock(toUpdate, toDelete)
-        }
-    }
-
-    fun clearDiscoveredPacketsLog() {
-        _discoveredPacketsLog.value = emptyList()
-    }
-
     private fun getCoherence(seq: String, target: String): String {
         if (seq.isEmpty() || target.isEmpty()) return "none"
         val seq64 = seq.take(64).uppercase()
@@ -4283,6 +1131,19 @@ class MainViewModel(private val repository: DataRepository) : ViewModel() {
         }
         if (alignedMatches == 8) return "full"
         return "none"
+    }
+}
+
+class MainViewModelFactory(
+    private val repository: DataRepository,
+    private val synthManager: PoxSynthManager
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return MainViewModel(repository, synthManager) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
 
@@ -4322,16 +1183,6 @@ data class PoxAnomaly(
     }
 }
 
-class MainViewModelFactory(private val repository: DataRepository) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return MainViewModel(repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
-
 data class UnlockedMove(
     val type: String,
     val name: String,
@@ -4365,7 +1216,8 @@ data class PoxBaseFont(
     val baseType: Char, // 'A', 'G', 'T', 'C'
     val spawnTime: Long,
     val durationMs: Long = 90000L, // 90 seconds
-    val maxRadiusFeet: Double = 500.0
+    val maxRadiusFeet: Double = 500.0,
+    val isInverted: Boolean = false
 ) {
     fun isExpired(now: Long): Boolean {
         return now - spawnTime >= durationMs
@@ -4379,3 +1231,12 @@ data class PoxBaseFont(
     }
 }
 
+data class CelestialWell(
+    val id: String,
+    val name: String,
+    val lat: Double,
+    val lng: Double,
+    val radiusFeet: Double,
+    val type: String, // "GREENHOUSE", "MAGNETOSPHERIC", "GRAVITATIONAL"
+    val hazardPower: Double // base intensity multiplier
+)

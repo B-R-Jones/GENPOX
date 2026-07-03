@@ -138,7 +138,7 @@ fun BatchPacketLogView(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .cyberglass(borderColor = Color(0xFF00FF41), backgroundColor = Color.Transparent)
+                .border(1.dp, Color(0xFF00FF41), RoundedCornerShape(4.dp)).background(Color.Transparent, RoundedCornerShape(4.dp))
                 .padding(8.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
@@ -187,10 +187,8 @@ fun BatchPacketLogView(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .cyberglass(
-                                borderColor = Color(0xFF00FF41).copy(alpha = 0.25f),
-                                backgroundColor = Color.Black.copy(alpha = 0.4f)
-                            )
+                            .border(1.dp, Color(0xFF00FF41), RoundedCornerShape(4.dp))
+                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                             .padding(8.dp)
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -263,10 +261,11 @@ fun BatchPacketLogView(
                                         .fillMaxWidth()
                                         .then(
                                             if (isNew) {
-                                                Modifier.cyberglass(
-                                                    borderColor = Color(0xFFA855F7).copy(alpha = alpha),
-                                                    backgroundColor = Color.Transparent
-                                                )
+                                                Modifier.border(
+                                                    1.dp,
+                                                    Color(0xFFA855F7),
+                                                    RoundedCornerShape(4.dp)
+                                                ).background(Color.Transparent, RoundedCornerShape(4.dp))
                                             } else {
                                                 Modifier
                                             }
@@ -327,10 +326,11 @@ fun BatchPacketLogView(
                                                             .weight(1f)
                                                             .then(
                                                                 if (isNew) {
-                                                                    Modifier.cyberglass(
-                                                                        borderColor = Color(0xFF22D3EE).copy(alpha = alpha),
-                                                                        backgroundColor = Color.Transparent
-                                                                    )
+                                                                    Modifier.border(
+                                                                        1.dp,
+                                                                        Color(0xFF22D3EE),
+                                                                        RoundedCornerShape(4.dp)
+                                                                    ).background(Color.Transparent, RoundedCornerShape(4.dp))
                                                                 } else {
                                                                     Modifier
                                                                 }
@@ -441,21 +441,35 @@ fun TerminalLogSubView(
             )
             
             // Clear logs button
-            PoxButton(
-                text = "CLEAR CACHE",
-                onClick = { viewModel.clearTerminalLogs() },
-                buttonType = PoxButtonType.RED_MUTED,
-                buttonSize = PoxButtonSize.COMPACT,
-                sound = PoxButtonSound.REJECT_BEEP,
-                viewModel = viewModel
-            )
+            Button(
+                onClick = {
+                    viewModel.synthManager.playReject()
+                    viewModel.clearTerminalLogs()
+                },
+                modifier = Modifier.height(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = Color.Red
+                ),
+                border = BorderStroke(1.dp, Color.Red),
+                shape = RoundedCornerShape(4.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                Text(
+                    text = "CLEAR CACHE",
+                    color = Color.Red,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Default
+                )
+            }
         }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .border(1.dp, activeBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.7f))
                 .padding(8.dp)
         ) {
@@ -578,7 +592,7 @@ fun CombinatorView(viewModel: MainViewModel) {
         },
         borderColor = activeBorder,
         backgroundColor = activePanel,
-        isScrollable = (bioLabSubTab == "pox"),
+        isScrollable = false,
         subTabs = subTabs,
         activeSubTab = bioLabSubTab,
         onSubTabClick = { id, tag ->

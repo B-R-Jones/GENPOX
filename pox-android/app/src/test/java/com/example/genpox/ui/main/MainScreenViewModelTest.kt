@@ -6,6 +6,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -34,6 +35,7 @@ class MainScreenViewModelTest {
     private class FakeDataRepository : DataRepository {
         val creaturesList = mutableListOf<Creature>()
         val sequencesList = mutableListOf<GeneSequence>()
+        val sequencesFlow = MutableStateFlow<List<GeneSequence>>(emptyList())
         val missionsList = mutableListOf<HarvestMission>()
         
         val apiKeyFlow = MutableStateFlow("")
@@ -45,6 +47,10 @@ class MainScreenViewModelTest {
         val stockGFlow = MutableStateFlow(10000L)
         val stockTFlow = MutableStateFlow(10000L)
         val stockCFlow = MutableStateFlow(10000L)
+        val bioWasteFlow = MutableStateFlow(0L)
+        val splicerSlotsFlow = MutableStateFlow<List<String?>>(List(8) { null })
+        val splicerQScoresFlow = MutableStateFlow<List<Double>>(List(8) { 25.0 })
+        val splicerSignaturesFlow = MutableStateFlow<List<String>>(List(8) { "TAQ" })
 
         override val allCreatures: Flow<List<Creature>> = flowOf(creaturesList)
         override suspend fun getCreatureById(id: String): Creature? = creaturesList.find { it.id == id }
@@ -59,9 +65,10 @@ class MainScreenViewModelTest {
             creaturesList.remove(creature)
         }
 
-        override val allGeneSequences: Flow<List<GeneSequence>> = flowOf(sequencesList)
+        override val allGeneSequences: Flow<List<GeneSequence>> = sequencesFlow
         override suspend fun insertGeneSequence(sequence: GeneSequence) {
             sequencesList.add(sequence)
+            sequencesFlow.value = sequencesList.toList()
         }
         override suspend fun insertGeneSequences(sequences: List<GeneSequence>) {
             sequences.forEach { seq ->
@@ -72,19 +79,25 @@ class MainScreenViewModelTest {
                     sequencesList.add(seq)
                 }
             }
+            sequencesFlow.value = sequencesList.toList()
         }
         override suspend fun updateGeneSequence(sequence: GeneSequence) {
             val index = sequencesList.indexOfFirst { it.sequence == sequence.sequence }
-            if (index != -1) sequencesList[index] = sequence
+            if (index != -1) {
+                sequencesList[index] = sequence
+                sequencesFlow.value = sequencesList.toList()
+            }
         }
         override suspend fun deleteGeneSequence(sequence: GeneSequence) {
             sequencesList.remove(sequence)
+            sequencesFlow.value = sequencesList.toList()
         }
         override suspend fun deleteAllCreatures() {
             creaturesList.clear()
         }
         override suspend fun deleteAllGeneSequences() {
             sequencesList.clear()
+            sequencesFlow.value = emptyList()
         }
         override suspend fun updateGeneStock(toInsertOrUpdate: List<GeneSequence>, toDelete: List<GeneSequence>) {
             toDelete.forEach { sequencesList.remove(it) }
@@ -96,6 +109,7 @@ class MainScreenViewModelTest {
                     sequencesList.add(item)
                 }
             }
+            sequencesFlow.value = sequencesList.toList()
         }
 
         override val activeMissions: Flow<List<HarvestMission>> = flowOf(missionsList)
@@ -130,12 +144,26 @@ class MainScreenViewModelTest {
         override val rawStockG: Flow<Long> = stockGFlow
         override val rawStockT: Flow<Long> = stockTFlow
         override val rawStockC: Flow<Long> = stockCFlow
+        override val bioWaste: Flow<Long> = bioWasteFlow
+        override val splicerSlots: Flow<List<String?>> = splicerSlotsFlow
+        override val splicerQScores: Flow<List<Double>> = splicerQScoresFlow
+        override val splicerSignatures: Flow<List<String>> = splicerSignaturesFlow
 
         override suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long) {
             stockAFlow.value = a
             stockGFlow.value = g
             stockTFlow.value = t
             stockCFlow.value = c
+        }
+
+        override suspend fun saveBioWaste(waste: Long) {
+            bioWasteFlow.value = waste
+        }
+
+        override suspend fun saveSplicerState(slots: List<String?>, qScores: List<Double>, signatures: List<String>) {
+            splicerSlotsFlow.value = slots
+            splicerQScoresFlow.value = qScores
+            splicerSignaturesFlow.value = signatures
         }
 
         val cachedRoadCells = mutableListOf<CachedRoadCell>()
@@ -154,6 +182,23 @@ class MainScreenViewModelTest {
         override suspend fun clearMapCache() {
             cachedRoadCells.clear()
             cachedBuildingCells.clear()
+        }
+
+        val reagentsStockFlow = MutableStateFlow<List<ReagentStock>>(emptyList())
+        override val allReagentStock: Flow<List<ReagentStock>> = reagentsStockFlow
+        override suspend fun insertReagentStock(reagents: List<ReagentStock>) {
+            reagentsStockFlow.value = reagents
+        }
+        override suspend fun decrementReagentStock(id: String) {
+            val list = reagentsStockFlow.value.toMutableList()
+            val idx = list.indexOfFirst { it.id == id }
+            if (idx >= 0) {
+                val stock = list[idx]
+                if (stock.count > 0) {
+                    list[idx] = stock.copy(count = stock.count - 1)
+                    reagentsStockFlow.value = list
+                }
+            }
         }
     }
 
@@ -325,6 +370,117 @@ class MainScreenViewModelTest {
         tick()
         assertEquals("COMPLETED", currentMission.phase)
         assertEquals(true, currentMission.isCompleted)
+    }
+
+    @Test
+    fun testPreCompileReagentsSplicing() = runTest {
+        val repo = FakeDataRepository()
+        val viewModel = MainViewModel(repo)
+        
+        val initialReagents = listOf(
+            com.example.genpox.data.ReagentStock("REAGENT_LIGASE", "T4 DNA Ligase", 3, "stabilizer", "Whole-Genome Joining Enzyme"),
+            com.example.genpox.data.ReagentStock("REAGENT_TACTICAL_DEFEND", "Silver-Nitrate Catalyst", 3, "tactical", "Autonomous Defender Coating")
+        )
+        repo.insertReagentStock(initialReagents)
+        
+        repo.saveSplicerState(
+            List(8) { "AAAAAAAA" },
+            List(8) { 40.0 },
+            List(8) { "TAQ" }
+        )
+        
+        viewModel.selectReagent("REAGENT_LIGASE")
+        assertEquals("REAGENT_LIGASE", viewModel.selectedReagent.value)
+        
+        viewModel.constructSplicedCreature()
+        testScheduler.advanceUntilIdle()
+        
+        viewModel.completeSplicingAndViewInVault()
+        testScheduler.advanceUntilIdle()
+        
+        val creatures = repo.creaturesList
+        assertEquals(1, creatures.size)
+        val spliced = creatures.first()
+        assertEquals(100, spliced.telomeres)
+        org.junit.Assert.assertTrue(spliced.origin.contains("Catalyzed"))
+        
+        val updatedStock = repo.reagentsStockFlow.value
+        val ligaseStock = updatedStock.find { it.id == "REAGENT_LIGASE" }?.count ?: 0
+        assertEquals(2, ligaseStock)
+        
+        assertEquals(null, viewModel.selectedReagent.value)
+    }
+
+    @Test
+    fun testCustomScaffoldMode() = runTest {
+        val repo = FakeDataRepository()
+        val viewModel = MainViewModel(repo)
+
+        // Launch collection job to activate the WhileSubscribed stateIn flow
+        val collectJob = launch { viewModel.geneSequences.collect {} }
+
+        // Initial default: Custom Scaffold is false
+        assertEquals(false, viewModel.isCustomScaffoldMode.value)
+
+        // Toggle on
+        viewModel.setCustomScaffoldMode(true)
+        assertEquals(true, viewModel.isCustomScaffoldMode.value)
+
+        // Splicer state should reset slots
+        val slots = repo.splicerSlotsFlow.value
+        org.junit.Assert.assertTrue(slots.all { it == null })
+
+        // Assign a gene that does NOT match target codon at slot 0
+        repo.saveTargetSequence("AAAAAAAAGGGGGGGGTTTTTTTTCCCCCCCCAAAAAAAAAAAAAAAAGGGGGGGGTTTTTTTT") 
+        viewModel.selectSplicerSlot(0)
+        repo.insertGeneSequence(GeneSequence(
+            sequence = "GGGGGGGG",
+            count = 1,
+            discoveredAt = System.currentTimeMillis(),
+            averageQScore = 40.0,
+            meltingTemp = 75.0,
+            minimumFreeEnergy = -5.0,
+            polymeraseSignature = "TTH"
+        ))
+        testScheduler.advanceUntilIdle()
+        viewModel.assignGeneToSlot("GGGGGGGG")
+        testScheduler.advanceUntilIdle()
+        
+        // With Custom Scaffold active, it should assign successfully bypassing checks!
+        assertEquals("GGGGGGGG", repo.splicerSlotsFlow.value[0])
+        assertEquals("TTH", repo.splicerSignaturesFlow.value[0])
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testCreatureResistancesFromSignatures() = runTest {
+        val repo = FakeDataRepository()
+        val viewModel = MainViewModel(repo)
+
+        // Fill slots with specific enzyme signatures
+        // Slot 0, 1: TTH (2 slots) -> 2 * 12.5% = 25% Heat resistance
+        // Slot 2: PFU (1 slot) -> 1 * 12.5% = 12.5% Rad resistance
+        // Slot 3..7: TAQ (5 slots) -> 5 * 12.5% = 62.5% Kinetic resistance
+        repo.saveSplicerState(
+            List(8) { "AAAAAAAA" },
+            List(8) { 40.0 },
+            listOf("TTH", "TTH", "PFU", "TAQ", "TAQ", "TAQ", "TAQ", "TAQ")
+        )
+
+        viewModel.constructSplicedCreature()
+        testScheduler.advanceUntilIdle()
+
+        viewModel.completeSplicingAndViewInVault()
+        testScheduler.advanceUntilIdle()
+
+        val creatures = repo.creaturesList
+        assertEquals(1, creatures.size)
+        val creature = creatures.first()
+        
+        assertEquals(25.0, creature.heatResistance)
+        assertEquals(12.5, creature.radResistance)
+        assertEquals(62.5, creature.kineticResistance)
     }
 }
 

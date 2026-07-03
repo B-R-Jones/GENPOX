@@ -74,6 +74,7 @@ We maintain a consistent sci-fi retro color system:
 | **PurpleDim** | `0xFF701A75` | Anomaly Engine sub-headers, secondary dim labels. |
 | **Cyan** | `0xFF22D3EE` | Celestial & telemetry status, special radar grids. |
 | **Yellow** | `0xFFFBBF24` | Warnings, intermediate/selection states, Undo/Reset actions. |
+| **CyberOrange** | `0xFFF97316` | Overrides, attach actions, forced compile states. |
 | **Red** | `0xFFEF4444` | System failure states, close/dismiss buttons. |
 | **CyberPanel** | `0xFF09120B` | Background panel color. |
 | **CyberBorder** | `0xFF0D2513` | Default border/frame outline color. |
@@ -94,18 +95,23 @@ GENPOX consoles alternate between two rendering models:
 
 ## 6. Button & Frame Layout Styles
 
+### Core Layout Rules
+*   **Solid Button Backgrounds**: Interactive buttons must always have a solid background color according to their active cyber theme (e.g. `CyberRed` for Close buttons, `CyberGreen` for confirmations, etc.) with high-contrast text (typically `Color.Black`).
+*   **Non-Solid Data Fields**: Data fields (e.g., text inputs, telemetry boxes, gene lists) must not have solid backgrounds (they should be transparent or use outlines with low-opacity overlay layers) to differentiate them from active button controls.
+
 ### The Cyberglass Frame Aesthetic
 All interactive containers, panels, and buttons utilize the double-layered **Cyberglass** style:
 *   A solid or semi-transparent dark background (`Color.Black` or `CyberPanel`).
-*   A thin 1.dp border with 35% opacity.
+*   A thin 1.dp border with 35% opacity. In Native Android (Compose), this is standard across all tabs (`Bio-Lab`, `Gen-Vault`, `Scanner`, `Network`, `Splicer`) via `PoxTabFrame`. The border defaults to a glowing `CyberGreen.copy(alpha = 0.35f)` style for active high contrast rather than dark static colors.
+*   **Dynamic Reagent Theme Integration**: The frame borders across all five core tabs automatically color-shift to match the active slotted catalyst reagent (e.g., matching the orange of `BETAINE SOLV` or the iridescent shifting hue of the `SHIMMER CHASSIS` Chromatophore), keeping the entire workspace unified in the selected reagent's spectral profile.
 *   **Double-Layer Corner Ticks**: 8.dp corner lines drawn in the four outer corners of the box layout to create a premium retro wireframe border.
 
 ### Standard Button Layouts
 Standard controls must use custom double-layered cyberglass box structures (instead of stock buttons or flat clickable text):
 
 1.  **Close Button**:
-    *   **Style**: Red border (`borderColor = Color.Red`, background `Color.Transparent`).
-    *   **Text**: `"✕ CLOSE"` (in default Sans-Serif, 8.sp, bold, red color).
+    *   **Style**: Solid red background (`containerColor = CyberRed`, content/text `Color.Black`, no transparent border).
+    *   **Text**: `"CLOSE"` (in default Sans-Serif, 8.sp, bold, black color).
     *   **Padding**: `horizontal = 8.dp, vertical = 4.dp`.
     *   **Placement**: Must be positioned as the top-rightmost element within the header row.
 2.  **Clear / Reset Button**:
@@ -117,9 +123,8 @@ Standard controls must use custom double-layered cyberglass box structures (inst
     *   **Text**: `"↶ UNDO"` or `"✕ BACK"` (in default Sans-Serif, 8.sp, bold, yellow color).
     *   **Padding**: `horizontal = 8.dp, vertical = 4.dp`.
 4.  **Frame Navigation Buttons**:
-    *   **Style**: Small, square holographic buttons floating in corners of active screens.
     *   **Size**: `46.dp` x `46.dp`.
-    *   **Border & Glow**: Styled using `.cyberglass(...)` modifier. Mapped to active color when selected (e.g. `CyberGreen`, purple, or cyan), and dimmed secondary color when inactive (e.g. `CyberGreenDim.copy(alpha = 0.4f)`). Thin glow (`glowColor = borderColor.copy(alpha = 0.15f)`) is active only when selected.
+    *   **Border & Glow**: Styled using `.cyberglass(...)` modifier. Mapped to active color when selected (e.g. `CyberGreen`, purple, or cyan). When inactive, mapped to a dimmed version derived from the active color at 24% opacity (i.e. `activeColor.copy(alpha = 0.24f)`). Thin glow (`glowColor = borderColor.copy(alpha = 0.15f)`) is active only when selected.
     *   **Content**: Contains either a 24.dp custom wireframe Canvas vector icon (such as a target reticle) or exactly three horizontal lines of question marks/symbols/text stacked vertically in `FontFamily.Monospace`, 7.sp, bold, uppercase.
     *   **Feedback**: Trigger arcade chime sound beep upon click.
 5.  Unified Holo-Nav Container & Gestures (PoxUnifiedHoloNav):
@@ -135,6 +140,10 @@ Standard controls must use custom double-layered cyberglass box structures (inst
         *   *Vertical Attraction Bounce*: The inactive row performs a periodic vertical bounce (rising by `-8.dp` and returning via low-stiffness spring every 6 seconds) when unstacked.
         *   *Horizontal Offscreen Bounce*: The stacked handle performs an infinite horizontal bounce (oscillating left by `-8.dp` and returning) when collapsed to indicate it is draggable.
     *   **Feedback**: Trigger combinator click/tick sounds on stacking, unstacking, and cycling.
+6.  **Loop Button**:
+    *   **Style**: Solid background matching active status (e.g., solid `CyberOrange` when active, solid dark gray `Color(0xFF2E2E2E)` when inactive) with high-contrast text.
+    *   **Border**: Thin 1.dp border stroke derived from the active theme color (e.g. `BorderStroke(1.dp, CyberOrange)` when active, and `BorderStroke(1.dp, CyberOrange.copy(alpha = 0.35f))` when inactive).
+    *   **Text**: `"⟲"` (in default Sans-Serif, bold).
 
 ---
 

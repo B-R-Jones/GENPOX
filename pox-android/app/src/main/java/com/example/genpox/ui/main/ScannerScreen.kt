@@ -152,6 +152,7 @@ fun ScannerRadarView(
 ) {
     val anomalies by viewModel.anomalies.collectAsState()
     val baseFonts by viewModel.baseFonts.collectAsState()
+    val celestialWells by viewModel.celestialWells.collectAsState()
     val lat by viewModel.latitude.collectAsState()
     val lng by viewModel.longitude.collectAsState()
     val roads by viewModel.roads.collectAsState()
@@ -185,39 +186,19 @@ fun ScannerRadarView(
     val subTabs = remember(activeMissionsList) {
         val list = mutableListOf(
             PoxSubTab("radar", "RADAR") { iconColor ->
-                Canvas(modifier = Modifier.size(24.dp)) {
-                    val w = size.width
-                    val h = size.height
-                    val center = Offset(w / 2f, h / 2f)
-                    val strokeW = 1.5.dp.toPx()
-
-                    drawCircle(iconColor, radius = w * 0.38f, center = center, style = Stroke(width = strokeW))
-                    drawCircle(iconColor, radius = w * 0.08f, center = center)
-
-                    drawLine(iconColor, Offset(center.x - w * 0.45f, center.y), Offset(center.x - w * 0.18f, center.y), strokeWidth = strokeW)
-                    drawLine(iconColor, Offset(center.x + w * 0.18f, center.y), Offset(center.x + w * 0.45f, center.y), strokeWidth = strokeW)
-                    drawLine(iconColor, Offset(center.x, center.y - h * 0.45f), Offset(center.x, center.y - h * 0.18f), strokeWidth = strokeW)
-                    drawLine(iconColor, Offset(center.x, center.y + h * 0.18f), Offset(center.x, center.y + h * 0.45f), strokeWidth = strokeW)
-                }
+                WireframeRadarIcon(color = iconColor, modifier = Modifier.size(24.dp))
             },
             PoxSubTab("list", "LIST") { iconColor ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(1.dp)
-                ) {
-                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                }
+                WireframeListIcon(color = iconColor, modifier = Modifier.size(24.dp))
             },
             PoxSubTab("forecast", "FORECAST") { iconColor ->
-                WireframeCloudIcon(color = iconColor)
+                WireframeCloudIcon(color = iconColor, modifier = Modifier.size(24.dp))
             }
         )
         if (activeMissionsList.isNotEmpty()) {
             list.add(
                 PoxSubTab("missions", "MISSIONS") { iconColor ->
-                    WireframePickaxeIcon(color = iconColor)
+                    WireframePickaxeIcon(color = iconColor, modifier = Modifier.size(24.dp))
                 }
             )
         }
@@ -232,6 +213,7 @@ fun ScannerRadarView(
                 viewModel = viewModel,
                 anomalies = anomalies,
                 baseFonts = baseFonts,
+                celestialWells = celestialWells,
                 userLat = lat,
                 userLng = lng,
                 roads = roads,
@@ -263,6 +245,7 @@ fun ScannerNormalView(viewModel: MainViewModel) {
     val depletedAnomalyCoords by viewModel.depletedAnomalyCoords.collectAsState()
     val scannerSubTab by viewModel.scannerSubTab.collectAsState()
     val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
+    val celestialWells by viewModel.celestialWells.collectAsState()
     var activeAnomalyTab by remember { mutableStateOf("scan") }
 
     val activeMissions by viewModel.activeMissions.collectAsState()
@@ -285,39 +268,19 @@ fun ScannerNormalView(viewModel: MainViewModel) {
     val subTabs = remember(activeMissionsList) {
         val list = mutableListOf(
             PoxSubTab("radar", "RADAR") { iconColor ->
-                Canvas(modifier = Modifier.size(24.dp)) {
-                    val w = size.width
-                    val h = size.height
-                    val center = Offset(w / 2f, h / 2f)
-                    val strokeW = 1.5.dp.toPx()
-
-                    drawCircle(iconColor, radius = w * 0.38f, center = center, style = Stroke(width = strokeW))
-                    drawCircle(iconColor, radius = w * 0.08f, center = center)
-
-                    drawLine(iconColor, Offset(center.x - w * 0.45f, center.y), Offset(center.x - w * 0.18f, center.y), strokeWidth = strokeW)
-                    drawLine(iconColor, Offset(center.x + w * 0.18f, center.y), Offset(center.x + w * 0.45f, center.y), strokeWidth = strokeW)
-                    drawLine(iconColor, Offset(center.x, center.y - h * 0.45f), Offset(center.x, center.y - h * 0.18f), strokeWidth = strokeW)
-                    drawLine(iconColor, Offset(center.x, center.y + h * 0.18f), Offset(center.x, center.y + h * 0.45f), strokeWidth = strokeW)
-                }
+                WireframeRadarIcon(color = iconColor, modifier = Modifier.size(24.dp))
             },
             PoxSubTab("list", "LIST") { iconColor ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(1.dp)
-                ) {
-                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                    Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                }
+                WireframeListIcon(color = iconColor, modifier = Modifier.size(24.dp))
             },
             PoxSubTab("forecast", "FORECAST") { iconColor ->
-                WireframeCloudIcon(color = iconColor)
+                WireframeCloudIcon(color = iconColor, modifier = Modifier.size(24.dp))
             }
         )
         if (activeMissionsList.isNotEmpty()) {
             list.add(
                 PoxSubTab("missions", "MISSIONS") { iconColor ->
-                    WireframePickaxeIcon(color = iconColor)
+                    WireframePickaxeIcon(color = iconColor, modifier = Modifier.size(24.dp))
                 }
             )
         }
@@ -381,6 +344,8 @@ fun ScannerNormalView(viewModel: MainViewModel) {
                             ScannerWaveForecastView(viewModel = viewModel)
                         }
                         else -> { // "list"
+                            var activeListSubTab by remember { mutableStateOf("anomalies") }
+
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -437,33 +402,256 @@ fun ScannerNormalView(viewModel: MainViewModel) {
                                     }
                                 }
 
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    if (anomalies.isEmpty()) {
+                                    listOf(
+                                        "anomalies" to "ANOMALIES",
+                                        "fonts" to "FONTS",
+                                        "wells" to "WELLS"
+                                    ).forEach { (id, label) ->
+                                        val isSelected = activeListSubTab == id
+                                        val tabColor = if (isSelected) Color(0xFF22D3EE) else Color.Gray.copy(alpha = 0.5f)
                                         Box(
                                             modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(200.dp)
-                                                .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                                                .background(Color.Black.copy(alpha = 0.4f)),
+                                                .weight(1f)
+                                                .clickable {
+                                                    viewModel.synthManager.playCombinatorTick()
+                                                    activeListSubTab = id
+                                                }
+                                                .background(
+                                                    color = if (isSelected) Color(0xFF22D3EE).copy(alpha = 0.15f) else Color.Transparent,
+                                                    shape = RoundedCornerShape(4.dp)
+                                                )
+                                                .border(
+                                                    width = 1.dp,
+                                                    color = tabColor,
+                                                    shape = RoundedCornerShape(4.dp)
+                                                )
+                                                .padding(vertical = 6.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = "NO ANOMALIES IN RANGE.",
-                                                style = Typography.bodySmall,
-                                                color = CyberGreenDim
+                                                text = label,
+                                                color = if (isSelected) Color(0xFF22D3EE) else Color.LightGray,
+                                                fontSize = 7.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace
                                             )
                                         }
-                                    } else {
-                                        anomalies.take(5).forEach { anomaly ->
-                                            AnomalyItemRow(
-                                                anomaly = anomaly,
-                                                userLat = lat,
-                                                userLng = lng,
-                                                viewModel = viewModel,
-                                                onClick = { viewModel.setSelectedAnomalyId(anomaly.id) }
-                                            )
+                                    }
+                                }
+
+                                when (activeListSubTab) {
+                                    "anomalies" -> {
+                                        Column(
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            if (anomalies.isEmpty()) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(200.dp)
+                                                        .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                                        .background(Color.Black.copy(alpha = 0.4f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "NO ANOMALIES IN RANGE.",
+                                                        style = Typography.bodySmall,
+                                                        color = CyberGreenDim
+                                                    )
+                                                }
+                                            } else {
+                                                anomalies.take(5).forEach { anomaly ->
+                                                    AnomalyItemRow(
+                                                        anomaly = anomaly,
+                                                        userLat = lat,
+                                                        userLng = lng,
+                                                        viewModel = viewModel,
+                                                        onClick = { viewModel.setSelectedAnomalyId(anomaly.id) }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                    "fonts" -> {
+                                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            if (baseFonts.isEmpty()) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(150.dp)
+                                                        .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                                        .background(Color.Black.copy(alpha = 0.4f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "NO SIGNS OF INTEL STOCK FONTS.",
+                                                        style = Typography.bodySmall,
+                                                        color = CyberGreenDim
+                                                    )
+                                                }
+                                            } else {
+                                                baseFonts.forEach { font ->
+                                                    val fontDist = viewModel.calculateDistanceInFeet(lat, lng, font.lat, font.lng)
+                                                    val isNear = fontDist <= font.maxRadiusFeet
+                                                    val remaining = ((font.durationMs - (System.currentTimeMillis() - font.spawnTime)) / 1000L).coerceAtLeast(0L)
+                                                    val typeStr = if (font.isInverted) "GRAVITATIONAL VOID SINK" else "ATMOSPHERIC INLET CODON"
+                                                    val cardColor = if (font.isInverted) Color(0xFF8B5CF6) else when (font.baseType) {
+                                                        'A' -> Color(0xFF38BDF8)
+                                                        'G' -> Color(0xFF34D399)
+                                                        'T' -> Color(0xFFFB7185)
+                                                        'C' -> Color(0xFFFBBF24)
+                                                        else -> Color.Cyan
+                                                    }
+                                                    
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .border(1.dp, cardColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                                            .background(Color.Black.copy(alpha = 0.6f))
+                                                            .padding(10.dp)
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                text = font.id,
+                                                                color = cardColor,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                            Text(
+                                                                text = "${remaining}s LEFT",
+                                                                color = Color.LightGray,
+                                                                fontSize = 8.sp,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                        }
+                                                        Spacer(modifier = Modifier.height(4.dp))
+                                                        Text(
+                                                            text = "Type: $typeStr (${font.baseType})",
+                                                            color = Color.White,
+                                                            fontSize = 8.sp,
+                                                            fontFamily = FontFamily.Default
+                                                        )
+                                                        Text(
+                                                            text = "Distance: ${fontDist.toInt()} ft (Coverage: ${font.maxRadiusFeet.toInt()} ft)",
+                                                            color = Color.Gray,
+                                                            fontSize = 8.sp,
+                                                            fontFamily = FontFamily.Default
+                                                        )
+                                                        if (isNear) {
+                                                            val rate = font.getGatherAmount(fontDist)
+                                                            Text(
+                                                                text = if (font.isInverted) "VOID ACTIVE: -${rate} stocks/s (Transmuting to Waste)" else "SIPHON ACTIVE: +${rate} units/sec",
+                                                                color = if (font.isInverted) Color(0xFFFBBF24) else Color(0xFF34D399),
+                                                                fontSize = 8.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                        } else {
+                                                            Text(
+                                                                text = "OUT OF RANGE",
+                                                                color = Color.Red,
+                                                                fontSize = 8.sp,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    "wells" -> {
+                                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            if (celestialWells.isEmpty()) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(150.dp)
+                                                        .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                                        .background(Color.Black.copy(alpha = 0.4f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "NO CELESTIAL WELLS REGISTERED.",
+                                                        style = Typography.bodySmall,
+                                                        color = CyberGreenDim
+                                                    )
+                                                }
+                                            } else {
+                                                celestialWells.forEach { well ->
+                                                    val wellDist = viewModel.calculateDistanceInFeet(lat, lng, well.lat, well.lng)
+                                                    val inRange = wellDist <= well.radiusFeet
+                                                    val wellColor = when (well.type) {
+                                                        "GREENHOUSE" -> Color(0xFFEF4444)
+                                                        "MAGNETOSPHERIC" -> Color(0xFFFBBF24)
+                                                        "GRAVITATIONAL" -> Color(0xFF8B5CF6)
+                                                        else -> Color.Cyan
+                                                    }
+                                                    
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .border(1.dp, wellColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                                            .background(Color.Black.copy(alpha = 0.6f))
+                                                            .padding(10.dp)
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                text = well.name,
+                                                                color = wellColor,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                            Text(
+                                                                text = well.type,
+                                                                color = wellColor.copy(alpha = 0.7f),
+                                                                fontSize = 8.sp,
+                                                                fontFamily = FontFamily.Monospace,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                        Spacer(modifier = Modifier.height(4.dp))
+                                                        Text(
+                                                            text = "Radius: ${well.radiusFeet.toInt()} ft | Distance: ${wellDist.toInt()} ft",
+                                                            color = Color.White,
+                                                            fontSize = 8.sp,
+                                                            fontFamily = FontFamily.Default
+                                                        )
+                                                        if (inRange) {
+                                                            Text(
+                                                                text = "ENVIRONMENTAL HAZARD TENSION ACTIVE",
+                                                                color = Color(0xFFEF4444),
+                                                                fontSize = 8.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                        } else {
+                                                            Text(
+                                                                text = "SAFE BOUNDARY",
+                                                                color = Color(0xFF34D399),
+                                                                fontSize = 8.sp,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1178,6 +1366,7 @@ fun HolographicRadarScanner(
     viewModel: MainViewModel,
     anomalies: List<PoxAnomaly>,
     baseFonts: List<PoxBaseFont>,
+    celestialWells: List<CelestialWell>,
     userLat: Double,
     userLng: Double,
     roads: List<List<Pair<Double, Double>>>,
@@ -2344,6 +2533,53 @@ fun HolographicRadarScanner(
                     }
                 }
 
+                // 6b. Render Celestial Anomaly Wells
+                val celestialWellsVal = celestialWells
+                val wellsSize = celestialWellsVal.size
+                for (wIdx in 0 until wellsSize) {
+                    val well = celestialWellsVal[wIdx]
+                    val wy = projectY(well.lat, well.lng)
+                    val wx = projectX(well.lat, well.lng)
+                    val wellRadiusPx = ((well.radiusFeet / 364000.0) * scale).toFloat()
+                    
+                    val wellColor = when (well.type) {
+                        "GREENHOUSE" -> Color(0xFFEF4444)
+                        "MAGNETOSPHERIC" -> Color(0xFFFBBF24)
+                        "GRAVITATIONAL" -> Color(0xFF8B5CF6)
+                        else -> Color.Cyan
+                    }
+                    
+                    // Draw outer hazard radius ring with a dotted/dashed border
+                    drawCircle(
+                        color = wellColor.copy(alpha = 0.08f),
+                        radius = wellRadiusPx,
+                        center = Offset(wx, wy)
+                    )
+                    
+                    drawCircle(
+                        color = wellColor.copy(alpha = 0.35f),
+                        radius = wellRadiusPx,
+                        center = Offset(wx, wy),
+                        style = Stroke(
+                            width = 1.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f)
+                        )
+                    )
+                    
+                    // Draw a pulsing epicenter core
+                    val epicentPulse = (timeMs % 1500) / 1500f
+                    drawCircle(
+                        color = wellColor.copy(alpha = 0.7f * (1.0f - epicentPulse)),
+                        radius = 8.dp.toPx() * epicentPulse,
+                        center = Offset(wx, wy)
+                    )
+                    drawCircle(
+                        color = wellColor,
+                        radius = 2.5.dp.toPx(),
+                        center = Offset(wx, wy)
+                    )
+                }
+
                 // 6c. Render Base Fonts with Overlap Grouping & Clipping
                 val baseFontsVal = baseFonts
                 val baseFontsSize = baseFontsVal.size
@@ -2354,12 +2590,16 @@ fun HolographicRadarScanner(
                     val fy = projectY(font.lat, font.lng)
                     val fx = projectX(font.lat, font.lng) + getGlitchOffsetX(fy, timeMs)
                     
-                    val baseColor = when (font.baseType) {
-                        'A' -> Color(0xFF38BDF8)
-                        'G' -> Color(0xFF34D399)
-                        'T' -> Color(0xFFFB7185)
-                        'C' -> Color(0xFFFBBF24)
-                        else -> Color.Cyan
+                    val baseColor = if (font.isInverted) {
+                        Color(0xFF8B5CF6)
+                    } else {
+                        when (font.baseType) {
+                            'A' -> Color(0xFF38BDF8)
+                            'G' -> Color(0xFF34D399)
+                            'T' -> Color(0xFFFB7185)
+                            'C' -> Color(0xFFFBBF24)
+                            else -> Color.Cyan
+                        }
                     }
                     
                     val ageMs = timeMs - font.spawnTime
@@ -2531,7 +2771,34 @@ fun HolographicRadarScanner(
                                 )
                             }
                         }
-                        
+
+                        // 3b. Draw Singularity Gravity Horizon (inward spinning dashed rings)
+                        for (i in 0 until groupSize) {
+                            val pFont = group[i]
+                            if (pFont.font.isInverted) {
+                                val spinSpeed = (timeMs % 2000) / 2000f
+                                val inwardRadius = pFont.maxRadiusPx * (1.0f - spinSpeed)
+                                val ringPath = Path()
+                                for (step in 0..36) {
+                                    val theta = (step * 2.0 * Math.PI) / 36.0
+                                    val rBase = inwardRadius * (1.0f + pFont.epsilon * cos(pFont.kLobe * theta + pFont.phiOffset).toFloat())
+                                    val thetaRotated = theta - rotRad - (spinSpeed * 2.0 * Math.PI)
+                                    val px = pFont.fx + rBase * cos(thetaRotated).toFloat()
+                                    val py = pFont.fy - rBase * sin(thetaRotated).toFloat() * tiltYScale
+                                    if (step == 0) ringPath.moveTo(px, py) else ringPath.lineTo(px, py)
+                                }
+                                ringPath.close()
+                                drawPath(
+                                    path = ringPath,
+                                    color = Color(0xFFC084FC).copy(alpha = 0.6f * pFont.flickerMultiplier),
+                                    style = Stroke(
+                                        width = 1.2.dp.toPx(),
+                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
+                                    )
+                                )
+                            }
+                        }
+
                         // 4. Draw Cascading Peak Particles for each font in the group (thinned out & sped up)
                         for (i in 0 until groupSize) {
                             val pFont = group[i]

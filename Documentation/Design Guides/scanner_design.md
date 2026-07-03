@@ -138,6 +138,32 @@ Anomalous radiation forces a random nucleotide swap at a random sequence index e
 
 ---
 
+## 7. Anomalous Material & Environmental Hazards
+
+### Inverted Radar Base Sinks (Singularities)
+Base fonts on the radar have a 15% spawn chance to initialize as **Inverted Base Fonts** (Void Sinks):
+* **Siphoning Transmutation**: Instead of adding bases, siphoning a Void Sink drains raw stock bases from the siphoned character type and transutes them to Bio-Waste at a 6:1 ratio.
+* **Radar Drawing**: Rendered on the canvas as deep purple singularities with inward-spinning dashed rings mapping the gravitational horizon.
+
+### Celestial Anomaly Wells & Environmental Hazards
+Three permanent Celestial Anomaly Wells reside on the map (Venusian Greenhouse, Jovian Magnetospheric, and Asteroid Gravitational):
+* **Radial Decay Hazard Penalty**: During touchdown and harvesting phases, proximity to any well applies a decaying environmental hazard damage penalty to the specimen's telomeres. Damage scales down linearly based on distance from epicenter:
+  $$\text{Damage} = 8.0 \times \left(1.0 - \frac{\text{Distance}}{\text{Radius}}\right) \times \text{Intensity}$$
+* **Specimen Environmental Resistance**: Damage is mitigated by the corresponding resistance aggregated from the creature's spliced slots enzyme signatures (+12.5% per slot):
+  - **Tth Compile Signature**: Grants +12.5% Heat Resistance (Greenhouse Well).
+  - **Pfu Compile Signature**: Grants +12.5% Rad Resistance (Magnetospheric Well).
+  - **Taq Compile Signature**: Grants +12.5% Kinetic Resistance (Gravitational Well).
+  If telomeres decay to 0%, the mission aborts fatally.
+* **Radar Drawing**: Drawn as dotted hazard boundary rings with pulsing core coordinates colored according to type (Red for Greenhouse, Orange for Magnetospheric, Purple for Gravitational).
+
+### Holo-Nav Secondary Sub-Tabs
+Inside the **LIST** subtab, a secondary navigation bar allows swapping between:
+1. **ANOMALIES**: Active procedural cosmic gene carriers.
+2. **FONTS**: Active nucleotide inlets and void singularities.
+3. **WELLS**: Permanent Celestial Wells with hazard ranges and intensity indicators.
+
+---
+
 ## See Also
 *   [Master Design & Font Standards](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/master_design_standards.md)
 *   [Gen-Vault Design Document](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/gen_vault_design.md)

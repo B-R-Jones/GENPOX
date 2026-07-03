@@ -276,6 +276,17 @@ Once a mechanic is mathematically validated, the code is ported to the **Antigra
         *   📁 [ui/components](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui/components) - Custom drawing modules (holographic maps, wireframe vectors, canvas charts, and camera scanners).
     *   📁 `app/src/main/assets` - Pre-cached road maps and building geometries (`pre_cached_roads.json`).
 *   📁 [Documentation](file:///c:/Users/brent/Antigravity/GENPOX/Documentation) - Structured design specs, developer guides, player manuals, and technical reports.
+    *   📁 [Celestial Bodies](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies) - Technical profiles and scientific classifications of orbital bodies that influence game mechanics.
+        *   📄 [luna_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/luna_profile.md) - Scientific profile of the Moon (Luna), detailing orbital parameters, physical properties, and synodic phase cycles.
+        *   📄 [mercury_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/mercury_profile.md) - Scientific profile of Mercury (Hermes), detailing 3:2 spin-orbit resonance, orbital parameters, and Earth-synodic phase cycles.
+        *   📄 [venus_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/venus_profile.md) - Scientific profile of Venus (Aphrodite), detailing retrograde rotation, dense greenhouse atmosphere, and phase configurations.
+        *   📄 [earth_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/earth_profile.md) - Scientific profile of Earth (Terra), detailing baseline physical metrics, magnetospheric protection, and orbital cycles.
+        *   📄 [mars_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/mars_profile.md) - Scientific profile of Mars (Ares), detailing thin atmospheric dynamics, orbital eccentricity, and synodic oppositions.
+        *   📄 [jupiter_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/jupiter_profile.md) - Scientific profile of Jupiter (Zeus), detailing rapid rotation mechanics, massive magnetic field, and Galilean satellite tides.
+        *   📄 [saturn_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/saturn_profile.md) - Scientific profile of Saturn (Cronus), detailing ice ring physics, axisymmetric magnetosphere, and Titan/Enceladus satellites.
+        *   📄 [uranus_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/uranus_profile.md) - Scientific profile of Uranus (Ouranos), detailing extreme axial obliquity, internal heat deficit, and asymmetric magnetospheric offsets.
+        *   📄 [neptune_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/neptune_profile.md) - Scientific profile of Neptune (Poseidon), detailing supersonic atmospheric winds, ice-giant thermodynamics, and Triton capture dynamics.
+        *   📄 [pluto_charon_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/pluto_charon_profile.md) - Scientific profile of the Pluto-Charon binary system (Hades & Persephone), detailing external barycentric mechanics, double-synchronous tidal locking, and chaotic minor satellite rotations.
     *   📁 [Design Guides](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Design%20Guides) - System architecture and visual design specification sheets.
         *   📄 [master_design_standards.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Design%20Guides/master_design_standards.md) - Theme palette, typography rules, and frame layout standards.
         *   📄 [splicer_design.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Design%20Guides/splicer_design.md) - Design guidelines for splicing operations and combinator layouts.
@@ -288,7 +299,12 @@ Once a mechanic is mathematically validated, the code is ported to the **Antigra
         *   📄 [pox_reactor_q_score_guide.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides/pox_reactor_q_score_guide.md) - Algorithmic guide on optimizing Tide Pool synthesis Q-Score.
         *   📄 [bio_lab_tutorial.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides/bio_lab_tutorial.md) - Step-by-step tutorial on nucleotide harmonization and specimen splicing.
     *   📁 [Reports](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports) - Post-mortems, rendering audits, and runtime validation logs.
+        *   📄 [anomaly_investigation_report.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/anomaly_investigation_report.md) - Deep investigation report detailing dynamic physics equations and anomalies.
         *   📄 [base_fonts_technical_report.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/base_fonts_technical_report.md) - Investigation and resolution of radar canvas font rotation errors.
+        *   📄 [forced_construction_log_text.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/forced_construction_log_text.md) - Compilation log text template copy and error handling reference for Forced Splicing.
+        *   📄 [pox_reactor_loop_report.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/pox_reactor_loop_report.md) - Technical audit report on reactor synthesis simulation loop and thermodynamic parameters.
+        *   📄 [splicer_compiled.txt](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/splicer_compiled.txt) - Minified user interface reference script copy for the splicer canvas.
+        *   📄 [step_search_compiled.txt](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/step_search_compiled.txt) - Minified user interface reference script copy for step search.
 *   📁 [scratch](file:///c:/Users/brent/Antigravity/GENPOX/scratch) - Development scripts and experimental scratchpads.
 
 ---

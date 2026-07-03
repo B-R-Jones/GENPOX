@@ -38,9 +38,49 @@ Once all 8 slots are filled with matching standard genes, the player initiates s
 3.  **Compilation**: The 64-character DNA sequence is compiled offline to calculate the creature's final stats (Vitality, Attack, Defense, Speed), faction alignment, movesets, and lore.
 4.  **Metadata Badging**: The assembled creature is saved with origin `"Spliced Gene"`, `isFullCoherence = true`, and `coherenceType = "Natural"`.
 
+### Custom Genome Scaffold Mode (Scaffold Mode)
+A toggleable mode at the top of the Splicer screen that allows players to construct custom genomes using any standard gene blocks from their inventory:
+* **Alignment Bypass**: Bypasses codon alignment validation checks. Players can slot any inventory gene block into empty slots regardless of sequence contents.
+* **Inventory Redirection**: Clicking an empty slot redirects the user directly to the Gen-Vault screen with active filters to choose and insert a compiled gene block.
+* **UI Themes**: Renders Cyber Cyan slot boundaries, shows `[ ANY ]` for empty slots, and displays the central progress tracking specimen **ASSEMBLY %** (count of filled slots / 8) rather than COHERENCE %.
+* **Environmental Resistances**: Aggregates the polymerase compile signature of all 8 slots to calculate creature resistances (each slot compiled using Tth adds +12.5% heat resistance, Pfu adds +12.5% rad resistance, and Taq adds +12.5% kinetic resistance). This allows specimens to resist environmental damage during missions.
+
 ---
 
-## 3. Emergency Forced Compile Terminal (Forced Construction)
+## 3. Splicing Catalyst Additives & Dynamic Theme Integration
+
+Players can optimize assembly attributes by slotting a **Splicing Catalyst Reagent** into the injection port located beneath the circular genome map:
+
+### Reagent Deck & Drawer Carousel
+- **Injection Port**: A dedicated slot that shows the currently active reagent name and slotting state. Clicking opens/closes the drawer.
+- **Sliding Cyberglass Drawer**: A horizontal carousel listing available stock.
+- **Category Filter Tabs**: Includes `ALL`, `ASSEMBLY`, `STAT`, `FACTION`, `TACTICAL`, and `AESTHETIC` filter buttons to dynamically slice the list and prevent deck clutter.
+
+### Catalyst Additive Modifiers
+1. **ASSEMBLY (Preparation Stabilizers)**:
+   - `T4 DNA LIGASE`: Forces $100\%$ telomeres, boosts defense by $+20\%$, slows compilation cycle to 5s, and modulates tone synthesizer sweeps.
+   - `BETAINE SOLV`: Reduces A/T failure rates in Forced Splicing to $0\%$. Penalty of $-10$ telomeres.
+   - `FORMAMIDE DEN`: Reduces G/C failure rates in Forced Splicing to $0\%$. Penalty of $-10$ telomeres.
+   - `TU-115 ACTIVATOR`: Overcharges telomeres by $+15$ (allowing them to exceed standard caps up to $115\%$).
+2. **STAT (Focus Enhancers)**:
+   - Boosts a primary attribute (`VITALITY`, `ATTACK`, `DEFENSE`, or `SPEED`) by $+25\%$, while reducing other stats proportionally based on the DNA base frequency.
+3. **FACTION (Sector Transmutation Agents)**:
+   - Adds $+15$ weight count offsets during offline faction compilation to force alignment to target sectors (`ALIGN: CONTAIN`, `ALIGN: INFECT`, `ALIGN: MECH`, or `ALIGN: PARASITE`).
+4. **TACTICAL (Coatings)**:
+   - `BETA-GEL POLY`: Grants `isAutoHacker = true` with a $-5\%$ speed penalty.
+   - `SILVER-NITRATE`: Grants `isAutoDefender = true` (allowing creatures to automatically defend network nodes without being set as defenders) with a flat $-10$ attack penalty.
+   - `BETAINE HYDRATE`: Overclocks damage under high reactor temperatures with $+10\%$ telomere decay speed.
+5. **AESTHETIC (Visualizers)**:
+   - `LUMINESCENT`: Applies a bioluminescent outline glow.
+   - `MATRIX OVERLAY`: Applies horizontal scanline grid filters.
+   - `SHIMMER CHASSIS`: Cycles chassis outline slowly through standard theme hues.
+
+### Dynamic Theme Integration
+Slotting a reagent color-shifts the entire application's outer frame border, subtabs, and navigation dashboard elements (in `Bio-Lab`, `Gen-Vault`, `Scanner`, `Network`, and `Splicer` screens) to match the selected reagent's active color theme.
+
+---
+
+## 4. Emergency Forced Compile Terminal (Forced Construction)
 
 When players lack the exact matching gene blocks to fill the 8 slots, they can resort to **Forced Construction**. This process forces compiler loops to fuse mismatched standard genes together using unstable nucleotide replacements.
 

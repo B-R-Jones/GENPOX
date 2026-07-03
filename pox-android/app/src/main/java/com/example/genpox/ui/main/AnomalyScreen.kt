@@ -371,7 +371,7 @@ fun AnomalyVaultView(
             )
             Box(
                 modifier = Modifier
-                    .cyberglass(borderColor = Color.Red, backgroundColor = Color.Transparent)
+                    .cyberglass(borderColor = CyberRed, backgroundColor = CyberRed)
                     .clickable {
                         viewModel.synthManager.playBeep(440f, 0.05f, "sine")
                         onClose()
@@ -380,8 +380,8 @@ fun AnomalyVaultView(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "✕ CLOSE",
-                    color = Color.Red,
+                    text = "CLOSE",
+                    color = Color.Black,
                     fontSize = 8.sp,
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight.Bold
@@ -984,8 +984,7 @@ fun LockedAnomalyDetails(
                 )
                 Box(
                     modifier = Modifier
-                        .border(1.dp, Color(0xFF990000), RoundedCornerShape(2.dp))
-                        .background(Color.Black)
+                        .background(CyberRed, RoundedCornerShape(2.dp))
                         .clickable {
                             viewModel.synthManager.playBeep(450f, 0.05f, "sine")
                             viewModel.setSelectedAnomalyId(null)
@@ -993,8 +992,8 @@ fun LockedAnomalyDetails(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "✕ CLOSE",
-                        color = Color.Red,
+                        text = "CLOSE",
+                        color = Color.Black,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace

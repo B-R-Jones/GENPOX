@@ -857,4 +857,64 @@ fun WireframeCloudIcon(
     }
 }
 
+@Composable
+fun WireframeRadarIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val center = Offset(w / 2f, h / 2f)
+        val strokeW = 1.5.dp.toPx()
+
+        drawCircle(color, radius = w * 0.38f, center = center, style = Stroke(width = strokeW))
+        drawCircle(color, radius = w * 0.08f, center = center)
+
+        drawLine(color, Offset(center.x - w * 0.45f, center.y), Offset(center.x - w * 0.18f, center.y), strokeWidth = strokeW)
+        drawLine(color, Offset(center.x + w * 0.18f, center.y), Offset(center.x + w * 0.45f, center.y), strokeWidth = strokeW)
+        drawLine(color, Offset(center.x, center.y - h * 0.45f), Offset(center.x, center.y - h * 0.18f), strokeWidth = strokeW)
+        drawLine(color, Offset(center.x, center.y + h * 0.18f), Offset(center.x, center.y + h * 0.45f), strokeWidth = strokeW)
+    }
+}
+
+@Composable
+fun WireframeListIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val strokeW = 1.5.dp.toPx()
+
+        // Draw 3 horizontal list lines with small indicators (hollow squares/bullets)
+        val lineStartX = w * 0.35f
+        val lineEndX = w * 0.85f
+
+        // Bullets (small hollow squares)
+        val bulletSize = w * 0.12f
+        val bulletX = w * 0.15f
+
+        listOf(0.28f, 0.5f, 0.72f).forEach { yFrac ->
+            val y = h * yFrac
+            // Draw list line
+            drawLine(
+                color = color,
+                start = Offset(lineStartX, y),
+                end = Offset(lineEndX, y),
+                strokeWidth = strokeW
+            )
+            // Draw bullet
+            drawRect(
+                color = color,
+                topLeft = Offset(bulletX, y - bulletSize / 2f),
+                size = Size(bulletSize, bulletSize),
+                style = Stroke(width = strokeW)
+            )
+        }
+    }
+}
+
+
 

@@ -35,6 +35,9 @@ import com.example.genpox.ui.components.CloudChamberVisualizer
 import com.example.genpox.ui.components.PoxHoloNav
 import com.example.genpox.ui.components.PoxSubTab
 import com.example.genpox.ui.components.PoxRadarDials
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontFamily
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -51,7 +54,7 @@ fun MainScreen(
     val context = LocalContext.current
     val app = context.applicationContext as PoxApplication
     val viewModel: MainViewModel = viewModel(
-        factory = MainViewModelFactory(app.repository)
+        factory = MainViewModelFactory(app.repository, app.synthManager)
     )
 
     // Initialize synthManager context and networkManager
@@ -397,12 +400,26 @@ fun MainScreen(
                 }
             }
 
+            val flashAlpha = remember { Animatable(0f) }
+            LaunchedEffect(Unit) {
+                viewModel.logFlashTrigger.collect { peerName ->
+                    displayedLogText = "message received from $peerName"
+                    repeat(2) {
+                        flashAlpha.animateTo(0.6f, animationSpec = tween(200))
+                        flashAlpha.animateTo(0f, animationSpec = tween(200))
+                    }
+                }
+            }
+
+            val animatedBorderColor = lerp(CyberBorder, CyberGreen, flashAlpha.value)
+            val animatedBgColor = lerp(Color.Black, CyberGreen.copy(alpha = 0.25f), flashAlpha.value)
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(38.dp)
-                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                    .background(Color.Black)
+                    .border(1.dp, animatedBorderColor, RoundedCornerShape(4.dp))
+                    .background(animatedBgColor)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
@@ -508,39 +525,19 @@ fun MainScreen(
             val subTabs = remember(activeMissionsList) {
                 val list = mutableListOf(
                     PoxSubTab("radar", "RADAR") { iconColor ->
-                        androidx.compose.foundation.Canvas(modifier = Modifier.size(24.dp)) {
-                            val w = size.width
-                            val h = size.height
-                            val center = Offset(w / 2f, h / 2f)
-                            val strokeW = 1.5.dp.toPx()
-
-                            drawCircle(iconColor, radius = w * 0.38f, center = center, style = Stroke(width = strokeW))
-                            drawCircle(iconColor, radius = w * 0.08f, center = center)
-
-                            drawLine(iconColor, Offset(center.x - w * 0.45f, center.y), Offset(center.x - w * 0.18f, center.y), strokeWidth = strokeW)
-                            drawLine(iconColor, Offset(center.x + w * 0.18f, center.y), Offset(center.x + w * 0.45f, center.y), strokeWidth = strokeW)
-                            drawLine(iconColor, Offset(center.x, center.y - h * 0.45f), Offset(center.x, center.y - h * 0.18f), strokeWidth = strokeW)
-                            drawLine(iconColor, Offset(center.x, center.y + h * 0.18f), Offset(center.x, center.y + h * 0.45f), strokeWidth = strokeW)
-                        }
+                        WireframeRadarIcon(color = iconColor, modifier = Modifier.size(24.dp))
                     },
                     PoxSubTab("list", "LIST") { iconColor ->
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(1.dp)
-                        ) {
-                            Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                            Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                            Text("???", color = iconColor, fontSize = 7.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, lineHeight = 7.sp)
-                        }
+                        WireframeListIcon(color = iconColor, modifier = Modifier.size(24.dp))
                     },
                     PoxSubTab("forecast", "FORECAST") { iconColor ->
-                        WireframeCloudIcon(color = iconColor)
+                        WireframeCloudIcon(color = iconColor, modifier = Modifier.size(24.dp))
                     }
                 )
                 if (activeMissionsList.isNotEmpty()) {
                     list.add(
                         PoxSubTab("missions", "MISSIONS") { iconColor ->
-                            WireframePickaxeIcon(color = iconColor)
+                            WireframePickaxeIcon(color = iconColor, modifier = Modifier.size(24.dp))
                         }
                     )
                 }
@@ -556,13 +553,13 @@ fun MainScreen(
                 PoxHoloNav(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(bottom = 144.dp, end = 12.dp),
+                        .padding(bottom = 148.dp, end = 22.dp),
                     subTabs = subTabs,
                     activeSubTab = scannerSubTab,
                     onSubTabClick = { id, _ -> viewModel.setScannerSubTab(id) },
                     viewModel = viewModel,
                     activeColor = CyberGreen,
-                    inactiveColor = CyberGreenDim
+                    inactiveColor = CyberGreen.copy(alpha = 0.6f)
                 )
             }
         }

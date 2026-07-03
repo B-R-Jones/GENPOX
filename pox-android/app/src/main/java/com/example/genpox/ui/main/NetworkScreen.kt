@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.*
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.DualPaneConsoleFrame
 import com.example.genpox.ui.components.PoxTabFrame
@@ -104,7 +105,11 @@ fun HoloMailIcon(color: Color, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun HoloFriendsIcon(color: Color, modifier: Modifier = Modifier) {
+fun HoloFriendsIcon(
+    color: Color,
+    modifier: Modifier = Modifier,
+    buttonBackgroundColor: Color = Color(0xFF0F172A)
+) {
     Canvas(modifier = modifier.size(22.dp)) {
         val w = size.width
         val h = size.height
@@ -133,8 +138,8 @@ fun HoloFriendsIcon(color: Color, modifier: Modifier = Modifier) {
         val r2 = w * 0.13f
         
         // Mask behind the foreground silhouette to avoid overlapping background lines
-        drawCircle(Color.Black, radius = r2 + 2.dp.toPx(), center = Offset(c2x, c2y))
-        drawRect(Color.Black, topLeft = Offset(c2x - r2 * 2f, c2y + r2 * 0.5f), size = Size(r2 * 4f, r2 * 2.5f))
+        drawCircle(buttonBackgroundColor, radius = r2 + 2.dp.toPx(), center = Offset(c2x, c2y))
+        drawRect(buttonBackgroundColor, topLeft = Offset(c2x - r2 * 2f, c2y + r2 * 0.5f), size = Size(r2 * 4f, r2 * 2.5f))
         
         // Head
         drawCircle(color, radius = r2, center = Offset(c2x, c2y), style = Stroke(width = strokeW))
@@ -191,7 +196,7 @@ fun HoloCautionIcon(color: Color, modifier: Modifier = Modifier) {
 @Composable
 fun NetworkView(viewModel: MainViewModel) {
     val coroutineScope = rememberCoroutineScope()
-    var activeSubView by remember { mutableStateOf("hydranet") } // "hydranet", "diagnostics", "inbox", "friends"
+    val activeSubView by viewModel.networkSubTab.collectAsState() // "hydranet", "diagnostics", "inbox", "friends"
 
     val context = LocalContext.current
     val networkManager = viewModel.networkManager
@@ -261,15 +266,54 @@ fun NetworkView(viewModel: MainViewModel) {
     }
 
     val inboxMessages by viewModel.inboxMessages.collectAsState()
+    val hasUnread = inboxMessages.any { !it.isRead }
+
+    val selectedInboxMessageId by viewModel.selectedInboxMessageId.collectAsState()
+    val selectedInboxMessage = remember(selectedInboxMessageId, inboxMessages) {
+        inboxMessages.find { it.id == selectedInboxMessageId }
+    }
 
     val peerNodes by viewModel.registeredPeers.collectAsState()
 
-    val subTabs = listOf(
-        PoxSubTab("hydranet", "HYDRA", icon = { iconColor -> HoloCautionIcon(iconColor) }),
-        PoxSubTab("diagnostics", "GEAR", icon = { iconColor -> HoloGearIcon(iconColor) }),
-        PoxSubTab("inbox", "MAIL", icon = { iconColor -> HoloMailIcon(iconColor) }),
-        PoxSubTab("friends", "PEERS", icon = { iconColor -> HoloFriendsIcon(iconColor) })
-    )
+    val composerRecipientId by viewModel.composerRecipientId.collectAsState()
+    val composerRecipientName by viewModel.composerRecipientName.collectAsState()
+    val composerRecipientIsConnected by viewModel.composerRecipientIsConnected.collectAsState()
+
+    val showComposerForPeer = remember(composerRecipientId, composerRecipientName, composerRecipientIsConnected) {
+        if (composerRecipientId != null && composerRecipientName != null) {
+            LivePeerDisplay(composerRecipientId!!, composerRecipientName!!, composerRecipientIsConnected)
+        } else {
+            null
+        }
+    }
+
+    val subTabs = remember(hasUnread, activeSubView) {
+        listOf(
+            PoxSubTab("hydranet", "HYDRA", icon = { iconColor -> HoloCautionIcon(iconColor) }),
+            PoxSubTab("diagnostics", "GEAR", icon = { iconColor -> HoloGearIcon(iconColor) }),
+            PoxSubTab("inbox", "MAIL", bounce = hasUnread, icon = { iconColor -> HoloMailIcon(iconColor) }),
+            PoxSubTab("friends", "PEERS", icon = { iconColor ->
+                HoloFriendsIcon(
+                    color = iconColor,
+                    buttonBackgroundColor = if (activeSubView == "friends") CyberGreen else Color(0xFF0F172A)
+                )
+            }),
+            PoxSubTab("logs", "LOGS", icon = { iconColor ->
+                Box(
+                    modifier = Modifier.size(22.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = ">_",
+                        color = iconColor,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            })
+        )
+    }
 
     val activeConnectionsCount = if (networkManager != null) activeConnections.size else peerNodes.count { it.status != "OFFLINE" }
     val activeStatusText = if (networkManager != null) {
@@ -283,74 +327,123 @@ fun NetworkView(viewModel: MainViewModel) {
         CyberGreen
     }
 
+    val isComposerActive = showComposerForPeer != null
+
     PoxTabFrame(
         flavorTitle = "G.E.N. P.O.X. HYDRA-NET V0.7",
-        statusText = activeStatusText,
-        statusColor = activeStatusColor,
-        headerTitle = "MULTI-NODE COMMUNICATIONS",
-        descriptionText = "Manager your node contacts and communications here.",
+        statusText = if (showComposerForPeer != null) "CLOSE" else if (selectedInboxMessage != null) "CLOSE" else activeStatusText,
+        statusColor = if (showComposerForPeer != null) CyberRed else if (selectedInboxMessage != null) CyberRed else activeStatusColor,
+        onStatusClick = if (showComposerForPeer != null) { {
+            viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+            viewModel.clearComposer()
+        } } else if (selectedInboxMessage != null) { {
+            viewModel.synthManager.playBeep(480f, 0.04f, "sine")
+            viewModel.selectInboxMessage(null)
+        } } else null,
+        headerTitle = if (showComposerForPeer != null) "SECURE UPLINK MESSAGE COMPILER" else if (selectedInboxMessage != null) "DECRYPTED MESSAGE MODULE" else "MULTI-NODE COMMUNICATIONS",
+        descriptionText = if (showComposerForPeer != null) "RECIPIENT: ${showComposerForPeer.name} [${showComposerForPeer.endpointId}]" else if (selectedInboxMessage != null) "DECRYPTING TRANSMISSION FROM: ${selectedInboxMessage.from}" else "Manager your node contacts and communications here.",
 
         subTabs = subTabs,
         activeSubTab = activeSubView,
         onSubTabClick = { id, tag ->
-            activeSubView = id
+            if (showComposerForPeer != null) {
+                viewModel.clearComposer()
+            }
+            viewModel.selectInboxMessage(null)
+            viewModel.setNetworkSubTab(id)
             addDiagnosticLog("NAV: Holo-deck switch to sub-screen [${tag}]")
         },
         viewModel = viewModel,
         isScrollable = false
     ) {
-        when (activeSubView) {
-            "hydranet" -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+        if (showComposerForPeer != null) {
+            MessageCompilerContent(
+                viewModel = viewModel,
+                peer = showComposerForPeer,
+                onAddLog = { addDiagnosticLog(it) },
+                onClose = { viewModel.clearComposer() }
+            )
+        } else if (selectedInboxMessage != null) {
+            MessageReaderContent(
+                viewModel = viewModel,
+                message = selectedInboxMessage,
+                onAddLog = { addDiagnosticLog(it) },
+                onClose = { viewModel.selectInboxMessage(null) }
+            )
+        } else {
+            when (activeSubView) {
+                "hydranet" -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 10.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "HYDRA-NET CONNECTION SECURED. SYSTEMS NOMINAL.",
-                            color = CyberGreen.copy(alpha = 0.6f),
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = "ACTIVE LINKS IN CLUSTER: $activeConnectionsCount",
-                            color = Color.White,
-                            style = Typography.labelSmall,
-                            fontFamily = FontFamily.Monospace
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "HYDRA-NET CONNECTION SECURED. SYSTEMS NOMINAL.",
+                                color = CyberGreen.copy(alpha = 0.6f),
+                                style = Typography.labelSmall,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "ACTIVE LINKS IN CLUSTER: $activeConnectionsCount",
+                                color = Color.White,
+                                style = Typography.labelSmall,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                     }
                 }
-            }
-            "diagnostics" -> {
-                DiagnosticsContent(
-                    viewModel = viewModel,
-                    diagnosticsLogs = if (networkManager != null) networkLogs else diagnosticsLogs,
-                    logsListState = logsListState,
-                    onAddLog = { addDiagnosticLog(it) }
-                )
-            }
-            "inbox" -> {
-                InboxContent(
-                    viewModel = viewModel,
-                    messages = inboxMessages,
-                    onAddLog = { addDiagnosticLog(it) }
-                )
-            }
-            "friends" -> {
-                FriendsListContent(
-                    viewModel = viewModel,
-                    peers = peerNodes,
-                    onAddLog = { addDiagnosticLog(it) },
-                    hasPermissions = hasPermissions,
-                    onRequestPermissions = {
-                        permissionLauncher.launch(permissionsToRequest)
-                    }
-                )
+                "diagnostics" -> {
+                    DiagnosticsContent(
+                        viewModel = viewModel,
+                        onAddLog = { addDiagnosticLog(it) }
+                    )
+                }
+                "logs" -> {
+                    TerminalLogsContent(
+                        viewModel = viewModel,
+                        diagnosticsLogs = if (networkManager != null) networkLogs else diagnosticsLogs,
+                        logsListState = logsListState,
+                        onClearLogs = {
+                            if (networkManager != null) {
+                                networkManager.clearLogs()
+                            } else {
+                                diagnosticsLogs.clear()
+                            }
+                        }
+                    )
+                }
+                "inbox" -> {
+                    InboxContent(
+                        viewModel = viewModel,
+                        messages = inboxMessages,
+                        onAddLog = { addDiagnosticLog(it) }
+                    )
+                }
+                "friends" -> {
+                    FriendsListContent(
+                        viewModel = viewModel,
+                        peers = peerNodes,
+                        onAddLog = { addDiagnosticLog(it) },
+                        hasPermissions = hasPermissions,
+                        onRequestPermissions = {
+                            permissionLauncher.launch(permissionsToRequest)
+                        },
+                        showComposerForPeer = showComposerForPeer,
+                        onShowComposerChange = { peer ->
+                            if (peer != null) {
+                                viewModel.setComposerRecipient(peer.endpointId, peer.name, peer.isConnected)
+                            } else {
+                                viewModel.clearComposer()
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -364,8 +457,6 @@ fun NetworkView(viewModel: MainViewModel) {
 @Composable
 private fun DiagnosticsContent(
     viewModel: MainViewModel,
-    diagnosticsLogs: List<String>,
-    logsListState: LazyListState,
     onAddLog: (String) -> Unit
 ) {
     val userLat by viewModel.latitude.collectAsState()
@@ -444,50 +535,12 @@ private fun DiagnosticsContent(
                     }
                 }
             },
-            secondaryTitle = "TERMINAL DIAGNOSTICS LOG",
+            secondaryTitle = "SYSTEM DIAGNOSTIC CONTROLS",
             secondaryContent = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = "System log stream monitoring local node network socket transactions.",
-                        color = CyberGreenDim,
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Default
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(110.dp)
-                            .background(Color.Black)
-                            .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                            .padding(6.dp)
-                    ) {
-                        LazyColumn(
-                            state = logsListState,
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            items(diagnosticsLogs) { log ->
-                                Text(
-                                    text = log,
-                                    color = if (log.contains("SYS")) CyberGreenDim else if (log.contains("PING")) Color(0xFF22D3EE) else CyberGreen,
-                                    style = Typography.bodySmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 7.5.sp,
-                                    lineHeight = 10.sp
-                                )
-                            }
-                        }
-                    }
-
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
                     // Radio Signal Emulation Toggle Card
                     val isSimActive by viewModel.isNetworkSimulationActive.collectAsState()
                     Box(
@@ -629,6 +682,109 @@ private fun DiagnosticsContent(
     }
 }
 
+@Composable
+private fun TerminalLogsContent(
+    viewModel: MainViewModel,
+    diagnosticsLogs: List<String>,
+    logsListState: LazyListState,
+    onClearLogs: () -> Unit
+) {
+    // Auto-scroll to the bottom when new logs arrive
+    LaunchedEffect(diagnosticsLogs.size) {
+        if (diagnosticsLogs.isNotEmpty()) {
+            logsListState.animateScrollToItem(diagnosticsLogs.size - 1)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .padding(4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "ACTIVE TERMINAL LOGS",
+                color = CyberGreen,
+                style = Typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+            
+            // Clear logs button
+            Button(
+                onClick = {
+                    viewModel.synthManager.playReject()
+                    onClearLogs()
+                },
+                modifier = Modifier.height(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = Color.Red
+                ),
+                border = BorderStroke(1.dp, Color.Red),
+                shape = RoundedCornerShape(4.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                Text(
+                    text = "CLEAR CACHE",
+                    color = Color.Red,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Default
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                .background(Color.Black.copy(alpha = 0.7f))
+                .padding(8.dp)
+        ) {
+            if (diagnosticsLogs.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "TERMINAL LOG IS EMPTY.",
+                        color = CyberGreen.copy(alpha = 0.5f),
+                        style = Typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            } else {
+                LazyColumn(
+                    state = logsListState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(diagnosticsLogs) { log ->
+                        Text(
+                            text = log,
+                            color = if (log.contains("CRITICAL") || log.contains("ERROR")) Color.Red 
+                                    else if (log.contains("MUTATION") || log.contains("CROSSTALK")) Color(0xFFF97316) 
+                                    else if (log.contains("SUCCESS") || log.contains("ENGAGED")) CyberGreen
+                                    else CyberGreen.copy(alpha = 0.6f),
+                            style = Typography.bodySmall,
+                            fontSize = 8.5.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ==========================================
 // SUB-VIEW: INBOX
 // ==========================================
@@ -639,8 +795,6 @@ private fun InboxContent(
     messages: List<MailMessage>,
     onAddLog: (String) -> Unit
 ) {
-    var expandedMessageId by remember { mutableStateOf<String?>(null) }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -678,22 +832,18 @@ private fun InboxContent(
         )
 
         messages.forEach { msg ->
-            val isExpanded = expandedMessageId == msg.id
-            val cardBorderColor = if (isExpanded) CyberGreen else CyberBorder
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, cardBorderColor, RoundedCornerShape(4.dp))
+                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                     .background(CyberPanel)
                     .clickable {
-                        viewModel.synthManager.playBeep(if (isExpanded) 480f else 580f, 0.04f, "sine")
-                        expandedMessageId = if (isExpanded) null else msg.id
+                        viewModel.synthManager.playBeep(580f, 0.04f, "sine")
                         if (!msg.isRead) {
                             viewModel.markMessageAsRead(msg.id)
                             onAddLog("INBOX: Read message from ${msg.from}")
                         }
-
+                        viewModel.selectInboxMessage(msg.id)
                     }
                     .padding(10.dp)
             ) {
@@ -728,134 +878,15 @@ private fun InboxContent(
                         fontFamily = FontFamily.Default
                     )
 
-                    if (isExpanded) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color.Black.copy(alpha = 0.5f))
-                                .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
-                                .padding(8.dp)
-                        ) {
-                            Text(
-                                text = msg.body,
-                                color = CyberGreen.copy(alpha = 0.9f),
-                                style = Typography.bodySmall,
-                                fontSize = 8.5.sp,
-                                fontFamily = FontFamily.Default,
-                                lineHeight = 12.sp
-                            )
-                        }
+                    Spacer(modifier = Modifier.height(2.dp))
 
-                        val hasAttachment = msg.attachedCreatureDna != null || msg.attachedGeneSequence != null || msg.transferGenes > 0 || msg.transferWaste > 0
-                        if (hasAttachment) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(1.dp, if (msg.isClaimed) Color.Gray else CyberCyan, RoundedCornerShape(4.dp))
-                                    .background(CyberPanel)
-                                    .padding(8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Text(
-                                            text = "INCOMING CARGO TRANSFERS:",
-                                            color = Color.White,
-                                            fontSize = 8.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        if (msg.attachedCreatureDna != null) {
-                                            Text(
-                                                text = "• SPECIMEN: ${msg.attachedCreatureName} [${msg.attachedCreatureFaction}]",
-                                                color = CyberCyan,
-                                                fontSize = 7.5.sp,
-                                                fontFamily = FontFamily.Monospace
-                                            )
-                                        }
-                                        if (msg.attachedGeneSequence != null) {
-                                            Text(
-                                                text = "• CODON BLOCK: ${msg.attachedGeneSequence}",
-                                                color = CyberCyan,
-                                                fontSize = 7.5.sp,
-                                                fontFamily = FontFamily.Monospace
-                                            )
-                                        }
-                                        if (msg.transferGenes > 0 || msg.transferWaste > 0) {
-                                            Text(
-                                                text = "• RESOURCES: +10 All Bases / +25 Bio-Waste",
-                                                color = CyberCyan,
-                                                fontSize = 7.5.sp,
-                                                fontFamily = FontFamily.Monospace
-                                            )
-                                        }
-                                    }
-
-                                    if (msg.isClaimed) {
-                                        Box(
-                                            modifier = Modifier
-                                                .border(1.dp, Color.Gray, RoundedCornerShape(2.dp))
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = "EXTRACTED / SECURED",
-                                                color = Color.Gray,
-                                                fontSize = 7.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    } else {
-                                        Button(
-                                            onClick = {
-                                                viewModel.synthManager.playBeep(880f, 0.05f, "sine")
-                                                viewModel.claimMessageAttachment(msg.id)
-                                                onAddLog("CARGO: Decrypted and claimed transfer cargo from ${msg.from}.")
-                                            },
-                                            modifier = Modifier
-                                                .height(24.dp)
-                                                .width(105.dp),
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = CyberCyan,
-                                                contentColor = Color.Black
-                                            ),
-                                            shape = RoundedCornerShape(2.dp),
-                                            contentPadding = PaddingValues(0.dp)
-                                        ) {
-                                            Text(
-                                                text = "SECURE TRANSFERS",
-                                                color = Color.Black,
-                                                fontSize = 7.5.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "CLICK TO COLLAPSE PACKET",
-                            color = CyberGreenDim,
-                            fontSize = 7.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        Text(
-                            text = "CLICK TO DECRYPT AND READ",
-                            color = CyberGreenDim.copy(alpha = 0.6f),
-                            fontSize = 7.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
-                        )
-                    }
+                    Text(
+                        text = "CLICK TO DECRYPT AND READ",
+                        color = CyberGreenDim.copy(alpha = 0.6f),
+                        fontSize = 7.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default
+                    )
                 }
             }
         }
@@ -870,17 +901,17 @@ private data class LivePeerDisplay(
 
 @Composable
 private fun FriendsListContent(
-
     viewModel: MainViewModel,
     peers: List<PeerNode>,
     onAddLog: (String) -> Unit,
     hasPermissions: Boolean,
-    onRequestPermissions: () -> Unit
+    onRequestPermissions: () -> Unit,
+    showComposerForPeer: LivePeerDisplay?,
+    onShowComposerChange: (LivePeerDisplay?) -> Unit
 ) {
     var showRegisterForm by remember { mutableStateOf(false) }
     var peerNameInput by remember { mutableStateOf("") }
     var peerSectorInput by remember { mutableStateOf("") }
-    var showComposerForPeer by remember { mutableStateOf<LivePeerDisplay?>(null) }
 
 
     val nm = viewModel.networkManager
@@ -1188,16 +1219,15 @@ private fun FriendsListContent(
                                         .height(26.dp)
                                         .width(70.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color.Transparent,
-                                        contentColor = CyberGreen
+                                        containerColor = CyberGreen,
+                                        contentColor = Color.Black
                                     ),
-                                    border = BorderStroke(1.dp, CyberGreen),
                                     shape = RoundedCornerShape(2.dp),
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
                                     Text(
                                         text = "PING",
-                                        color = CyberGreen,
+                                        color = Color.Black,
                                         fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Default
@@ -1207,7 +1237,7 @@ private fun FriendsListContent(
                                 Button(
                                     onClick = {
                                         viewModel.synthManager.playBeep(640f, 0.05f, "sine")
-                                        showComposerForPeer = peer
+                                        onShowComposerChange(peer)
                                     },
                                     modifier = Modifier
                                         .height(26.dp)
@@ -1238,16 +1268,15 @@ private fun FriendsListContent(
                                         .height(26.dp)
                                         .width(90.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color.Transparent,
-                                        contentColor = Color(0xFF22D3EE)
+                                        containerColor = Color(0xFF22D3EE),
+                                        contentColor = Color.Black
                                     ),
-                                    border = BorderStroke(1.dp, Color(0xFF22D3EE)),
                                     shape = RoundedCornerShape(2.dp),
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
                                     Text(
                                         text = "CONNECT",
-                                        color = Color(0xFF22D3EE),
+                                        color = Color.Black,
                                         fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Default
@@ -1418,8 +1447,8 @@ private fun FriendsListContent(
                             unfocusedTextColor = CyberGreen,
                             focusedBorderColor = CyberGreen,
                             unfocusedBorderColor = CyberBorder,
-                            focusedContainerColor = Color.Black,
-                            unfocusedContainerColor = Color.Black
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
                         )
                     )
 
@@ -1433,8 +1462,8 @@ private fun FriendsListContent(
                             unfocusedTextColor = CyberGreen,
                             focusedBorderColor = CyberGreen,
                             unfocusedBorderColor = CyberBorder,
-                            focusedContainerColor = Color.Black,
-                            unfocusedContainerColor = Color.Black
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
                         )
                     )
 
@@ -1484,16 +1513,15 @@ private fun FriendsListContent(
                                 .weight(1f)
                                 .height(32.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Transparent,
-                                contentColor = Color.Yellow
+                                containerColor = CyberRed,
+                                contentColor = Color.Black
                             ),
-                            border = BorderStroke(1.dp, Color.Yellow),
                             shape = RoundedCornerShape(4.dp),
                             contentPadding = PaddingValues(0.dp)
                         ) {
                             Text(
-                                text = "✕ CANCEL",
-                                color = Color.Yellow,
+                                text = "CANCEL",
+                                color = Color.Black,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Default
@@ -1505,316 +1533,407 @@ private fun FriendsListContent(
         }
     }
 
-    if (showComposerForPeer != null) {
-        val peer = showComposerForPeer!!
-        androidx.compose.ui.window.Popup(
-            alignment = Alignment.Center,
-            onDismissRequest = { showComposerForPeer = null }
+}
+
+@Composable
+private fun MessageCompilerContent(
+    viewModel: MainViewModel,
+    peer: LivePeerDisplay,
+    onAddLog: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    val msgText by viewModel.composerMessageText.collectAsState()
+    val attachedCreature by viewModel.composerAttachedCreature.collectAsState()
+    val attachedGene by viewModel.composerAttachedGene.collectAsState()
+    val transferResources by viewModel.composerTransferResources.collectAsState()
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(10.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Attachment status indicators
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, CyberGreen.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+                .background(Color.Black.copy(alpha = 0.3f))
+                .padding(8.dp)
         ) {
-            var msgText by remember { mutableStateOf("") }
-            var attachedCreature by remember { mutableStateOf<Creature?>(null) }
-            var attachedGene by remember { mutableStateOf<GeneSequence?>(null) }
-            var transferResources by remember { mutableStateOf(false) }
+            Text(
+                text = "ACTIVE ATTACHMENTS",
+                color = CyberGreenDim,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "SPECIMEN: ${attachedCreature?.name ?: "NONE"}",
+                color = if (attachedCreature != null) CyberGreen else Color.Gray,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = "GENE SEQUENCE: ${attachedGene?.sequence ?: "NONE"}",
+                color = if (attachedGene != null) CyberGreen else Color.Gray,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = "QUANTUM SHIPMENT 10 BASES 25 WASTE: ${if (transferResources) "ACTIVE" else "NONE"}",
+                color = if (transferResources) CyberGreen else Color.Gray,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace
+            )
+        }
 
-            var showCreatureSelect by remember { mutableStateOf(false) }
-            var showGeneSelect by remember { mutableStateOf(false) }
+        // Attachment Action Buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Button(
+                onClick = {
+                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                    viewModel.setActiveCreature(null, "message_creature")
+                    viewModel.setVaultSubTab("creatures")
+                    viewModel.selectTab("vault")
+                },
+                modifier = Modifier.weight(1f).height(30.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = CyberOrange, contentColor = Color.Black),
+                shape = RoundedCornerShape(4.dp),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(
+                    text = "ATTACH SPECIMEN",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Default
+                )
+            }
 
-            val creatures by viewModel.creatures.collectAsState()
-            val geneSequences by viewModel.geneSequences.collectAsState()
+            Button(
+                onClick = {
+                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                    viewModel.setActiveCreature(null, "message_gene")
+                    viewModel.setVaultSubTab("search")
+                    viewModel.selectTab("vault")
+                },
+                modifier = Modifier.weight(1f).height(30.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = CyberOrange, contentColor = Color.Black),
+                shape = RoundedCornerShape(4.dp),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(
+                    text = "ATTACH GENE",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Default
+                )
+            }
+        }
 
+        val rawStockA by viewModel.rawStockA.collectAsState()
+        val rawStockG by viewModel.rawStockG.collectAsState()
+        val rawStockT by viewModel.rawStockT.collectAsState()
+        val rawStockC by viewModel.rawStockC.collectAsState()
+        val bioWaste by viewModel.bioWaste.collectAsState()
+        val hasEnoughResources = rawStockA >= 10 && rawStockG >= 10 && rawStockT >= 10 && rawStockC >= 10 && bioWaste >= 25
+
+        Button(
+            onClick = {
+                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                if (hasEnoughResources) {
+                    viewModel.setComposerTransferResources(!transferResources)
+                } else {
+                    viewModel.synthManager.playReject()
+                }
+            },
+            modifier = Modifier.fillMaxWidth().height(30.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (transferResources) CyberGreen else Color(0xFF2E2E2E),
+                contentColor = if (transferResources) Color.Black else Color.White
+            ),
+            border = BorderStroke(1.dp, if (transferResources) CyberGreen else CyberGreen.copy(alpha = 0.35f)),
+            shape = RoundedCornerShape(4.dp),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Text(
+                text = if (hasEnoughResources) "ATTACH 10 BASES 25 WASTE" else "INSUFFICIENT STOCK FOR RESOURCE ATTACHMENT",
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Default
+            )
+        }
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // Message text field
+        OutlinedTextField(
+            value = msgText,
+            onValueChange = {
+                if (it.length <= 64) {
+                    viewModel.setComposerMessageText(it)
+                }
+            },
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            placeholder = {
+                Text(
+                    text = "ENTER SECURE TRANSMISSION LOG MAX 64 CHARACTERS",
+                    fontSize = 8.sp,
+                    color = Color.Gray,
+                    fontFamily = FontFamily.Monospace
+                )
+            },
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 9.sp, color = Color.White, fontFamily = FontFamily.Monospace),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = CyberCyan,
+                unfocusedBorderColor = CyberCyan.copy(alpha = 0.35f),
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent
+            )
+        )
+        Text(
+            text = "${msgText.length}/64",
+            color = if (msgText.length >= 64) Color.Red else CyberCyan.copy(alpha = 0.8f),
+            fontSize = 8.sp,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.align(Alignment.End)
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        val canTransmit = msgText.isNotBlank() || attachedCreature != null || attachedGene != null || transferResources
+        Button(
+            onClick = {
+                viewModel.transmitP2PMessage(
+                    endpointId = peer.endpointId,
+                    text = msgText,
+                    creature = attachedCreature,
+                    gene = attachedGene,
+                    transferResources = transferResources
+                )
+                onAddLog("TX: Dispatched payload block containing message: \"$msgText\" to ${peer.name}.")
+                onClose()
+            },
+            enabled = canTransmit,
+            modifier = Modifier.fillMaxWidth().height(36.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (canTransmit) CyberCyan else Color(0xFF2E2E2E),
+                contentColor = if (canTransmit) Color.Black else Color.Gray
+            ),
+            shape = RoundedCornerShape(4.dp),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Text(
+                text = "TRANSMIT PROTOCOL",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (canTransmit) Color.Black else Color.Gray,
+                fontFamily = FontFamily.Default
+            )
+        }
+    }
+}
+
+@Composable
+private fun MessageReaderContent(
+    viewModel: MainViewModel,
+    message: MailMessage,
+    onAddLog: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(10.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Message Metadata Panel
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                .background(CyberPanel)
+                .padding(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "FROM: ${message.from}",
+                    color = CyberGreen,
+                    style = Typography.bodySmall,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = "DATE: ${message.timestamp}",
+                    color = Color.Gray,
+                    style = Typography.bodySmall,
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "SUBJECT: ${message.subject}",
+                color = Color.White,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Default
+            )
+        }
+
+        // Message Body Panel
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                .padding(12.dp)
+        ) {
+            Text(
+                text = message.body,
+                color = CyberGreen.copy(alpha = 0.9f),
+                style = Typography.bodySmall,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Default,
+                lineHeight = 13.sp
+            )
+        }
+
+        // Cargo/Attachment Section
+        val hasAttachment = message.attachedCreatureDna != null || message.attachedGeneSequence != null || message.transferGenes > 0 || message.transferWaste > 0
+        if (hasAttachment) {
             Box(
                 modifier = Modifier
-                    .width(320.dp)
-                    .border(2.dp, CyberCyan, RoundedCornerShape(8.dp))
-                    .background(Color.Black)
-                    .padding(16.dp)
+                    .fillMaxWidth()
+                    .border(1.dp, if (message.isClaimed) Color.Gray else CyberCyan, RoundedCornerShape(4.dp))
+                    .background(CyberPanel)
+                    .padding(10.dp)
             ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "SECURE UPLINK MESSAGE COMPILER",
-                        color = CyberCyan,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Default
-                    )
-
-                    Text(
-                        text = "RECIPIENT: ${peer.name} [${peer.endpointId}]",
-                        color = Color.LightGray,
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-
-                    Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().background(CyberCyan.copy(alpha = 0.3f)))
-
-                    // Attachment status indicators
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "ACTIVE ATTACHMENTS:",
-                            color = Color.Gray,
-                            fontSize = 8.sp,
+                            text = "INCOMING CARGO TRANSFERS:",
+                            color = Color.White,
+                            fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = "• SPECIMEN: ${attachedCreature?.name ?: "NONE"}",
-                            color = if (attachedCreature != null) CyberGreen else Color.DarkGray,
-                            fontSize = 8.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = "• GENE SEQUENCE: ${attachedGene?.sequence ?: "NONE"}",
-                            color = if (attachedGene != null) CyberGreen else Color.DarkGray,
-                            fontSize = 8.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = "• QUANTUM SHIPMENT (10B/25W): ${if (transferResources) "ACTIVE" else "NONE"}",
-                            color = if (transferResources) CyberGreen else Color.DarkGray,
-                            fontSize = 8.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-
-                    // Attachment Action Buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                showCreatureSelect = true
-                            },
-                            modifier = Modifier.weight(1f).height(28.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = CyberPanel, contentColor = Color.White),
-                            shape = RoundedCornerShape(2.dp),
-                            border = BorderStroke(1.dp, CyberBorder),
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            Text(text = "ATTACH SPECIMEN", fontSize = 7.5.sp)
+                        if (message.attachedCreatureDna != null) {
+                            Text(
+                                text = "• SPECIMEN: ${message.attachedCreatureName} [${message.attachedCreatureFaction}]",
+                                color = CyberCyan,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
                         }
-
-                        Button(
-                            onClick = {
-                                viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                                showGeneSelect = true
-                            },
-                            modifier = Modifier.weight(1f).height(28.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = CyberPanel, contentColor = Color.White),
-                            shape = RoundedCornerShape(2.dp),
-                            border = BorderStroke(1.dp, CyberBorder),
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            Text(text = "ATTACH GENE", fontSize = 7.5.sp)
+                        if (message.attachedGeneSequence != null) {
+                            Text(
+                                text = "• CODON BLOCK: ${message.attachedGeneSequence}",
+                                color = CyberCyan,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        if (message.transferGenes > 0 || message.transferWaste > 0) {
+                            Text(
+                                text = "• RESOURCES: +10 All Bases / +25 Bio-Waste",
+                                color = CyberCyan,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
                         }
                     }
 
-                    val rawStockA by viewModel.rawStockA.collectAsState()
-                    val rawStockG by viewModel.rawStockG.collectAsState()
-                    val rawStockT by viewModel.rawStockT.collectAsState()
-                    val rawStockC by viewModel.rawStockC.collectAsState()
-                    val bioWaste by viewModel.bioWaste.collectAsState()
-                    val hasEnoughResources = rawStockA >= 10 && rawStockG >= 10 && rawStockT >= 10 && rawStockC >= 10 && bioWaste >= 25
+                    Spacer(modifier = Modifier.width(6.dp))
 
-                    Button(
-                        onClick = {
-                            viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                            if (hasEnoughResources) {
-                                transferResources = !transferResources
-                            } else {
-                                viewModel.synthManager.playReject()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(28.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (transferResources) CyberGreen else CyberPanel,
-                            contentColor = if (transferResources) Color.Black else Color.White
-                        ),
-                        shape = RoundedCornerShape(2.dp),
-                        border = BorderStroke(1.dp, if (hasEnoughResources) CyberBorder else Color.Red.copy(alpha = 0.5f)),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text(
-                            text = if (hasEnoughResources) "ATTACH 10 BASES / 25 WASTE" else "INSUFFICIENT STOCK FOR RESOURCE ATTACHMENT",
-                            fontSize = 7.5.sp
-                        )
-                    }
-
-                    // Message text field
-                    OutlinedTextField(
-                        value = msgText,
-                        onValueChange = {
-                            if (it.length <= 64) {
-                                msgText = it
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(60.dp),
-                        placeholder = { Text(text = "Enter secure transmission log (max 64 chars)...", fontSize = 8.sp, color = Color.Gray) },
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 9.sp, color = Color.White, fontFamily = FontFamily.Monospace),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = CyberCyan,
-                            unfocusedBorderColor = CyberBorder,
-                            focusedContainerColor = Color.Black,
-                            unfocusedContainerColor = Color.Black
-                        )
-                    )
-                    Text(
-                        text = "${msgText.length}/64",
-                        color = if (msgText.length >= 64) Color.Red else Color.Gray,
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.align(Alignment.End)
-                    )
-
-                    // Action Controls
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                viewModel.synthManager.playBeep(450f, 0.05f, "sine")
-                                showComposerForPeer = null
-                            },
-                            modifier = Modifier.weight(1f).height(32.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.Yellow),
-                            border = BorderStroke(1.dp, Color.Yellow),
-                            shape = RoundedCornerShape(4.dp),
-                            contentPadding = PaddingValues(0.dp)
+                    if (message.isClaimed) {
+                        Box(
+                            modifier = Modifier
+                                .border(1.dp, Color.Gray, RoundedCornerShape(2.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            Text(text = "✕ CANCEL", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "EXTRACTED / SECURED",
+                                color = Color.Gray,
+                                fontSize = 7.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
-
-                        val canTransmit = msgText.isNotBlank() || attachedCreature != null || attachedGene != null || transferResources
+                    } else {
                         Button(
                             onClick = {
-                                viewModel.transmitP2PMessage(
-                                    endpointId = peer.endpointId,
-                                    text = msgText,
-                                    creature = attachedCreature,
-                                    gene = attachedGene,
-                                    transferResources = transferResources
-                                )
-                                onAddLog("TX: Dispatched payload block containing message: \"$msgText\" to ${peer.name}.")
-                                showComposerForPeer = null
+                                viewModel.synthManager.playBeep(880f, 0.05f, "sine")
+                                viewModel.claimMessageAttachment(message.id)
+                                onAddLog("CARGO: Decrypted and claimed transfer cargo from ${message.from}.")
                             },
-                            enabled = canTransmit,
-                            modifier = Modifier.weight(1.5f).height(32.dp),
+                            modifier = Modifier
+                                .height(26.dp)
+                                .width(115.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (canTransmit) CyberCyan else Color.DarkGray,
+                                containerColor = CyberCyan,
                                 contentColor = Color.Black
                             ),
-                            shape = RoundedCornerShape(4.dp),
+                            shape = RoundedCornerShape(2.dp),
                             contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text(text = "TRANSMIT PROTOCOL", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = if (canTransmit) Color.Black else Color.Gray)
-                        }
-                    }
-                }
-
-                // Sub-Selector overlays
-                if (showCreatureSelect) {
-                    androidx.compose.ui.window.Popup(
-                        alignment = Alignment.Center,
-                        onDismissRequest = { showCreatureSelect = false }
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .width(280.dp)
-                                .height(300.dp)
-                                .border(1.dp, CyberGreen, RoundedCornerShape(4.dp))
-                                .background(Color.Black)
-                                .padding(12.dp)
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
-                                Text(text = "SELECT SPECIMEN TO ATTACH", color = CyberGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    items(creatures) { creature ->
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .border(1.dp, CyberBorder, RoundedCornerShape(2.dp))
-                                                .background(CyberPanel)
-                                                .clickable {
-                                                    viewModel.synthManager.playBeep(520f, 0.05f, "sine")
-                                                    attachedCreature = creature
-                                                    showCreatureSelect = false
-                                                }
-                                                .padding(6.dp)
-                                        ) {
-                                            Text(text = "${creature.name} [V: ${creature.vitality}]", color = Color.White, fontSize = 8.sp)
-                                        }
-                                    }
-                                }
-                                Button(
-                                    onClick = { showCreatureSelect = false },
-                                    modifier = Modifier.fillMaxWidth().height(26.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.Yellow),
-                                    border = BorderStroke(1.dp, Color.Yellow),
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Text(text = "CANCEL", fontSize = 8.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (showGeneSelect) {
-                    androidx.compose.ui.window.Popup(
-                        alignment = Alignment.Center,
-                        onDismissRequest = { showGeneSelect = false }
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .width(280.dp)
-                                .height(300.dp)
-                                .border(1.dp, CyberGreen, RoundedCornerShape(4.dp))
-                                .background(Color.Black)
-                                .padding(12.dp)
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
-                                Text(text = "SELECT CODON TO ATTACH", color = CyberGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    items(geneSequences) { gene ->
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .border(1.dp, CyberBorder, RoundedCornerShape(2.dp))
-                                                .background(CyberPanel)
-                                                .clickable {
-                                                    viewModel.synthManager.playBeep(520f, 0.05f, "sine")
-                                                    attachedGene = gene
-                                                    showGeneSelect = false
-                                                }
-                                                .padding(6.dp)
-                                        ) {
-                                            Text(text = gene.sequence, color = Color.White, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
-                                        }
-                                    }
-                                }
-                                Button(
-                                    onClick = { showGeneSelect = false },
-                                    modifier = Modifier.fillMaxWidth().height(26.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.Yellow),
-                                    border = BorderStroke(1.dp, Color.Yellow),
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Text(text = "CANCEL", fontSize = 8.sp)
-                                }
-                            }
+                            Text(
+                                text = "SECURE TRANSFERS",
+                                color = Color.Black,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Back Button
+        Button(
+            onClick = {
+                viewModel.synthManager.playBeep(480f, 0.04f, "sine")
+                onClose()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = CyberGreen.copy(alpha = 0.15f),
+                contentColor = CyberGreen
+            ),
+            border = BorderStroke(1.dp, CyberGreen.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(4.dp),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Text(
+                text = "RETURN TO INBOX MODULE",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Default
+            )
+        }
     }
 }
+
 
 
 

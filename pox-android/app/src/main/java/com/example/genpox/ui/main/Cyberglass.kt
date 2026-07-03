@@ -91,6 +91,45 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.Immutable
 
 
+@Composable
+fun getActiveReagentColor(selectedReagent: String?): Color {
+    return selectedReagent?.let { rId ->
+        when (rId) {
+            "REAGENT_LIGASE" -> Color(0xFF00FF66)
+            "REAGENT_BETAINE" -> Color(0xFFFBBF24)
+            "REAGENT_FORMAMIDE" -> Color(0xFFA855F7)
+            "REAGENT_TU" -> Color(0xFFEF4444)
+            "REAGENT_STAT_VITALITY" -> Color(0xFF38BDF8)
+            "REAGENT_STAT_ATTACK" -> Color(0xFF34D399)
+            "REAGENT_STAT_DEFENSE" -> Color(0xFFFB7185)
+            "REAGENT_STAT_SPEED" -> Color(0xFFFBBF24)
+            "REAGENT_ALIGN_CONTAINMENT" -> Color(0xFF38BDF8)
+            "REAGENT_ALIGN_INFECTION" -> Color(0xFF34D399)
+            "REAGENT_ALIGN_MECH" -> Color(0xFFFB7185)
+            "REAGENT_ALIGN_PARASITE" -> Color(0xFFFBBF24)
+            "REAGENT_TACTICAL_HACK" -> Color(0xFF84CC16)
+            "REAGENT_TACTICAL_DEFEND" -> Color(0xFFCBD5E1)
+            "REAGENT_TACTICAL_TEMP" -> Color(0xFFEC4899)
+            "REAGENT_VISUAL_GLOW" -> Color(0xFF00FF66)
+            "REAGENT_VISUAL_MATRIX" -> Color(0xFF22D3EE)
+            "REAGENT_VISUAL_SHIMMER" -> {
+                val transition = rememberInfiniteTransition(label = "shimmer_transition")
+                val hue by transition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 6000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "shimmer_hue"
+                )
+                Color.hsv(hue, 0.8f, 0.9f)
+            }
+            else -> CyberTheme.green
+        }
+    } ?: CyberTheme.green
+}
+
 fun Modifier.cyberglass(
     borderColor: Color,
     glowColor: Color = borderColor.copy(alpha = 0.2f),

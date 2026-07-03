@@ -78,6 +78,7 @@ import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
 import kotlin.math.absoluteValue
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
@@ -109,10 +110,16 @@ fun GeneDetailsPopup(
     
     AlertDialog(
         onDismissRequest = onClose,
-        modifier = Modifier.cyberglass(
-            borderColor = if (isAnom) CyberTheme.purple else activeColor,
-            backgroundColor = if (isAnom) CyberTheme.purplePanel else activePanel
-        ),
+        modifier = Modifier
+            .border(
+                1.dp,
+                if (isAnom) CyberTheme.purple else activeColor,
+                RoundedCornerShape(4.dp)
+            )
+            .background(
+                if (isAnom) CyberTheme.purplePanel else activePanel,
+                RoundedCornerShape(4.dp)
+            ),
         containerColor = Color.Transparent,
         title = {
             Row(
@@ -154,12 +161,13 @@ fun GeneDetailsPopup(
                 Box(
                     modifier = Modifier
                         .size(24.dp)
+                        .background(CyberRed, RoundedCornerShape(4.dp))
                         .clickable { onClose() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "✕",
-                        color = Color.Gray,
+                        color = Color.Black,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -194,7 +202,7 @@ fun GeneDetailsPopup(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
-                        .border(1.dp, (if (isAnom) Color(0xFFD8B4FE) else activeColor).copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                        .border(1.dp, if (isAnom) Color(0xFFD8B4FE) else activeColor, RoundedCornerShape(4.dp))
                         .background(Color.Black.copy(alpha = 0.5f))
                         .padding(6.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -263,34 +271,53 @@ fun GeneDetailsPopup(
 
                 if (onEject != null) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    PoxButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = "✕ EJECT GENE BLOCK FROM SPLICER",
+                    Button(
                         onClick = {
+                            viewModel.synthManager.playReject()
                             onEject()
                             onClose()
                         },
-                        buttonType = PoxButtonType.RED_DANGER,
-                        buttonSize = PoxButtonSize.STANDARD,
-                        sound = PoxButtonSound.REJECT_BEEP,
-                        viewModel = viewModel
-                    )
+                        modifier = Modifier.fillMaxWidth().height(34.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color.Red
+                        ),
+                        border = BorderStroke(1.dp, Color.Red),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "✕ EJECT GENE BLOCK FROM SPLICER",
+                            color = Color.Red,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Default
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
-            PoxButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = "TARGET IN BIO-LAB",
+            Button(
                 onClick = {
+                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
                     viewModel.setTargetSynthesisSequence(gene)
                     onClose()
                 },
-                buttonType = PoxButtonType.CYAN_CELESTIAL,
-                buttonSize = PoxButtonSize.STANDARD,
-                sound = PoxButtonSound.BEEP_DEFAULT,
-                viewModel = viewModel
-            )
+                modifier = Modifier.fillMaxWidth().height(34.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = CyberCyan,
+                    contentColor = Color.Black
+                ),
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text(
+                    text = "TARGET IN BIO-LAB",
+                    color = Color.Black,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Default
+                )
+            }
         }
     )
 }
@@ -306,13 +333,19 @@ fun StepSearchGeneDetailsPopup(
 ) {
     val isAnom = WaveMath.isAnomalousGene(gene)
     val benefit = if (isAnom) WaveMath.getBenefitForAnomalousGene(gene) else null
-    
+
     AlertDialog(
         onDismissRequest = onClose,
-        modifier = Modifier.cyberglass(
-            borderColor = if (isAnom) CyberTheme.purple else activeColor,
-            backgroundColor = if (isAnom) CyberTheme.purplePanel else activePanel
-        ),
+        modifier = Modifier
+            .border(
+                1.dp,
+                if (isAnom) CyberTheme.purple else activeColor,
+                RoundedCornerShape(4.dp)
+            )
+            .background(
+                if (isAnom) CyberTheme.purplePanel else activePanel,
+                RoundedCornerShape(4.dp)
+            ),
         containerColor = Color.Transparent,
         title = {
             Row(
@@ -324,30 +357,30 @@ fun StepSearchGeneDetailsPopup(
                         color = Color(0xFFD8B4FE),
                         modifier = Modifier.size(16.dp)
                     )
-                    Text(
-                        text = "DECRYPTED ANOMALY MOLECULE",
-                        style = Typography.titleMedium,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFD8B4FE)
-                    )
-                } else {
-                    WireframeDna(
-                        color = activeColor,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "MOLECULAR STOCK DETAILED VIEW",
-                        style = Typography.titleMedium,
-                        fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold,
-                        color = activeColor
-                    )
                 }
+                Text(
+                    text = if (isAnom) "ANOMALOUS SEQUENCE" else "GENETIC BLOCK DETAILED DATA",
+                    style = Typography.titleMedium,
+                    fontFamily = FontFamily.Default,
+                    color = if (isAnom) Color(0xFFD8B4FE) else activeColor,
+                    fontWeight = FontWeight.Bold
+                )
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            val geneSequence = viewModel.geneSequences.collectAsState().value.find { it.sequence == gene }
+            val tm = remember(gene, geneSequence, viewModel.reactorSalt) {
+                geneSequence?.meltingTemp ?: BiophysicsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
+            }
+            val mfe = remember(gene, geneSequence) {
+                geneSequence?.minimumFreeEnergy ?: BiophysicsEngine.calculateMinimumFreeEnergy(gene)
+            }
+            val qScore = remember(gene, geneSequence) {
+                geneSequence?.averageQScore ?: 30.0
+            }
+            val count = geneSequence?.count ?: 0
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = "SEQUENCE: $gene",
                     style = Typography.bodyMedium,
@@ -356,71 +389,54 @@ fun StepSearchGeneDetailsPopup(
                     color = if (isAnom) Color(0xFFD8B4FE) else activeColor
                 )
 
-                // Biophysical parameters
-                val geneSequence = remember(gene, viewModel.geneSequences.collectAsState().value) {
-                    viewModel.geneSequences.value.find { it.sequence == gene }
-                }
-                val tm = remember(gene, geneSequence) {
-                    geneSequence?.meltingTemp ?: BiophysicsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
-                }
-                val mfe = remember(gene, geneSequence) {
-                    geneSequence?.minimumFreeEnergy ?: BiophysicsEngine.calculateMinimumFreeEnergy(gene)
-                }
-                val qScore = remember(gene, geneSequence) {
-                    geneSequence?.averageQScore ?: 30.0
-                }
-                val count = geneSequence?.count ?: 0
-
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .border(1.dp, (if (isAnom) Color(0xFFD8B4FE) else activeColor).copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                        .border(1.dp, if (isAnom) Color(0xFFD8B4FE) else activeColor, RoundedCornerShape(4.dp))
                         .background(Color.Black.copy(alpha = 0.5f))
-                        .padding(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = "THERMODYNAMIC Tm: " + String.format(Locale.US, "%.2f°C", tm),
                         color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 8.5.sp,
+                        fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "MIN FREE ENERGY: " + String.format(Locale.US, "%.2f kcal/mol", mfe),
                         color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 8.5.sp,
+                        fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "ACCURATE Q-SCORE: " + String.format(Locale.US, "%.1f (Phred)", qScore),
+                        text = "AVERAGE Q-SCORE: " + String.format(Locale.US, "%.1f dB", qScore),
                         color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 8.5.sp,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "INVENTORY YIELD STOCK: $count BLOCKS",
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
-                if (isAnom && benefit != null) {
+                if (benefit != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "TACTICAL PERK: ${benefit.name.uppercase()}",
-                        style = Typography.bodySmall,
+                        text = "ANOMALY SIGNAL CLUSTER DETECTED. BIOLOGICAL PAYLOAD BENEFITS EMANATING FROM THIS NODE:",
+                        style = Typography.labelSmall,
                         fontFamily = FontFamily.Default,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        color = Color(0xFFD8B4FE)
                     )
                     Text(
                         text = benefit.description.uppercase(),
-                        style = Typography.labelSmall,
-                        fontFamily = FontFamily.Default,
-                        color = Color.LightGray,
-                        lineHeight = 12.sp
-                    )
-                } else {
-                    Text(
-                        text = "STANDARD STABLE SEQUENCE. IDEAL FOR CREATURE TELOMERE REINFORCEMENT OPERATIONS.",
                         style = Typography.labelSmall,
                         fontFamily = FontFamily.Default,
                         color = Color.LightGray,
@@ -430,40 +446,134 @@ fun StepSearchGeneDetailsPopup(
 
                 if (geneSequence != null && count > 0) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    PoxButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = "♺ DECONSTRUCT GENE BLOCK",
-                        onClick = { onDeconstructGene?.invoke(geneSequence) },
-                        buttonType = PoxButtonType.RED_DANGER,
-                        buttonSize = PoxButtonSize.STANDARD,
-                        sound = PoxButtonSound.BEEP_HIGH,
-                        viewModel = viewModel
-                    )
+                    Button(
+                        onClick = {
+                            viewModel.synthManager.playBeep(600f, 0.05f, "sine")
+                            onDeconstructGene?.invoke(geneSequence)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(34.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color.Red
+                        ),
+                        border = BorderStroke(1.dp, Color.Red),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "♺ DECONSTRUCT GENE BLOCK",
+                            color = Color.Red,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Default
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
-            PoxButton(
-                text = "✕ CLOSE",
-                onClick = onClose,
-                buttonType = PoxButtonType.RED_DANGER,
-                buttonSize = PoxButtonSize.COMPACT,
-                sound = PoxButtonSound.BEEP_DEFAULT,
-                viewModel = viewModel
-            )
-        },
-        dismissButton = {
-            PoxButton(
-                text = "TARGET IN BIO-LAB",
+            Button(
                 onClick = {
-                    viewModel.setTargetSynthesisSequence(gene)
+                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
                     onClose()
                 },
-                buttonType = PoxButtonType.CYAN_CELESTIAL,
-                buttonSize = PoxButtonSize.COMPACT,
-                sound = PoxButtonSound.BEEP_DEFAULT,
-                viewModel = viewModel
-            )
+                modifier = Modifier.height(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = CyberRed,
+                    contentColor = Color.Black
+                ),
+                shape = RoundedCornerShape(4.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                Text(
+                    text = "CLOSE",
+                    color = Color.Black,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Default
+                )
+            }
+        },
+        dismissButton = {
+            val openedFrom by viewModel.creatureCardOpenedFrom.collectAsState()
+            if (openedFrom == "message_gene") {
+                Button(
+                    onClick = {
+                        viewModel.synthManager.playBeep(600f, 0.05f, "sine")
+                        val geneSequence = viewModel.geneSequences.value.find { it.sequence == gene } ?: GeneSequence(
+                            sequence = gene,
+                            count = 1,
+                            discoveredAt = System.currentTimeMillis()
+                        )
+                        viewModel.setComposerAttachedGene(geneSequence)
+                        viewModel.setActiveCreature(null, "vault")
+                        viewModel.selectTab("network")
+                        onClose()
+                    },
+                    modifier = Modifier.height(28.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CyberCyan,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text(
+                        text = "ATTACH GENE",
+                        color = Color.Black,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default
+                    )
+                }
+            } else if (openedFrom == "splicer_slot") {
+                Button(
+                    onClick = {
+                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                        viewModel.assignGeneToSlot(gene)
+                        viewModel.setActiveCreature(null, "vault")
+                        viewModel.selectTab("splicer")
+                        onClose()
+                    },
+                    modifier = Modifier.height(28.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CyberCyan,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text(
+                        text = "LOAD INTO SPLICER",
+                        color = Color.Black,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default
+                    )
+                }
+            } else {
+                Button(
+                    onClick = {
+                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                        viewModel.setTargetSynthesisSequence(gene)
+                        onClose()
+                    },
+                    modifier = Modifier.height(28.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CyberCyan,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text(
+                        text = "TARGET IN BIO-LAB",
+                        color = Color.Black,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default
+                    )
+                }
+            }
         }
     )
 }
@@ -479,10 +589,16 @@ fun VaultGeneDetailsPopup(
     
     AlertDialog(
         onDismissRequest = onClose,
-        modifier = Modifier.cyberglass(
-            borderColor = CyberTheme.purple,
-            backgroundColor = CyberTheme.purplePanel
-        ),
+        modifier = Modifier
+            .border(
+                1.dp,
+                CyberTheme.purple,
+                RoundedCornerShape(4.dp)
+            )
+            .background(
+                CyberTheme.purplePanel,
+                RoundedCornerShape(4.dp)
+            ),
         containerColor = Color.Transparent,
         title = {
             Row(
@@ -530,7 +646,7 @@ fun VaultGeneDetailsPopup(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
-                        .border(1.dp, Color(0xFFD8B4FE).copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                        .border(1.dp, Color(0xFFD8B4FE), RoundedCornerShape(4.dp))
                         .background(Color.Black.copy(alpha = 0.5f))
                         .padding(6.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -581,27 +697,51 @@ fun VaultGeneDetailsPopup(
             }
         },
         confirmButton = {
-            PoxButton(
-                text = "✕ CLOSE",
-                onClick = onClose,
-                buttonType = PoxButtonType.RED_DANGER,
-                buttonSize = PoxButtonSize.COMPACT,
-                sound = PoxButtonSound.BEEP_DEFAULT,
-                viewModel = viewModel
-            )
+            Button(
+                onClick = {
+                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                    onClose()
+                },
+                modifier = Modifier.height(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = CyberRed,
+                    contentColor = Color.Black
+                ),
+                shape = RoundedCornerShape(4.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                Text(
+                    text = "CLOSE",
+                    color = Color.Black,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Default
+                )
+            }
         },
         dismissButton = {
-            PoxButton(
-                text = "TARGET IN BIO-LAB",
+            Button(
                 onClick = {
+                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
                     viewModel.setTargetSynthesisSequence(gene)
                     onClose()
                 },
-                buttonType = PoxButtonType.CYAN_CELESTIAL,
-                buttonSize = PoxButtonSize.COMPACT,
-                sound = PoxButtonSound.BEEP_DEFAULT,
-                viewModel = viewModel
-            )
+                modifier = Modifier.height(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = CyberCyan,
+                    contentColor = Color.Black
+                ),
+                shape = RoundedCornerShape(4.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                Text(
+                    text = "TARGET IN BIO-LAB",
+                    color = Color.Black,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Default
+                )
+            }
         }
     )
 }
@@ -630,10 +770,16 @@ fun GeneDeconstructPopup(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.cyberglass(
-            borderColor = Color(0xFFEF4444),
-            backgroundColor = Color(0xFF150808)
-        ),
+        modifier = Modifier
+            .border(
+                1.dp,
+                Color(0xFFEF4444),
+                RoundedCornerShape(4.dp)
+            )
+            .background(
+                Color(0xFF150808),
+                RoundedCornerShape(4.dp)
+            ),
         containerColor = Color.Transparent,
         title = {
             Row(
@@ -678,24 +824,25 @@ fun GeneDeconstructPopup(
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     listOf(
-                        Pair("A", aCount),
-                        Pair("G", gCount),
-                        Pair("T", tCount),
-                        Pair("C", cCount)
-                    ).forEach { (base, count) ->
+                        Triple("A", aCount, CyberGreen),
+                        Triple("G", gCount, CyberGreen),
+                        Triple("T", tCount, CyberGreen),
+                        Triple("C", cCount, CyberGreen),
+                        Triple("WASTE", 2, Color.Yellow)
+                    ).forEach { (name, count, color) ->
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .border(1.dp, CyberBorder.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                                 .background(Color.Black.copy(alpha = 0.3f))
                                 .padding(vertical = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = base, color = CyberGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                Text(text = name, color = color, fontWeight = FontWeight.Bold, fontSize = 8.sp)
                                 Text(text = "+${count}", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                             }
                         }
@@ -717,7 +864,7 @@ fun GeneDeconstructPopup(
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
-                                .cyberglass(borderColor = CyberBorder, backgroundColor = CyberPanel)
+                                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp)).background(CyberPanel, RoundedCornerShape(4.dp))
                                 .clickable { if (deconstructCount > 1) deconstructCount-- },
                             contentAlignment = Alignment.Center
                         ) {
@@ -737,7 +884,7 @@ fun GeneDeconstructPopup(
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
-                                .cyberglass(borderColor = CyberBorder, backgroundColor = CyberPanel)
+                                .border(1.dp, CyberBorder, RoundedCornerShape(4.dp)).background(CyberPanel, RoundedCornerShape(4.dp))
                                 .clickable { if (deconstructCount < gene.count) deconstructCount++ },
                             contentAlignment = Alignment.Center
                         ) {
@@ -753,34 +900,76 @@ fun GeneDeconstructPopup(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (gene.count > 1) {
-                    PoxButton(
-                        text = "♺ DECONSTRUCT ALL",
-                        onClick = { onConfirm(gene.count) },
-                        buttonType = PoxButtonType.RED_DANGER,
-                        buttonSize = PoxButtonSize.COMPACT,
-                        sound = PoxButtonSound.BEEP_DEFAULT,
-                        viewModel = viewModel
+                    Button(
+                        onClick = {
+                            viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                            onConfirm(gene.count)
+                        },
+                        modifier = Modifier.height(28.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color.Red
+                        ),
+                        border = BorderStroke(1.dp, Color.Red),
+                        shape = RoundedCornerShape(4.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Text(
+                            text = "♺ DECONSTRUCT ALL",
+                            color = Color.Red,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Default
+                        )
+                    }
+                }
+                Button(
+                    onClick = {
+                        viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                        onConfirm(deconstructCount)
+                    },
+                    modifier = Modifier.height(28.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Red
+                    ),
+                    border = BorderStroke(1.dp, Color.Red),
+                    shape = RoundedCornerShape(4.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text(
+                        text = "✓ DECONSTRUCT",
+                        color = Color.Red,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default
                     )
                 }
-                PoxButton(
-                    text = "✓ DECONSTRUCT",
-                    onClick = { onConfirm(deconstructCount) },
-                    buttonType = PoxButtonType.RED_MUTED,
-                    buttonSize = PoxButtonSize.COMPACT,
-                    sound = PoxButtonSound.BEEP_DEFAULT,
-                    viewModel = viewModel
-                )
             }
         },
         dismissButton = {
-            PoxButton(
-                text = "✕ CANCEL",
-                onClick = onDismiss,
-                buttonType = PoxButtonType.GRAY_UTILITY,
-                buttonSize = PoxButtonSize.COMPACT,
-                sound = PoxButtonSound.BEEP_DEFAULT,
-                viewModel = viewModel
-            )
+            Button(
+                onClick = {
+                    viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                    onDismiss()
+                },
+                modifier = Modifier.height(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = Color.Gray
+                ),
+                border = BorderStroke(1.dp, Color.Gray),
+                shape = RoundedCornerShape(4.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                Text(
+                    text = "✕ CANCEL",
+                    color = Color.Gray,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Default
+                )
+            }
         }
     )
 }

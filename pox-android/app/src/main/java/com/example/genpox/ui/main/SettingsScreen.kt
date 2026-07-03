@@ -374,7 +374,7 @@ fun PaletteSettingsView(viewModel: MainViewModel) {
 // ==========================================
 @Composable
 fun SettingsView(viewModel: MainViewModel) {
-    var subTab by remember { mutableStateOf("general") }
+    val subTab by viewModel.settingsSubTab.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -394,7 +394,7 @@ fun SettingsView(viewModel: MainViewModel) {
                 Button(
                     onClick = {
                         viewModel.synthManager.playCombinatorTick()
-                        subTab = tab.first
+                        viewModel.setSettingsSubTab(tab.first)
                     },
                     modifier = Modifier
                         .weight(1f)
@@ -458,8 +458,8 @@ fun SettingsView(viewModel: MainViewModel) {
                                 unfocusedTextColor = CyberGreen,
                                 focusedBorderColor = CyberGreen,
                                 unfocusedBorderColor = CyberBorder,
-                                focusedContainerColor = Color.Black,
-                                unfocusedContainerColor = Color.Black
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent
                             ),
                             placeholder = { Text("Paste AIStudio API Key...", color = CyberGreenDim, style = Typography.bodySmall) }
                         )

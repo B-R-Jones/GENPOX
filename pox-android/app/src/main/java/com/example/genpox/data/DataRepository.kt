@@ -47,11 +47,22 @@ interface DataRepository {
     val rawStockG: Flow<Long>
     val rawStockT: Flow<Long>
     val rawStockC: Flow<Long>
+    val bioWaste: Flow<Long>
+    val splicerSlots: Flow<List<String?>>
+    val splicerQScores: Flow<List<Double>>
+    val splicerSignatures: Flow<List<String>>
     suspend fun saveGeminiApiKey(apiKey: String)
     suspend fun setMuteSound(mute: Boolean)
     suspend fun setScanRadius(radius: Float)
     suspend fun saveTargetSequence(seq: String)
     suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long)
+    suspend fun saveBioWaste(waste: Long)
+    suspend fun saveSplicerState(slots: List<String?>, qScores: List<Double>, signatures: List<String>)
+
+    // Reagent stockpile
+    val allReagentStock: Flow<List<ReagentStock>>
+    suspend fun insertReagentStock(reagents: List<ReagentStock>)
+    suspend fun decrementReagentStock(id: String)
 }
 
 class DefaultDataRepository(private val context: Context) : DataRepository {
@@ -146,6 +157,18 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
     override val rawStockC: Flow<Long>
         get() = settings.rawStockC
 
+    override val bioWaste: Flow<Long>
+        get() = settings.bioWaste
+
+    override val splicerSlots: Flow<List<String?>>
+        get() = settings.splicerSlots
+
+    override val splicerQScores: Flow<List<Double>>
+        get() = settings.splicerQScores
+
+    override val splicerSignatures: Flow<List<String>>
+        get() = settings.splicerSignatures
+
     override suspend fun saveGeminiApiKey(apiKey: String) = settings.saveGeminiApiKey(apiKey)
 
     override suspend fun setMuteSound(mute: Boolean) = settings.setMuteSound(mute)
@@ -156,4 +179,19 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
 
     override suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long) =
         settings.saveRawStocks(a, g, t, c)
+
+    override suspend fun saveBioWaste(waste: Long) = settings.saveBioWaste(waste)
+
+    override suspend fun saveSplicerState(slots: List<String?>, qScores: List<Double>, signatures: List<String>) =
+        settings.saveSplicerState(slots, qScores, signatures)
+
+    // Reagent stockpile overrides
+    override val allReagentStock: Flow<List<ReagentStock>>
+        get() = poxDao.getAllReagentStock()
+
+    override suspend fun insertReagentStock(reagents: List<ReagentStock>) =
+        poxDao.insertReagentStock(reagents)
+
+    override suspend fun decrementReagentStock(id: String) =
+        poxDao.decrementReagentStock(id)
 }

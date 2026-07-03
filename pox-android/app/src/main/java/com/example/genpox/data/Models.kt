@@ -22,6 +22,7 @@ data class Creature(
     val discoveredAt: Long,
     val origin: String,
     val isAutoHacker: Boolean = false,
+    val isAutoDefender: Boolean = false,
     val appendedGenes: List<String> = emptyList(),
     val isFavorite: Boolean = false,
     val telomeres: Int = 100,
@@ -29,18 +30,23 @@ data class Creature(
     val coherenceType: String? = null,
     val isMutated: Boolean = false,
     val originalSequence: String? = null,
-    val codonAdaptationIndex: Double = 1.0
+    val codonAdaptationIndex: Double = 1.0,
+    val heatResistance: Double = 0.0,
+    val radResistance: Double = 0.0,
+    val kineticResistance: Double = 0.0
 )
 
 @Entity(tableName = "gene_sequences")
 @Serializable
 data class GeneSequence(
-    @PrimaryKey val sequence: String, // 8-character gene sequence
-    val count: Int,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val sequence: String, // 8-character gene sequence
+    val count: Int = 1,
     val discoveredAt: Long,
     val averageQScore: Double = 30.0,
     val meltingTemp: Double = 0.0,
-    val minimumFreeEnergy: Double = 0.0
+    val minimumFreeEnergy: Double = 0.0,
+    val polymeraseSignature: String = "TAQ"
 )
 
 @Entity(tableName = "harvest_missions")
@@ -104,4 +110,14 @@ data class BuildingStructure(
 
 @Serializable
 data class RoadPoint(val lat: Double, val lng: Double)
+
+@Entity(tableName = "reagent_stock")
+@Serializable
+data class ReagentStock(
+    @PrimaryKey val id: String,
+    val name: String,
+    val count: Int,
+    val type: String,
+    val description: String
+)
 
