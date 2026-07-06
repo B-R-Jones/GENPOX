@@ -116,7 +116,7 @@ class ScannerViewModel(
                 name = animName,
                 lat = m.lat,
                 lng = m.lng,
-                gene = m.harvestedGenes.firstOrNull() ?: "AGTCGTAC",
+                gene = m.harvestedPayload.firstOrNull() ?: "AGTCGTAC",
                 faction = m.creatureFaction,
                 distance = dist,
                 heatZoneDiameter = 500.0 * 3.28084,
@@ -807,29 +807,7 @@ class ScannerViewModel(
     }
 
     fun getSynodicResonanceMod(faction: String, phaseName: String): Int {
-        return when (faction) {
-            "Infection" -> {
-                if (phaseName == "Waxing Crescent" || phaseName == "Waxing Gibbous") 15
-                else if (phaseName == "Waning Crescent" || phaseName == "Waning Gibbous") -10
-                else 0
-            }
-            "Mech" -> {
-                if (phaseName == "First Quarter" || phaseName == "Third Quarter") 15
-                else if (phaseName == "New Moon" || phaseName == "Full Moon") -10
-                else 0
-            }
-            "Parasite" -> {
-                if (phaseName == "Full Moon") 15
-                else if (phaseName == "New Moon") -10
-                else 0
-            }
-            "Containment" -> {
-                if (phaseName == "New Moon") 15
-                else if (phaseName == "Full Moon") -10
-                else 0
-            }
-            else -> 0
-        }
+        return DeploymentEngine.getSynodicResonanceMod(faction, phaseName)
     }
 
     private fun hasCoherenceShield(creature: Creature): Boolean {
@@ -847,40 +825,26 @@ class ScannerViewModel(
     fun dispatchMission(creature: Creature, anomaly: PoxAnomaly) {
         viewModelScope.launch {
             val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
-            val phaseFraction = wave.lunarAge / WaveMath.LUNAR_MONTH_DAYS
+            val boundaryRadius = anomaly.getBoundaryRadiusForPlayer(_latitude.value, _longitude.value)
+            val phaseFraction = wave.lunarAge / DeploymentEngine.LUNAR_MONTH_DAYS
             val lunarPhaseScale = (1.0 - kotlin.math.cos(phaseFraction * 2.0 * Math.PI)) / 2.0
             val lunarResistanceMod = 0.7 + 0.6 * lunarPhaseScale
-            val lunarMutationMod = 0.5 + 1.0 * lunarPhaseScale
-
-            val boundaryRadius = anomaly.getBoundaryRadiusForPlayer(_latitude.value, _longitude.value)
             val R_base = boundaryRadius * 0.1
             val R_anom = R_base * lunarResistanceMod
 
-            val resonanceMod = getSynodicResonanceMod(creature.faction, wave.phaseName)
-            val effectiveDefense = creature.defense + resonanceMod
+            val resonanceMod = DeploymentEngine.getSynodicResonanceMod(creature.faction, wave.phaseName)
+            val effectiveDefense = DeploymentEngine.calculateEffectiveDefense(creature.defense, creature.faction, wave.phaseName)
 
-            val stalledDepth = (effectiveDefense.toDouble() / R_anom * 100.0).coerceIn(0.0, 100.0)
+            val stalledDepth = DeploymentEngine.calculateStallDepth(effectiveDefense, boundaryRadius, wave.lunarAge)
             val dispatchDistance = boundaryRadius * (1.0 - stalledDepth / 100.0)
 
-            val mutationInterval = Math.round((480.0 * Math.pow(2.0, -stalledDepth / 25.0)) / lunarMutationMod / 16.0).coerceAtLeast(1L)
+            val mutationInterval = DeploymentEngine.calculateMutationInterval(stalledDepth, wave.lunarAge)
 
             val t = if (anomaly.distance > 0.0) (dispatchDistance / anomaly.distance).coerceIn(0.0, 1.0) else 0.0
             val landingLat = anomaly.lat + t * (_latitude.value - anomaly.lat)
             val landingLng = anomaly.lng + t * (_longitude.value - anomaly.lng)
 
-            var combinedDensity = 0.0
-            _rawAnomalies.value.forEach { anom ->
-                val distFromAnom = calculateDistanceInFeet(landingLat, landingLng, anom.lat, anom.lng)
-                val boundRad = anom.getBoundaryRadiusForPlayer(landingLat, landingLng)
-                if (distFromAnom <= boundRad) {
-                    val seed = anom.id.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
-                    val phi = (seed % 360) * (Math.PI / 180.0)
-                    val omega = 0.02
-                    val alpha = 0.002
-                    val waveTerm = kotlin.math.cos(omega * distFromAnom + phi) * kotlin.math.exp(-alpha * distFromAnom)
-                    combinedDensity += anom.density * waveTerm
-                }
-            }
+            val combinedDensity = DeploymentEngine.calculateCombinedWaveDensity(landingLat, landingLng, _rawAnomalies.value)
 
             val descentDistance = boundaryRadius * (stalledDepth / 100.0)
             val densityShift = 0.2 * (lunarPhaseScale - 0.5)
@@ -889,32 +853,21 @@ class ScannerViewModel(
             val hasCoherenceShield = hasCoherenceShield(creature)
             val finalDensity = if (hasCoherenceShield && effectiveDensity > 0.0) 0.0 else effectiveDensity
 
-            val travelTimeComponent = 32.0
-            val travelDistanceComponent = 16.0
-            val speedFactor = 1350.0
-            val V_travel_base = (((creature.speed.toDouble() / 50.0) * travelDistanceComponent) / travelTimeComponent) * speedFactor
+            val metrics = DeploymentEngine.calculateTransitMetrics(
+                creatureSpeed = creature.speed,
+                anomalyDistance = anomaly.distance,
+                boundaryRadius = boundaryRadius,
+                stalledDepth = stalledDepth,
+                effectiveDensity = effectiveDensity,
+                hasCoherenceShield = hasCoherenceShield
+            )
 
-            val V_travel = V_travel_base
-
-            val travelDistance = maxOf(0.0, anomaly.distance - boundaryRadius)
-            val travelDuration = if (V_travel > 0.0) {
-                Math.round(travelDistance / V_travel).coerceAtLeast(1L)
-            } else {
-                32L
-            }
-
-            val V_descent = V_travel_base * (1.0 - 2.0 * finalDensity).coerceAtLeast(0.1) * 0.024
-
-            val descentDuration = if (V_descent > 0.0) {
-                Math.round(descentDistance / V_descent).coerceAtLeast(1L)
-            } else {
-                32L
-            }
-
-            val harvestDuration = 60L
-            val ascentDuration = descentDuration
-            val transitBackDuration = travelDuration
-            val calculatedDuration = travelDuration + descentDuration + harvestDuration + ascentDuration + transitBackDuration
+            val travelDuration = metrics.travelDuration
+            val descentDuration = metrics.descentDuration
+            val harvestDuration = metrics.harvestDuration
+            val ascentDuration = metrics.ascentDuration
+            val transitBackDuration = metrics.returnDuration
+            val calculatedDuration = metrics.totalDuration
 
             val densityVal = Math.round(combinedDensity * 100.0).toInt()
             val effDensityVal = Math.round(effectiveDensity * 100.0).toInt()
@@ -939,7 +892,7 @@ class ScannerViewModel(
                 lng = anomaly.lng,
                 startTime = System.currentTimeMillis(),
                 totalDuration = calculatedDuration,
-                harvestedGenes = listOf(anomaly.gene),
+                harvestedPayload = listOf(anomaly.gene),
                 isCompleted = false,
                 isReturned = false,
                 dispatchDistance = dispatchDistance,
@@ -978,7 +931,11 @@ class ScannerViewModel(
                 calculateDistanceInFeet(landingLat, landingLng, anom.lat, anom.lng) <= anom.getBoundaryRadiusForPlayer(landingLat, landingLng)
             }
 
-            val primaryGene = mission.harvestedGenes.firstOrNull() ?: "AGTCGTAC"
+            fun isGeneSequence(s: String): Boolean {
+                return s.length == 8 && s.all { it in "AGTC" }
+            }
+
+            val primaryGene = mission.harvestedPayload.find { isGeneSequence(it) } ?: "AGTCGTAC"
             var updatedPrimaryGene = primaryGene
             var spilloverSuccess = false
             var hybridGene: String? = null
@@ -1011,23 +968,44 @@ class ScannerViewModel(
                 }
             }
 
-            val bonusGene = WaveMath.generateAnomalousGene()
-            val rewardedGenes = listOf(updatedPrimaryGene) + bonusGene
-            val updated = mission.copy(isReturned = true, harvestedGenes = rewardedGenes, missionLogs = finalLogs)
-            repository.insertMission(updated)
+            val finalPayload = mission.harvestedPayload.toMutableList()
+            val primaryIndex = finalPayload.indexOf(primaryGene)
+            if (primaryIndex != -1) {
+                finalPayload[primaryIndex] = updatedPrimaryGene
+            } else {
+                finalPayload.add(0, updatedPrimaryGene)
+            }
 
-            if (_trackedMissionId.value == mission.id) {
-                _trackedMissionId.value = null
+            val bonusGene = WaveMath.generateAnomalousGene()
+            finalPayload.add(bonusGene)
+
+            val genesToInsert = mutableListOf<String>()
+            var deltaA = 0L
+            var deltaG = 0L
+            var deltaT = 0L
+            var deltaC = 0L
+
+            finalPayload.forEach { item ->
+                if (isGeneSequence(item)) {
+                    genesToInsert.add(item)
+                } else {
+                    when (item.uppercase()) {
+                        "STOCK_A" -> deltaA++
+                        "STOCK_G" -> deltaG++
+                        "STOCK_T" -> deltaT++
+                        "STOCK_C" -> deltaC++
+                    }
+                }
             }
 
             val toInsertOrUpdate = mutableListOf<GeneSequence>()
-            rewardedGenes.forEach { gene ->
-                val tm = BiophysicsEngine.calculateMeltingTemperature(gene, _reactorSalt.value.toDouble())
-                val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(gene)
+            genesToInsert.distinct().forEach { gene ->
+                val tm = GeneticsEngine.calculateMeltingTemperature(gene, _reactorSalt.value.toDouble())
+                val mfe = GeneticsEngine.calculateMinimumFreeEnergy(gene)
                 toInsertOrUpdate.add(
                     GeneSequence(
                         sequence = gene,
-                        count = 1,
+                        count = finalPayload.count { it == gene },
                         discoveredAt = System.currentTimeMillis(),
                         averageQScore = 30.0,
                         meltingTemp = tm,
@@ -1037,7 +1015,29 @@ class ScannerViewModel(
             }
             repository.insertGeneSequences(toInsertOrUpdate)
 
-            addLog("RCL: Mission returned. Genes cached: ${rewardedGenes.joinToString()}")
+            if (deltaA > 0 || deltaG > 0 || deltaT > 0 || deltaC > 0) {
+                val currentA = repository.rawStockA.first()
+                val currentG = repository.rawStockG.first()
+                val currentT = repository.rawStockT.first()
+                val currentC = repository.rawStockC.first()
+
+                val newA = currentA + deltaA
+                val newG = currentG + deltaG
+                val newT = currentT + deltaT
+                val newC = currentC + deltaC
+
+                repository.saveRawStocks(newA, newG, newT, newC)
+                finalLogs.add("[RESOURCES] Siphoned resources deposited to stockpile: A: +$deltaA, G: +$deltaG, T: +$deltaT, C: +$deltaC")
+            }
+
+            val updated = mission.copy(isReturned = true, harvestedPayload = finalPayload, missionLogs = finalLogs)
+            repository.insertMission(updated)
+
+            if (_trackedMissionId.value == mission.id) {
+                _trackedMissionId.value = null
+            }
+
+            addLog("RCL: Mission returned. Payload processed: ${finalPayload.joinToString()}")
             synthManager.playSynthesisSuccess()
         }
     }
@@ -1123,12 +1123,11 @@ class ScannerViewModel(
                             val isCompleted = nextPhase == "COMPLETED"
 
                             val waveConfig = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
-                            val phaseFraction = waveConfig.lunarAge / WaveMath.LUNAR_MONTH_DAYS
-                            val lunarPhaseScale = (1.0 - kotlin.math.cos(phaseFraction * 2.0 * Math.PI)) / 2.0
-                            val lunarMutationMod = 0.5 + 1.0 * lunarPhaseScale
-                            val mutationInterval = Math.round((480.0 * Math.pow(2.0, -m.stalledDepth / 25.0)) / lunarMutationMod / 16.0).coerceAtLeast(1L)
+                            val waveCouplingVal = WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis())
+                            val mutationInterval = DeploymentEngine.calculateMutationInterval(m.stalledDepth, waveConfig.lunarAge)
 
                             val newLogs = m.missionLogs.toMutableList()
+                            val newHarvestedPayload = m.harvestedPayload.toMutableList()
                             phaseLogs.forEach { log ->
                                 newLogs.add(log)
                             }
@@ -1148,58 +1147,88 @@ class ScannerViewModel(
                                         m.lat to m.lng
                                     }
 
-                                    val currentWells = _celestialWells.value
-                                    var greenhouseDmg = 0.0
-                                    var magDmg = 0.0
-                                    var gravDmg = 0.0
+                                    val anomaly = _rawAnomalies.value.find { Math.abs(it.lat - m.lat) < 0.0001 && Math.abs(it.lng - m.lng) < 0.0001 }
+                                        ?: PoxAnomaly(
+                                            id = "ANM-MUTATED",
+                                            name = "Mutated Anomaly",
+                                            lat = m.lat,
+                                            lng = m.lng,
+                                            gene = m.harvestedPayload.firstOrNull() ?: "AGTCGTAC",
+                                            faction = m.creatureFaction,
+                                            distance = 0.0,
+                                            heatZoneDiameter = 500.0 * 3.28084,
+                                            density = 0.0
+                                        )
 
-                                    currentWells.forEach { well ->
-                                        val dist = calculateDistanceInFeet(landingLat, landingLng, well.lat, well.lng)
-                                        if (dist <= well.radiusFeet) {
-                                            val ratio = 1.0 - (dist / well.radiusFeet)
-                                            val baseDmg = 8.0 * ratio * well.hazardPower
-                                            when (well.type) {
-                                                "GREENHOUSE" -> {
-                                                    val res = creature.heatResistance
-                                                    val dmg = (baseDmg * (1.0 - res / 100.0)).coerceAtLeast(0.0)
-                                                    greenhouseDmg += dmg
+                                    val overlappingWells = _celestialWells.value.filter { well -> well.contains(landingLat, landingLng) }
+
+                                    var currentCreature: Creature = creature
+                                    val isLoggingTick = nextElapsed % 5 == 0L
+
+                                    val anomalyResult = ConflictEngine.simulateCreatureVsEnvironment(
+                                        creature = currentCreature,
+                                        hazard = anomaly,
+                                        userLat = landingLat,
+                                        userLng = landingLng,
+                                        totalTicks = 1,
+                                        lunarAge = waveConfig.lunarAge,
+                                        waveCoupling = waveCouplingVal
+                                    )
+                                    currentCreature = currentCreature.copy(telomeres = anomalyResult.finalTelomeres)
+
+                                    anomalyResult.logs.forEach { log ->
+                                        if (log.startsWith("Tick ") && isLoggingTick) {
+                                            newLogs.add("[HAZARD] Anomaly: $log")
+                                        } else if (log.contains("Coherence Shield") && currentPhaseElapsed == 1L) {
+                                            newLogs.add(log)
+                                        }
+                                    }
+
+                                    val isHarvestingCompleteTick = m.phase == "HARVESTING" && nextPhase == "ASCENT"
+                                    if (isHarvestingCompleteTick && anomalyResult.harvestedPayload.isNotEmpty()) {
+                                        newHarvestedPayload.addAll(anomalyResult.harvestedPayload)
+                                    }
+
+                                    var survived = anomalyResult.survived
+                                    if (survived) {
+                                        for (well in overlappingWells) {
+                                            val wellResult = ConflictEngine.simulateCreatureVsEnvironment(
+                                                creature = currentCreature,
+                                                hazard = well,
+                                                userLat = landingLat,
+                                                userLng = landingLng,
+                                                totalTicks = 1,
+                                                lunarAge = waveConfig.lunarAge,
+                                                waveCoupling = waveCouplingVal
+                                            )
+                                            currentCreature = currentCreature.copy(telomeres = wellResult.finalTelomeres)
+
+                                            wellResult.logs.forEach { log ->
+                                                if (log.startsWith("Tick ") && isLoggingTick) {
+                                                    newLogs.add("[HAZARD] ${well.name}: $log")
+                                                } else if (log.contains("Coherence Shield") && currentPhaseElapsed == 1L) {
+                                                    newLogs.add(log)
                                                 }
-                                                "MAGNETOSPHERIC" -> {
-                                                    val res = creature.radResistance
-                                                    val dmg = (baseDmg * (1.0 - res / 100.0)).coerceAtLeast(0.0)
-                                                    magDmg += dmg
-                                                }
-                                                "GRAVITATIONAL" -> {
-                                                    val res = creature.kineticResistance
-                                                    val dmg = (baseDmg * (1.0 - res / 100.0)).coerceAtLeast(0.0)
-                                                    gravDmg += dmg
-                                                }
+                                            }
+
+                                            if (isHarvestingCompleteTick && wellResult.harvestedPayload.isNotEmpty()) {
+                                                newHarvestedPayload.addAll(wellResult.harvestedPayload)
+                                            }
+
+                                            if (!wellResult.survived) {
+                                                survived = false
+                                                break
                                             }
                                         }
                                     }
 
-                                    val totalDmg = greenhouseDmg + magDmg + gravDmg
-                                    val dmgInt = Math.round(totalDmg).toInt()
-                                    var currentCreature = creature
-                                    if (dmgInt > 0) {
-                                        val nextTelomeres = (creature.telomeres - dmgInt).coerceIn(0, 115)
-                                        currentCreature = creature.copy(telomeres = nextTelomeres)
-                                        repository.insertCreature(currentCreature)
+                                    repository.insertCreature(currentCreature)
 
-                                        if (nextElapsed % 5 == 0L || nextTelomeres <= 0) {
-                                            val hTypes = mutableListOf<String>()
-                                            if (greenhouseDmg > 0) hTypes.add("Greenhouse (${String.format(java.util.Locale.US, "%.1f", greenhouseDmg)} dmg, ${creature.heatResistance}% res)")
-                                            if (magDmg > 0) hTypes.add("Radiation (${String.format(java.util.Locale.US, "%.1f", magDmg)} dmg, ${creature.radResistance}% res)")
-                                            if (gravDmg > 0) hTypes.add("Gravity (${String.format(java.util.Locale.US, "%.1f", gravDmg)} dmg, ${creature.kineticResistance}% res)")
-                                            newLogs.add("[HAZARD] Specimen took $dmgInt damage from: ${hTypes.joinToString(", ")}. Telomeres: $nextTelomeres%.")
-                                        }
-
-                                        if (nextTelomeres <= 0) {
-                                            newLogs.add("[FATAL] Specimen's telomeres completely decayed under extreme environmental hazard. Mission aborted.")
-                                            resolvedPhase = "COMPLETED"
-                                            resolvedPhaseElapsed = 0L
-                                            resolvedCompleted = true
-                                        }
+                                    if (currentCreature.telomeres <= 0) {
+                                        newLogs.add("[FATAL] Specimen's telomeres completely decayed under extreme environmental hazard. Mission aborted.")
+                                        resolvedPhase = "COMPLETED"
+                                        resolvedPhaseElapsed = 0L
+                                        resolvedCompleted = true
                                     }
 
                                     if (!resolvedCompleted && nextElapsed % mutationInterval == 0L) {
@@ -1237,7 +1266,8 @@ class ScannerViewModel(
                                 isCompleted = resolvedCompleted,
                                 missionLogs = newLogs,
                                 phase = resolvedPhase,
-                                currentPhaseElapsed = resolvedPhaseElapsed
+                                currentPhaseElapsed = resolvedPhaseElapsed,
+                                harvestedPayload = newHarvestedPayload
                             )
                             if (resolvedCompleted) {
                                 recallMission(updatedMission)
@@ -1350,13 +1380,6 @@ class ScannerViewModel(
     }
 
     private fun calculateDistanceInFeet(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLng = Math.toRadians(lng2 - lng1)
-        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                Math.sin(dLng / 2) * Math.sin(dLng / 2)
-        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        val earthRadiusFeet = 20902231.0
-        return earthRadiusFeet * c
+        return DeploymentEngine.calculateDistanceInFeet(lat1, lng1, lat2, lng2)
     }
 }

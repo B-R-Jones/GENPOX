@@ -1006,8 +1006,8 @@ class ReactorViewModel(
 
         val generated = if (isSuccess) {
             val anomalousGene = WaveMath.generateAnomalousGene()
-            val tm = BiophysicsEngine.calculateMeltingTemperature(anomalousGene, _reactorSalt.value.toDouble())
-            val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(anomalousGene)
+            val tm = GeneticsEngine.calculateMeltingTemperature(anomalousGene, _reactorSalt.value.toDouble())
+            val mfe = GeneticsEngine.calculateMinimumFreeEnergy(anomalousGene)
             val q = 40.0
 
             val isNewSequence = currentList.none { it.sequence == anomalousGene }

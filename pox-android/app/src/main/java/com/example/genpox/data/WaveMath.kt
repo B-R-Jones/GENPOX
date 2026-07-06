@@ -94,10 +94,8 @@ object WaveMath {
         }
     }
 
-    private val _isTestMode = ThreadLocal.withInitial { false }
-    var isTestMode: Boolean
-        get() = _isTestMode.get() ?: false
-        set(value) = _isTestMode.set(value)
+    @Volatile
+    var isTestMode: Boolean = false
 
     fun getBaseAlignmentState(base: Char, timeMs: Long): AlignmentState {
         if (isTestMode) return AlignmentState.NEUTRAL

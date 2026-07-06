@@ -1,5 +1,8 @@
 package com.example.genpox.ui.main
 
+import com.example.genpox.data.GraphicsMath
+
+
 import android.content.Context
 import androidx.annotation.Keep
 import androidx.compose.animation.core.*
@@ -87,7 +90,7 @@ import androidx.compose.ui.text.font.SystemFontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.drawText
-import com.example.genpox.data.BiophysicsEngine
+import com.example.genpox.data.GeneticsEngine
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -152,32 +155,27 @@ fun HolographicHelixReactor(
         val glitchCenterY = glitchProgress * h
         
         for (i in 0 until numStrands) {
-            val t = i.toFloat() / (numStrands - 1)
-            val cyPos = h * 0.12f + t * h * 0.76f
-            
-            val nodeAngle = t * 3.5f * Math.PI.toFloat() + rotationPhase
-            
-            val x1 = cx + helixRadius * kotlin.math.cos(nodeAngle.toDouble()).toFloat()
-            val z1 = helixRadius * kotlin.math.sin(nodeAngle.toDouble()).toFloat()
-            
-            val x2 = cx + helixRadius * kotlin.math.cos((nodeAngle + Math.PI.toFloat()).toDouble()).toFloat()
-            val z2 = helixRadius * kotlin.math.sin((nodeAngle + Math.PI.toFloat()).toDouble()).toFloat()
-            
-            var gx1 = x1
-            var gx2 = x2
-            if (isGlitching && kotlin.math.abs(cyPos - glitchCenterY) < 35.dp.toPx()) {
-                val offsetVal = (kotlin.math.sin(cyPos * 0.1f) * 10.dp.toPx()).toFloat()
-                gx1 += offsetVal
-                gx2 -= offsetVal
-            }
-            
-            val alpha1 = ((z1 + helixRadius) / (2f * helixRadius) * 0.6f + 0.4f).coerceIn(0.1f, 1.0f)
-            val alpha2 = ((z2 + helixRadius) / (2f * helixRadius) * 0.6f + 0.4f).coerceIn(0.1f, 1.0f)
-            
-            val radius1 = ((z1 + helixRadius) / (2f * helixRadius) * 2.5.dp.toPx() + 1.8.dp.toPx())
-            val radius2 = ((z2 + helixRadius) / (2f * helixRadius) * 2.5.dp.toPx() + 1.8.dp.toPx())
-            
-            val barAlpha = ((alpha1 + alpha2) / 2f * 0.4f).coerceIn(0.1f, 0.7f)
+            val metrics = GraphicsMath.calculateHelixStrand(
+                index = i,
+                numStrands = numStrands,
+                w = w,
+                h = h,
+                rotationPhase = rotationPhase,
+                pulseScale = pulseScale,
+                isGlitching = isGlitching,
+                glitchProgress = glitchProgress,
+                isAnomaly = isAnomaly,
+                glitchThresholdPx = 35.dp.toPx(),
+                glitchOffsetPx = 10.dp.toPx()
+            )
+            val gx1 = metrics.x1
+            val gx2 = metrics.x2
+            val cyPos = metrics.y
+            val alpha1 = metrics.alpha1
+            val alpha2 = metrics.alpha2
+            val radius1 = metrics.radius1Dp.dp.toPx()
+            val radius2 = metrics.radius2Dp.dp.toPx()
+            val barAlpha = metrics.barAlpha
             drawLine(
                 color = activeColor.copy(alpha = barAlpha),
                 start = Offset(gx1, cyPos),
@@ -731,7 +729,7 @@ fun ReactorDashboardView(
     val isLoopActive by viewModel.isLoopActive.collectAsState()
 
     val targetTm = remember(targetSeq, currentSalt) {
-        BiophysicsEngine.calculateMeltingTemperature(targetSeq, currentSalt.toDouble())
+        GeneticsEngine.calculateMeltingTemperature(targetSeq, currentSalt.toDouble())
     }
 
     val tempDeviance = currentTemp - targetTm.toFloat()
@@ -747,7 +745,7 @@ fun ReactorDashboardView(
         }
     }
     val targetMfe = remember(targetSeq) {
-        BiophysicsEngine.calculateMinimumFreeEnergy(targetSeq)
+        GeneticsEngine.calculateMinimumFreeEnergy(targetSeq)
     }
 
     val isStallThreat = remember(targetSeq, currentTemp, safeMinTemp, targetMfe, activeSolute) {
@@ -1395,7 +1393,7 @@ fun ReactorParametersView(
 
     val targetSeq by viewModel.targetSynthesisSequence.collectAsState()
     val targetTm = remember(targetSeq, saltState) {
-        BiophysicsEngine.calculateMeltingTemperature(targetSeq, saltState.toDouble()).toFloat()
+        GeneticsEngine.calculateMeltingTemperature(targetSeq, saltState.toDouble()).toFloat()
     }
     val tempDeviance = tempState - targetTm
 

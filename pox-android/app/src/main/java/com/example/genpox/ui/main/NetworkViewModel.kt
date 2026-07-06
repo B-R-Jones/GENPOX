@@ -22,7 +22,49 @@ class NetworkViewModel(
         onLog?.invoke(message)
     }
 
-    var networkManager: PoxNetworkManager? = null
+    private var connectionsJob: kotlinx.coroutines.Job? = null
+
+    var networkManager: com.example.genpox.data.network.PoxNetworkInterface? = null
+        set(value) {
+            field = value
+            if (value != null) {
+                observeConnections(value)
+            } else {
+                connectionsJob?.cancel()
+            }
+        }
+
+    private fun observeConnections(nm: com.example.genpox.data.network.PoxNetworkInterface) {
+        connectionsJob?.cancel()
+        connectionsJob = viewModelScope.launch {
+            var previousConnections = emptyMap<String, String>()
+            nm.activeConnections.collect { currentConnections ->
+                val newlyAdded = currentConnections.keys - previousConnections.keys
+                previousConnections = currentConnections
+                
+                if (newlyAdded.isNotEmpty()) {
+                    newlyAdded.forEach { endpointId ->
+                        triggerPassiveHackIfPossible(nm, endpointId)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun triggerPassiveHackIfPossible(nm: com.example.genpox.data.network.PoxNetworkInterface, endpointId: String) {
+        viewModelScope.launch {
+            val autoHacker = repository.allCreatures.first().find { it.isAutoHacker && it.telomeres > 0 }
+            if (autoHacker != null) {
+                val targetNodeId = nm.activeConnections.value[endpointId] ?: "Remote Node"
+                val intrusionPacket = HydraPacket.HackingIntrusion(
+                    hacker = autoHacker,
+                    targetNodeId = targetNodeId
+                )
+                nm.sendPacket(endpointId, intrusionPacket)
+                addLog("HACK: Designated Auto-Hacker \"${autoHacker.name}\" initiated passive intrusion on $targetNodeId.")
+            }
+        }
+    }
 
     // State Variables
     private val _inboxMessages = MutableStateFlow<List<MailMessage>>(emptyList())
@@ -145,8 +187,8 @@ class NetworkViewModel(
             }
 
             if (msg.attachedGeneSequence != null) {
-                val tm = BiophysicsEngine.calculateMeltingTemperature(msg.attachedGeneSequence, _reactorSalt.value.toDouble())
-                val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(msg.attachedGeneSequence)
+                val tm = GeneticsEngine.calculateMeltingTemperature(msg.attachedGeneSequence, _reactorSalt.value.toDouble())
+                val mfe = GeneticsEngine.calculateMinimumFreeEnergy(msg.attachedGeneSequence)
                 val newSeq = GeneSequence(
                     sequence = msg.attachedGeneSequence,
                     count = 1,
@@ -182,47 +224,161 @@ class NetworkViewModel(
         }
     }
 
-    fun receiveIncomingPacket(peerName: String, packet: HydraPacket) {
-        if (packet is HydraPacket.NetworkMessage) {
-            val text = packet.messageText
-            val subject = when {
-                packet.attachedCreatureDna != null -> "CREATURE SECURED TRANSACTION"
-                packet.attachedGeneSequence != null -> "GENE SEQUENCE TRANSFERRED"
-                packet.transferGenes > 0 -> "RESOURCES DISPATCH RECEIVED"
-                else -> "PEER UPLINK MESSAGE"
+    fun receiveIncomingPacket(endpointId: String, peerName: String, packet: HydraPacket) {
+        when (packet) {
+            is HydraPacket.HackingIntrusion -> {
+                viewModelScope.launch {
+                    val allCreatures = repository.allCreatures.first()
+                    val autoDefenders = allCreatures.filter { it.isAutoDefender && it.telomeres > 0 }
+                    val primaryDefender = autoDefenders.firstOrNull()
+                    
+                    addLog("SECURITY: Hacking intrusion detected from $peerName using hacker spec \"${packet.hacker.name}\". Defender assigned: ${primaryDefender?.name ?: "NONE"}.")
+                    
+                    val responsePacket = HydraPacket.HackingCounterResponse(
+                        targetNodeId = packet.targetNodeId,
+                        defender = primaryDefender,
+                        vaultAutoDefenders = autoDefenders,
+                        baseFirewallComplexity = 50.0
+                    )
+                    networkManager?.sendPacket(endpointId, responsePacket)
+                }
             }
+            is HydraPacket.HackingCounterResponse -> {
+                viewModelScope.launch {
+                    val autoHacker = repository.allCreatures.first().find { it.isAutoHacker && it.telomeres > 0 }
+                    if (autoHacker == null) {
+                        addLog("HACK ERR: Active Auto-Hacker not found for counter response.")
+                        return@launch
+                    }
+                    
+                    val waveConfig = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
+                    val waveCouplingVal = WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis())
+                    val hackingResult = ConflictEngine.simulateCreatureVsPlayerNode(
+                        hacker = autoHacker,
+                        targetNodeId = packet.targetNodeId,
+                        defender = packet.defender,
+                        vaultAutoDefenders = packet.vaultAutoDefenders,
+                        baseFirewallComplexity = packet.baseFirewallComplexity,
+                        phaseName = waveConfig.phaseName,
+                        waveCoupling = waveCouplingVal,
+                        seed = System.currentTimeMillis()
+                    )
+                    
+                    val updatedHacker = autoHacker.copy(telomeres = hackingResult.finalHackerTelomeres)
+                    repository.insertCreature(updatedHacker)
+                    
+                    if (hackingResult.success && hackingResult.siphonedPayload.isNotEmpty()) {
+                        hackingResult.siphonedPayload.forEach { gene ->
+                            val tm = GeneticsEngine.calculateMeltingTemperature(gene, _reactorSalt.value.toDouble())
+                            val mfe = GeneticsEngine.calculateMinimumFreeEnergy(gene)
+                            val newSeq = GeneSequence(
+                                sequence = gene,
+                                count = 1,
+                                discoveredAt = System.currentTimeMillis(),
+                                averageQScore = 35.0,
+                                meltingTemp = tm,
+                                minimumFreeEnergy = mfe
+                            )
+                            repository.insertGeneSequence(newSeq)
+                            addLog("HACK: Siphoned gene sequence $gene from target $peerName and saved to database.")
+                        }
+                    }
+                    
+                    val defenderVal = packet.defender
+                    val defenderFinalTelomeres = if (defenderVal != null) {
+                        val combat = hackingResult.directCombatResult
+                        if (combat != null) {
+                            val maxHp = combat.logs.find { it.contains("Defender effective stats: HP ") }
+                                ?.substringAfter("HP ")?.substringBefore(",")?.toIntOrNull() ?: defenderVal.telomeres
+                            if (combat.finalDefenderHp <= 0) {
+                                maxOf(0, defenderVal.telomeres - 20)
+                            } else if (combat.finalDefenderHp < maxHp) {
+                                maxOf(0, defenderVal.telomeres - 10)
+                            } else {
+                                defenderVal.telomeres
+                            }
+                        } else {
+                            defenderVal.telomeres
+                        }
+                    } else {
+                        null
+                    }
+                    
+                    val reportPacket = HydraPacket.HackingResultReport(
+                        targetNodeId = packet.targetNodeId,
+                        success = hackingResult.success,
+                        logs = hackingResult.logs,
+                        siphonedPayload = hackingResult.siphonedPayload,
+                        hackerFinalTelomeres = hackingResult.finalHackerTelomeres,
+                        defenderFinalTelomeres = defenderFinalTelomeres
+                    )
+                    networkManager?.sendPacket(endpointId, reportPacket)
+                    
+                    addLog("HACK RESULT: Hacking on $peerName was a ${if (hackingResult.success) "SUCCESS" else "FAILURE"}. Final Hacker Telomeres: ${hackingResult.finalHackerTelomeres}%.")
+                    hackingResult.logs.forEach { addLog("  $it") }
+                }
+            }
+            is HydraPacket.HackingResultReport -> {
+                viewModelScope.launch {
+                    addLog("SECURITY REPORT: Node security breach assessment on ${packet.targetNodeId} by $peerName.")
+                    addLog("  Result: ${if (packet.success) "BREACHED" else "CONTAINED"}")
+                    packet.logs.forEach { addLog("  $it") }
+                    
+                    if (packet.defenderFinalTelomeres != null) {
+                        val defender = repository.allCreatures.first().find { it.isAutoDefender && it.telomeres > 0 }
+                        if (defender != null) {
+                            val updatedDefender = defender.copy(telomeres = packet.defenderFinalTelomeres)
+                            repository.insertCreature(updatedDefender)
+                            addLog("SECURITY: Defender \"${defender.name}\" telomeres updated to ${packet.defenderFinalTelomeres}% after combat.")
+                            if (packet.defenderFinalTelomeres <= 0) {
+                                addLog("FATAL: Defender \"${defender.name}\" disintegrated due to total telomere decay during security defense.")
+                            }
+                        }
+                    }
+                }
+            }
+            is HydraPacket.NetworkMessage -> {
+                val text = packet.messageText
+                val subject = when {
+                    packet.attachedCreatureDna != null -> "CREATURE SECURED TRANSACTION"
+                    packet.attachedGeneSequence != null -> "GENE SEQUENCE TRANSFERRED"
+                    packet.transferGenes > 0 -> "RESOURCES DISPATCH RECEIVED"
+                    else -> "PEER UPLINK MESSAGE"
+                }
 
-            val bodyBuilder = java.lang.StringBuilder()
-            bodyBuilder.append("PAYLOAD MESSAGE:\n\"$text\"\n\n")
-            if (packet.attachedCreatureDna != null) {
-                bodyBuilder.append("ATTACHED HYBRID: ${packet.attachedCreatureName} [FACTION: ${packet.attachedCreatureFaction}]\n")
-            }
-            if (packet.attachedGeneSequence != null) {
-                bodyBuilder.append("ATTACHED CODON BLOCK: ${packet.attachedGeneSequence}\n")
-            }
-            if (packet.transferGenes > 0 || packet.transferWaste > 0) {
-                bodyBuilder.append("ATTACHED RESOURCES:\n")
-                if (packet.transferGenes > 0) bodyBuilder.append("  +${packet.transferGenes} Stock of all Bases (A, G, T, C)\n")
-                if (packet.transferWaste > 0) bodyBuilder.append("  +${packet.transferWaste} Bio-Waste stockpile units\n")
-            }
+                val bodyBuilder = java.lang.StringBuilder()
+                bodyBuilder.append("PAYLOAD MESSAGE:\n\"$text\"\n\n")
+                if (packet.attachedCreatureDna != null) {
+                    bodyBuilder.append("ATTACHED HYBRID: ${packet.attachedCreatureName} [FACTION: ${packet.attachedCreatureFaction}]\n")
+                }
+                if (packet.attachedGeneSequence != null) {
+                    bodyBuilder.append("ATTACHED CODON BLOCK: ${packet.attachedGeneSequence}\n")
+                }
+                if (packet.transferGenes > 0 || packet.transferWaste > 0) {
+                    bodyBuilder.append("ATTACHED RESOURCES:\n")
+                    if (packet.transferGenes > 0) bodyBuilder.append("  +${packet.transferGenes} Stock of all Bases (A, G, T, C)\n")
+                    if (packet.transferWaste > 0) bodyBuilder.append("  +${packet.transferWaste} Bio-Waste stockpile units\n")
+                }
 
-            val newMsg = MailMessage(
-                id = "msg_recv_${System.currentTimeMillis()}",
-                from = peerName,
-                subject = subject,
-                timestamp = "Just now",
-                body = bodyBuilder.toString(),
-                isRead = false,
-                attachedCreatureDna = packet.attachedCreatureDna,
-                attachedCreatureName = packet.attachedCreatureName,
-                attachedCreatureFaction = packet.attachedCreatureFaction,
-                attachedGeneSequence = packet.attachedGeneSequence,
-                transferGenes = packet.transferGenes,
-                transferWaste = packet.transferWaste
-            )
+                val newMsg = MailMessage(
+                    id = "msg_recv_${System.currentTimeMillis()}",
+                    from = peerName,
+                    subject = subject,
+                    timestamp = "Just now",
+                    body = bodyBuilder.toString(),
+                    isRead = false,
+                    attachedCreatureDna = packet.attachedCreatureDna,
+                    attachedCreatureName = packet.attachedCreatureName,
+                    attachedCreatureFaction = packet.attachedCreatureFaction,
+                    attachedGeneSequence = packet.attachedGeneSequence,
+                    transferGenes = packet.transferGenes,
+                    transferWaste = packet.transferWaste
+                )
 
-            _inboxMessages.value = listOf(newMsg) + _inboxMessages.value
-            synthManager.playSynthesisSuccess()
+                _inboxMessages.value = listOf(newMsg) + _inboxMessages.value
+                synthManager.playSynthesisSuccess()
+            }
+            else -> {}
         }
     }
 

@@ -260,7 +260,7 @@ class MainScreenViewModelTest {
             lng = -74.0,
             startTime = System.currentTimeMillis(),
             totalDuration = 10,
-            harvestedGenes = listOf("AGTCGTAC"),
+            harvestedPayload = listOf("AGTCGTAC"),
             isCompleted = false,
             isReturned = false,
             dispatchDistance = 100.0,

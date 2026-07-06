@@ -156,8 +156,8 @@ class SplicerViewModel(
                 val existing = _splicerSlots.value.getOrNull(i)
                 if (existing != null) {
                     val qScore = _splicerQScores.value.getOrNull(i) ?: 25.0
-                    val tm = BiophysicsEngine.calculateMeltingTemperature(existing, _reactorSalt.value.toDouble())
-                    val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(existing)
+                    val tm = GeneticsEngine.calculateMeltingTemperature(existing, _reactorSalt.value.toDouble())
+                    val mfe = GeneticsEngine.calculateMinimumFreeEnergy(existing)
                     repository.insertGeneSequence(
                         GeneSequence(
                             sequence = existing,
@@ -211,8 +211,8 @@ class SplicerViewModel(
             val existing = _splicerSlots.value[slotIdx]
             if (existing != null) {
                 val qScore = _splicerQScores.value[slotIdx]
-                val tm = BiophysicsEngine.calculateMeltingTemperature(existing, _reactorSalt.value.toDouble())
-                val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(existing)
+                val tm = GeneticsEngine.calculateMeltingTemperature(existing, _reactorSalt.value.toDouble())
+                val mfe = GeneticsEngine.calculateMinimumFreeEnergy(existing)
                 val sig = _splicerSignatures.value.getOrNull(slotIdx) ?: "TAQ"
                 repository.insertGeneSequence(
                     GeneSequence(
@@ -255,8 +255,8 @@ class SplicerViewModel(
             synthManager.playBeep(330f, 0.1f, "sawtooth")
 
             val qScore = _splicerQScores.value.getOrNull(slotIdx) ?: 25.0
-            val tm = BiophysicsEngine.calculateMeltingTemperature(existing, _reactorSalt.value.toDouble())
-            val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(existing)
+            val tm = GeneticsEngine.calculateMeltingTemperature(existing, _reactorSalt.value.toDouble())
+            val mfe = GeneticsEngine.calculateMinimumFreeEnergy(existing)
             val signature = _splicerSignatures.value.getOrNull(slotIdx) ?: "TAQ"
             repository.insertGeneSequence(
                 GeneSequence(
@@ -370,8 +370,8 @@ class SplicerViewModel(
                         addedAny = true
                     }
                 } else {
-                    val tm = BiophysicsEngine.calculateMeltingTemperature(seq, _reactorSalt.value.toDouble())
-                    val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(seq)
+                    val tm = GeneticsEngine.calculateMeltingTemperature(seq, _reactorSalt.value.toDouble())
+                    val mfe = GeneticsEngine.calculateMinimumFreeEnergy(seq)
                     existingList.add(
                         GeneSequence(
                             sequence = seq,
@@ -794,7 +794,7 @@ class SplicerViewModel(
 
                 stepLogs.add(StepLog(minOf(7, i + 1), "Slot #${i + 1} processing using scaffold: $scaffoldType"))
 
-                val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(expectedGene)
+                val mfe = GeneticsEngine.calculateMinimumFreeEnergy(expectedGene)
                 val isFoldStalled = mfe <= -5.0
                 val slotFailureChance = failureChance + (if (isFoldStalled) 10.0 else 0.0)
                 if (isFoldStalled) {
@@ -928,7 +928,7 @@ class SplicerViewModel(
                 val matchesTarget = getCoherence(dnaSeq, _targetSequence.value) == "full"
                 val idSuffix = UUID.randomUUID().toString().take(6).uppercase()
 
-                val cai = BiophysicsEngine.calculateCodonAdaptationIndex(dnaSeq, spawned.faction)
+                val cai = GeneticsEngine.calculateCodonAdaptationIndex(dnaSeq, spawned.faction)
 
                 val finalCreature = spawned.copy(
                     id = "PX-$idSuffix",

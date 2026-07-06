@@ -60,7 +60,7 @@ data class HarvestMission(
     val lng: Double,
     val startTime: Long,
     val totalDuration: Long,
-    val harvestedGenes: List<String> = emptyList(),
+    val harvestedPayload: List<String> = emptyList(),
     val isCompleted: Boolean = false,
     val isReturned: Boolean = false,
     val dispatchDistance: Double = 0.0,
@@ -120,4 +120,107 @@ data class ReagentStock(
     val type: String,
     val description: String
 )
+
+interface GeographicHazard {
+    val id: String
+    val lat: Double
+    val lng: Double
+    val hazardType: String
+    fun contains(targetLat: Double, targetLng: Double): Boolean
+    fun distanceTo(targetLat: Double, targetLng: Double): Double
+    fun getHazardPowerAt(targetLat: Double, targetLng: Double, lunarAge: Double): Double
+    fun generateHarvestPayload(creature: Creature, waveCoupling: Double, hasHarvestBoost: Boolean): List<String>
+}
+
+@Serializable
+data class PoxAnomaly(
+    override val id: String,
+    val name: String,
+    override val lat: Double,
+    override val lng: Double,
+    val gene: String,
+    val faction: String,
+    val distance: Double,
+    val heatZoneDiameter: Double,
+    val density: Double = 0.0
+) : GeographicHazard {
+    override val hazardType: String
+        get() = if (faction == "Mech" || faction == "Containment") "KINETIC" else "RADIATION"
+
+    override fun contains(targetLat: Double, targetLng: Double): Boolean {
+        val distFeet = distanceTo(targetLat, targetLng)
+        val boundaryFeet = getBoundaryRadiusForPlayer(targetLat, targetLng)
+        return distFeet <= boundaryFeet
+    }
+
+    override fun distanceTo(targetLat: Double, targetLng: Double): Double {
+        return DeploymentEngine.calculateDistanceInFeet(lat, lng, targetLat, targetLng)
+    }
+
+    override fun getHazardPowerAt(targetLat: Double, targetLng: Double, lunarAge: Double): Double {
+        return maxOf(0.1, density)
+    }
+
+    override fun generateHarvestPayload(creature: Creature, waveCoupling: Double, hasHarvestBoost: Boolean): List<String> {
+        val payload = mutableListOf<String>()
+        payload.add(gene)
+        if (hasHarvestBoost && java.util.Random().nextDouble() < 0.40) {
+            payload.add(gene)
+        }
+        return payload
+    }
+
+    fun getBoundaryRadius(theta: Double): Double {
+        return DeploymentEngine.calculateBoundaryRadius(id, heatZoneDiameter, theta)
+    }
+
+    fun getBoundaryRadiusForPlayer(userLat: Double, userLng: Double): Double {
+        return DeploymentEngine.calculateBoundaryRadiusForCoordinates(id, heatZoneDiameter, lat, lng, userLat, userLng)
+    }
+}
+
+@Serializable
+data class CelestialWell(
+    override val id: String,
+    val name: String,
+    override val lat: Double,
+    override val lng: Double,
+    val radiusFeet: Double,
+    val type: String, // "GREENHOUSE", "MAGNETOSPHERIC", "GRAVITATIONAL"
+    val hazardPower: Double // base intensity multiplier
+) : GeographicHazard {
+    override val hazardType: String
+        get() = when (type.uppercase()) {
+            "GREENHOUSE" -> "HEAT"
+            "MAGNETOSPHERIC" -> "RADIATION"
+            else -> "KINETIC"
+        }
+
+    override fun contains(targetLat: Double, targetLng: Double): Boolean {
+        return distanceTo(targetLat, targetLng) <= radiusFeet
+    }
+
+    override fun distanceTo(targetLat: Double, targetLng: Double): Double {
+        return DeploymentEngine.calculateDistanceInFeet(lat, lng, targetLat, targetLng)
+    }
+
+    override fun getHazardPowerAt(targetLat: Double, targetLng: Double, lunarAge: Double): Double {
+        return hazardPower
+    }
+
+    override fun generateHarvestPayload(creature: Creature, waveCoupling: Double, hasHarvestBoost: Boolean): List<String> {
+        val payload = mutableListOf<String>()
+        val reward = when (type.uppercase()) {
+            "GREENHOUSE" -> "STOCK_A"
+            "MAGNETOSPHERIC" -> "STOCK_G"
+            "GRAVITATIONAL" -> "STOCK_T"
+            else -> "STOCK_C"
+        }
+        payload.add(reward)
+        if (hasHarvestBoost && java.util.Random().nextDouble() < 0.40) {
+            payload.add(reward)
+        }
+        return payload
+    }
+}
 

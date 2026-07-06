@@ -1,5 +1,8 @@
 package com.example.genpox.ui.main
 
+import com.example.genpox.data.GraphicsMath
+
+
 import android.content.Context
 import androidx.annotation.Keep
 import androidx.compose.animation.core.*
@@ -1050,27 +1053,7 @@ fun SplicerLeftPanel(
                         val angleRad = a * Math.PI / 180.0
 
                         // Calculate dynamic wave height based on slot state
-                        var h = when {
-                            slotGene == null -> {
-                                val ripple = sin(a * 2f * Math.PI.toFloat() / 180f + wavePhase * 1.5f)
-                                1.5.dp.toPx() + 1.dp.toPx() * ripple
-                            }
-                            isAnom -> {
-                                val ripple = sin(a * 40f * Math.PI.toFloat() / 180f + wavePhase * 25f)
-                                val noise = sin(a * 123f).absoluteValue
-                                6.dp.toPx() + 14.dp.toPx() * ripple * noise
-                            }
-                            isCoherent -> {
-                                val ripple = sin(a * 6f * Math.PI.toFloat() / 180f + wavePhase * 3f)
-                                7.dp.toPx() + 5.dp.toPx() * ripple
-                            }
-                            else -> {
-                                // Mismatch
-                                val ripple = sin(a * 25f * Math.PI.toFloat() / 180f + wavePhase * 12f)
-                                val noise = sin(a * 77f).absoluteValue
-                                5.dp.toPx() + 7.dp.toPx() * ripple * noise
-                            }
-                        }
+                        var h = GraphicsMath.calculateOscilloscopeHeightDp(a, slotGene, requiredSegment, wavePhase).dp.toPx()
 
                         // Calculate radar sweep excitation effect (brightening & height boost)
                         val sweepAngleDeg = (sweepAngleRad * 180.0 / Math.PI) % 360.0

@@ -1,6 +1,7 @@
 package com.example.genpox.data.network
 
 import android.content.Context
+import com.example.genpox.data.Creature
 import android.util.Log
 import com.example.genpox.audio.PoxSynthManager
 import com.google.android.gms.nearby.Nearby
@@ -56,12 +57,46 @@ sealed class HydraPacket {
         val transferGenes: Int = 0,
         val transferWaste: Int = 0
     ) : HydraPacket()
+
+    @Serializable
+    data class HackingIntrusion(
+        val hacker: Creature,
+        val targetNodeId: String
+    ) : HydraPacket()
+
+    @Serializable
+    data class HackingCounterResponse(
+        val targetNodeId: String,
+        val defender: Creature?,
+        val vaultAutoDefenders: List<Creature>,
+        val baseFirewallComplexity: Double
+    ) : HydraPacket()
+
+    @Serializable
+    data class HackingResultReport(
+        val targetNodeId: String,
+        val success: Boolean,
+        val logs: List<String>,
+        val siphonedPayload: List<String>,
+        val hackerFinalTelomeres: Int,
+        val defenderFinalTelomeres: Int?
+    ) : HydraPacket()
+}
+
+interface PoxNetworkInterface {
+    val isAdvertising: kotlinx.coroutines.flow.StateFlow<Boolean>
+    val isDiscovering: kotlinx.coroutines.flow.StateFlow<Boolean>
+    val discoveredPeers: kotlinx.coroutines.flow.StateFlow<List<PoxNetworkManager.DiscoveredPeer>>
+    val activeConnections: kotlinx.coroutines.flow.StateFlow<Map<String, String>>
+    val connectionLogs: kotlinx.coroutines.flow.StateFlow<List<String>>
+    val incomingPackets: kotlinx.coroutines.flow.SharedFlow<Pair<String, HydraPacket>>
+    fun sendPacket(endpointId: String, packet: HydraPacket)
 }
 
 class PoxNetworkManager(
     private val context: Context,
     private val synthManager: PoxSynthManager
-) {
+) : PoxNetworkInterface {
     private val connectionsClient = Nearby.getConnectionsClient(context)
     private val serviceId = "com.example.genpox.HYDRA_NET"
 
@@ -120,22 +155,22 @@ class PoxNetworkManager(
     }
 
     private val _discoveredPeers = MutableStateFlow<List<DiscoveredPeer>>(emptyList())
-    val discoveredPeers: StateFlow<List<DiscoveredPeer>> = _discoveredPeers
+    override val discoveredPeers: StateFlow<List<DiscoveredPeer>> = _discoveredPeers
 
     private val _activeConnections = MutableStateFlow<Map<String, String>>(emptyMap()) // EndpointId -> PeerName
-    val activeConnections: StateFlow<Map<String, String>> = _activeConnections
+    override val activeConnections: StateFlow<Map<String, String>> = _activeConnections
 
     private val _incomingPackets = MutableSharedFlow<Pair<String, HydraPacket>>(extraBufferCapacity = 16)
-    val incomingPackets: SharedFlow<Pair<String, HydraPacket>> = _incomingPackets.asSharedFlow()
+    override val incomingPackets: SharedFlow<Pair<String, HydraPacket>> = _incomingPackets.asSharedFlow()
 
     private val _connectionLogs = MutableStateFlow<List<String>>(emptyList())
-    val connectionLogs: StateFlow<List<String>> = _connectionLogs
+    override val connectionLogs: StateFlow<List<String>> = _connectionLogs
 
     private val _isAdvertising = MutableStateFlow(false)
-    val isAdvertising: StateFlow<Boolean> = _isAdvertising
+    override val isAdvertising: StateFlow<Boolean> = _isAdvertising
 
     private val _isDiscovering = MutableStateFlow(false)
-    val isDiscovering: StateFlow<Boolean> = _isDiscovering
+    override val isDiscovering: StateFlow<Boolean> = _isDiscovering
 
     data class DiscoveredPeer(
         val endpointId: String,
@@ -295,7 +330,7 @@ class PoxNetworkManager(
         }
     }
 
-    fun sendPacket(endpointId: String, packet: HydraPacket) {
+    override fun sendPacket(endpointId: String, packet: HydraPacket) {
         resetInactivityTimeout()
         if (isSimulationActive && endpointId.startsWith("MOCK-")) {
             log("PACKET SENT: Transmitted package to $endpointId")

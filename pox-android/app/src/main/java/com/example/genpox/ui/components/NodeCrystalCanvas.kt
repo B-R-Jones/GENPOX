@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import java.util.*
 import kotlin.math.*
 
+import com.example.genpox.data.GraphicsMath
+
 data class CanvasMetrics(
     val subnodeDepthG: Float,
     val subnodeDepthA: Float,
@@ -105,7 +107,7 @@ fun NodeCrystalCanvas(
             val cy = size.height / 2
 
             // Baseline radius R structural modification from Lunar Phase
-            val lunarBaselineMod = 1.0f + lunarPhase.toFloat() * 0.15f // full moon expands radius up to 15%
+            val lunarBaselineMod = GraphicsMath.calculateLunarBaselineMod(lunarPhase)
             val R = (min(size.width, size.height) / 2f) * 0.65f * lunarBaselineMod
 
             val subWidthG = metrics.subnodeWidthG
@@ -120,18 +122,17 @@ fun NodeCrystalCanvas(
 
             // Skewness/Variance for wave amplitude
             val widths = listOf(subWidthG, subWidthA, subWidthT, subWidthC)
-            val avgWidth = widths.average().toFloat()
-            val variance = widths.map { (it - avgWidth).pow(2) }.average().toFloat()
-            val skewness = sqrt(variance)
+            val skewness = GraphicsMath.calculateSkewness(widths)
 
-            val waveAmplitude = 0.5f + skewness * 12.0f
-            val waveFrequency = 0.05f + totDepth * 0.08f
+            val waveAmplitude = GraphicsMath.calculateWaveAmplitude(skewness)
+            val waveFrequency = GraphicsMath.calculateWaveFrequency(totDepth)
 
             // Vertex points
-            val ptG = Offset(cx, cy - R * subWidthG)
-            val ptT = Offset(cx + R * subWidthT, cy)
-            val ptC = Offset(cx, cy + R * subWidthC)
-            val ptA = Offset(cx - R * subWidthA, cy)
+            val vertices = GraphicsMath.calculateCrystalVertices(cx, cy, R, subWidthG, subWidthT, subWidthC, subWidthA)
+            val ptG = Offset(vertices[0].x, vertices[0].y)
+            val ptT = Offset(vertices[1].x, vertices[1].y)
+            val ptC = Offset(vertices[2].x, vertices[2].y)
+            val ptA = Offset(vertices[3].x, vertices[3].y)
 
             // Draw Background grid
             val steps = listOf(0.25f, 0.5f, 0.75f, 1.0f)

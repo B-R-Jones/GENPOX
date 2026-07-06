@@ -1,14 +1,12 @@
-# GENPOX
+# G.E.N.P.O.X. (pronounced 'genpox')
 
-GENPOX is a native Android location-based genetic research & hacking game with a cyber-retro/sci-fi aesthetic. Using the device's GPS and custom overlays, players scan, splice, combine, and hack creature genomes, dispatching drones on coordinates to harvest genetic materials, and upgrading reactors using specialized algorithms.
+G.E.N.P.O.X. is a native Android location-based genetic research and database hacking simulation game. Set in a cyber-retro, low-fi sci-fi terminal interface, players physically scan genetic barcodes, splice complex creature genomes, deploy automated harvesters on geographic anomalies, and hack peer mainframe nodes.
 
-All interface elements are built with a terminal-inspired HUD aesthetic, featuring custom cyberglass borders, CRT scanline glitch simulations, and wireframe vector components.
+All interfaces are built with a terminal-inspired HUD aesthetic, featuring custom cyberglass borders, CRT scanline flickering, and multi-axis rotating vector wireframes.
 
 ---
 
 ## ☣️ Creator Manifesto: A Note on AI Use
-
-AI use in software development is a hot button issue. AI use in pretty much anything is don't-touch-the-stove hot. But let me offer my two cents:
 
 > **G.E.N. P.O.X. is my dream. Not Gemini's, not any LLMs, not any AIs.** The way it looks, the way it feels, the way it plays is all pulled directly from over 35 years of sci-fi nerd osmosis. What you see on the screen is what I see in my head. It is not a vision forced by AI. It is not an asset shoveled in from someone else. It's my direction to the perfect sous-chef. This soup, this fuckin' cybersoup, is mine.
 >
@@ -19,334 +17,144 @@ AI use in software development is a hot button issue. AI use in pretty much anyt
 > **Get splicing, Agent.**
 >
 > P.S. No AI had any part in the statement above.
----
-## 🔁 Core Gameplay Loops
-
-The gameplay in GENPOX is organized around three interconnected feedback loops:
-
-```mermaid
-graph TD
-    A[Telemetry Scan Loop] -->|Transferred Creatures & Genomes| B(Genetic Engineering Loop)
-    B -->|Specimen Breeding & Upgrades| C(Tactical Dispatch Loop)
-    C -->|Harvested Nucleotides & Anomalies| B
-    C -->|Decay & Failures| A
-```
-
-### 1. The Telemetry Scan Loop (Physical-Digital Ingestion)
-Players scan real-world QR codes using the mobile device's camera.
-*   **Ingestion**: Powered by `CameraX` and `ML Kit Barcode Scanning` (configured to support QR codes).
-*   **Result**: Decoded QR code payloads (Base64-encoded JSON) are parsed to transfer and compile creatures from other player nodes (saving them in the local database with $99\%$ telomeres). Additionally, raw 64-character DNA sequences or 8-character gene blocks can be scanned directly to compile new specimens or register genetic blocks in the player's stock.
-
-### 2. The Genetic Engineering Loop (Bio-Lab Refinery)
-Within the biological laboratory, players refine genetic sequences and breed specimens:
-*   **Tide Pool Synthesis**: Refines standard nucleotides continuously using cycles modulated by real-world lunar age.
-*   **Harmonization**: Fuses standard nucleotides into rare, anomalous gene blocks containing alien characters (`XZYW?!$%&@#`) with positive/negative probability waves.
-*   **Gene Splicer**: Integrates an 8-slot Circular Splicing Matrix to assemble creature genomes from 8-character gene blocks. Extending sequences beyond the base 64 characters increases attributes and unlocks special movesets (Healing/Evasion).
-*   **Maintenance**: Managing telomere length and preventing **Chromosomal Failure** (permanent deletion of a specimen upon reaching $0\%$ telomeres, returning $50\%$ of genetic blocks back to inventory).
-
-### 3. The Tactical Dispatch Loop (Location-Based Harvest)
-Players target geographical anomalies detected on the radar HUD derived from open-source maps:
-*   **Radar HUD Exploration**: Move physically or simulate network link coordinates to lock onto overlapping anomaly centers.
-*   **Harvester Deployment**: Dispatch compiled specimens on automated retrieval runs.
-*   **Coordinate Penetration**: Harvesters traverse geographic distances, penetrate gravity wells, and extract targeted gene blocks.
-*   **Real-time Telemetry**: Monitor mission status, travel phases, event logs, and sequence decay mutations occurring in transit before initiating recovery commands.
 
 ---
 
-## ⚙️ Core Game Mechanics
+## ⚙️ Core Engines & Gameplay Simulations
 
-### 1. Reactor Engine & Bio-Lab
-*   **Tide Pool Reactor (`pox`)**: An automated synthesizer compiling standard 8-base gene blocks. The base cycle duration depends on the active polymerase (Taq: $8\text{s}$, Tth: $16\text{s}$, Pfu: $32\text{s}$), halved if a reactor booster is active, and further modulated by the chamber's salt concentration ($1.0 + (\text{salt} - 0.05) \times 2.0$ speed multiplier). Daily output is governed by the active **Base-Pair Wave** matching the synodic moon phase.
-*   **Genetic Anomaly Harmonizer (`anomaly`)**: An unstable, high-energy fusion chamber that consumes $10,000$ standard nucleotides ($1,250$ gene blocks) per loop, trying to create rare anomalous gene strings. Requires a safety reserve of $250,000$ nucleotides to operate.
+G.E.N.P.O.X. is driven under the hood by 6 specialized mathematical and physical engines that shape the gameplay and run real-time simulations:
 
-### 2. Gene Splicer & Combinator
-*   **Circular Splicing Matrix**: The Gene Splicer maps the target creature's genome into 8 circular segment slots arranged around a rotating 3D DNA helix wireframe. Displays real-time genomic coherence tracking ($0-100\%$) and provides visual alignment spokes.
-*   **Attributes**: Scale according to A, G, T, C density (Vitality, Attack, Defense, Speed, Telomeres).
-*   **Splicing Extension**: Extending sequences beyond 64 characters unlocks Slot 1 (at $\ge 72$ chars) and Slot 2 (at $\ge 80$ chars) move slots, resolving into **Bio-Drain Repair**, **Micro-Phage Extraction**, **Quantum Escape Deviation**, or **Electromagnetic Shell Deflect**.
-*   **Anomalous Benefits**: Anomalous characters grant passive buffs (like double strikes, health regeneration, or drag immunity) with specific trigger conditions (e.g. active only during dark moon phases or when Vitality drops below $40\%$).
+### 1. Genetics Engine
+The biophysical core of genetic research. It models DNA thermodynamics and sequence adaptation index metrics.
+- **Melting Temperature ($T_m$)**: Evaluates how temperature and salt screening affect DNA stability using a salt-corrected Wallace-Breslauer formula.
+- **Minimum Free Energy ($MFE$)**: Simulates single-stranded folding loops using Nussinov's dynamic programming algorithm to detect GC hairpin structures.
+- **Phred Quality Scores ($Q$)**: Models base-replication accuracy depending on the active polymerase (Taq, Tth, Pfu).
+- **Codon Adaptation Index ($CAI$)**: Evaluates genetic translation weights against faction-specific codon preferences (Infection, Mech, Parasite, Containment).
+- **Source**: [GeneticsEngine.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/GeneticsEngine.kt) | [Tech Spec](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Engines/genetics_engine.md)
 
-### 3. Tactical Radar HUD
-*   **Terrain Rendering**: Renders real-world road and building geometries parsed from pre-cached OpenStreetMap coordinates.
-*   **2.5D Camera Projection**: Simulates a tilted HUD view. Includes perspective tilting, manual rotation, and variable zoom multipliers ($4.00\text{x}$ down to $0.25\text{x}$).
-*   **Font Rotation & Dial Protection**: Employs font rotation stabilization to keep label text readable under rotation, and includes dial tap protection to prevent accidental coordinate changes.
-*   **Dynamic Building Depth Sorting**: Dynamically sorts and renders buildings from back to front based on viewport angle to ensure proper visual layering and occlusion on the 2.5D grid canvas.
-*   **Frustum Culling & simplified LOD**: Expansion of the culling radius along the tilt dimension prevents distant objects from popping out. Flat 2D rendering paths activate automatically when tilted flat or when building shapes are small to minimize GPU batch draw calls.
-*   **Foreground Canvas Layering**: Active harvesters, target locks, and text markers are layered above building fills to prevent HUD occlusion.
+### 2. Conflict Engine
+Governs turn-based tactical combat, spec-ops infiltration, and specimen decay.
+- **Telomere Stat Degradation**: Real-time degradation of creature HP, attack, and speed based on their telomeric decay ($0-100\%$).
+- **Action Resolver**: Simulates battle phases, dodging states, and special movesets (e.g. *BIO_DRAIN_REPAIR* siphons health; *QUANTUM_ESCAPE_DEVIATION* evades damage).
+- **Survival Simulation**: Resolves environmental hazards and telomere decay rates for specimens in the field.
+- **Source**: [ConflictEngine.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/ConflictEngine.kt) | [Tech Spec](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Engines/conflict_engine.md)
 
-### 4. Telemetry & Globe Uplink
-*   **4-Stage Globe Zoom**: The telemetry system features a multi-tiered globe visualization interface with four zoom levels (0 to 3):
-    *   **Level 0 (Holographic Satellite Globe)**: A continental-scale global projection.
-    *   **Level 1 (Metropolitan Region Uplink)**: Regional mapping centered on user coordinates with stabilization and tilt/rotation modifiers.
-    *   **Level 2 (Local Mesh Sector Grid)**: Visualizes the local grid range with active peer detection.
-    *   **Level 3 (Pinpoint Node Transceiver Core)**: Displays detailed device diagnostics, system harmonics, and network identity parameters.
+### 3. Deployment Engine
+Handles geodetic mapping, coordinates checking, and transit kinetics.
+- **Geodetic Distance**: Uses the Haversine formula to compute exact distances (in feet) between coordinates.
+- **Lobed Boundary Radii**: Models anomalies with non-circular, multi-lobed forcefields ($R(\theta)$) containing $3$, $4$, or $5$ lobes.
+- **Forcefield Stall Depth**: Calculates how far a harvester penetrates the containment field before stalling based on its defense and active lunar resistance.
+- **Combined Wave Density**: Models spatial wave interference from nearby overlapping anomalies using damped sine equations.
+- **Source**: [DeploymentEngine.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/DeploymentEngine.kt) | [Tech Spec](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Engines/deployment_engine.md)
 
-### 5. P2P Mesh Network & Cargo Transfer
-*   **Nearby Connections Protocol**: Utilizing Google Play Services Nearby Connections, player devices establish a peer-to-peer (P2P) mesh network using the custom `HydraPacket` serialization protocol over the `com.google.android.gms.nearby.HYDRA_NET` service ID.
-*   **Broadcast & Discovery**: Dynamically advertise and discover neighboring player nodes. Support for mock simulation modes allows testing mesh connectivity and message handling offline.
-*   **Secure Mail & Cargo Exchange**: Send direct text messages and transfer in-game assets—including specimen DNA (names, factions), raw gene sequences, standard genes, or waste assets.
-*   **Auto-Shutdown Timeout**: Features a battery-saving auto-shutdown daemon. It monitors radio activity and automatically disables active transmitters and scanners if no connections or beacons are detected within 120 seconds.
+### 4. Reactor Simulation Engine
+Runs step-by-step transcription checks during the synthesis of nucleotide blocks.
+- **Stepped Assembly**: Delays and transcribes sequences base-by-base, checking for biophysical collapse states.
+- **Biophysical Collapse Filters**: Halts synthesis if it suffers from feedstock *Inlet Deprivation*, stabilized *GC Hairpin Stalling* (mitigated by DMSO), or *AT Denaturation* (mitigated by Netropsin).
+- **Source**: [ReactorSimulationEngine.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/ReactorSimulationEngine.kt) | [Tech Spec](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Engines/reactor_simulation_engine.md)
 
-### 6. Synth Soundscapes
-*   **PoxSynthManager**: A native Kotlin audio synthesizer utilizing Android's low-level audio tracks. Generates frequency oscillators and pitch envelopes to play retro sci-fi alerts, synthesis beats, and system alarms dynamically without relying on external MP3/WAV assets.
+### 5. Wave Math Engine
+Aligns siphoning loops with real-world solar system coordinate projections.
+- **Heliocentric Orbits**: Calculates planetary orbits using orbital periods and Keplerian distances.
+- **Geocentric Projections**: Translates heliocentric vectors into geocentric longitudes and declinations as viewed from Earth.
+- **Local Diurnal Hour Angles**: Accounts for Earth's rotation to map planetary bodies onto the dome coordinates of the observer.
+- **Synodic Alignments**: Classifies planet configurations into Conjunctions, Oppositions, and Quadratures.
+- **Source**: [WaveMath.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/WaveMath.kt) | [Tech Spec](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Engines/wave_math_engine.md)
 
----
-
-## 🧮 Integrated Scientific & Mathematical Formulas
-
-The underlying systems of GENPOX are driven by deterministic physical and astronomical equations:
-
-### 1. Synodic Lunar Cycle & Wave Weights
-The tide pool synthesis is synchronized with the synodic lunar cycle. The current lunar age is derived from standard epoch milliseconds:
-*   **Reference New Moon ($T_0$)**: May 17, 2026, 01:54:00 UTC.
-*   **Synodic Period ($L$)**: $29.53059\text{ days}$.
-*   **Days Elapsed ($D$)**:
-    $$D = \frac{\text{Current Time (ms)} - T_0}{86,400,000}$$
-*   **Lunar Age ($A$)**:
-    $$A = (D \bmod L + L) \bmod L$$
-
-Based on the lunar age, the moon's angular phase determines the Primary ($m_1$) and Secondary ($m_2$) multipliers for nucleotide weights:
-*   **Moon Angle ($\theta$)**:
-    $$\theta = \frac{2\pi \cdot A}{L} - \frac{\pi}{2}$$
-*   **Moon Modifier ($\delta$)**:
-    $$\delta = 0.0125 \cdot \sin(\theta)$$
-*   **Primary Wave Multiplier ($m_1$)**:
-    $$m_1 = 1.125 + \delta$$
-*   **Secondary Wave Multiplier ($m_2$)**:
-    $$m_2 = 1.625 + \delta$$
-
-> [!NOTE]
-> If a deterministic date-hash yields $(Hash \bmod 100) < 50$, the wave is suppressed into a **Dormant State**, overriding the multipliers and enforcing a flat $25\%$ weight distribution.
-
-### 2. Anomaly Harmonization Fusion Chance
-The unstable fusion success probability ($FinalChance$) scales logarithmically and couples with daily sinusoidal waves:
-*   **Base Chance ($BaseChance$)**: Locked to $1\%$ below $10,000$ nucleotides, and reaches $100\%$ at $250,000$ nucleotides:
-    $$t = \frac{\ln(\text{Stockpile}) - \ln(10,000)}{\ln(250,000) - \ln(10,000)}$$
-    $$BaseChance = 1.0 + 99.0 \cdot t$$
-*   **Resonance Peak Boost ($PB$)**: Bell-curve peaks occur at multiples of $14\%$ ($P \in \{14, 28, 42, 56, 70, 84, 98\}$). If the distance $d = |BaseChance - P| < 5.0$:
-    $$PB = 6.5 \cdot \exp\left(-\left(\frac{d}{1.8}\right)^2\right)$$
-*   **Spectrum Wave Coupling ($S$)**: Daily sinusoidal modifier with a 6-hour cycle:
-    $$S = 80.0 + 12.375 \cdot \sin(f_{\text{day}} \cdot 8\pi)$$
-    $$HM = (S - 80.0) \times 0.25$$
-    *(where $f_{\text{day}}$ is the elapsed fraction of the 24-hour day)*
-*   **Final Success Chance ($FinalChance$)**:
-    $$FinalChance = \operatorname{clamp}(BaseChance + PB + HM, 1.0\%, 100.0\%)$$
-
-### 3. Anomalous Gene Coding & Raw Power
-*   **Naming prefix & suffix**: Deterministic mapping of characters $s_0$ and $s_1$ (e.g. `Z?` becomes "Zero-Point Siphon").
-*   **Raw Power ($RawPower$)**: Sum of character ratings in the middle indices ($s_2$ to $s_5$):
-    $$RawPower = \sum_{i=2}^5 \operatorname{val}(s_i) \quad (\text{Range: } 4 \text{ to } 24)$$
-    *(where `X, Z, Y, W` = 3; `?, !` = 4; `$, %` = 5; `&, @, #` = 6; others = 1)*
-*   **Combat Benefit ID**: Determined by:
-    $$EffectIndex = (\operatorname{code}(s_0) + \operatorname{code}(s_1)) \bmod 6$$
-*   **Activation Condition**: Governed by the last two characters:
-    $$TriggerIndex = (\operatorname{code}(s_6) + \operatorname{code}(s_7)) \bmod 8$$
-
-### 4. Dispatch Physics & Transit Duration
-When a specimen is sent on a harvest run, it travels to the anomaly's boundary, penetrates the gravity well, harvests the gene block, and returns:
-*   **Effective Resistance ($R_{\text{anom}}$)**:
-    $$R_{\text{anom}} = (R_{\text{boundary}} \times 0.1) \times \operatorname{mod}_{\text{resistance}}$$
-    *(where $\operatorname{mod}_{\text{resistance}}$ ranges between $0.7$ and $1.3$ based on the lunar age cycle)*
-*   **Stalled Depth ($Depth_{\text{stalled}}$)**: The depth percentage at which the specimen halts in the well:
-    $$Depth_{\text{stalled}} = \operatorname{clamp}\left(\frac{\text{Creature.defense} + \operatorname{mod}_{\text{resonance}}}{R_{\text{anom}}} \times 100.0, 0.0, 100.0\right)$$
-    $$d_{\text{dispatch}} = R_{\text{boundary}} \times \left(1.0 - \frac{Depth_{\text{stalled}}}{100.0}\right)$$
-*   **Overlapping Gravity Wave Drag ($D_{\text{combined}}$)**: Cumulative interference from neighboring anomalies:
-    $$D_{\text{combined}} = \sum_{j} \operatorname{density}_j \times \cos(0.02 \cdot d_j + \phi_j) \cdot e^{-0.002 d_j}$$
-    $$D_{\text{eff\_density}} = \operatorname{clamp}(D_{\text{combined}} + 0.2 \cdot (\operatorname{scale}_{\text{lunar}} - 0.5), -0.33, 0.33)$$
-    *(If the creature has a **Coherence Shield**, positive drag is completely negated)*
-*   **Velocities**:
-    *   Horizontal Travel Velocity: $V_{\text{travel}} = \text{Creature.speed} \times 13.5$
-    *   Vertical Descent Velocity: $V_{\text{descent}} = V_{\text{travel}} \times \max(0.1, 1.0 - 2.0 \times D_{\text{eff\_density}}) \times 0.024$
-*   **Durations (Seconds)**:
-    *   Travel Time: $t_{\text{travel}} = \max\left(1, \operatorname{round}\left(\frac{\max(0, \text{Distance} - R_{\text{boundary}})}{V_{\text{travel}}}\right)\right)$
-    *   Descent Time: $t_{\text{descent}} = \max\left(1, \operatorname{round}\left(\frac{R_{\text{boundary}} \times \frac{Depth_{\text{stalled}}}{100.0}}{V_{\text{descent}}}\right)\right)$
-    *   Harvest Time: $t_{\text{harvest}} = 60\text{s}$ (static)
-    *   Ascent Time: $t_{\text{ascent}} = t_{\text{descent}}$
-    *   Return Time: $t_{\text{return}} = t_{\text{travel}}$
-    *   Total Duration: $t_{\text{total}} = t_{\text{travel}} + t_{\text{descent}} + t_{\text{harvest}} + t_{\text{ascent}} + t_{\text{return}}$
-
-### 5. Genetic Mutation Decay
-During the `DESCENT`, `HARVEST`, and `ASCENT` phases inside the well, cosmic radiation induces mutations at deterministic intervals:
-$$\Delta t_{\text{mutation}} = \max\left(1, \operatorname{round}\left( \frac{480.0 \times 2^{-\frac{Depth_{\text{stalled}}}{25.0}}}{\operatorname{mod}_{\text{mutation}} \times 16.0} \right)\right)$$
-*Every $\Delta t_{\text{mutation}}$ seconds, a random nucleotide index in the genome is replaced. Base attributes are immediately recompiled.*
-
-### 6. Attribute Scaling by Telomere Degradation
-A creature's base attributes are degraded in real-time as its telomeres decay:
-$$\text{Effective Stat} = \max\left(\text{MinBound}, \operatorname{round}\left(\text{Base Stat} \times \left(0.25 + 0.75 \times \frac{\text{Telomeres}}{100}\right)\right)\right)$$
-*(where $\text{MinBound}$ is $10$ HP for Vitality, and $5$ rating for all other attributes)*
+### 6. P.O.X. Network Manager
+Coordinates ad-hoc peer-to-peer (P2P) connections over local radios.
+- **Nearby Connections**: Leverages Google Nearby Connections to establish ad-hoc clusters.
+- **Hydra Packet Protocol**: Custom binary serialization of trade offers, specimen files, database hacking intrusions, and mainframe security audits.
+- **Source**: [PoxNetworkManager.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/network/PoxNetworkManager.kt) | [Tech Spec](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Engines/pox_network_manager.md)
 
 ---
 
-## 🛠️ Tech Stack & Design Decision: Why Kotlin?
+## 🎨 Visual Aesthetics & Animation Framework
 
-Rather than developing GENPOX inside a traditional cross-platform game engine (e.g. Unity, Godot, or Unreal), we opted to build the application as a **fully native Kotlin Android App** using **Jetpack Compose**. The rationale is detailed below:
+To achieve a tactile, futuristic terminal aesthetic, G.E.N.P.O.X. utilizes a custom graphics framework built directly on Jetpack Compose Canvas layers.
 
-### 1. Battery & Memory Efficiency for Location-Based Play
-Location-based games require GPS tracking and background tasks to run for extended periods. Game engines like Unity loop a heavy, dedicated C++ rendering thread that constantly repaints the entire screen ($30$–$60$ frames per second), draining battery rapidly. 
-By utilizing Jetpack Compose's state-driven recomposition, GENPOX only draws vectors on the Canvas when states actually change. This reduces GPU overhead to near zero when the screen is static, dramatically preserving the device's battery life in the field.
+### 1. Retro CRT & Wireframe Aesthetics
+- **Phosphor Monitor Effect**: UI layers are colored in single-wavelength cybernetic palettes: CyberCyan (`0xFF06B6D4`), CyberGreen (`0xFF10B981`), CyberAmber (`0xF59E0B`), or Crimson Warning (`0xEF4444`).
+- **Cyberglass Materials**: Containers utilize semi-transparent backdrops and custom vector double borders, creating a glowing glassmorphic overlay.
+- **CRT Scanlines & Glitches**: Simulates signal interference and flickering loops by varying opacity, scale offsets, and linear shifts over time.
 
-### 2. High-Performance Native API Integration
+### 2. Math-Driven Rendering
+All visual geometries are calculated procedurally rather than using raster images:
+- **Rotating Double Helix**: Calculated in [GraphicsMath.calculateHelixStrand](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/GraphicsMath.kt) using sinusoidal wave functions.
+- **3D Wireframe blueprint**: Calculated via 3D rotation matrix coordinates projected onto 2D viewport coordinates in [GraphicsMath.project3DBlueprintPoint](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/GraphicsMath.kt).
+- **Diurnal Orrery Transit Panel**: Projects celestial declinations, geocentric longitude offsets, and local diurnal hour angles onto a shifted horizon arc in [GraphicsMath.projectOrreryPlanet](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/GraphicsMath.kt).
+
+### 3. Tactile Spring Physics & Layer Swap Animations
+Interactive transitions use spring physical models to feel responsive and alive:
+- **Infinite Transitions**: Utilizes `rememberInfiniteTransition` with distinct duration cycles (e.g. 18 seconds for global map rotation, 4 seconds for pulsing breath effects, 1.5 seconds for glitch jitters) to build an organic, non-repetitive UI.
+- **Swipe-to-Cycle Layer Stack**: Vertical drag coordinates on the radar overlay are captured using Compose `pointerInput(Unit) { detectDragGestures(...) }`. Swipes exceeding 50 pixels toggle the active z-layered screen depth.
+- **Tactile Springs**: Transition parameters (scale, alpha, and vertical translation) are computed using spring equations (`DampingRatioLowBouncy`, `StiffnessLow`) to create visual weight and bounce.
+
+---
+
+## 🛠️ Architectural Choice: Why Kotlin?
+
+Rather than developing G.E.N.P.O.X. inside a commercial game engine (e.g. Unity, Godot, or Unreal), we opted to build the application as a **fully native Kotlin Android App** using **Jetpack Compose**. The primary reasons are:
+
+### 1. Battery & Memory Efficiency in the Field
+Location-based games require GPS hardware and background radios to run for hours. Commercial game engines loop a heavy, dedicated C++ rendering thread that constantly repaints the entire screen ($30$–$60$ frames per second), draining battery rapidly. 
+By utilizing Jetpack Compose's state-driven recomposition, G.E.N.P.O.X. only draws vectors on the Canvas when states actually change. This reduces GPU overhead to near zero when the screen is static, preserving the device's battery life in the field.
+
+### 2. Low-Overhead Native API Integration
 Integrating camera overlays, hardware sensors, and ML engines inside a 3rd party game engine is complex and introduces JNI/interop lag. Native Kotlin allows:
-*   **Direct CameraX Bindings**: Low-overhead frame analysis on the CPU/GPU.
-*   **Google Play Services & Maps SDK**: Native map integration that doesn't need wrapper plugins or third-party mapping packages.
-*   **ML Kit Barcode Scanner**: Direct, lightning-fast execution of Google's barcode analysis pipeline.
+- **Direct CameraX Bindings**: Low-overhead frame analysis on the CPU/GPU.
+- **Google Play Services & Maps SDK**: Native map integration that doesn't need wrapper plugins or third-party mapping packages.
+- **ML Kit Barcode Scanner**: Direct, lightning-fast execution of Google's barcode analysis pipeline.
 
 ### 3. Background Services & Persistent Engines
 A core part of the gameplay loop involves creatures traversing anomalies in the background. Traditional game engines are paused or killed by the Android OS when minimized. Native Kotlin handles:
-*   **WorkManager & Foreground Services**: Safely processes background timers and triggers notifications even when the player exits the application.
-*   **Room Database**: Native SQLite integration for efficient inventory management and transaction safety.
-*   **DataStore Preferences**: Fast, async storage for application state.
-
-
----
-
-## 🧠 Gemini Compilation & Offline Fallback Engine
-
-When compiling a raw 64-character DNA sequence into a biological specimen, the game evaluates the sequence to generate its attributes, name, type, and sci-fi lore. This is done via two pathways:
-
-### 1. Google Gemini AI Compiler (Online)
-If a Gemini API key is configured, the app uses the `google-generativeai` SDK to call the `gemini-3.5-flash` model. 
-*   **Purpose**: The AI model dynamically compiles the DNA sequence into creative sci-fi creature lore, descriptive profiles, unique classification types, and immersive creature names matching the sequence's base frequencies.
-*   **Configuration**: The API key is entered directly in the app's settings dashboard UI and stored securely on-device using Jetpack DataStore Preferences. It does *not* need to be hardcoded in `local.properties`.
-
-### 2. On-Board Deterministic Compiler (Offline Fallback)
-If the Gemini API key is missing or the device is offline/receives an API error, the game automatically falls back to an on-board compiler.
-*   **Faction Resolution**: Determined by counting the most frequent base in the first 64 characters:
-    $$\text{Faction} = \operatorname{argmax}(A_{\text{count}}, G_{\text{count}}, T_{\text{count}}, C_{\text{count}})$$
-*   **Procedural Attribute Scaling**: Base stats are calculated deterministically:
-    *   **Vitality**: $100 + A_{\text{count}} \times 5$
-    *   **Attack (Aggression)**: $20 + G_{\text{count}} \times 2$
-    *   **Defense (Block Shells)**: $20 + C_{\text{count}} \times 2$
-    *   **Speed (Speed Rate)**: $20 + T_{\text{count}} \times 2$
-*   **Procedural Naming**: Seeding `java.util.Random` with the hash code of the sequence (`sequence.uppercase().hashCode()`) to generate faction-specific names (e.g. `Toxipod-XX` or `Chitin-Shell-XX`). Procedural wireframe vector graphics and colors are resolved dynamically based on these values.
-
----
-
-## 💾 Data Persistence & Database Schema
-
-GENPOX uses a SQLite database abstraction layer via **Jetpack Room** to handle persistent local game state, inventory, and cached geographic cells:
-
-1.  **`creatures` Table**:
-    *   Stores compiled specimens, sequences, custom names, factions, scaled base attributes (HP, Attack, Defense, Speed), telomere status ($0-100\%$), coherence indicators, mutation status, original sequence, and codon adaptation index.
-2.  **`gene_sequences` Table**:
-    *   Inventory of 8-character standard nucleotide blocks (composed of `A`, `G`, `T`, `C`) and rare anomalous blocks containing alien character variations (`XZYW?!$%&@#`) along with count, discovery timestamp, average Q-score, melting temperature, and minimum free energy.
-3.  **`harvest_missions` Table**:
-    *   Active dispatch state for harvesters. Stores coordinates, transit phases (`TRAVEL`, `DESCENT`, `HARVEST`, `ASCENT`, `RETURN`), total duration, elapsed seconds, original sequence, stalled depth, and mission logs.
-4.  **`cached_road_cells` Table**:
-    *   Offline storage of parsed road structures indexed by cell coordinate keys, enabling off-grid rendering without active network connectivity.
-5.  **`cached_building_cells` Table**:
-    *   Offline storage of building geometries indexed by cell coordinate keys, allowing consistent spatial rendering of terrain.
-
-
----
-
-## 🛠️ Prototyping & Development Workflow
-
-GENPOX is built using a dual-stage development loop, splitting experimental algorithmic research from strict native Android implementation:
-
-```mermaid
-graph LR
-    A[12-Year Genetic GA Codebase] --> B(Google AI Studio Sandbox)
-    B -->|Conceptual Prototypes & Raw Logic| C(Antigravity IDE Agentic Loop)
-    C -->|Native Code, DB, Compose & Styling| D[Production Android App]
-```
-
-### 1. The Prototyping Sandbox (Google AI Studio)
-The foundation of GENPOX is built on over 12 years of legacy Genetic Algorithm (GA) codebase files. To push these algorithms deeper, ideas are first spun up and iterated within Google AI Studio:
-*   **Purpose**: Rapid, high-level prototyping, payload structures exploration, and core mathematical model validation.
-*   **Focus**: Purely technical. Conceptual under-the-hood mechanics are tested here in a "messy" sandbox, completely decoupled from Android framework constraints and styling rules. This allows for deep algorithmic discovery without the friction of compiling the full application.
-
-### 2. Production Engineering (Antigravity IDE & Agentic AI)
-Once a mechanic is mathematically validated, the code is ported to the **Antigravity IDE** to be recreated and hardened into the production Android application:
-*   **Agentic Pairing**: Transitioning prototypes is coordinated through an Agentic AI pairing loop inside the workspace. The AI agent acts as a co-developer, translating raw algorithmic scripts into structured, Kotlin-native code.
-*   **Android Constraints & Refinement**: The agentic environment enforces strict design parameters:
-    *   Implementing persistence structures with Jetpack Room schemas.
-    *   Drawing vector lines, HUD components, and tilt matrices inside Jetpack Compose `Canvas` layers.
-    *   Structuring view states, audio track oscillators, and background WorkManager routines.
-*   **Clean Implementation**: The separation of concerns keeps the production codebase clean, leaving the prototyping "mess" behind in AI Studio while ensuring the Android app remains stylized, modular, and performant.
+- **WorkManager & Foreground Services**: Safely processes background timers and triggers notifications even when the player exits the application.
+- **Room Database**: Native SQLite integration for efficient inventory management and transaction safety.
+- **DataStore Preferences**: Fast, async storage for application state.
 
 ---
 
 ## 📂 Repository Structure
 
-*   📁 [pox-android](file:///c:/Users/brent/Antigravity/GENPOX/pox-android) - The core Android project module.
-    *   📁 `app/src/main/java/com/example/genpox` - Kotlin implementation of screens, view models, database, and background services.
-        *   📁 [audio](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/audio) - Procedural audio engine (`PoxSynthManager.kt`).
-        *   📁 [data](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data) - Room database configurations, models, settings, and formulas (`WaveMath.kt`).
-        *   📁 [ui](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui) - Composable screens, navigation files, and UI layout definitions.
-        *   📁 [ui/components](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui/components) - Custom drawing modules (holographic maps, wireframe vectors, canvas charts, and camera scanners).
-    *   📁 `app/src/main/assets` - Pre-cached road maps and building geometries (`pre_cached_roads.json`).
-*   📁 [Documentation](file:///c:/Users/brent/Antigravity/GENPOX/Documentation) - Structured design specs, developer guides, player manuals, and technical reports.
-    *   📁 [Celestial Bodies](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies) - Technical profiles and scientific classifications of orbital bodies that influence game mechanics.
-        *   📄 [luna_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/luna_profile.md) - Scientific profile of the Moon (Luna), detailing orbital parameters, physical properties, and synodic phase cycles.
-        *   📄 [mercury_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/mercury_profile.md) - Scientific profile of Mercury (Hermes), detailing 3:2 spin-orbit resonance, orbital parameters, and Earth-synodic phase cycles.
-        *   📄 [venus_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/venus_profile.md) - Scientific profile of Venus (Aphrodite), detailing retrograde rotation, dense greenhouse atmosphere, and phase configurations.
-        *   📄 [earth_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/earth_profile.md) - Scientific profile of Earth (Terra), detailing baseline physical metrics, magnetospheric protection, and orbital cycles.
-        *   📄 [mars_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/mars_profile.md) - Scientific profile of Mars (Ares), detailing thin atmospheric dynamics, orbital eccentricity, and synodic oppositions.
-        *   📄 [jupiter_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/jupiter_profile.md) - Scientific profile of Jupiter (Zeus), detailing rapid rotation mechanics, massive magnetic field, and Galilean satellite tides.
-        *   📄 [saturn_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/saturn_profile.md) - Scientific profile of Saturn (Cronus), detailing ice ring physics, axisymmetric magnetosphere, and Titan/Enceladus satellites.
-        *   📄 [uranus_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/uranus_profile.md) - Scientific profile of Uranus (Ouranos), detailing extreme axial obliquity, internal heat deficit, and asymmetric magnetospheric offsets.
-        *   📄 [neptune_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/neptune_profile.md) - Scientific profile of Neptune (Poseidon), detailing supersonic atmospheric winds, ice-giant thermodynamics, and Triton capture dynamics.
-        *   📄 [pluto_charon_profile.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies/pluto_charon_profile.md) - Scientific profile of the Pluto-Charon binary system (Hades & Persephone), detailing external barycentric mechanics, double-synchronous tidal locking, and chaotic minor satellite rotations.
-    *   📁 [Design Guides](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Design%20Guides) - System architecture and visual design specification sheets.
-        *   📄 [master_design_standards.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Design%20Guides/master_design_standards.md) - Theme palette, typography rules, and frame layout standards.
-        *   📄 [splicer_design.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Design%20Guides/splicer_design.md) - Design guidelines for splicing operations and combinator layouts.
-        *   📄 [bio_lab_design.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Design%20Guides/bio_lab_design.md) - Tide pool synthesis cycles, lunar multipliers, and anomalous harmonizer formulas.
-        *   📄 [scanner_design.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Design%20Guides/scanner_design.md) - 2.5D coordinate projection, spatial frustum culling, and dispatch physics math.
-    *   📁 [Player Guides](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides) - Walkthroughs and references for reactor control and genome manipulation.
-        *   📄 [creature_types.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides/creature_types.md) - Specimen factions, base attributes, and genomic patterns.
-        *   📄 [creature_handling.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides/creature_handling.md) - Life loops, telomere decay, and location-based dispatch rules.
-        *   📄 [pox_reactor_comprehensive_guide.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides/pox_reactor_comprehensive_guide.md) - Advanced guide on operating the POX Tide Pool reactor core.
-        *   📄 [pox_reactor_q_score_guide.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides/pox_reactor_q_score_guide.md) - Algorithmic guide on optimizing Tide Pool synthesis Q-Score.
-        *   📄 [bio_lab_tutorial.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides/bio_lab_tutorial.md) - Step-by-step tutorial on nucleotide harmonization and specimen splicing.
-    *   📁 [Reports](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports) - Post-mortems, rendering audits, and runtime validation logs.
-        *   📄 [anomaly_investigation_report.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/anomaly_investigation_report.md) - Deep investigation report detailing dynamic physics equations and anomalies.
-        *   📄 [base_fonts_technical_report.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/base_fonts_technical_report.md) - Investigation and resolution of radar canvas font rotation errors.
-        *   📄 [forced_construction_log_text.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/forced_construction_log_text.md) - Compilation log text template copy and error handling reference for Forced Splicing.
-        *   📄 [pox_reactor_loop_report.md](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/pox_reactor_loop_report.md) - Technical audit report on reactor synthesis simulation loop and thermodynamic parameters.
-        *   📄 [splicer_compiled.txt](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/splicer_compiled.txt) - Minified user interface reference script copy for the splicer canvas.
-        *   📄 [step_search_compiled.txt](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports/step_search_compiled.txt) - Minified user interface reference script copy for step search.
-*   📁 [scratch](file:///c:/Users/brent/Antigravity/GENPOX/scratch) - Development scripts and experimental scratchpads.
+- 📁 [pox-android](file:///c:/Users/brent/Antigravity/GENPOX/pox-android) - The core Android project module.
+  - 📁 `app/src/main/java/com/example/genpox` - Kotlin implementation of screens, view models, database, and background services.
+    - 📁 [audio](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/audio) - Procedural low-level audio engine (`PoxSynthManager.kt`).
+    - 📁 [data](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data) - Core engines, database, models, and utility formulas.
+      - 📁 [network](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/network) - P2P connection manager (`PoxNetworkManager.kt`).
+    - 📁 [ui](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui) - Composable screens, navigation files, and UI layouts.
+      - 📁 [components](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/ui/components) - Custom drawing modules (holographic maps, wireframe vectors, canvas charts, and camera scanners).
+  - 📁 `app/src/assets` - Pre-cached road maps and building geometries (`pre_cached_roads.json`).
+- 📁 [Documentation](file:///c:/Users/brent/Antigravity/GENPOX/Documentation) - Design specs, developer guides, player manuals, and technical reports.
+  - 📁 [Engines](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Engines) - Technical and scientific specifications of core simulation engines.
+  - 📁 [Celestial Bodies](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Celestial%20Bodies) - Profiles of orbital bodies that influence siphoning rates.
+  - 📁 [Design Guides](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Design%20Guides) - System architecture and visual design specification sheets.
+  - 📁 [Player Guides](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Player%20Guides) - Walkthroughs for reactor control and genome manipulation.
+  - 📁 [Reports](file:///c:/Users/brent/Antigravity/GENPOX/Documentation/Reports) - Rendering audits and runtime validation logs.
+- 📁 [scratch](file:///c:/Users/brent/Antigravity/GENPOX/scratch) - Development scripts and experimental scratchpads.
 
 ---
 
 ## 🛠️ Getting Started
 
 ### Prerequisites
-
-*   **Java Development Kit (JDK)**: JDK 17 or higher.
-*   **Android SDK**: Android Studio (Koala or newer recommended) or CLI command-line tools configured with SDK Platform support for API level 36.
-*   **Node.js**: Required to execute helper road-caching scripts.
+- **Java Development Kit (JDK)**: JDK 17 or higher.
+- **Android SDK**: Android Studio (Koala or newer recommended) or CLI command-line tools configured with SDK Platform support for API level 36.
+- **Node.js**: Required to execute helper road-caching scripts.
 
 ### Build and Run
 
-1.  **Configure Environment**:
-    Create a `pox-android/local.properties` file with your SDK paths and API keys:
-    ```properties
-    sdk.dir=/path/to/your/Android/sdk
-    MAPS_API_KEY=your_google_maps_api_key
-    ```
-2.  **Compile Android App**:
-    From the `pox-android` directory, run:
-    ```bash
-    ./gradlew assembleDebug
-    ```
-3.  **Run Tests**:
-    ```bash
-    ./gradlew test
-    ```
-
-## 🔌 Integrated Dependencies & Libraries
-
-GENPOX is built on top of standard open-source tools:
-*   **OpenStreetMap / Overpass API**: Geometrical datasets for road network profiling.
-*   **Google Maps SDK for Android (`play-services-maps`)**: Background spatial tracking and tile providers.
-*   **Maps Compose (`maps-compose`)**: Procedural map components mapped inside Jetpack Compose overlays.
-*   **Google Play Services Nearby Connections (`play-services-nearby`)**: Enables secure, high-throughput local P2P node connections and cargo/message exchange.
-*   **CameraX (`camerax`)**: Configured to capture raw camera frame streams for live analysis.
-*   **ML Kit Barcode Scanning (`play-services-mlkit-barcode-scanning`)**: Real-time QR code decoding engine used to parse incoming player transfer data.
-*   **ZXing (`zxing-core`)**: Offline vector QR code generator used to export and share creature profiles with other player nodes.
-*   **Google AI SDK (`google-generativeai`)**: Directly connects to Gemini API models to compile DNA sequences into lore, creature profiles, and dynamic stat blocks.
-*   **Kotlinx Serialization (`kotlinx-serialization-json`)**: Handles rapid, type-safe serialization of data payloads and P2P communication packets.
-*   **Jetpack Room (`room`)**: Object-relational mapping database supporting transactions.
-*   **Jetpack DataStore (`datastore-preferences`)**: Persistent key-value settings.
-*   **Android Graphics Path (`androidx-graphics-path`)**: Force 16 KB page-aligned graphic layouts.
+1. **Configure Environment**:
+   Create a `pox-android/local.properties` file with your SDK paths and API keys:
+   ```properties
+   sdk.dir=/path/to/your/Android/sdk
+   MAPS_API_KEY=your_google_maps_api_key
+   ```
+2. **Compile Android App**:
+   From the `pox-android` directory, run:
+   ```bash
+   ./gradlew.bat assembleDebug
+   ```
+3. **Run Tests**:
+   ```bash
+   ./gradlew.bat testDebugUnitTest
+   ```

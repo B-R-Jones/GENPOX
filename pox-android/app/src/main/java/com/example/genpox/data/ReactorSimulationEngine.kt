@@ -138,11 +138,11 @@ object ReactorSimulationEngine {
             }
 
             finalStrand += incorporatedChar
-            val tm = BiophysicsEngine.calculateMeltingTemperature(finalStrand, salt)
-            val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(finalStrand)
+            val tm = GeneticsEngine.calculateMeltingTemperature(finalStrand, salt)
+            val mfe = GeneticsEngine.calculateMinimumFreeEnergy(finalStrand)
 
-            val baseQ = BiophysicsEngine.calculatePhredQScore(poly, random)
-            var targetTmVal = BiophysicsEngine.calculateMeltingTemperature(target, salt)
+            val baseQ = GeneticsEngine.calculatePhredQScore(poly, random)
+            var targetTmVal = GeneticsEngine.calculateMeltingTemperature(target, salt)
             if (state == WaveMath.AlignmentState.QUADRATURE) {
                 targetTmVal += 4.0
             }
@@ -262,8 +262,8 @@ object ReactorSimulationEngine {
         return RunResult(
             finalStrand = finalStrand,
             qScore = currentQScore,
-            tm = BiophysicsEngine.calculateMeltingTemperature(finalStrand, salt),
-            mfe = BiophysicsEngine.calculateMinimumFreeEnergy(finalStrand),
+            tm = GeneticsEngine.calculateMeltingTemperature(finalStrand, salt),
+            mfe = GeneticsEngine.calculateMinimumFreeEnergy(finalStrand),
             steps = stepsList,
             isCollapsed = false
         )

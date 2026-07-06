@@ -91,17 +91,13 @@ The separation angle $\theta_{\text{sep}} = \text{deg}(\Delta\lambda)$ determine
 
 ---
 
-## 5. Parallel Test Isolation
-
-To support concurrent execution of unit tests without race conditions on singleton states, the global test mode bypass is isolated using a JVM `ThreadLocal` structure:
+To support execution of unit tests across coroutine dispatchers without state loss during thread switching, the global test mode bypass is marked as `@Volatile`:
 
 ```kotlin
 object WaveMath {
-    private val _isTestMode = ThreadLocal.withInitial { false }
-    var isTestMode: Boolean
-        get() = _isTestMode.get() ?: false
-        set(value) = _isTestMode.set(value)
+    @Volatile
+    var isTestMode: Boolean = false
 }
 ```
 
-This ensures that concurrent threads in testing frameworks (e.g. running `MainScreenViewModelTest` and `ReactorSimulationTest` concurrently) do not overwrite the test bypass flag for other threads, securing $100\%$ test run deterministic fidelity.
+This ensures that asynchronous tests running under coroutine dispatchers (e.g. `MainScreenViewModelTest` and `ReactorSimulationTest`) propagate the test bypass flag correctly across thread suspensions, securing 100% test run deterministic fidelity.

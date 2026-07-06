@@ -1,5 +1,8 @@
 package com.example.genpox.ui.main
 
+import com.example.genpox.data.GraphicsMath
+
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -1632,24 +1635,14 @@ fun PhenotypeGeneDecoder() {
         } else if (zoomLevel == 3) {
             // Draw 3D Crystal Core Blueprint
             val crystalRadius = radius * 0.45f
-            val rotationVal = rotationAngle.toDouble() * 1.5
+            val rotationVal = rotationAngle.toDouble()
             val tiltVal = Math.toRadians(35.0)
 
-            val vertices = listOf(
-                doubleArrayOf(0.0, crystalRadius.toDouble(), 0.0), // 0: Top
-                doubleArrayOf(0.0, -crystalRadius.toDouble(), 0.0), // 1: Bottom
-                doubleArrayOf(crystalRadius.toDouble() * cos(rotationVal), 0.0, crystalRadius.toDouble() * sin(rotationVal)), // 2
-                doubleArrayOf(crystalRadius.toDouble() * cos(rotationVal + Math.PI/2), 0.0, crystalRadius.toDouble() * sin(rotationVal + Math.PI/2)), // 3
-                doubleArrayOf(crystalRadius.toDouble() * cos(rotationVal + Math.PI), 0.0, crystalRadius.toDouble() * sin(rotationVal + Math.PI)), // 4
-                doubleArrayOf(crystalRadius.toDouble() * cos(rotationVal + 3*Math.PI/2), 0.0, crystalRadius.toDouble() * sin(rotationVal + 3*Math.PI/2)) // 5
-            )
+            val vertices = GraphicsMath.generate3DBlueprintVertices(crystalRadius.toDouble(), rotationVal)
 
             val projected = vertices.map { pt ->
-                val x = pt[0]
-                val y = pt[1]
-                val z = pt[2]
-                val yt = y * cos(tiltVal) - z * sin(tiltVal)
-                Offset((centerX + x).toFloat(), (centerY - yt).toFloat())
+                val projectedPt = GraphicsMath.project3DBlueprintPoint(pt, tiltVal, centerX.toDouble(), centerY.toDouble())
+                Offset(projectedPt.x, projectedPt.y)
             }
 
             for (i in 2..5) {

@@ -1,13 +1,10 @@
 package com.example.genpox.data
 
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.sin
 import kotlin.math.exp
 import kotlin.math.log10
 import java.util.Random
 
-object BiophysicsEngine {
+object GeneticsEngine {
 
     /**
      * Calculates the Melting Temperature (Tm) of a sequence in Celsius.
@@ -125,5 +122,21 @@ object BiophysicsEngine {
         
         if (count == 0) return 1.0
         return exp(productLog / count)
+    }
+
+    /**
+     * Calculates the error probability from a Phred Quality Score (Q).
+     */
+    fun qScoreToErrorProbability(qScore: Double): Double {
+        return Math.pow(10.0, -qScore / 10.0)
+    }
+
+    /**
+     * Calculates the Phred Quality Score (Q) from an error probability.
+     */
+    fun errorProbabilityToQScore(prob: Double): Double {
+        if (prob <= 0.0) return 40.0
+        if (prob >= 1.0) return 0.0
+        return -10.0 * Math.log10(prob)
     }
 }

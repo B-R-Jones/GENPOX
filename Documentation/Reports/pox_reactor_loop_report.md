@@ -68,7 +68,7 @@ Tapping **`✕ INITIATE SYNTHESIS`** starts a dedicated coroutine executing tran
 1. **Feedstock Subtraction**: Before starting, the reactor verifies stock availability (target sequence cost plus 100 units of each base if a chemical solute buffer is selected). It deducts feedstock immediately upon ignition.
 2. **Stepped Transcription**: On each tick, the target base at that index is transcribed and visualised in the **Nucleotide Docking Array** (drawing base characters into hexagons).
 3. **Real-time Biophysical Filters & Collapse**:
-   After each base is appended, thermodynamic parameters are calculated for the *growing sequence* via [BiophysicsEngine.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/BiophysicsEngine.kt):
+    After each base is appended, thermodynamic parameters are calculated for the *growing sequence* via [GeneticsEngine.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/GeneticsEngine.kt):
    - **Inlet Deprivation**:
      - *Trigger*: The inlet ratio slider for a nucleotide currently being transcribed in the target sequence is $\le 5\%$ (0.05).
      - *Mitigation*: Open the corresponding inlet slider above 5%.
@@ -110,7 +110,7 @@ The Anomaly Engine runs when engaged by the player, pausing the standard reactor
 
 ## 5. Mathematical Formulations
 
-The biophysical formulas implemented in [BiophysicsEngine.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/BiophysicsEngine.kt) are:
+The biophysical formulas implemented in [GeneticsEngine.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/GeneticsEngine.kt) are:
 
 ### Wallace-Breslauer Melting Temperature ($T_m$)
 For short oligonucleotides, the melting temperature is calculated using the salt-corrected Wallace formula:
@@ -147,3 +147,32 @@ Calculated for 64-character compiled creature genomes against the codon bias of 
 
 - **Splicer (Constructor)**: Combines 8 standard/anomalous gene blocks into a 64-character genome, deducting the blocks from inventory and utilizing raw nucleotides as feedstock. The resulting creature's base stats scale with its CAI.
 - **Vault (Recycling)**: Allows players to deconstruct accumulated standard gene blocks back into raw bases (each character $A, G, T, C$ yields $+1$ unit to its respective stock). Anomalous blocks cannot be decomposed.
+
+---
+
+## 7. Graphics Decoupling & Verification Math
+
+To achieve strict clean architecture compliance, all procedural mathematical formulas and coordinates used in the dashboard visuals have been extracted from Compose canvas drawing loops into a pure utility class [GraphicsMath.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/main/java/com/example/genpox/data/GraphicsMath.kt):
+- **Node Crystal Canvas**: Height modulations, radial coordinates, and phase offsets are handled by `calculateCrystalVertices`.
+- **Holographic Helix Reactor**: Coordinates, scales, alpha gradients, and signal interruption offsets for the double-helix rotating strands are modeled by `calculateHelixStrand`.
+- **3D Crystal Core Blueprint**: 3D rotation, tilting projections, and horizon-relative offsets are handled by `generate3DBlueprintVertices` and `project3DBlueprintPoint`.
+- **Bio-Resonance Oscilloscope**: Radial frequency spike height modulations are computed via `calculateOscilloscopeHeightDp`.
+- **Orrery Celestial Panel**: Orbit-to-dome mapping, hour angle declinations, and diurnal latitude projections are handled by `calculateOrreryCoordinates` and `projectOrreryPlanet`.
+
+---
+
+## 8. Automated Compliance & Verification Test Suite
+
+A multi-layered verification strategy enforces engineering standards across the project:
+1. **Zero UI Dependency Audits** ([ImportAuditTest.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/test/java/com/example/genpox/ImportAuditTest.kt)):
+   - Programs a regex-based package scan asserting that core engines (`GeneticsEngine`, `DeploymentEngine`, `ConflictEngine`, `PoxNetworkManager`) are completely free of UI-related imports (e.g. `androidx.compose`, `android.view`).
+2. **Extreme Inputs & Edge Cases** ([ExtremeEngineTest.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/test/java/com/example/genpox/ExtremeEngineTest.kt)):
+   - Simulates turn-based combat under 10% telomere decay and antagonistic moon phases to test the combat system's resilience.
+   - Evaluates deployment anomalies with overlapping density waves and checks bounding coercions of `calculateStallDepth` under close coordinates.
+3. **Graphics Calculations Isolation** ([GraphicsMathTest.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/test/java/com/example/genpox/GraphicsMathTest.kt)):
+   - Verifies all orbital, trigonometric, and wave frequency formulas outside of Compose draw scopes.
+4. **Compose Binding Verification** ([ComposeBindingTest.kt](file:///c:/Users/brent/Antigravity/GENPOX/pox-android/app/src/test/java/com/example/genpox/ui/main/ComposeBindingTest.kt)):
+   - Asserts that dashboard ViewModels cleanly expose StateFlow bindings to the UI without importing and coupling directly with Jetpack Compose views or activities.
+5. **Thread-Safe Testing**:
+   - The global `WaveMath.isTestMode` flag is backed by a `@Volatile` field to prevent state leaks or incorrect evaluations when testing multi-threaded asynchronous coroutines.
+

@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.genpox.data.Creature
 import com.example.genpox.data.GeneSequence
-import com.example.genpox.data.BiophysicsEngine
+import com.example.genpox.data.GeneticsEngine
 import com.example.genpox.data.HarvestMission
 import com.example.genpox.data.WaveMath
 import com.example.genpox.data.BuildingStructure

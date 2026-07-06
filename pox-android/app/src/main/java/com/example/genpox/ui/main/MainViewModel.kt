@@ -428,7 +428,7 @@ class MainViewModel(
                     val endpointId = pair.first
                     val packet = pair.second
                     val peerName = nm.activeConnections.value[endpointId] ?: "Unknown Peer"
-                    network.receiveIncomingPacket(peerName, packet)
+                    network.receiveIncomingPacket(endpointId, peerName, packet)
 
                     val now = System.currentTimeMillis()
                     val lastFlash = lastMessageFlashTime[peerName] ?: 0L
@@ -516,8 +516,8 @@ class MainViewModel(
     fun incinerateCreature(creature: Creature, harvestedGene: String) {
         viewModelScope.launch {
             repository.deleteCreature(creature)
-            val tm = BiophysicsEngine.calculateMeltingTemperature(harvestedGene, reactorSalt.value.toDouble())
-            val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(harvestedGene)
+            val tm = GeneticsEngine.calculateMeltingTemperature(harvestedGene, reactorSalt.value.toDouble())
+            val mfe = GeneticsEngine.calculateMinimumFreeEnergy(harvestedGene)
             val qScore = (creature.telomeres / 2.5).coerceIn(10.0, 45.0)
             repository.insertGeneSequence(
                 GeneSequence(
@@ -560,8 +560,8 @@ class MainViewModel(
 
                 returnedBlocks.forEach { seq ->
                     val upper = seq.uppercase()
-                    val tm = BiophysicsEngine.calculateMeltingTemperature(upper, reactorSalt.value.toDouble())
-                    val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(upper)
+                    val tm = GeneticsEngine.calculateMeltingTemperature(upper, reactorSalt.value.toDouble())
+                    val mfe = GeneticsEngine.calculateMinimumFreeEnergy(upper)
                     val qScore = (creature.telomeres / 2.5).coerceIn(10.0, 45.0)
                     repository.insertGeneSequence(
                         GeneSequence(
@@ -901,8 +901,8 @@ class MainViewModel(
                 compileCreature(data)
             } else if (data.length == 8 && data.all { it.uppercaseChar() in "AGTCXZYW?!$%&@#" }) {
                 val upper = data.uppercase()
-                val tm = BiophysicsEngine.calculateMeltingTemperature(upper, reactorSalt.value.toDouble())
-                val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(upper)
+                val tm = GeneticsEngine.calculateMeltingTemperature(upper, reactorSalt.value.toDouble())
+                val mfe = GeneticsEngine.calculateMinimumFreeEnergy(upper)
                 repository.insertGeneSequence(
                     GeneSequence(
                         sequence = upper,
@@ -1221,34 +1221,6 @@ data class GenePacket(
     val newGenes: List<String> = emptyList()
 )
 
-data class PoxAnomaly(
-    val id: String,
-    val name: String,
-    val lat: Double,
-    val lng: Double,
-    val gene: String,
-    val faction: String,
-    val distance: Double,
-    val heatZoneDiameter: Double,
-    val density: Double = 0.0
-) {
-    fun getBoundaryRadius(theta: Double): Double {
-        val seed = id.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
-        val r0 = heatZoneDiameter / 2.0
-        val epsilon = 0.15 + (seed % 3) * 0.05 // 0.15, 0.20, 0.25
-        val k = 3 + (seed % 3)                 // 3, 4, 5 lobes
-        val phi = (seed % 360) * (Math.PI / 180.0)
-        return r0 * (1.0 + epsilon * kotlin.math.cos(k * theta + phi))
-    }
-
-    fun getBoundaryRadiusForPlayer(userLat: Double, userLng: Double): Double {
-        val dLat = userLat - lat
-        val dLng = (userLng - lng) * kotlin.math.cos(Math.toRadians(userLat))
-        val theta = kotlin.math.atan2(dLat, dLng)
-        return getBoundaryRadius(theta)
-    }
-}
-
 data class UnlockedMove(
     val type: String,
     val name: String,
@@ -1296,13 +1268,3 @@ data class PoxBaseFont(
         return Math.round(maxGather * Math.pow(ratio, 4.0)).coerceAtLeast(0L)
     }
 }
-
-data class CelestialWell(
-    val id: String,
-    val name: String,
-    val lat: Double,
-    val lng: Double,
-    val radiusFeet: Double,
-    val type: String, // "GREENHOUSE", "MAGNETOSPHERIC", "GRAVITATIONAL"
-    val hazardPower: Double // base intensity multiplier
-)

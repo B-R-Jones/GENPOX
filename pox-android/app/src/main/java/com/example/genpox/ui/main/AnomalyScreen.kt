@@ -53,6 +53,7 @@ import com.example.genpox.data.Creature
 import com.example.genpox.data.GeneSequence
 import com.example.genpox.data.HarvestMission
 import com.example.genpox.data.WaveMath
+import com.example.genpox.data.PoxAnomaly
 import com.example.genpox.data.BuildingStructure
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.*
@@ -504,7 +505,7 @@ fun HarvestingCountdownTimer(
             // HARVESTING TEXT
             val remaining = maxOf(0L, m.totalDuration - m.elapsedSeconds)
             val timeStr = String.format(java.util.Locale.US, "%02dm %02ds", remaining / 60, remaining % 60)
-            val targetGene = m.harvestedGenes.firstOrNull() ?: "UNKNOWN"
+            val targetGene = m.harvestedPayload.firstOrNull() ?: "UNKNOWN"
             Text(
                 text = "Harvesting: $targetGene ($timeStr remaining)",
                 color = Color(0xFF00E1FF),

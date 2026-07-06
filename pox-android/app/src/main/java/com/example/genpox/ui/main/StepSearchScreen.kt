@@ -54,7 +54,7 @@ import com.example.genpox.data.Creature
 import com.example.genpox.data.GeneSequence
 import com.example.genpox.data.HarvestMission
 import com.example.genpox.data.WaveMath
-import com.example.genpox.data.BiophysicsEngine
+import com.example.genpox.data.GeneticsEngine
 import com.example.genpox.data.BuildingStructure
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.*
@@ -438,8 +438,8 @@ fun StepSearchView(
                     modifier = Modifier.fillMaxWidth()
                 ) { page ->
                     val pageCopy = copies.getOrNull(page)
-                    val tm = pageCopy?.meltingTemp ?: BiophysicsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
-                    val mfe = pageCopy?.minimumFreeEnergy ?: BiophysicsEngine.calculateMinimumFreeEnergy(gene)
+                    val tm = pageCopy?.meltingTemp ?: GeneticsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
+                    val mfe = pageCopy?.minimumFreeEnergy ?: GeneticsEngine.calculateMinimumFreeEnergy(gene)
                     val qScore = pageCopy?.averageQScore ?: 30.0
 
                     Column(
@@ -521,8 +521,8 @@ fun StepSearchView(
                 }
 
                 val currentCopy = copies.getOrNull(currentPage)
-                val currentTm = currentCopy?.meltingTemp ?: BiophysicsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
-                val currentMfe = currentCopy?.minimumFreeEnergy ?: BiophysicsEngine.calculateMinimumFreeEnergy(gene)
+                val currentTm = currentCopy?.meltingTemp ?: GeneticsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
+                val currentMfe = currentCopy?.minimumFreeEnergy ?: GeneticsEngine.calculateMinimumFreeEnergy(gene)
                 val currentQScore = currentCopy?.averageQScore ?: 30.0
 
                 val resolvedGeneSeq = currentCopy ?: GeneSequence(

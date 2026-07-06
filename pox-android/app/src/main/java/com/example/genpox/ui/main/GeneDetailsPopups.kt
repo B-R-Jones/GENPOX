@@ -54,7 +54,7 @@ import com.example.genpox.data.GeneSequence
 import com.example.genpox.data.HarvestMission
 import com.example.genpox.data.WaveMath
 import com.example.genpox.data.BuildingStructure
-import com.example.genpox.data.BiophysicsEngine
+import com.example.genpox.data.GeneticsEngine
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.*
 import com.google.android.gms.maps.model.CameraPosition
@@ -189,10 +189,10 @@ fun GeneDetailsPopup(
                     viewModel.geneSequences.value.find { it.sequence == gene }
                 }
                 val tm = remember(gene, geneSequence) {
-                    geneSequence?.meltingTemp ?: BiophysicsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
+                    geneSequence?.meltingTemp ?: GeneticsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
                 }
                 val mfe = remember(gene, geneSequence) {
-                    geneSequence?.minimumFreeEnergy ?: BiophysicsEngine.calculateMinimumFreeEnergy(gene)
+                    geneSequence?.minimumFreeEnergy ?: GeneticsEngine.calculateMinimumFreeEnergy(gene)
                 }
                 val qScore = remember(gene, geneSequence) {
                     geneSequence?.averageQScore ?: 30.0
@@ -370,10 +370,10 @@ fun StepSearchGeneDetailsPopup(
         text = {
             val geneSequence = viewModel.geneSequences.collectAsState().value.find { it.sequence == gene }
             val tm = remember(gene, geneSequence, viewModel.reactorSalt) {
-                geneSequence?.meltingTemp ?: BiophysicsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
+                geneSequence?.meltingTemp ?: GeneticsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
             }
             val mfe = remember(gene, geneSequence) {
-                geneSequence?.minimumFreeEnergy ?: BiophysicsEngine.calculateMinimumFreeEnergy(gene)
+                geneSequence?.minimumFreeEnergy ?: GeneticsEngine.calculateMinimumFreeEnergy(gene)
             }
             val qScore = remember(gene, geneSequence) {
                 geneSequence?.averageQScore ?: 30.0
@@ -633,10 +633,10 @@ fun VaultGeneDetailsPopup(
                     viewModel.geneSequences.value.find { it.sequence == gene }
                 }
                 val tm = remember(gene, geneSequence) {
-                    geneSequence?.meltingTemp ?: BiophysicsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
+                    geneSequence?.meltingTemp ?: GeneticsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
                 }
                 val mfe = remember(gene, geneSequence) {
-                    geneSequence?.minimumFreeEnergy ?: BiophysicsEngine.calculateMinimumFreeEnergy(gene)
+                    geneSequence?.minimumFreeEnergy ?: GeneticsEngine.calculateMinimumFreeEnergy(gene)
                 }
                 val qScore = remember(gene, geneSequence) {
                     geneSequence?.averageQScore ?: 30.0

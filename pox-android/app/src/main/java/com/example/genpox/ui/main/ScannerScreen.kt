@@ -1,5 +1,8 @@
 package com.example.genpox.ui.main
 
+import com.example.genpox.data.GraphicsMath
+
+
 import android.content.Context
 import androidx.annotation.Keep
 import androidx.compose.animation.core.*
@@ -54,6 +57,8 @@ import com.example.genpox.data.Creature
 import com.example.genpox.data.GeneSequence
 import com.example.genpox.data.HarvestMission
 import com.example.genpox.data.WaveMath
+import com.example.genpox.data.PoxAnomaly
+import com.example.genpox.data.CelestialWell
 import com.example.genpox.data.BuildingStructure
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.*
@@ -3262,50 +3267,29 @@ fun PlanetTransitArcPanel(
         WaveMath.getBaseAlignmentState(baseChar, timeMs)
     }
     
-    // Calculations
-    val (xE, yE) = remember(timeMs) { WaveMath.getHeliocentricPosition("EARTH", timeMs) }
+    // Calculations delegating to GraphicsMath
+    val earthPos = remember(timeMs) { WaveMath.getHeliocentricPosition("EARTH", timeMs) }
+    val xE = earthPos.first
+    val yE = earthPos.second
     
-    val (x1, y1) = remember(planet1, timeMs) { WaveMath.getHeliocentricPosition(planet1, timeMs) }
-    val lambda1 = remember(x1, y1, xE, yE, planet1) {
-        if (planet1.uppercase() == "EARTH") {
-            kotlin.math.atan2(-yE, -xE) // Sun Proxy (Option A)
-        } else {
-            kotlin.math.atan2(y1 - yE, x1 - xE)
-        }
+    val coords1 = remember(planet1, timeMs, userLng, xE, yE) {
+        GraphicsMath.calculateOrreryCoordinates(planet1, timeMs, userLng, xE, yE)
     }
+    val lambda1 = coords1.lambda
+    val dec1 = coords1.declination
+    val ha1 = coords1.hourAngle
     
-    val (x2, y2) = remember(planet2, timeMs) { WaveMath.getHeliocentricPosition(planet2, timeMs) }
-    val lambda2 = remember(x2, y2, xE, yE, planet2) {
-        if (planet2.uppercase() == "EARTH") {
-            kotlin.math.atan2(-yE, -xE) // Sun Proxy (Option A)
-        } else {
-            kotlin.math.atan2(y2 - yE, x2 - xE)
-        }
+    val coords2 = remember(planet2, timeMs, userLng, xE, yE) {
+        GraphicsMath.calculateOrreryCoordinates(planet2, timeMs, userLng, xE, yE)
     }
-    
-    val phiRot = remember(timeMs) { (2.0 * Math.PI * ((timeMs % 86400000L).toDouble() / 86400000.0 + 0.5)) % (2.0 * Math.PI) }
-    
-    val lambdaSun = remember(xE, yE) { kotlin.math.atan2(-yE, -xE) }
-    
-    // Apply observer's longitude offset to Hour Angles
-    val lngOffsetRad = Math.toRadians(userLng)
-    val ha1 = remember(phiRot, lambda1, lambdaSun, lngOffsetRad) {
-        ((phiRot + lngOffsetRad + lambdaSun - lambda1) % (2.0 * Math.PI) + 2.0 * Math.PI) % (2.0 * Math.PI)
-    }
-    val ha2 = remember(phiRot, lambda2, lambdaSun, lngOffsetRad) {
-        ((phiRot + lngOffsetRad + lambdaSun - lambda2) % (2.0 * Math.PI) + 2.0 * Math.PI) % (2.0 * Math.PI)
-    }
+    val lambda2 = coords2.lambda
+    val dec2 = coords2.declination
+    val ha2 = coords2.hourAngle
     
     val latRad = remember(userLat) { Math.toRadians(userLat) }
-    val dec1 = remember(lambda1) { kotlin.math.asin(0.3978 * kotlin.math.sin(lambda1)) }
-    val dec2 = remember(lambda2) { kotlin.math.asin(0.3978 * kotlin.math.sin(lambda2)) }
     
     val diffDeg = remember(ha1, ha2) {
-        var diff = kotlin.math.abs(ha1 - ha2)
-        if (diff > Math.PI) {
-            diff = 2.0 * Math.PI - diff
-        }
-        Math.toDegrees(diff)
+        GraphicsMath.calculateHourAngleSeparation(ha1, ha2)
     }
     
     val qScoreBuff = when (alignmentState) {
@@ -3475,20 +3459,19 @@ fun PlanetTransitArcPanel(
                 val isSel2 = selectedPlanet.uppercase() == planet2.uppercase()
                 
                 // Shifted centers and projected radii based on declination and latitude
-                val cy1 = cy - r1 * kotlin.math.sin(latRad).toFloat() * kotlin.math.sin(dec1).toFloat()
-                val rp1 = (r1 * kotlin.math.cos(latRad).toFloat() * kotlin.math.cos(dec1).toFloat()).coerceAtLeast(r1 * 0.2f)
+                val proj1 = GraphicsMath.projectOrreryPlanet(cx, cy, maxRadius, 0.78f, latRad, dec1, ha1)
+                val cy1 = proj1.centerY
+                val rp1 = proj1.projectedRadius
+                val dx1 = proj1.dx
+                val dy1 = proj1.dy
+                val isBelowHorizon1 = proj1.isBelowHorizon
                 
-                val cy2 = cy - r2 * kotlin.math.sin(latRad).toFloat() * kotlin.math.sin(dec2).toFloat()
-                val rp2 = (r2 * kotlin.math.cos(latRad).toFloat() * kotlin.math.cos(dec2).toFloat()).coerceAtLeast(r2 * 0.2f)
-                
-                // Calculate positions 1 and 2 first
-                val dx1 = cx + rp1 * kotlin.math.sin(ha1).toFloat()
-                val dy1 = cy1 - rp1 * kotlin.math.cos(ha1).toFloat()
-                val isBelowHorizon1 = dy1 > cy
-                
-                val dx2 = cx + rp2 * kotlin.math.sin(ha2).toFloat()
-                val dy2 = cy2 - rp2 * kotlin.math.cos(ha2).toFloat()
-                val isBelowHorizon2 = dy2 > cy
+                val proj2 = GraphicsMath.projectOrreryPlanet(cx, cy, maxRadius, 1.0f, latRad, dec2, ha2)
+                val cy2 = proj2.centerY
+                val rp2 = proj2.projectedRadius
+                val dx2 = proj2.dx
+                val dy2 = proj2.dy
+                val isBelowHorizon2 = proj2.isBelowHorizon
                 
                 // 1. Horizon Line
                 drawLine(
