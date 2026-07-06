@@ -97,6 +97,51 @@ class MainViewModel(
         addLog("PROFILER: Frame rate stats overlay set to: ${if (_isProfilerEnabled.value) "ACTIVE" else "OFFLINE"}")
     }
 
+    // Global CRT Phosphor Monitor custom parameters
+    private val _crtScanlineOpacity = MutableStateFlow(com.example.genpox.theme.CyberTheme.crtScanlineOpacity)
+    val crtScanlineOpacity: StateFlow<Float> = _crtScanlineOpacity.asStateFlow()
+
+    private val _crtGrilleOpacity = MutableStateFlow(com.example.genpox.theme.CyberTheme.crtGrilleOpacity)
+    val crtGrilleOpacity: StateFlow<Float> = _crtGrilleOpacity.asStateFlow()
+
+    private val _crtBloomIntensity = MutableStateFlow(com.example.genpox.theme.CyberTheme.crtBloomIntensity)
+    val crtBloomIntensity: StateFlow<Float> = _crtBloomIntensity.asStateFlow()
+
+    private val _crtCurvatureBezel = MutableStateFlow(com.example.genpox.theme.CyberTheme.crtCurvatureBezel)
+    val crtCurvatureBezel: StateFlow<Float> = _crtCurvatureBezel.asStateFlow()
+
+    private val _crtGlitchIntensity = MutableStateFlow(com.example.genpox.theme.CyberTheme.crtGlitchIntensity)
+    val crtGlitchIntensity: StateFlow<Float> = _crtGlitchIntensity.asStateFlow()
+
+    fun setCrtScanlineOpacity(value: Float) {
+        _crtScanlineOpacity.value = value
+        com.example.genpox.theme.CyberTheme.crtScanlineOpacity = value
+    }
+    fun setCrtGrilleOpacity(value: Float) {
+        _crtGrilleOpacity.value = value
+        com.example.genpox.theme.CyberTheme.crtGrilleOpacity = value
+    }
+    fun setCrtBloomIntensity(value: Float) {
+        _crtBloomIntensity.value = value
+        com.example.genpox.theme.CyberTheme.crtBloomIntensity = value
+    }
+    fun setCrtCurvatureBezel(value: Float) {
+        _crtCurvatureBezel.value = value
+        com.example.genpox.theme.CyberTheme.crtCurvatureBezel = value
+    }
+    fun setCrtGlitchIntensity(value: Float) {
+        _crtGlitchIntensity.value = value
+        com.example.genpox.theme.CyberTheme.crtGlitchIntensity = value
+    }
+
+    fun syncPhosphorSettingsFromTheme() {
+        _crtScanlineOpacity.value = com.example.genpox.theme.CyberTheme.crtScanlineOpacity
+        _crtGrilleOpacity.value = com.example.genpox.theme.CyberTheme.crtGrilleOpacity
+        _crtBloomIntensity.value = com.example.genpox.theme.CyberTheme.crtBloomIntensity
+        _crtCurvatureBezel.value = com.example.genpox.theme.CyberTheme.crtCurvatureBezel
+        _crtGlitchIntensity.value = com.example.genpox.theme.CyberTheme.crtGlitchIntensity
+    }
+
     // Daily Bounty Sequences
     val dailyBounties: StateFlow<List<String>> = flow {
         emit(generateDailyBounties())
@@ -187,6 +232,7 @@ class MainViewModel(
     val activeSiphonedFont get() = reactor.activeSiphonedFont
     val siphonedRate get() = reactor.siphonedRate
     val celestialWells get() = reactor.celestialWells
+    val selectedHostPlanet get() = reactor.selectedHostPlanet
 
     fun setReactorTemperature(value: Float) = reactor.setReactorTemperature(value)
     fun setReactorSalt(value: Float) = reactor.setReactorSalt(value)
@@ -198,6 +244,7 @@ class MainViewModel(
     fun setInletRatioC(value: Float) = reactor.setInletRatioC(value)
     fun setReactorDialIndex(index: Int) = reactor.setReactorDialIndex(index)
     fun toggleLoopActive() = reactor.toggleLoopActive()
+    fun changeHostPlanet(planet: String) = reactor.changeHostPlanet(planet)
     fun selectReagent(reagentId: String?) = reactor.selectReagent(reagentId)
     fun toggleDevForceAnomaly() = reactor.toggleDevForceAnomaly()
     fun addDevBases() = reactor.addDevBases()
@@ -288,6 +335,14 @@ class MainViewModel(
     val trackedMissionId get() = scanner.trackedMissionId
     val selectedAnomalyId get() = scanner.selectedAnomalyId
     val scannerSubTab get() = scanner.scannerSubTab
+    val listSubTab get() = scanner.listSubTab
+    val showAnomaliesOnMap get() = scanner.showAnomaliesOnMap
+    val showFontsOnMap get() = scanner.showFontsOnMap
+    val showWellsOnMap get() = scanner.showWellsOnMap
+
+    fun toggleAnomaliesOnMap() = scanner.toggleAnomaliesOnMap()
+    fun toggleFontsOnMap() = scanner.toggleFontsOnMap()
+    fun toggleWellsOnMap() = scanner.toggleWellsOnMap()
     val latitude get() = scanner.latitude
     val longitude get() = scanner.longitude
     val zoomMultiplier get() = scanner.zoomMultiplier
@@ -307,6 +362,7 @@ class MainViewModel(
     }
     fun setSelectedAnomalyId(id: String?) = scanner.setSelectedAnomalyId(id)
     fun setScannerSubTab(subTab: String) = scanner.setScannerSubTab(subTab)
+    fun setListSubTab(subTab: String) = scanner.setListSubTab(subTab)
     fun updateLocation(lat: Double, lng: Double) {
         reactor.updateLocation(lat, lng)
         scanner.updateLocation(lat, lng)
@@ -409,6 +465,16 @@ class MainViewModel(
             _selectedTab.value = tab
             addLog("NAV: Transition to section [${tab.uppercase()}]")
             synthManager.playCombinatorTick()
+
+            if (tab == "splicer") {
+                if (splicer.isCustomScaffoldMode.value) {
+                    splicer.selectSplicerSlot(null)
+                }
+                if (_vaultSubTab.value == "search") {
+                    _vaultSubTab.value = "creatures"
+                    _creatureCardOpenedFrom.value = "vault"
+                }
+            }
         }
     }
 

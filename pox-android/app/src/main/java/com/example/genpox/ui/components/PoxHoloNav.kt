@@ -55,6 +55,7 @@ fun PoxUnifiedHoloNav(
     modifier: Modifier = Modifier,
     rows: List<List<HoloNavButton>>,
     activeButtonId: String = "",
+    activeButtonIds: Set<String> = emptySet(),
     allowStacking: Boolean = true,
     viewModel: MainViewModel
 ) {
@@ -62,6 +63,12 @@ fun PoxUnifiedHoloNav(
 
     var isStacked by remember { mutableStateOf(false) }
     var activeRowIndex by remember { mutableStateOf(0) }
+
+    LaunchedEffect(rows.size) {
+        if (activeRowIndex >= rows.size) {
+            activeRowIndex = 0
+        }
+    }
 
     // Smoothly animate the stack fraction with a bouncy feel
     val stackedProgress by animateFloatAsState(
@@ -132,11 +139,11 @@ fun PoxUnifiedHoloNav(
         modifier = modifier
             .zIndex(10f)
             .fillMaxWidth()
-            .height(46.dp)
+            .height(120.dp)
     ) {
         Box(
             modifier = Modifier
-                .align(Alignment.CenterEnd)
+                .align(Alignment.BottomEnd)
                 .size(width = containerWidth, height = 46.dp)
                 .pointerInput(rows.size) {
                     var totalDragX = 0f
@@ -192,7 +199,8 @@ fun PoxUnifiedHoloNav(
                     val currentShift = offscreenShift * stackedProgress
                     val finalX = targetX + currentShift + (stackedBounceOffset * stackedProgress)
 
-                    val isButtonActive = activeButtonId.isNotEmpty() && activeButtonId == button.id
+                    val isButtonActive = (activeButtonId.isNotEmpty() && activeButtonId == button.id) ||
+                            activeButtonIds.contains(button.id)
                     val buttonAlphaFactor = if (isStacked && buttonIndex < M - 1) 0.5f else 1f
                     val finalAlpha = alpha * buttonAlphaFactor
 
@@ -211,7 +219,7 @@ fun PoxUnifiedHoloNav(
                                 this.scaleY = scale
                             }
                             .zIndex(zIndex),
-                        enabled = if (isStacked) (buttonIndex == M - 1) else button.enabled,
+                        enabled = if (isStacked) (buttonIndex == M - 1) else (isActive && button.enabled),
                         onClick = {
                             if (isStacked) {
                                 viewModel.synthManager.playCombinatorTick()
@@ -231,8 +239,8 @@ fun PoxUnifiedHoloNav(
             // Invisible stationary touch overlay to unstack with a large target area
             Box(
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .requiredSize(width = 140.dp, height = 90.dp)
+                    .align(Alignment.BottomEnd)
+                    .requiredSize(width = 180.dp, height = 120.dp)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null

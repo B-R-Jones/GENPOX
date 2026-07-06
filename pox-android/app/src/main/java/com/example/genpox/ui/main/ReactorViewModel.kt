@@ -153,6 +153,18 @@ class ReactorViewModel(
         emptyList()
     )
 
+    val selectedHostPlanet = repository.selectedHostPlanet.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        "EARTH"
+    )
+
+    fun changeHostPlanet(planet: String) {
+        viewModelScope.launch {
+            repository.saveSelectedHostPlanet(planet)
+        }
+    }
+
     private var heartbeatJob: Job? = null
     private var scrollingTickerJob: Job? = null
     private var ticksSinceLastSave = 0
@@ -546,6 +558,7 @@ class ReactorViewModel(
                 inletRatioT = _inletRatioT.value,
                 inletRatioC = _inletRatioC.value,
                 stepIntervalMs = stepIntervalMs,
+                hostPlanet = selectedHostPlanet.value,
                 onStep = { stepRes ->
                     _activeSynthesisStrand.value = stepRes.accumulatedStrand
                     _activeSynthesisStep.value = stepRes.step

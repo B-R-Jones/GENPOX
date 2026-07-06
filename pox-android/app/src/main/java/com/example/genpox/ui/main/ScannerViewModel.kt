@@ -63,6 +63,9 @@ class ScannerViewModel(
     private val _scannerSubTab = MutableStateFlow("radar")
     val scannerSubTab: StateFlow<String> = _scannerSubTab.asStateFlow()
 
+    private val _listSubTab = MutableStateFlow("anomalies")
+    val listSubTab: StateFlow<String> = _listSubTab.asStateFlow()
+
     private val _latitude = MutableStateFlow(37.4220)
     val latitude: StateFlow<Double> = _latitude.asStateFlow()
 
@@ -86,6 +89,15 @@ class ScannerViewModel(
 
     private val _celestialWells = MutableStateFlow<List<CelestialWell>>(emptyList())
     val celestialWells: StateFlow<List<CelestialWell>> = _celestialWells.asStateFlow()
+
+    private val _showAnomaliesOnMap = MutableStateFlow(true)
+    val showAnomaliesOnMap: StateFlow<Boolean> = _showAnomaliesOnMap.asStateFlow()
+
+    private val _showFontsOnMap = MutableStateFlow(true)
+    val showFontsOnMap: StateFlow<Boolean> = _showFontsOnMap.asStateFlow()
+
+    private val _showWellsOnMap = MutableStateFlow(true)
+    val showWellsOnMap: StateFlow<Boolean> = _showWellsOnMap.asStateFlow()
 
     private val _cachedCells = MutableStateFlow<List<String>>(emptyList())
 
@@ -172,6 +184,22 @@ class ScannerViewModel(
 
     fun setScannerSubTab(subTab: String) {
         _scannerSubTab.value = subTab
+    }
+
+    fun setListSubTab(subTab: String) {
+        _listSubTab.value = subTab
+    }
+
+    fun toggleAnomaliesOnMap() {
+        _showAnomaliesOnMap.value = !_showAnomaliesOnMap.value
+    }
+
+    fun toggleFontsOnMap() {
+        _showFontsOnMap.value = !_showFontsOnMap.value
+    }
+
+    fun toggleWellsOnMap() {
+        _showWellsOnMap.value = !_showWellsOnMap.value
     }
 
     fun updateLocation(lat: Double, lng: Double) {

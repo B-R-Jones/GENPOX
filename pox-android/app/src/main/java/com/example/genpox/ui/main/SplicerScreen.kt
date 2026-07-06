@@ -325,7 +325,8 @@ fun SplicerView(viewModel: MainViewModel) {
                 viewModel.setSplicerSubTab(id)
             },
             viewModel = viewModel,
-            useDynamicReagentColor = true
+            useDynamicReagentColor = true,
+            drawSubTabs = false
         ) {
             when (splicerSubTab) {
                 "splicer" -> {
@@ -361,6 +362,79 @@ fun SplicerView(viewModel: MainViewModel) {
                 }
             }
         }
+
+        val isCustomScaffoldMode by viewModel.isCustomScaffoldMode.collectAsState()
+
+        val mainRow = subTabs.map { tab ->
+            val isActive = splicerSubTab == tab.id
+            HoloNavButton(
+                id = tab.id,
+                borderColor = if (isActive) activeColor else activeColor.copy(alpha = 0.24f),
+                glowColor = if (isActive) activeColor.copy(alpha = 0.15f) else Color.Transparent,
+                backgroundColor = if (isActive) activeColor else Color(0xFF0F172A).copy(alpha = 0.85f),
+                enabled = true,
+                onClick = {
+                    if (splicerSubTab != tab.id) {
+                        viewModel.synthManager.playCombinatorTick()
+                        viewModel.setSplicerSubTab(tab.id)
+                    }
+                },
+                bounce = tab.bounce,
+                content = { iconColor ->
+                    tab.icon(iconColor)
+                }
+            )
+        }
+
+        val splicerSecondaryTabs = listOf(
+            PoxSubTab("targeted", "TARGETED") { iconColor ->
+                WireframeTargetedIcon(color = iconColor, modifier = Modifier.size(24.dp))
+            },
+            PoxSubTab("custom", "CUSTOM") { iconColor ->
+                WireframeCustomIcon(color = iconColor, modifier = Modifier.size(24.dp))
+            }
+        )
+
+        val secondaryRow = splicerSecondaryTabs.map { tab ->
+            val isModeActive = if (tab.id == "custom") isCustomScaffoldMode else !isCustomScaffoldMode
+            val tabColor = if (tab.id == "custom") Color(0xFF22D3EE) else activeColor
+            HoloNavButton(
+                id = tab.id,
+                borderColor = if (isModeActive) tabColor else tabColor.copy(alpha = 0.24f),
+                glowColor = if (isModeActive) tabColor.copy(alpha = 0.15f) else Color.Transparent,
+                backgroundColor = if (isModeActive) tabColor else Color(0xFF0F172A).copy(alpha = 0.85f),
+                enabled = true,
+                onClick = {
+                    val targetMode = tab.id == "custom"
+                    if (isCustomScaffoldMode != targetMode) {
+                        viewModel.synthManager.playCombinatorTick()
+                        viewModel.setCustomScaffoldMode(targetMode)
+                    }
+                },
+                bounce = tab.bounce,
+                content = { iconColor ->
+                    tab.icon(iconColor)
+                }
+            )
+        }
+
+        val rows = if (splicerSubTab == "splicer") {
+            listOf(mainRow, secondaryRow)
+        } else {
+            listOf(mainRow)
+        }
+
+        val activeModeId = if (isCustomScaffoldMode) "custom" else "targeted"
+
+        PoxUnifiedHoloNav(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 12.dp, end = 12.dp),
+            rows = rows,
+            activeButtonIds = setOf(splicerSubTab, activeModeId),
+            allowStacking = true,
+            viewModel = viewModel
+        )
 
         // Slotting UI Floating Panel (holographic popup overlay)
         if (activeSlotSelection != null && !isForcedConstructionActive && !isSplicing) {
@@ -839,55 +913,6 @@ fun SplicerLeftPanel(
             modifier = modifier,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                    .border(1.dp, if (isCustomScaffoldMode) Color(0xFF22D3EE) else activeColorDim, RoundedCornerShape(4.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = if (isCustomScaffoldMode) "CUSTOM SCAFFOLD ACTIVE" else "TARGET SEQUENCE MATCHING",
-                        color = if (isCustomScaffoldMode) Color(0xFF22D3EE) else Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = if (isCustomScaffoldMode) "Bypassing alignment validation gates." else "Requiring exact codon alignment matches.",
-                        color = Color.Gray,
-                        fontSize = 7.sp,
-                        fontFamily = FontFamily.Default
-                    )
-                }
-
-                Button(
-                    onClick = {
-                        viewModel.synthManager.playCombinatorTick()
-                        viewModel.setCustomScaffoldMode(!isCustomScaffoldMode)
-                    },
-                    modifier = Modifier.height(26.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isCustomScaffoldMode) Color(0xFF22D3EE) else Color.Transparent,
-                        contentColor = if (isCustomScaffoldMode) Color.Black else Color.White
-                    ),
-                    border = BorderStroke(1.dp, if (isCustomScaffoldMode) Color(0xFF22D3EE) else Color.LightGray),
-                    shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
-                ) {
-                    Text(
-                        text = if (isCustomScaffoldMode) "DISABLE CUSTOM" else "ENABLE CUSTOM",
-                        fontSize = 7.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Default
-                    )
-                }
-            }
-
             // Main workspace with Circular Splicing Matrix
             BoxWithConstraints(
                 modifier = Modifier

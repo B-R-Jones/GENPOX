@@ -532,11 +532,11 @@ fun AnomalyItemStatus(
     }
     
     val statusText = if (activeMission == null) {
-        "No Active Harvester"
+        "NO ACTIVE HARVESTER"
     } else {
         val remaining = maxOf(0L, activeMission.totalDuration - activeMission.elapsedSeconds)
-        val timeStr = String.format(java.util.Locale.US, "%02dm %02ds", remaining / 60, remaining % 60)
-        "Harvesting: $timeStr"
+        val timeStr = String.format(java.util.Locale.US, "%02dM %02dS", remaining / 60, remaining % 60)
+        "HARVESTING: $timeStr"
     }
     val statusColor = if (activeMission == null) Color.Gray else Color(0xFF00E1FF)
     Text(
@@ -544,8 +544,7 @@ fun AnomalyItemStatus(
         color = statusColor,
         fontSize = 8.sp,
         fontWeight = FontWeight.Bold,
-        fontFamily = FontFamily.Monospace,
-        modifier = Modifier.padding(top = 2.dp)
+        fontFamily = FontFamily.Monospace
     )
 }
 
@@ -585,7 +584,7 @@ fun AnomalyItemRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .border(1.dp, CyberBorder.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+            .border(1.dp, factionColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
             .background(CyberPanel)
             .padding(10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,

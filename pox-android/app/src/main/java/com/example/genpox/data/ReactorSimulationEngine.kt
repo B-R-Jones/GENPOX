@@ -37,6 +37,7 @@ object ReactorSimulationEngine {
         inletRatioT: Float,
         inletRatioC: Float,
         stepIntervalMs: Long,
+        hostPlanet: String = "EARTH",
         onStep: (StepResult) -> Unit
     ): RunResult {
         val sumInlets = inletRatioA + inletRatioG + inletRatioT + inletRatioC
@@ -62,6 +63,18 @@ object ReactorSimulationEngine {
         val stepsList = mutableListOf<StepResult>()
         val random = Random()
 
+        val hostIndex = when (hostPlanet.uppercase()) {
+            "MERCURY" -> 1
+            "VENUS" -> 2
+            "EARTH" -> 3
+            "MARS" -> 4
+            "JUPITER" -> 5
+            "SATURN" -> 6
+            "URANUS" -> 7
+            "NEPTUNE" -> 8
+            else -> 3
+        }
+
         for (step in 1..8) {
             kotlinx.coroutines.delay(stepIntervalMs)
 
@@ -69,6 +82,13 @@ object ReactorSimulationEngine {
             var incorporatedChar = expectedChar
             var isMutated = false
             var mutationMessage: String? = null
+
+            val state = WaveMath.getBaseAlignmentState(expectedChar, System.currentTimeMillis())
+            val alignmentCrosstalkMod = when (state) {
+                WaveMath.AlignmentState.CONJUNCTION -> 0.5f
+                WaveMath.AlignmentState.OPPOSITION -> 2.0f
+                else -> 1.0f
+            }
 
             if (!poly.equals("PFU", ignoreCase = true)) {
                 val rawRatio = when (expectedChar) {
@@ -83,8 +103,9 @@ object ReactorSimulationEngine {
                 } else {
                     rawRatio
                 }
+                val effectiveInletRatio = (1.0f - (1.0f - inletRatio) * alignmentCrosstalkMod).coerceIn(0.0f, 1.0f)
                 val roll = random.nextDouble()
-                if (roll > inletRatio) {
+                if (roll > effectiveInletRatio) {
                     isMutated = true
                     val options = listOf('A', 'G', 'T', 'C').filter { it != expectedChar }
                     val otherWeights = options.map { o ->
@@ -121,7 +142,10 @@ object ReactorSimulationEngine {
             val mfe = BiophysicsEngine.calculateMinimumFreeEnergy(finalStrand)
 
             val baseQ = BiophysicsEngine.calculatePhredQScore(poly, random)
-            val targetTmVal = BiophysicsEngine.calculateMeltingTemperature(target, salt)
+            var targetTmVal = BiophysicsEngine.calculateMeltingTemperature(target, salt)
+            if (state == WaveMath.AlignmentState.QUADRATURE) {
+                targetTmVal += 4.0
+            }
             val diff = temp.toDouble() - targetTmVal
             val sigma = when (poly.uppercase()) {
                 "TAQ" -> 15.0
@@ -130,9 +154,40 @@ object ReactorSimulationEngine {
                 else -> 15.0
             }
             val eta = Math.exp(-(diff * diff) / (2.0 * sigma * sigma))
-            val baseStepQ = (baseQ * eta - penalty).coerceIn(5.0, 40.0)
+
+            val alignmentQMod = when (state) {
+                WaveMath.AlignmentState.CONJUNCTION -> 5.0
+                WaveMath.AlignmentState.OPPOSITION -> -6.0
+                else -> 0.0
+            }
+
+            val baseStepQ = (baseQ * eta - penalty + alignmentQMod).coerceIn(5.0, 40.0)
             val newQ = if (step == 1) baseStepQ else (currentQScore * (step - 1) + baseStepQ) / step
             currentQScore = newQ.coerceIn(5.0, 40.0)
+
+            // Anomalous Window Chance Check at hostPlanet's associated step
+            if (step == hostIndex && !isMutated) {
+                val qThreshold = if (state == WaveMath.AlignmentState.CONJUNCTION) 22.0 else 28.0
+                val isQEligible = currentQScore >= qThreshold
+                var tempEligible = true
+                if (state == WaveMath.AlignmentState.QUADRATURE) {
+                    tempEligible = Math.abs(temp.toDouble() - targetTmVal) <= 1.5
+                }
+
+                val anomalousChance = when (state) {
+                    WaveMath.AlignmentState.CONJUNCTION -> 0.40
+                    WaveMath.AlignmentState.OPPOSITION -> 0.15
+                    else -> 0.20
+                }
+
+                if (isQEligible && tempEligible && random.nextDouble() < anomalousChance) {
+                    val anomBases = listOf('X', 'Z', 'Y', 'W')
+                    val anomChar = anomBases[random.nextInt(anomBases.size)]
+                    val planetDisplayName = hostPlanet.lowercase().replaceFirstChar { it.uppercase() }
+                    mutationMessage = "[CELESTIAL] Anomalous base '$anomChar' successfully bonded at step $step (under host $planetDisplayName: ${state.name} alignment). Treated as standard $expectedChar."
+                }
+            }
+
 
             var failureTriggered = false
             var collapseReason = ""

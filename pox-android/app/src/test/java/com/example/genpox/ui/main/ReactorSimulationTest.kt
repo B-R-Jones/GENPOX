@@ -45,6 +45,7 @@ class ReactorSimulationTest {
         val splicerSlotsFlow = MutableStateFlow<List<String?>>(List(8) { null })
         val splicerQScoresFlow = MutableStateFlow<List<Double>>(List(8) { 25.0 })
         val splicerSignaturesFlow = MutableStateFlow<List<String>>(List(8) { "TAQ" })
+        val hostPlanetFlow = MutableStateFlow("EARTH")
 
         override val allCreatures: Flow<List<Creature>> = flowOf(creaturesList)
         override suspend fun getCreatureById(id: String): Creature? = creaturesList.find { it.id == id }
@@ -142,6 +143,7 @@ class ReactorSimulationTest {
         override val splicerSlots: Flow<List<String?>> = splicerSlotsFlow
         override val splicerQScores: Flow<List<Double>> = splicerQScoresFlow
         override val splicerSignatures: Flow<List<String>> = splicerSignaturesFlow
+        override val selectedHostPlanet: Flow<String> = hostPlanetFlow
 
         override suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long) {
             stockAFlow.value = a
@@ -158,6 +160,10 @@ class ReactorSimulationTest {
             splicerSlotsFlow.value = slots
             splicerQScoresFlow.value = qScores
             splicerSignaturesFlow.value = signatures
+        }
+
+        override suspend fun saveSelectedHostPlanet(planet: String) {
+            hostPlanetFlow.value = planet
         }
 
         override suspend fun getCachedRoadCell(cellKey: String): CachedRoadCell? = null
@@ -194,11 +200,13 @@ class ReactorSimulationTest {
         Dispatchers.setMain(testDispatcher)
         repository = FakeReactorRepository()
         viewModel = MainViewModel(repository)
+        WaveMath.isTestMode = true
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        WaveMath.isTestMode = false
     }
 
     @Test

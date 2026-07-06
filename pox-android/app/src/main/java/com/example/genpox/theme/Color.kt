@@ -31,6 +31,12 @@ object CyberTheme {
     var background by mutableStateOf(Color(0xFF060B07))
     var backgroundDark by mutableStateOf(Color(0xFF010201))
 
+    var crtScanlineOpacity by mutableStateOf(0.22f)
+    var crtGrilleOpacity by mutableStateOf(0.12f)
+    var crtBloomIntensity by mutableStateOf(0.25f)
+    var crtCurvatureBezel by mutableStateOf(0.04f)
+    var crtGlitchIntensity by mutableStateOf(0.05f)
+
     fun resetToDefaults() {
         green = Color(0xFF00FF66)
         greenDim = Color(0xFF00993C)
@@ -54,6 +60,12 @@ object CyberTheme {
 
         background = Color(0xFF060B07)
         backgroundDark = Color(0xFF010201)
+
+        crtScanlineOpacity = 0.22f
+        crtGrilleOpacity = 0.12f
+        crtBloomIntensity = 0.25f
+        crtCurvatureBezel = 0.04f
+        crtGlitchIntensity = 0.05f
     }
 
     fun savePreset(context: Context, presetName: String) {
@@ -81,6 +93,12 @@ object CyberTheme {
 
             putInt("${presetName}_background", background.toArgb())
             putInt("${presetName}_backgroundDark", backgroundDark.toArgb())
+
+            putFloat("${presetName}_crtScanlineOpacity", crtScanlineOpacity)
+            putFloat("${presetName}_crtGrilleOpacity", crtGrilleOpacity)
+            putFloat("${presetName}_crtBloomIntensity", crtBloomIntensity)
+            putFloat("${presetName}_crtCurvatureBezel", crtCurvatureBezel)
+            putFloat("${presetName}_crtGlitchIntensity", crtGlitchIntensity)
             apply()
         }
     }
@@ -111,6 +129,12 @@ object CyberTheme {
 
         background = Color(prefs.getInt("${presetName}_background", background.toArgb()))
         backgroundDark = Color(prefs.getInt("${presetName}_backgroundDark", backgroundDark.toArgb()))
+
+        crtScanlineOpacity = prefs.getFloat("${presetName}_crtScanlineOpacity", 0.22f)
+        crtGrilleOpacity = prefs.getFloat("${presetName}_crtGrilleOpacity", 0.12f)
+        crtBloomIntensity = prefs.getFloat("${presetName}_crtBloomIntensity", 0.25f)
+        crtCurvatureBezel = prefs.getFloat("${presetName}_crtCurvatureBezel", 0.04f)
+        crtGlitchIntensity = prefs.getFloat("${presetName}_crtGlitchIntensity", 0.05f)
         return true
     }
 }

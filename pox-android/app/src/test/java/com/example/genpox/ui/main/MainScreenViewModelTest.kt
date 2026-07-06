@@ -25,11 +25,13 @@ class MainScreenViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        WaveMath.isTestMode = true
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        WaveMath.isTestMode = false
     }
 
     private class FakeDataRepository : DataRepository {
@@ -51,6 +53,7 @@ class MainScreenViewModelTest {
         val splicerSlotsFlow = MutableStateFlow<List<String?>>(List(8) { null })
         val splicerQScoresFlow = MutableStateFlow<List<Double>>(List(8) { 25.0 })
         val splicerSignaturesFlow = MutableStateFlow<List<String>>(List(8) { "TAQ" })
+        val hostPlanetFlow = MutableStateFlow("EARTH")
 
         override val allCreatures: Flow<List<Creature>> = flowOf(creaturesList)
         override suspend fun getCreatureById(id: String): Creature? = creaturesList.find { it.id == id }
@@ -148,6 +151,7 @@ class MainScreenViewModelTest {
         override val splicerSlots: Flow<List<String?>> = splicerSlotsFlow
         override val splicerQScores: Flow<List<Double>> = splicerQScoresFlow
         override val splicerSignatures: Flow<List<String>> = splicerSignaturesFlow
+        override val selectedHostPlanet: Flow<String> = hostPlanetFlow
 
         override suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long) {
             stockAFlow.value = a
@@ -164,6 +168,10 @@ class MainScreenViewModelTest {
             splicerSlotsFlow.value = slots
             splicerQScoresFlow.value = qScores
             splicerSignaturesFlow.value = signatures
+        }
+
+        override suspend fun saveSelectedHostPlanet(planet: String) {
+            hostPlanetFlow.value = planet
         }
 
         val cachedRoadCells = mutableListOf<CachedRoadCell>()
@@ -481,6 +489,35 @@ class MainScreenViewModelTest {
         assertEquals(25.0, creature.heatResistance)
         assertEquals(12.5, creature.radResistance)
         assertEquals(62.5, creature.kineticResistance)
+    }
+
+    @Test
+    fun testCustomScaffoldBackNavigationReset() = runTest {
+        val repo = FakeDataRepository()
+        val viewModel = MainViewModel(repo)
+
+        // Enable custom scaffold mode
+        viewModel.setCustomScaffoldMode(true)
+        testScheduler.advanceUntilIdle()
+
+        // Select slot 3 and set openedFrom to "splicer_slot" and vault tab to "search"
+        viewModel.selectSplicerSlot(3)
+        viewModel.setVaultSubTab("search")
+        viewModel.setActiveCreature(null, "splicer_slot")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(3, viewModel.activeSlotSelection.value)
+        assertEquals("search", viewModel.vaultSubTab.value)
+        assertEquals("splicer_slot", viewModel.creatureCardOpenedFrom.value)
+
+        // Navigate back to splicer tab
+        viewModel.selectTab("splicer")
+        testScheduler.advanceUntilIdle()
+
+        // Verify active slot selection is cleared and vault search is reset
+        assertEquals(null, viewModel.activeSlotSelection.value)
+        assertEquals("creatures", viewModel.vaultSubTab.value)
+        assertEquals("vault", viewModel.creatureCardOpenedFrom.value)
     }
 }
 

@@ -25,6 +25,7 @@ class PoxSettings(private val context: Context) {
         val SPLICER_SLOTS = stringPreferencesKey("splicer_slots")
         val SPLICER_Q_SCORES = stringPreferencesKey("splicer_q_scores")
         val SPLICER_SIGNATURES = stringPreferencesKey("splicer_signatures")
+        val SELECTED_HOST_PLANET = stringPreferencesKey("selected_host_planet")
     }
 
     val geminiApiKey: Flow<String> = context.dataStore.data.map { preferences ->
@@ -41,6 +42,10 @@ class PoxSettings(private val context: Context) {
 
     val targetSequence: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[TARGET_SEQUENCE] ?: ""
+    }
+
+    val selectedHostPlanet: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[SELECTED_HOST_PLANET] ?: "EARTH"
     }
 
     val rawStockA: Flow<Long> = context.dataStore.data.map { preferences ->
@@ -146,6 +151,12 @@ class PoxSettings(private val context: Context) {
             preferences[SPLICER_SLOTS] = Json.encodeToString(slots)
             preferences[SPLICER_Q_SCORES] = Json.encodeToString(qScores)
             preferences[SPLICER_SIGNATURES] = Json.encodeToString(signatures)
+        }
+    }
+
+    suspend fun saveSelectedHostPlanet(planet: String) {
+        context.dataStore.edit { preferences ->
+            preferences[SELECTED_HOST_PLANET] = planet
         }
     }
 }

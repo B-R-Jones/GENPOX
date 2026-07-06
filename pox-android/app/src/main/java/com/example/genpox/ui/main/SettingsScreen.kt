@@ -294,6 +294,7 @@ fun PaletteSettingsView(viewModel: MainViewModel) {
                                 if (isSaved) {
                                     viewModel.synthManager.playSynthesisSuccess()
                                     CyberTheme.loadPreset(context, preset.first)
+                                    viewModel.syncPhosphorSettingsFromTheme()
                                     viewModel.addLog("SYS: Loaded theme from ${preset.second}.")
                                 }
                             },
@@ -388,7 +389,8 @@ fun SettingsView(viewModel: MainViewModel) {
             listOf(
                 Pair("general", "GENERAL"),
                 Pair("telemetry", "TELEMETRY"),
-                Pair("palette", "PALETTE")
+                Pair("palette", "PALETTE"),
+                Pair("phosphor", "PHOSPHOR")
             ).forEach { tab ->
                 val isActive = subTab == tab.first
                 Button(
@@ -509,6 +511,8 @@ fun SettingsView(viewModel: MainViewModel) {
             TelemetryView(viewModel)
         } else if (subTab == "palette") {
             PaletteSettingsView(viewModel)
+        } else if (subTab == "phosphor") {
+            PhosphorMonitorSettingsView(viewModel)
         }
     }
 }

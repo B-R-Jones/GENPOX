@@ -559,7 +559,35 @@ fun StepSearchView(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                } else if (count > 0) {
+                } else if (openedFrom == "splicer_slot") {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Button(
+                        onClick = {
+                            viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                            viewModel.assignGeneToSlot(resolvedGeneSeq.sequence)
+                            viewModel.setActiveCreature(null, "vault")
+                            viewModel.selectTab("splicer")
+                            onClose()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(32.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = CyberCyan,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(4.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = "LOAD INTO SPLICER",
+                            color = Color.Black,
+                            style = Typography.labelSmall,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                if (openedFrom != "message_gene" && count > 0) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Button(
                         onClick = {

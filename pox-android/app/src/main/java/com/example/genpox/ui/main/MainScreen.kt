@@ -30,13 +30,15 @@ import com.example.genpox.data.WaveMath
 import com.example.genpox.data.network.PoxNetworkManager
 import com.example.genpox.theme.*
 
+import com.example.genpox.ui.components.phosphorMonitor
 import com.example.genpox.ui.components.PoxCameraScanner
 import com.example.genpox.ui.components.CloudChamberVisualizer
 import com.example.genpox.ui.components.PoxHoloNav
 import com.example.genpox.ui.components.PoxSubTab
 import com.example.genpox.ui.components.PoxRadarDials
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import com.example.genpox.ui.components.HoloNavButton
+import com.example.genpox.ui.components.PoxUnifiedHoloNav
+import androidx.compose.animation.core.*
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontFamily
 import kotlinx.coroutines.launch
@@ -218,10 +220,39 @@ fun MainScreen(
         }
     }
 
+    // Root CRT Phosphor filter animation ticker and color mapping
+    val selectedReagent by viewModel.selectedReagent.collectAsState()
+    val baseColor = getActiveReagentColor(selectedReagent)
+    val rootInfiniteTransition = rememberInfiniteTransition(label = "root_crt_time")
+    val timeMsFloat by rootInfiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 100000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(100000, easing = LinearEasing)
+        ),
+        label = "time_ms"
+    )
+    val timeMs = timeMsFloat.toLong()
+
+    val scanlineOpacity by viewModel.crtScanlineOpacity.collectAsState()
+    val grilleOpacity by viewModel.crtGrilleOpacity.collectAsState()
+    val bloomIntensity by viewModel.crtBloomIntensity.collectAsState()
+    val curvatureBezel by viewModel.crtCurvatureBezel.collectAsState()
+    val glitchIntensity by viewModel.crtGlitchIntensity.collectAsState()
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(CyberBackgroundDark)
+            .phosphorMonitor(
+                baseColor = baseColor,
+                scanlineOpacity = scanlineOpacity,
+                grilleOpacity = grilleOpacity,
+                bloomIntensity = bloomIntensity,
+                curvatureBezel = curvatureBezel,
+                glitchIntensity = glitchIntensity,
+                timeMs = timeMs
+            )
     ) {
         // Persistent Cloud Chamber Background Animation
         CloudChamberVisualizer(
@@ -519,6 +550,7 @@ fun MainScreen(
 
         if (selectedTab == "scanner") {
             val scannerSubTab by viewModel.scannerSubTab.collectAsState()
+            val listSubTab by viewModel.listSubTab.collectAsState()
             val activeMissions by viewModel.activeMissions.collectAsState()
             val activeMissionsList = remember(activeMissions) { activeMissions.filter { !it.isReturned } }
 
@@ -532,6 +564,9 @@ fun MainScreen(
                     },
                     PoxSubTab("forecast", "FORECAST") { iconColor ->
                         WireframeCloudIcon(color = iconColor, modifier = Modifier.size(24.dp))
+                    },
+                    PoxSubTab("orrery", "ORRERY") { iconColor ->
+                        WireframeSolarSystemIcon(color = iconColor, modifier = Modifier.size(24.dp))
                     }
                 )
                 if (activeMissionsList.isNotEmpty()) {
@@ -544,22 +579,145 @@ fun MainScreen(
                 list
             }
 
+            val mainRow = subTabs.map { tab ->
+                val isActive = scannerSubTab == tab.id
+                HoloNavButton(
+                    id = tab.id,
+                    borderColor = if (isActive) CyberGreen else CyberGreen.copy(alpha = 0.24f),
+                    glowColor = if (isActive) CyberGreen.copy(alpha = 0.15f) else Color.Transparent,
+                    backgroundColor = if (isActive) CyberGreen else Color(0xFF0F172A).copy(alpha = 0.85f),
+                    enabled = true,
+                    onClick = {
+                        if (scannerSubTab != tab.id) {
+                            viewModel.synthManager.playCombinatorTick()
+                            viewModel.setScannerSubTab(tab.id)
+                        }
+                    },
+                    bounce = tab.bounce,
+                    content = { iconColor ->
+                        tab.icon(iconColor)
+                    }
+                )
+            }
+
+            val listSecondaryTabs = listOf(
+                PoxSubTab("anomalies", "ANOMALIES") { iconColor ->
+                    WireframeAnomalyIcon(color = iconColor, modifier = Modifier.size(24.dp))
+                },
+                PoxSubTab("fonts", "FONTS") { iconColor ->
+                    WireframeFontIcon(color = iconColor, modifier = Modifier.size(24.dp))
+                },
+                PoxSubTab("wells", "WELLS") { iconColor ->
+                    WireframeWellIcon(color = iconColor, modifier = Modifier.size(24.dp))
+                }
+            )
+
+            val secondaryRow = listSecondaryTabs.map { tab ->
+                val isActive = listSubTab == tab.id
+                HoloNavButton(
+                    id = tab.id,
+                    borderColor = if (isActive) Color(0xFF22D3EE) else Color(0xFF22D3EE).copy(alpha = 0.24f),
+                    glowColor = if (isActive) Color(0xFF22D3EE).copy(alpha = 0.15f) else Color.Transparent,
+                    backgroundColor = if (isActive) Color(0xFF22D3EE) else Color(0xFF0F172A).copy(alpha = 0.85f),
+                    enabled = true,
+                    onClick = {
+                        if (listSubTab != tab.id) {
+                            viewModel.synthManager.playCombinatorTick()
+                            viewModel.setListSubTab(tab.id)
+                        }
+                    },
+                    bounce = tab.bounce,
+                    content = { iconColor ->
+                        tab.icon(iconColor)
+                    }
+                )
+            }
+
+            val hostPlanetState by viewModel.selectedHostPlanet.collectAsState()
+
+            val activeBaseGroup = remember(hostPlanetState) {
+                when (hostPlanetState.uppercase()) {
+                    "MERCURY", "VENUS" -> "orrery_A"
+                    "EARTH", "MARS" -> "orrery_G"
+                    "JUPITER", "SATURN" -> "orrery_T"
+                    "URANUS", "NEPTUNE" -> "orrery_C"
+                    else -> "orrery_G"
+                }
+            }
+
+            val orrerySecondaryTabs = listOf(
+                PoxSubTab("orrery_A", "ADENINE") { iconColor ->
+                    WireframeAdenineIcon(color = iconColor, modifier = Modifier.size(24.dp))
+                },
+                PoxSubTab("orrery_G", "GUANINE") { iconColor ->
+                    WireframeGuanineIcon(color = iconColor, modifier = Modifier.size(24.dp))
+                },
+                PoxSubTab("orrery_T", "THYMINE") { iconColor ->
+                    WireframeThymineIcon(color = iconColor, modifier = Modifier.size(24.dp))
+                },
+                PoxSubTab("orrery_C", "CYTOSINE") { iconColor ->
+                    WireframeCytosineIcon(color = iconColor, modifier = Modifier.size(24.dp))
+                }
+            )
+
+            val orrerySecondaryRow = orrerySecondaryTabs.map { tab ->
+                val isActive = activeBaseGroup == tab.id
+                HoloNavButton(
+                    id = tab.id,
+                    borderColor = if (isActive) CyberGreen else CyberGreen.copy(alpha = 0.24f),
+                    glowColor = if (isActive) CyberGreen.copy(alpha = 0.15f) else Color.Transparent,
+                    backgroundColor = if (isActive) CyberGreen else Color(0xFF0F172A).copy(alpha = 0.85f),
+                    enabled = true,
+                    onClick = {
+                        if (activeBaseGroup != tab.id) {
+                            viewModel.synthManager.playCombinatorTick()
+                            val defaultPlanet = when (tab.id) {
+                                "orrery_A" -> "MERCURY"
+                                "orrery_G" -> "EARTH"
+                                "orrery_T" -> "JUPITER"
+                                "orrery_C" -> "URANUS"
+                                else -> "EARTH"
+                            }
+                            viewModel.changeHostPlanet(defaultPlanet)
+                        } else {
+                            viewModel.synthManager.playCombinatorTick()
+                            val togglePlanet = when (tab.id) {
+                                "orrery_A" -> if (hostPlanetState.uppercase() == "MERCURY") "VENUS" else "MERCURY"
+                                "orrery_G" -> if (hostPlanetState.uppercase() == "EARTH") "MARS" else "EARTH"
+                                "orrery_T" -> if (hostPlanetState.uppercase() == "JUPITER") "SATURN" else "JUPITER"
+                                "orrery_C" -> if (hostPlanetState.uppercase() == "URANUS") "NEPTUNE" else "URANUS"
+                                else -> "EARTH"
+                            }
+                            viewModel.changeHostPlanet(togglePlanet)
+                        }
+                    },
+                    bounce = tab.bounce,
+                    content = { iconColor ->
+                        tab.icon(iconColor)
+                    }
+                )
+            }
+
+            val rows = when (scannerSubTab) {
+                "list" -> listOf(mainRow, secondaryRow)
+                "orrery" -> listOf(mainRow, orrerySecondaryRow)
+                else -> listOf(mainRow)
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .safeDrawingPadding()
                     .padding(6.dp)
             ) {
-                PoxHoloNav(
+                PoxUnifiedHoloNav(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(bottom = 148.dp, end = 22.dp),
-                    subTabs = subTabs,
-                    activeSubTab = scannerSubTab,
-                    onSubTabClick = { id, _ -> viewModel.setScannerSubTab(id) },
-                    viewModel = viewModel,
-                    activeColor = CyberGreen,
-                    inactiveColor = CyberGreen.copy(alpha = 0.6f)
+                    rows = rows,
+                    activeButtonIds = setOf(scannerSubTab, listSubTab, activeBaseGroup),
+                    allowStacking = true,
+                    viewModel = viewModel
                 )
             }
         }

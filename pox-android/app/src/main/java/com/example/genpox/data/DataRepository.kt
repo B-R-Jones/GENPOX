@@ -51,6 +51,7 @@ interface DataRepository {
     val splicerSlots: Flow<List<String?>>
     val splicerQScores: Flow<List<Double>>
     val splicerSignatures: Flow<List<String>>
+    val selectedHostPlanet: Flow<String>
     suspend fun saveGeminiApiKey(apiKey: String)
     suspend fun setMuteSound(mute: Boolean)
     suspend fun setScanRadius(radius: Float)
@@ -58,6 +59,7 @@ interface DataRepository {
     suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long)
     suspend fun saveBioWaste(waste: Long)
     suspend fun saveSplicerState(slots: List<String?>, qScores: List<Double>, signatures: List<String>)
+    suspend fun saveSelectedHostPlanet(planet: String)
 
     // Reagent stockpile
     val allReagentStock: Flow<List<ReagentStock>>
@@ -169,6 +171,9 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
     override val splicerSignatures: Flow<List<String>>
         get() = settings.splicerSignatures
 
+    override val selectedHostPlanet: Flow<String>
+        get() = settings.selectedHostPlanet
+
     override suspend fun saveGeminiApiKey(apiKey: String) = settings.saveGeminiApiKey(apiKey)
 
     override suspend fun setMuteSound(mute: Boolean) = settings.setMuteSound(mute)
@@ -184,6 +189,9 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
 
     override suspend fun saveSplicerState(slots: List<String?>, qScores: List<Double>, signatures: List<String>) =
         settings.saveSplicerState(slots, qScores, signatures)
+
+    override suspend fun saveSelectedHostPlanet(planet: String) =
+        settings.saveSelectedHostPlanet(planet)
 
     // Reagent stockpile overrides
     override val allReagentStock: Flow<List<ReagentStock>>

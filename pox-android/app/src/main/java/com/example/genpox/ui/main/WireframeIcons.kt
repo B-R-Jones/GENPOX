@@ -916,5 +916,344 @@ fun WireframeListIcon(
     }
 }
 
+@Composable
+fun WireframeAnomalyIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val center = Offset(w / 2f, h / 2f)
+        val strokeW = 1.5.dp.toPx()
 
+        // Draw a diamond
+        val path = Path().apply {
+            moveTo(center.x, h * 0.15f)
+            lineTo(w * 0.85f, center.y)
+            lineTo(center.x, h * 0.85f)
+            lineTo(w * 0.15f, center.y)
+            close()
+        }
+        drawPath(path, color, style = Stroke(width = strokeW))
 
+        // Draw a small circle in center
+        drawCircle(color, radius = w * 0.15f, center = center, style = Stroke(width = strokeW))
+
+        // Draw small crosshair ticks
+        drawLine(color, Offset(center.x - w * 0.08f, center.y), Offset(center.x + w * 0.08f, center.y), strokeWidth = strokeW)
+        drawLine(color, Offset(center.x, center.y - h * 0.08f), Offset(center.x, center.y + h * 0.08f), strokeWidth = strokeW)
+    }
+}
+
+@Composable
+fun WireframeFontIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val strokeW = 1.5.dp.toPx()
+
+        // Draw three circles in a triangle (representing a codon triplet)
+        val r = w * 0.12f
+        val c1 = Offset(w * 0.5f, h * 0.28f)
+        val c2 = Offset(w * 0.25f, h * 0.7f)
+        val c3 = Offset(w * 0.75f, h * 0.7f)
+
+        // Draw connecting lines between them
+        drawLine(color, c1, c2, strokeWidth = strokeW)
+        drawLine(color, c2, c3, strokeWidth = strokeW)
+        drawLine(color, c3, c1, strokeWidth = strokeW)
+
+        // Draw the circles
+        drawCircle(color, radius = r, center = c1, style = Fill)
+        drawCircle(color, radius = r, center = c2, style = Stroke(width = strokeW))
+        drawCircle(color, radius = r, center = c3, style = Stroke(width = strokeW))
+    }
+}
+
+@Composable
+fun WireframeWellIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val center = Offset(w / 2f, h / 2f)
+        val strokeW = 1.5.dp.toPx()
+
+        // Outer circle
+        drawCircle(color, radius = w * 0.4f, center = center, style = Stroke(width = strokeW))
+
+        // Inner dashed boundary
+        drawCircle(
+            color = color,
+            radius = w * 0.25f,
+            center = center,
+            style = Stroke(
+                width = strokeW,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
+            )
+        )
+
+        // Center solid core
+        drawCircle(color, radius = w * 0.08f, center = center, style = Fill)
+    }
+}
+
+@Composable
+fun WireframeTargetedIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val center = Offset(w / 2f, h / 2f)
+        val strokeW = 1.5.dp.toPx()
+
+        drawCircle(color, radius = w * 0.35f, center = center, style = Stroke(width = strokeW))
+        drawCircle(color, radius = w * 0.1f, center = center, style = Fill)
+
+        // Draw crosshair ticks
+        drawLine(color, Offset(center.x - w * 0.45f, center.y), Offset(center.x - w * 0.2f, center.y), strokeWidth = strokeW)
+        drawLine(color, Offset(center.x + w * 0.2f, center.y), Offset(center.x + w * 0.45f, center.y), strokeWidth = strokeW)
+        drawLine(color, Offset(center.x, center.y - h * 0.45f), Offset(center.x, center.y - h * 0.2f), strokeWidth = strokeW)
+        drawLine(color, Offset(center.x, center.y + h * 0.2f), Offset(center.x, center.y + h * 0.45f), strokeWidth = strokeW)
+    }
+}
+
+@Composable
+fun WireframeCustomIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val strokeW = 1.5.dp.toPx()
+
+        // Draw a gear/spark design representing customization/engineering
+        val center = Offset(w / 2f, h / 2f)
+        val outerRadius = w * 0.35f
+        val innerRadius = w * 0.18f
+
+        // Draw outer gear circle
+        drawCircle(color, radius = outerRadius, center = center, style = Stroke(width = strokeW))
+        drawCircle(color, radius = innerRadius, center = center, style = Stroke(width = strokeW))
+
+        // Draw gear teeth (8 ticks)
+        for (i in 0 until 8) {
+            val angle = i * Math.PI.toFloat() / 4f
+            val start = Offset(
+                (center.x + innerRadius * cos(angle)).toFloat(),
+                (center.y + innerRadius * sin(angle)).toFloat()
+            )
+            val end = Offset(
+                (center.x + (outerRadius + w * 0.08f) * cos(angle)).toFloat(),
+                (center.y + (outerRadius + w * 0.08f) * sin(angle)).toFloat()
+            )
+            drawLine(color, start, end, strokeWidth = strokeW * 1.2f)
+        }
+    }
+}
+
+@Composable
+fun WireframeSolarSystemIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val cx = w / 2f
+        val cy = h / 2f
+        val px = 1.2.dp.toPx()
+        
+        // Center Sun
+        drawCircle(
+            color = color,
+            radius = 3.dp.toPx(),
+            center = Offset(cx, cy),
+            style = Stroke(width = px)
+        )
+        
+        // Inner Orbit (Radius 5.dp)
+        drawCircle(
+            color = color.copy(alpha = 0.5f),
+            radius = 5.dp.toPx(),
+            center = Offset(cx, cy),
+            style = Stroke(width = px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f))
+        )
+        // Inner planet
+        drawCircle(
+            color = color,
+            radius = 1.2.dp.toPx(),
+            center = Offset(cx + 5.dp.toPx() * kotlin.math.cos(0.5f).toFloat(), cy + 5.dp.toPx() * kotlin.math.sin(0.5f).toFloat()),
+            style = Fill
+        )
+        
+        // Middle Orbit (Radius 8.dp)
+        drawCircle(
+            color = color.copy(alpha = 0.5f),
+            radius = 8.dp.toPx(),
+            center = Offset(cx, cy),
+            style = Stroke(width = px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f))
+        )
+        // Middle planet
+        drawCircle(
+            color = color,
+            radius = 1.8.dp.toPx(),
+            center = Offset(cx + 8.dp.toPx() * kotlin.math.cos(2.2f).toFloat(), cy + 8.dp.toPx() * kotlin.math.sin(2.2f).toFloat()),
+            style = Fill
+        )
+        
+        // Outer Orbit (Radius 11.dp)
+        drawCircle(
+            color = color.copy(alpha = 0.4f),
+            radius = 11.dp.toPx(),
+            center = Offset(cx, cy),
+            style = Stroke(width = px)
+        )
+        // Outer planet
+        drawCircle(
+            color = color,
+            radius = 1.5.dp.toPx(),
+            center = Offset(cx + 11.dp.toPx() * kotlin.math.cos(4.1f).toFloat(), cy + 11.dp.toPx() * kotlin.math.sin(4.1f).toFloat()),
+            style = Fill
+        )
+    }
+}
+
+@Composable
+fun WireframeAdenineIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val px = 1.2.dp.toPx()
+        
+        val path = Path().apply {
+            // Hexagon (left)
+            moveTo(w * 0.15f, h * 0.35f)
+            lineTo(w * 0.35f, h * 0.18f)
+            lineTo(w * 0.55f, h * 0.35f)
+            lineTo(w * 0.55f, h * 0.65f)
+            lineTo(w * 0.35f, h * 0.82f)
+            lineTo(w * 0.15f, h * 0.65f)
+            close()
+            
+            // Pentagon (right)
+            moveTo(w * 0.55f, h * 0.35f)
+            lineTo(w * 0.78f, h * 0.25f)
+            lineTo(w * 0.92f, h * 0.5f)
+            lineTo(w * 0.78f, h * 0.75f)
+            lineTo(w * 0.55f, h * 0.65f)
+        }
+        drawPath(path, color, style = Stroke(width = px))
+        
+        // Stylized 'A'
+        val aPath = Path().apply {
+            moveTo(w * 0.3f, h * 0.58f)
+            lineTo(w * 0.35f, h * 0.42f)
+            lineTo(w * 0.4f, h * 0.58f)
+            moveTo(w * 0.32f, h * 0.52f)
+            lineTo(w * 0.38f, h * 0.52f)
+        }
+        drawPath(aPath, color, style = Stroke(width = px))
+    }
+}
+
+@Composable
+fun WireframeGuanineIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val px = 1.2.dp.toPx()
+        
+        val path = Path().apply {
+            // Hexagon (left)
+            moveTo(w * 0.15f, h * 0.35f)
+            lineTo(w * 0.35f, h * 0.18f)
+            lineTo(w * 0.55f, h * 0.35f)
+            lineTo(w * 0.55f, h * 0.65f)
+            lineTo(w * 0.35f, h * 0.82f)
+            lineTo(w * 0.15f, h * 0.65f)
+            close()
+            
+            // Pentagon (right)
+            moveTo(w * 0.55f, h * 0.35f)
+            lineTo(w * 0.78f, h * 0.25f)
+            lineTo(w * 0.92f, h * 0.5f)
+            lineTo(w * 0.78f, h * 0.75f)
+            lineTo(w * 0.55f, h * 0.65f)
+        }
+        drawPath(path, color, style = Stroke(width = px))
+        
+        // Stylized 'G'
+        val gPath = Path().apply {
+            moveTo(w * 0.42f, h * 0.46f)
+            quadraticTo(w * 0.3f, h * 0.42f, w * 0.3f, h * 0.5f)
+            quadraticTo(w * 0.3f, h * 0.58f, w * 0.4f, h * 0.58f)
+            lineTo(w * 0.4f, h * 0.5f)
+            lineTo(w * 0.35f, h * 0.5f)
+        }
+        drawPath(gPath, color, style = Stroke(width = px))
+    }
+}
+
+@Composable
+fun WireframeThymineIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val px = 1.2.dp.toPx()
+        
+        val path = Path().apply {
+            moveTo(w * 0.28f, h * 0.35f)
+            lineTo(w * 0.5f, h * 0.18f)
+            lineTo(w * 0.72f, h * 0.35f)
+            lineTo(w * 0.72f, h * 0.65f)
+            lineTo(w * 0.5f, h * 0.82f)
+            lineTo(w * 0.28f, h * 0.65f)
+            close()
+        }
+        drawPath(path, color, style = Stroke(width = px))
+        
+        // Stylized 'T'
+        val tPath = Path().apply {
+            moveTo(w * 0.42f, h * 0.42f)
+            lineTo(w * 0.58f, h * 0.42f)
+            moveTo(w * 0.5f, h * 0.42f)
+            lineTo(w * 0.5f, h * 0.58f)
+        }
+        drawPath(tPath, color, style = Stroke(width = px))
+    }
+}
+
+@Composable
+fun WireframeCytosineIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val px = 1.2.dp.toPx()
+        
+        val path = Path().apply {
+            moveTo(w * 0.28f, h * 0.35f)
+            lineTo(w * 0.5f, h * 0.18f)
+            lineTo(w * 0.72f, h * 0.35f)
+            lineTo(w * 0.72f, h * 0.65f)
+            lineTo(w * 0.5f, h * 0.82f)
+            lineTo(w * 0.28f, h * 0.65f)
+            close()
+        }
+        drawPath(path, color, style = Stroke(width = px))
+        
+        // Stylized 'C'
+        val cPath = Path().apply {
+            moveTo(w * 0.58f, h * 0.46f)
+            quadraticTo(w * 0.42f, h * 0.42f, w * 0.42f, h * 0.5f)
+            quadraticTo(w * 0.42f, h * 0.58f, w * 0.58f, h * 0.54f)
+        }
+        drawPath(cPath, color, style = Stroke(width = px))
+    }
+}

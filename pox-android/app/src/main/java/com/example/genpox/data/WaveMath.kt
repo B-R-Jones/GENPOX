@@ -22,6 +22,95 @@ object WaveMath {
         sdf.parse("2026-05-17T01:54:00Z")?.time ?: 1778982840000L
     }
 
+    data class PlanetOrbitalElements(
+        val name: String,
+        val semiMajorAxis: Double,
+        val eccentricity: Double,
+        val orbitalPeriod: Double,
+        val longitudeOfPerihelion: Double,
+        val siderealRotationPeriod: Double
+    )
+
+    val planetElements = mapOf(
+        "MERCURY" to PlanetOrbitalElements("Mercury", 0.3871, 0.2056, 87.969, 77.456, 58.646),
+        "VENUS" to PlanetOrbitalElements("Venus", 0.7233, 0.0068, 224.701, 131.532, -243.025),
+        "EARTH" to PlanetOrbitalElements("Earth", 1.0000, 0.0167, 365.256, 102.947, 0.9973),
+        "MARS" to PlanetOrbitalElements("Mars", 1.5237, 0.0934, 686.980, 336.041, 1.0260),
+        "JUPITER" to PlanetOrbitalElements("Jupiter", 5.2028, 0.0484, 4332.589, 14.754, 0.4135),
+        "SATURN" to PlanetOrbitalElements("Saturn", 9.5388, 0.0541, 10759.22, 92.431, 0.4440),
+        "URANUS" to PlanetOrbitalElements("Uranus", 19.1914, 0.0473, 30685.4, 170.964, -0.7183),
+        "NEPTUNE" to PlanetOrbitalElements("Neptune", 30.0611, 0.0086, 60189.0, 44.971, 0.6713)
+    )
+
+    enum class AlignmentState {
+        CONJUNCTION,
+        OPPOSITION,
+        QUADRATURE,
+        NEUTRAL
+    }
+
+    fun getHeliocentricPosition(planetName: String, timeMs: Long): Pair<Double, Double> {
+        val elem = planetElements[planetName.uppercase()] ?: return Pair(0.0, 0.0)
+        val tDays = timeMs.toDouble() / (1000.0 * 60.0 * 60.0 * 24.0)
+        val mAngle = (2.0 * Math.PI * (tDays / elem.orbitalPeriod)) % (2.0 * Math.PI)
+        var eAngle = mAngle
+        val e = elem.eccentricity
+        for (i in 0 until 5) {
+            val delta = (eAngle - e * kotlin.math.sin(eAngle) - mAngle) / (1.0 - e * kotlin.math.cos(eAngle))
+            eAngle -= delta
+        }
+        val xOrb = elem.semiMajorAxis * (kotlin.math.cos(eAngle) - e)
+        val yOrb = elem.semiMajorAxis * kotlin.math.sqrt(1.0 - e * e) * kotlin.math.sin(eAngle)
+        val periRad = Math.toRadians(elem.longitudeOfPerihelion)
+        val xEcl = xOrb * kotlin.math.cos(periRad) - yOrb * kotlin.math.sin(periRad)
+        val yEcl = xOrb * kotlin.math.sin(periRad) + yOrb * kotlin.math.cos(periRad)
+        return Pair(xEcl, yEcl)
+    }
+
+    fun getPairAlignmentState(planet1: String, planet2: String, timeMs: Long): AlignmentState {
+        val (xE, yE) = getHeliocentricPosition("EARTH", timeMs)
+        val lambda1 = if (planet1.uppercase() == "EARTH") {
+            kotlin.math.atan2(-yE, -xE) // Sun Proxy
+        } else {
+            val (x1, y1) = getHeliocentricPosition(planet1, timeMs)
+            kotlin.math.atan2(y1 - yE, x1 - xE)
+        }
+        val lambda2 = if (planet2.uppercase() == "EARTH") {
+            kotlin.math.atan2(-yE, -xE) // Sun Proxy
+        } else {
+            val (x2, y2) = getHeliocentricPosition(planet2, timeMs)
+            kotlin.math.atan2(y2 - yE, x2 - xE)
+        }
+        var diff = kotlin.math.abs(lambda1 - lambda2) % (2.0 * Math.PI)
+        if (diff > Math.PI) {
+            diff = 2.0 * Math.PI - diff
+        }
+        val diffDeg = Math.toDegrees(diff)
+        return when {
+            diffDeg < 30.0 -> AlignmentState.CONJUNCTION
+            diffDeg >= 150.0 -> AlignmentState.OPPOSITION
+            diffDeg in 75.0..105.0 -> AlignmentState.QUADRATURE
+            else -> AlignmentState.NEUTRAL
+        }
+    }
+
+    private val _isTestMode = ThreadLocal.withInitial { false }
+    var isTestMode: Boolean
+        get() = _isTestMode.get() ?: false
+        set(value) = _isTestMode.set(value)
+
+    fun getBaseAlignmentState(base: Char, timeMs: Long): AlignmentState {
+        if (isTestMode) return AlignmentState.NEUTRAL
+        return when (base.uppercaseChar()) {
+            'A' -> getPairAlignmentState("MERCURY", "VENUS", timeMs)
+            'G' -> getPairAlignmentState("EARTH", "MARS", timeMs)
+            'T' -> getPairAlignmentState("JUPITER", "SATURN", timeMs)
+            'C' -> getPairAlignmentState("URANUS", "NEPTUNE", timeMs)
+            else -> AlignmentState.NEUTRAL
+        }
+    }
+
+
     data class WaveConfig(
         val pair: String,
         val primary: String,
