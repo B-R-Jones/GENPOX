@@ -241,7 +241,9 @@ class SplicerViewModel(
 
             repository.saveSplicerState(updatedSlots, updatedQScores, updatedSignatures)
 
-            _activeSlotSelection.value = null
+            if (_isCustomScaffoldMode.value) {
+                _activeSlotSelection.value = null
+            }
             _slotSequenceFilter.value = ""
 
             synthManager.playBeep(440f, 0.1f, "triangle")

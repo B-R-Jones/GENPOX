@@ -68,6 +68,8 @@ import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.ui.layout.onSizeChanged
+import kotlin.math.roundToInt
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlinx.coroutines.delay
@@ -3228,6 +3230,124 @@ fun ScannerCyberOrreryView(viewModel: MainViewModel) {
 }
 
 @Composable
+fun HorizontalCyberScaleSlider(
+    label: String,
+    steps: List<String>,
+    selectedIndex: Int,
+    onIndexSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var width by remember { mutableStateOf(0f) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                color = CyberGreenDim,
+                fontSize = 7.5.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = steps[selectedIndex],
+                color = CyberGreen,
+                fontSize = 7.5.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(18.dp)
+                .pointerInput(steps.size) {
+                    detectTapGestures { offset ->
+                        if (width > 0) {
+                            val segmentWidth = width / (steps.size - 1)
+                            val index = (offset.x / segmentWidth).roundToInt().coerceIn(0, steps.size - 1)
+                            onIndexSelected(index)
+                        }
+                    }
+                }
+                .pointerInput(steps.size) {
+                    detectDragGestures { change, _ ->
+                        if (width > 0) {
+                            val segmentWidth = width / (steps.size - 1)
+                            val index = (change.position.x / segmentWidth).roundToInt().coerceIn(0, steps.size - 1)
+                            onIndexSelected(index)
+                        }
+                    }
+                }
+        ) {
+            width = size.width
+            val h = size.height
+            val trackY = h * 0.35f
+            
+            // Draw thin track line
+            drawLine(
+                color = CyberGreenDim.copy(alpha = 0.25f),
+                start = Offset(0f, trackY),
+                end = Offset(width, trackY),
+                strokeWidth = 1.dp.toPx()
+            )
+            
+            val segmentWidth = width / (steps.size - 1)
+            
+            val paint = android.graphics.Paint().apply {
+                color = Color.White.copy(alpha = 0.5f).toArgb()
+                textSize = with(density) { 7.sp.toPx() }
+                typeface = android.graphics.Typeface.MONOSPACE
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            val activePaint = android.graphics.Paint().apply {
+                color = CyberGreen.toArgb()
+                textSize = with(density) { 7.sp.toPx() }
+                typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            
+            for (i in steps.indices) {
+                val x = i * segmentWidth
+                val isSelected = i == selectedIndex
+                
+                // Draw tick mark
+                drawLine(
+                    color = if (isSelected) CyberGreen else CyberGreenDim.copy(alpha = 0.4f),
+                    start = Offset(x, trackY - 3.dp.toPx()),
+                    end = Offset(x, trackY + 3.dp.toPx()),
+                    strokeWidth = if (isSelected) 1.5.dp.toPx() else 0.8.dp.toPx()
+                )
+                
+                // Draw label below track
+                drawContext.canvas.nativeCanvas.drawText(
+                    steps[i],
+                    x,
+                    h - 1.dp.toPx(),
+                    if (isSelected) activePaint else paint
+                )
+            }
+            
+            // Draw active slider mark (slightly larger and bold)
+            val activeX = selectedIndex * segmentWidth
+            drawLine(
+                color = CyberGreen,
+                start = Offset(activeX, trackY - 5.dp.toPx()),
+                end = Offset(activeX, trackY + 5.dp.toPx()),
+                strokeWidth = 2.5.dp.toPx()
+            )
+        }
+    }
+}
+@Composable
 fun PlanetTransitArcPanel(
     planet1: String,
     planet2: String,
@@ -3237,7 +3357,21 @@ fun PlanetTransitArcPanel(
     viewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
-    val timeMs = System.currentTimeMillis()
+    val scaleIndex by viewModel.orreryTimeScaleIndex.collectAsState()
+    
+    val timeState = remember { mutableStateOf(WaveMath.getAdjustedTime()) }
+    LaunchedEffect(scaleIndex) {
+        while (true) {
+            withFrameMillis {
+                timeState.value = WaveMath.getAdjustedTime()
+            }
+        }
+    }
+    val timeMs = timeState.value
+    
+    var canvasWidth by remember { mutableStateOf(0f) }
+    var canvasHeight by remember { mutableStateOf(0f) }
+    var lastAngle by remember { mutableStateOf<Double?>(null) }
     
     // Helper to get planet-specific cyber colors
     fun getPlanetCyberColor(planet: String): Color {
@@ -3314,11 +3448,6 @@ fun PlanetTransitArcPanel(
     
     Box(
         modifier = modifier
-            .clickable {
-                val otherPlanet = if (selectedPlanet.uppercase() == planet1.uppercase()) planet2 else planet1
-                viewModel.synthManager.playCombinatorTick()
-                viewModel.changeHostPlanet(otherPlanet.uppercase())
-            }
             .padding(12.dp)
     ) {
         // Corner 1: Top-Left (Diurnal Hour Angles)
@@ -3443,204 +3572,136 @@ fun PlanetTransitArcPanel(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 16.dp, end = 16.dp, top = 40.dp, bottom = 55.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 40.dp, bottom = 104.dp)
+                .onSizeChanged { size ->
+                    canvasWidth = size.width.toFloat()
+                    canvasHeight = size.height.toFloat()
+                }
+                .pointerInput(selectedPlanet, planet1, planet2) {
+                    detectTapGestures(
+                        onTap = {
+                            val otherPlanet = if (selectedPlanet.uppercase() == planet1.uppercase()) planet2 else planet1
+                            viewModel.synthManager.playCombinatorTick()
+                            viewModel.changeHostPlanet(otherPlanet.uppercase())
+                        },
+                        onLongPress = {
+                            viewModel.rewindOrreryTime()
+                        }
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            val cx = canvasWidth / 2f
+                            val cy = canvasHeight * 0.5f
+                            lastAngle = kotlin.math.atan2((offset.y - cy).toDouble(), (offset.x - cx).toDouble())
+                        },
+                        onDragEnd = {
+                            lastAngle = null
+                        },
+                        onDragCancel = {
+                            lastAngle = null
+                        },
+                        onDrag = { change, _ ->
+                            val cx = canvasWidth / 2f
+                            val cy = canvasHeight * 0.5f
+                            if (canvasWidth > 0 && canvasHeight > 0) {
+                                val newAngle = kotlin.math.atan2((change.position.y - cy).toDouble(), (change.position.x - cx).toDouble())
+                                val prevAngle = lastAngle
+                                if (prevAngle != null) {
+                                    var delta = newAngle - prevAngle
+                                    if (delta > Math.PI) delta -= 2.0 * Math.PI
+                                    else if (delta < -Math.PI) delta += 2.0 * Math.PI
+                                    
+                                    val timeScaleFactor = WaveMath.timeScale.coerceAtLeast(1.0)
+                                    val fullRotationMs = 30L * 24L * 3600L * 1000L
+                                    val deltaMs = ((delta / (2.0 * Math.PI)) * fullRotationMs * timeScaleFactor).toLong()
+                                    
+                                    val nextOffset = (WaveMath.manualOffsetMs + deltaMs).coerceAtLeast(0L)
+                                    if (nextOffset != WaveMath.manualOffsetMs) {
+                                        WaveMath.manualOffsetMs = nextOffset
+                                        if (kotlin.math.abs(delta) > 0.04) {
+                                            viewModel.synthManager.playBeep(440f, 0.01f, "sine")
+                                        }
+                                    }
+                                }
+                                lastAngle = newAngle
+                            }
+                        }
+                    )
+                }
         ) {
-            clipRect {
-                val w = size.width
-                val h = size.height
-                val cx = w / 2f
-                val cy = h * 0.5f
-                
-                val maxRadius = kotlin.math.min(w, h) * 0.45f
-                val r1 = maxRadius * 0.78f
-                val r2 = maxRadius * 1.0f
-                
-                val isSel1 = selectedPlanet.uppercase() == planet1.uppercase()
-                val isSel2 = selectedPlanet.uppercase() == planet2.uppercase()
-                
-                // Shifted centers and projected radii based on declination and latitude
-                val proj1 = GraphicsMath.projectOrreryPlanet(cx, cy, maxRadius, 0.78f, latRad, dec1, ha1)
-                val cy1 = proj1.centerY
-                val rp1 = proj1.projectedRadius
-                val dx1 = proj1.dx
-                val dy1 = proj1.dy
-                val isBelowHorizon1 = proj1.isBelowHorizon
-                
-                val proj2 = GraphicsMath.projectOrreryPlanet(cx, cy, maxRadius, 1.0f, latRad, dec2, ha2)
-                val cy2 = proj2.centerY
-                val rp2 = proj2.projectedRadius
-                val dx2 = proj2.dx
-                val dy2 = proj2.dy
-                val isBelowHorizon2 = proj2.isBelowHorizon
-                
-                // 1. Horizon Line
-                drawLine(
-                    color = Color.Gray.copy(alpha = 0.3f),
-                    start = Offset(w * 0.02f, cy),
-                    end = Offset(w * 0.98f, cy),
-                    strokeWidth = 1.5.dp.toPx()
+            val drawScope = this
+            val w = size.width
+            val h = size.height
+            val cx = w / 2f
+            val cy = h * 0.5f
+            
+            val maxRadius = kotlin.math.min(w, h) * 0.45f
+            
+            val isSel1 = selectedPlanet.uppercase() == planet1.uppercase()
+            val isSel2 = selectedPlanet.uppercase() == planet2.uppercase()
+            
+            val proj1 = GraphicsMath.projectOrreryPlanet(cx, cy, maxRadius, 0.78f, latRad, dec1, ha1)
+            val cy1 = proj1.centerY
+            val rp1 = proj1.projectedRadius
+            val dx1 = proj1.dx
+            val dy1 = proj1.dy
+            val isBelowHorizon1 = proj1.isBelowHorizon
+            
+            val proj2 = GraphicsMath.projectOrreryPlanet(cx, cy, maxRadius, 1.0f, latRad, dec2, ha2)
+            val cy2 = proj2.centerY
+            val rp2 = proj2.projectedRadius
+            val dx2 = proj2.dx
+            val dy2 = proj2.dy
+            val isBelowHorizon2 = proj2.isBelowHorizon
+
+            val dateText = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply {
+                timeZone = TimeZone.getDefault()
+            }.format(Date(timeMs))
+
+            val p1Color = getPlanetCyberColor(planet1)
+            val p2Color = getPlanetCyberColor(planet2)
+
+            HolographicRenderEngine.run {
+                drawPlanetTransitOrrery(
+                    w = w,
+                    h = h,
+                    cx = cx,
+                    cy = cy,
+                    maxRadius = maxRadius,
+                    cy1 = cy1,
+                    rp1 = rp1,
+                    dx1 = dx1,
+                    dy1 = dy1,
+                    isBelowHorizon1 = isBelowHorizon1,
+                    isSel1 = isSel1,
+                    p1Color = p1Color,
+                    cy2 = cy2,
+                    rp2 = rp2,
+                    dx2 = dx2,
+                    dy2 = dy2,
+                    isBelowHorizon2 = isBelowHorizon2,
+                    isSel2 = isSel2,
+                    p2Color = p2Color,
+                    dateText = dateText,
+                    alignmentState = alignmentState,
+                    density = drawScope
                 )
-                
-                // 2. Draw reference elevation grid arcs (concentric sky domes)
-                val gridAngles = listOf(0.4f, 0.7f, 1.0f)
-                gridAngles.forEach { ratio ->
-                    val rGrid = maxRadius * ratio
-                    val gridPath = Path().apply {
-                        val oval = Rect(cx - rGrid, cy - rGrid, cx + rGrid, cy + rGrid)
-                        addArc(oval, 180f, 180f)
-                    }
-                    drawPath(
-                        path = gridPath,
-                        color = CyberGreenDim.copy(alpha = 0.15f),
-                        style = Stroke(
-                            width = 0.8.dp.toPx(),
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
-                        )
-                    )
-                }
-                
-                // Vertical Meridian line
-                drawLine(
-                    color = CyberGreenDim.copy(alpha = 0.15f),
-                    start = Offset(cx, cy),
-                    end = Offset(cx, cy - maxRadius),
-                    strokeWidth = 0.8.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f)
-                )
-                
-                // 3. Draw Clock Face Elements
-                val angleColor = when (alignmentState) {
-                    WaveMath.AlignmentState.CONJUNCTION -> Color(0xFF00FF66) // Cyber Green
-                    WaveMath.AlignmentState.OPPOSITION -> Color(0xFFFF1744) // Cyber Red
-                    else -> Color(0xFFFFEA00) // Cyber Yellow
-                }
-                
-                // Clock line 1
-                drawLine(
-                    color = angleColor.copy(alpha = 0.5f),
-                    start = Offset(cx, cy),
-                    end = Offset(dx1, dy1),
-                    strokeWidth = 1.2.dp.toPx()
-                )
-                
-                // Clock line 2
-                drawLine(
-                    color = angleColor.copy(alpha = 0.5f),
-                    start = Offset(cx, cy),
-                    end = Offset(dx2, dy2),
-                    strokeWidth = 1.2.dp.toPx()
-                )
-                
-                // Clock wedge / sector of separation
-                val deg1 = Math.toDegrees(ha1) - 90.0
-                val deg2 = Math.toDegrees(ha2) - 90.0
-                var sweep = (deg2 - deg1) % 360.0
-                if (sweep > 180.0) sweep -= 360.0
-                else if (sweep < -180.0) sweep += 360.0
-                
-                val rWedge = maxRadius * 0.25f
-                
-                drawArc(
-                    color = angleColor.copy(alpha = 0.08f),
-                    startAngle = deg1.toFloat(),
-                    sweepAngle = sweep.toFloat(),
-                    useCenter = true,
-                    size = Size(rWedge * 2f, rWedge * 2f),
-                    topLeft = Offset(cx - rWedge, cy - rWedge)
-                )
-                drawArc(
-                    color = angleColor.copy(alpha = 0.25f),
-                    startAngle = deg1.toFloat(),
-                    sweepAngle = sweep.toFloat(),
-                    useCenter = false,
-                    size = Size(rWedge * 2f, rWedge * 2f),
-                    topLeft = Offset(cx - rWedge, cy - rWedge),
-                    style = Stroke(width = 1.dp.toPx())
-                )
-                
-                // 4. Draw Planet 1 Path
-                // Draw above-horizon (solid Cyber Cyan)
-                clipRect(top = 0f, bottom = cy) {
-                    drawCircle(
-                        color = Color(0xFF00E5FF),
-                        radius = rp1,
-                        center = Offset(cx, cy1),
-                        style = Stroke(width = if (isSel1) 2.dp.toPx() else 1.dp.toPx())
-                    )
-                }
-                
-                // Draw below-horizon (dashed Cyber Purple)
-                clipRect(top = cy, bottom = h) {
-                    drawCircle(
-                        color = Color(0xFFD500F9).copy(alpha = 0.4f),
-                        radius = rp1,
-                        center = Offset(cx, cy1),
-                        style = Stroke(
-                            width = if (isSel1) 1.5.dp.toPx() else 0.8.dp.toPx(),
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
-                        )
-                    )
-                }
-                
-                // 5. Draw Planet 2 Path
-                // Draw above-horizon (solid Cyber Cyan)
-                clipRect(top = 0f, bottom = cy) {
-                    drawCircle(
-                        color = Color(0xFF00E5FF),
-                        radius = rp2,
-                        center = Offset(cx, cy2),
-                        style = Stroke(width = if (isSel2) 2.dp.toPx() else 1.dp.toPx())
-                    )
-                }
-                
-                // Draw below-horizon (dashed Cyber Purple)
-                clipRect(top = cy, bottom = h) {
-                    drawCircle(
-                        color = Color(0xFFD500F9).copy(alpha = 0.4f),
-                        radius = rp2,
-                        center = Offset(cx, cy2),
-                        style = Stroke(
-                            width = if (isSel2) 1.5.dp.toPx() else 0.8.dp.toPx(),
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
-                        )
-                    )
-                }
-                
-                // 6. Draw Planet 1 Dot & reticle
-                val p1Color = getPlanetCyberColor(planet1)
-                drawCircle(
-                    color = if (isBelowHorizon1) p1Color.copy(alpha = 0.4f) else p1Color,
-                    radius = if (isSel1) 6.dp.toPx() else 4.dp.toPx(),
-                    center = Offset(dx1, dy1)
-                )
-                
-                if (isSel1) {
-                    drawCircle(
-                        color = p1Color,
-                        radius = 9.5.dp.toPx(),
-                        center = Offset(dx1, dy1),
-                        style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f))
-                    )
-                }
-                
-                // 7. Draw Planet 2 Dot & reticle
-                val p2Color = getPlanetCyberColor(planet2)
-                drawCircle(
-                    color = if (isBelowHorizon2) p2Color.copy(alpha = 0.4f) else p2Color,
-                    radius = if (isSel2) 6.dp.toPx() else 4.dp.toPx(),
-                    center = Offset(dx2, dy2)
-                )
-                
-                if (isSel2) {
-                    drawCircle(
-                        color = p2Color,
-                        radius = 9.5.dp.toPx(),
-                        center = Offset(dx2, dy2),
-                        style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f))
-                    )
-                }
             }
         }
+        
+        // Horizontal Timescale Slider
+        HorizontalCyberScaleSlider(
+            label = "SCALE",
+            steps = listOf("1", "10", "100", "1000", "10000"),
+            selectedIndex = scaleIndex,
+            onIndexSelected = { viewModel.setOrreryTimeScaleIndex(it) },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, bottom = 80.dp)
+        )
         
         // Inner Legend overlay
         Row(

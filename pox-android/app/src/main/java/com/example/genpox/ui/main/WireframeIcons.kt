@@ -1257,3 +1257,96 @@ fun WireframeCytosineIcon(color: Color, modifier: Modifier = Modifier) {
         drawPath(cPath, color, style = Stroke(width = px))
     }
 }
+
+@Composable
+fun WireframeMailIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(22.dp)) {
+        val w = size.width
+        val h = size.height
+        val strokeW = 1.5.dp.toPx()
+        
+        val paddingX = w * 0.15f
+        val paddingY = h * 0.26f
+        val left = paddingX
+        val right = w - paddingX
+        val top = paddingY
+        val bottom = h - paddingY
+        
+        drawRect(
+            color = color,
+            topLeft = Offset(left, top),
+            size = Size(right - left, bottom - top),
+            style = Stroke(width = strokeW)
+        )
+        
+        val cx = w / 2f
+        val cy = h * 0.54f
+        drawLine(color, Offset(left, top), Offset(cx, cy), strokeWidth = strokeW)
+        drawLine(color, Offset(right, top), Offset(cx, cy), strokeWidth = strokeW)
+    }
+}
+
+@Composable
+fun WireframeFriendsIcon(
+    color: Color,
+    modifier: Modifier = Modifier,
+    buttonBackgroundColor: Color = Color(0xFF0F172A)
+) {
+    Canvas(modifier = modifier.size(22.dp)) {
+        val w = size.width
+        val h = size.height
+        val strokeW = 1.5.dp.toPx()
+        
+        val c1x = w * 0.35f
+        val c1y = h * 0.40f
+        val r1 = w * 0.11f
+        drawCircle(color, radius = r1, center = Offset(c1x, c1y), style = Stroke(width = strokeW * 0.8f))
+        drawArc(
+            color = color,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset(c1x - r1 * 1.4f, c1y + r1 * 0.7f),
+            size = Size(r1 * 2.8f, r1 * 2f),
+            style = Stroke(width = strokeW * 0.8f)
+        )
+        
+        val c2x = w * 0.65f
+        val c2y = h * 0.45f
+        val r2 = w * 0.13f
+        
+        drawCircle(buttonBackgroundColor, radius = r2 + 2.dp.toPx(), center = Offset(c2x, c2y))
+        drawRect(buttonBackgroundColor, topLeft = Offset(c2x - r2 * 2f, c2y + r2 * 0.5f), size = Size(r2 * 4f, r2 * 2.5f))
+        
+        drawCircle(color, radius = r2, center = Offset(c2x, c2y), style = Stroke(width = strokeW))
+        drawArc(
+            color = color,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset(c2x - r2 * 1.7f, c2y + r2 * 0.7f),
+            size = Size(r2 * 3.4f, r2 * 2.2f),
+            style = Stroke(width = strokeW)
+        )
+    }
+}
+
+@Composable
+fun WireframeSearchIcon(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(12.dp)) {
+        val w = size.width
+        val h = size.height
+        drawCircle(
+            color = color,
+            radius = w * 0.333f,
+            style = Stroke(width = 1.5.dp.toPx()),
+            center = Offset(w * 0.417f, h * 0.417f)
+        )
+        drawLine(
+            color = color,
+            start = Offset(w * 0.625f, h * 0.625f),
+            end = Offset(w * 0.917f, h * 0.917f),
+            strokeWidth = 1.5.dp.toPx()
+        )
+    }
+}

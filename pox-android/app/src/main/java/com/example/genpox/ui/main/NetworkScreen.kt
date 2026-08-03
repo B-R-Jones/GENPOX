@@ -42,152 +42,6 @@ import com.example.genpox.data.PeerNode
 import androidx.compose.ui.platform.LocalContext
 
 
-// ==========================================
-// HOLOGRAPHIC CANVAS ICON RENDERERS
-// ==========================================
-
-@Composable
-fun HoloGearIcon(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(22.dp)) {
-        val w = size.width
-        val h = size.height
-        val cx = w / 2f
-        val cy = h / 2f
-        val strokeW = 1.5.dp.toPx()
-        
-        // Outer ring
-        drawCircle(color, radius = w * 0.26f, center = Offset(cx, cy), style = Stroke(width = strokeW))
-        
-        // Inner hub hole
-        drawCircle(color, radius = w * 0.12f, center = Offset(cx, cy), style = Stroke(width = strokeW))
-        
-        // Gear teeth (8 teeth)
-        for (i in 0 until 8) {
-            val angleRad = Math.toRadians((i * 45).toDouble())
-            val cosA = cos(angleRad).toFloat()
-            val sinA = sin(angleRad).toFloat()
-            
-            val pStart = Offset(cx + w * 0.26f * cosA, cy + h * 0.26f * sinA)
-            val pEnd = Offset(cx + w * 0.40f * cosA, cy + h * 0.40f * sinA)
-            drawLine(color, pStart, pEnd, strokeWidth = strokeW * 1.5f)
-        }
-    }
-}
-
-@Composable
-fun HoloMailIcon(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(22.dp)) {
-        val w = size.width
-        val h = size.height
-        val strokeW = 1.5.dp.toPx()
-        
-        val paddingX = w * 0.15f
-        val paddingY = h * 0.26f
-        val left = paddingX
-        val right = w - paddingX
-        val top = paddingY
-        val bottom = h - paddingY
-        
-        // Envelope outline
-        drawRect(
-            color = color,
-            topLeft = Offset(left, top),
-            size = Size(right - left, bottom - top),
-            style = Stroke(width = strokeW)
-        )
-        
-        // Envelope flap fold line
-        val cx = w / 2f
-        val cy = h * 0.54f // slightly below center
-        drawLine(color, Offset(left, top), Offset(cx, cy), strokeWidth = strokeW)
-        drawLine(color, Offset(right, top), Offset(cx, cy), strokeWidth = strokeW)
-    }
-}
-
-@Composable
-fun HoloFriendsIcon(
-    color: Color,
-    modifier: Modifier = Modifier,
-    buttonBackgroundColor: Color = Color(0xFF0F172A)
-) {
-    Canvas(modifier = modifier.size(22.dp)) {
-        val w = size.width
-        val h = size.height
-        val strokeW = 1.5.dp.toPx()
-        
-        // Left background silhouette (smaller)
-        val c1x = w * 0.35f
-        val c1y = h * 0.40f
-        val r1 = w * 0.11f
-        // Head
-        drawCircle(color, radius = r1, center = Offset(c1x, c1y), style = Stroke(width = strokeW * 0.8f))
-        // Shoulders
-        drawArc(
-            color = color,
-            startAngle = 180f,
-            sweepAngle = 180f,
-            useCenter = false,
-            topLeft = Offset(c1x - r1 * 1.4f, c1y + r1 * 0.7f),
-            size = Size(r1 * 2.8f, r1 * 2f),
-            style = Stroke(width = strokeW * 0.8f)
-        )
-        
-        // Right foreground silhouette (larger, overlapping)
-        val c2x = w * 0.65f
-        val c2y = h * 0.45f
-        val r2 = w * 0.13f
-        
-        // Mask behind the foreground silhouette to avoid overlapping background lines
-        drawCircle(buttonBackgroundColor, radius = r2 + 2.dp.toPx(), center = Offset(c2x, c2y))
-        drawRect(buttonBackgroundColor, topLeft = Offset(c2x - r2 * 2f, c2y + r2 * 0.5f), size = Size(r2 * 4f, r2 * 2.5f))
-        
-        // Head
-        drawCircle(color, radius = r2, center = Offset(c2x, c2y), style = Stroke(width = strokeW))
-        // Shoulders
-        drawArc(
-            color = color,
-            startAngle = 180f,
-            sweepAngle = 180f,
-            useCenter = false,
-            topLeft = Offset(c2x - r2 * 1.7f, c2y + r2 * 0.7f),
-            size = Size(r2 * 3.4f, r2 * 2.2f),
-            style = Stroke(width = strokeW)
-        )
-    }
-}
-
-@Composable
-fun HoloCautionIcon(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(22.dp)) {
-        val w = size.width
-        val h = size.height
-        val cx = w / 2f
-        val cy = h / 2f
-        val strokeW = 1.5.dp.toPx()
-        
-        val path = Path().apply {
-            moveTo(cx, cy - h * 0.38f)
-            lineTo(cx + w * 0.42f, cy + h * 0.35f)
-            lineTo(cx - w * 0.42f, cy + h * 0.35f)
-            close()
-        }
-        
-        drawPath(path, color = color, style = Stroke(width = strokeW))
-        
-        drawLine(
-            color = color,
-            start = Offset(cx, cy - h * 0.12f),
-            end = Offset(cx, cy + h * 0.10f),
-            strokeWidth = strokeW * 1.2f
-        )
-        
-        drawCircle(
-            color = color,
-            radius = strokeW * 0.8f,
-            center = Offset(cx, cy + h * 0.22f)
-        )
-    }
-}
 
 // ==========================================
 // MAIN NETWORK SCREEN VIEW
@@ -289,11 +143,11 @@ fun NetworkView(viewModel: MainViewModel) {
 
     val subTabs = remember(hasUnread, activeSubView) {
         listOf(
-            PoxSubTab("hydranet", "HYDRA", icon = { iconColor -> HoloCautionIcon(iconColor) }),
-            PoxSubTab("diagnostics", "GEAR", icon = { iconColor -> HoloGearIcon(iconColor) }),
-            PoxSubTab("inbox", "MAIL", bounce = hasUnread, icon = { iconColor -> HoloMailIcon(iconColor) }),
+            PoxSubTab("hydranet", "HYDRA", icon = { iconColor -> WireframeWarning(iconColor, modifier = Modifier.size(22.dp)) }),
+            PoxSubTab("diagnostics", "GEAR", icon = { iconColor -> WireframeGear(iconColor, modifier = Modifier.size(22.dp)) }),
+            PoxSubTab("inbox", "MAIL", bounce = hasUnread, icon = { iconColor -> WireframeMailIcon(iconColor, modifier = Modifier.size(22.dp)) }),
             PoxSubTab("friends", "PEERS", icon = { iconColor ->
-                HoloFriendsIcon(
+                WireframeFriendsIcon(
                     color = iconColor,
                     buttonBackgroundColor = if (activeSubView == "friends") CyberGreen else Color(0xFF0F172A)
                 )

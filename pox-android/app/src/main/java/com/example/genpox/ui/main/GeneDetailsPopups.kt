@@ -333,6 +333,10 @@ fun StepSearchGeneDetailsPopup(
 ) {
     val isAnom = WaveMath.isAnomalousGene(gene)
     val benefit = if (isAnom) WaveMath.getBenefitForAnomalousGene(gene) else null
+    val openedFromState = viewModel.creatureCardOpenedFrom.collectAsState()
+    val isCustomScaffoldModeState = viewModel.isCustomScaffoldMode.collectAsState()
+    val openedFrom = openedFromState.value
+    val isCustomScaffoldMode = isCustomScaffoldModeState.value
 
     AlertDialog(
         onDismissRequest = onClose,
@@ -444,7 +448,7 @@ fun StepSearchGeneDetailsPopup(
                     )
                 }
 
-                if (geneSequence != null && count > 0) {
+                if (geneSequence != null && count > 0 && openedFrom != "splicer_slot") {
                     Spacer(modifier = Modifier.height(4.dp))
                     Button(
                         onClick = {
@@ -453,15 +457,14 @@ fun StepSearchGeneDetailsPopup(
                         },
                         modifier = Modifier.fillMaxWidth().height(34.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent,
-                            contentColor = Color.Red
+                            containerColor = CyberRed,
+                            contentColor = Color.Black
                         ),
-                        border = BorderStroke(1.dp, Color.Red),
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
                             text = "♺ DECONSTRUCT GENE BLOCK",
-                            color = Color.Red,
+                            color = Color.Black,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Default
@@ -494,7 +497,6 @@ fun StepSearchGeneDetailsPopup(
             }
         },
         dismissButton = {
-            val openedFrom by viewModel.creatureCardOpenedFrom.collectAsState()
             if (openedFrom == "message_gene") {
                 Button(
                     onClick = {
@@ -531,7 +533,9 @@ fun StepSearchGeneDetailsPopup(
                         viewModel.synthManager.playBeep(440f, 0.05f, "sine")
                         viewModel.assignGeneToSlot(gene)
                         viewModel.setActiveCreature(null, "vault")
-                        viewModel.selectTab("splicer")
+                        if (isCustomScaffoldMode) {
+                            viewModel.selectTab("splicer")
+                        }
                         onClose()
                     },
                     modifier = Modifier.height(28.dp),
@@ -930,16 +934,15 @@ fun GeneDeconstructPopup(
                     },
                     modifier = Modifier.height(28.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = Color.Red
+                        containerColor = CyberRed,
+                        contentColor = Color.Black
                     ),
-                    border = BorderStroke(1.dp, Color.Red),
                     shape = RoundedCornerShape(4.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp)
                 ) {
                     Text(
                         text = "✓ DECONSTRUCT",
-                        color = Color.Red,
+                        color = Color.Black,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Default

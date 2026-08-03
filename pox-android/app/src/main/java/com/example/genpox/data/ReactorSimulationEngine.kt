@@ -83,7 +83,7 @@ object ReactorSimulationEngine {
             var isMutated = false
             var mutationMessage: String? = null
 
-            val state = WaveMath.getBaseAlignmentState(expectedChar, System.currentTimeMillis())
+            val state = WaveMath.getBaseAlignmentState(expectedChar, WaveMath.getAdjustedTime())
             val alignmentCrosstalkMod = when (state) {
                 WaveMath.AlignmentState.CONJUNCTION -> 0.5f
                 WaveMath.AlignmentState.OPPOSITION -> 2.0f
@@ -138,8 +138,8 @@ object ReactorSimulationEngine {
             }
 
             finalStrand += incorporatedChar
-            val tm = GeneticsEngine.calculateMeltingTemperature(finalStrand, salt)
-            val mfe = GeneticsEngine.calculateMinimumFreeEnergy(finalStrand)
+            var tm = GeneticsEngine.calculateMeltingTemperature(finalStrand, salt)
+            var mfe = GeneticsEngine.calculateMinimumFreeEnergy(finalStrand)
 
             val baseQ = GeneticsEngine.calculatePhredQScore(poly, random)
             var targetTmVal = GeneticsEngine.calculateMeltingTemperature(target, salt)
@@ -185,6 +185,12 @@ object ReactorSimulationEngine {
                     val anomChar = anomBases[random.nextInt(anomBases.size)]
                     val planetDisplayName = hostPlanet.lowercase().replaceFirstChar { it.uppercase() }
                     mutationMessage = "[CELESTIAL] Anomalous base '$anomChar' successfully bonded at step $step (under host $planetDisplayName: ${state.name} alignment). Treated as standard $expectedChar."
+                    if (finalStrand.isNotEmpty()) {
+                        finalStrand = finalStrand.substring(0, finalStrand.length - 1) + anomChar
+                    }
+                    isMutated = true
+                    tm = GeneticsEngine.calculateMeltingTemperature(finalStrand, salt)
+                    mfe = GeneticsEngine.calculateMinimumFreeEnergy(finalStrand)
                 }
             }
 

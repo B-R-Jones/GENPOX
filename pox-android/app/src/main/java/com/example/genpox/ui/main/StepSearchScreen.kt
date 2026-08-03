@@ -89,13 +89,95 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 
+private fun getStandardBaseForIndex(index: Int): Char {
+    return when (index) {
+        0, 1 -> 'A'
+        2, 3 -> 'G'
+        4, 5 -> 'T'
+        6, 7 -> 'C'
+        else -> 'A'
+    }
+}
+
+private fun getStandardCounterpart(seq: String): String {
+    val anomalousChars = "XZYW?!$%&@#"
+    return seq.mapIndexed { index, char ->
+        if (char in anomalousChars) {
+            getStandardBaseForIndex(index)
+        } else {
+            char
+        }
+    }.joinToString("")
+}
+
+private fun matchesPrefix(gene: String, prefix: String): Boolean {
+    if (gene.length < prefix.length) return false
+    for (i in prefix.indices) {
+        val pChar = prefix[i]
+        val gChar = gene[i]
+        if (pChar in "XZYW?!$%&@#") {
+            if (gChar != pChar) return false
+        } else {
+            val gStandard = getStandardBaseForIndex(i)
+            val gCharStandard = if (gChar in "XZYW?!$%&@#") gStandard else gChar
+            if (gCharStandard != pChar) return false
+        }
+    }
+    return true
+}
+
+private fun getAnomalousOptionsForCouple(couple: String, activeStep: Int, anomalousWindowIndex: Int): List<String> {
+    if (anomalousWindowIndex / 2 != activeStep) return listOf(couple)
+    val anomPos = anomalousWindowIndex % 2
+    val anomalousBases = listOf("X", "Z", "Y", "W", "?", "!", "$", "%", "&", "@", "#")
+    val c1 = couple[0].toString()
+    val c2 = couple[1].toString()
+    
+    val list = mutableListOf(couple)
+    if (anomPos == 0) {
+        for (b in anomalousBases) {
+            list.add(b + c2)
+        }
+    } else {
+        for (b in anomalousBases) {
+            list.add(c1 + b)
+        }
+    }
+    return list
+}
+
+private fun calculateAnomalyDepth(prefix: String, couple: String, activeStep: Int, allInventoryGenes: List<String>): Int {
+    val fullPrefix = prefix + couple
+    val matchingGenes = allInventoryGenes.filter { matchesPrefix(it, fullPrefix) }
+    
+    var maxDepth = 0
+    val anomalousChars = "XZYW?!$%&@#"
+    for (gene in matchingGenes) {
+        val startIndex = (activeStep + 1) * 2
+        for (i in startIndex until 8) {
+            if (i < gene.length && gene[i] in anomalousChars) {
+                val stepOfAnom = i / 2
+                val depth = stepOfAnom - activeStep
+                if (depth > maxDepth) {
+                    maxDepth = depth
+                }
+            }
+        }
+    }
+    return maxDepth
+}
 
 // ==========================================
 // STEP SEARCH VIEW
 // ==========================================
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun StepSearchView(
     viewModel: MainViewModel,
@@ -110,13 +192,29 @@ fun StepSearchView(
     onDeconstructGene: ((GeneSequence) -> Unit)? = null
 ) {
     val geneSequences by viewModel.geneSequences.collectAsState()
-    val openedFrom by viewModel.creatureCardOpenedFrom.collectAsState()
+    val openedFromState = viewModel.creatureCardOpenedFrom.collectAsState()
+    val isCustomScaffoldModeState = viewModel.isCustomScaffoldMode.collectAsState()
+    
+    val selectedHostPlanet by viewModel.selectedHostPlanet.collectAsState()
+    val hostIndex = when (selectedHostPlanet.uppercase()) {
+        "MERCURY" -> 1
+        "VENUS" -> 2
+        "EARTH" -> 3
+        "MARS" -> 4
+        "JUPITER" -> 5
+        "SATURN" -> 6
+        "URANUS" -> 7
+        "NEPTUNE" -> 8
+        else -> 3
+    }
+    val anomalousWindowIndex = hostIndex - 1
     
     var stepSearchPrefix by remember { mutableStateOf("") }
     var viewStepSearchMatchesOnly by remember { mutableStateOf(false) }
+    var activeSubSearchCouple by remember { mutableStateOf<String?>(null) }
 
     val matches = remember(geneSequences, stepSearchPrefix) {
-        geneSequences.filter { it.sequence.startsWith(stepSearchPrefix, ignoreCase = true) }
+        geneSequences.filter { matchesPrefix(it.sequence, stepSearchPrefix) }
     }
     val matchCount = remember(matches) { matches.sumOf { it.count } }
 
@@ -534,6 +632,9 @@ fun StepSearchView(
                     minimumFreeEnergy = currentMfe
                 )
 
+                val openedFrom = openedFromState.value
+                val isCustomScaffoldMode = isCustomScaffoldModeState.value
+
                 if (openedFrom == "message_gene") {
                     Spacer(modifier = Modifier.height(4.dp))
                     Button(
@@ -566,7 +667,9 @@ fun StepSearchView(
                             viewModel.synthManager.playBeep(440f, 0.05f, "sine")
                             viewModel.assignGeneToSlot(resolvedGeneSeq.sequence)
                             viewModel.setActiveCreature(null, "vault")
-                            viewModel.selectTab("splicer")
+                            if (isCustomScaffoldMode) {
+                                viewModel.selectTab("splicer")
+                            }
                             onClose()
                         },
                         modifier = Modifier.fillMaxWidth().height(32.dp),
@@ -587,7 +690,7 @@ fun StepSearchView(
                     }
                 }
 
-                if (openedFrom != "message_gene" && count > 0) {
+                if (openedFrom != "message_gene" && openedFrom != "splicer_slot" && count > 0) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Button(
                         onClick = {
@@ -596,16 +699,15 @@ fun StepSearchView(
                         },
                         modifier = Modifier.fillMaxWidth().height(32.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent,
-                            contentColor = CyberRed
+                            containerColor = CyberRed,
+                            contentColor = Color.Black
                         ),
-                        border = BorderStroke(1.dp, CyberRed),
                         shape = RoundedCornerShape(4.dp),
                         contentPadding = PaddingValues(0.dp)
                     ) {
                         Text(
                             text = "DECONSTRUCT GENE BLOCK",
-                            color = CyberRed,
+                            color = Color.Black,
                             style = Typography.labelSmall,
                             fontFamily = FontFamily.Default,
                             fontWeight = FontWeight.Bold
@@ -652,7 +754,7 @@ fun StepSearchView(
                 }
                 
                 val matches = remember(allInventoryGenes, stepSearchPrefix) {
-                    allInventoryGenes.filter { it.startsWith(stepSearchPrefix) }
+                    allInventoryGenes.filter { matchesPrefix(it, stepSearchPrefix) }
                 }
                 
                 if (matches.isEmpty()) {
@@ -732,14 +834,136 @@ fun StepSearchView(
             // Grid View (Select Couple or Base)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (isAnomaly) "SELECT ANOMALY BASE TO FILTER:" else "SELECT SEQUENCE COUPLE TO FILTER:",
+                    text = if (activeSubSearchCouple != null) "SELECT ANOMALOUS PAIR COMPATIBLE WITH INVENTORY:" else if (isAnomaly) "SELECT ANOMALY BASE TO FILTER:" else "SELECT SEQUENCE COUPLE TO FILTER:",
                     style = Typography.labelSmall,
                     fontFamily = FontFamily.Default,
-                    color = activeColorDim,
+                    color = if (activeSubSearchCouple != null) Color(0xFFA855F7) else activeColorDim,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
 
-                if (isAnomaly) {
+                if (activeSubSearchCouple != null) {
+                    val targetCouple = activeSubSearchCouple!!
+                    val subOptions = getAnomalousOptionsForCouple(targetCouple, activeStep, anomalousWindowIndex)
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "TARGET: $targetCouple (STEP ${activeStep + 1})",
+                            style = Typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFD8B4FE)
+                        )
+                        Text(
+                            text = "✕ CANCEL",
+                            color = Color.Yellow,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable {
+                                activeSubSearchCouple = null
+                                viewModel.synthManager.playReject()
+                            }
+                        )
+                    }
+
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(subOptions) { option ->
+                            val tentative = stepSearchPrefix + option
+                            val isFinalStep = tentative.length == 8
+                            val matchCount = allInventoryGenes.count { matchesPrefix(it, tentative) }
+                            val displayCount = if (isFinalStep) {
+                                geneSequences.filter { matchesPrefix(it.sequence, tentative) }.sumOf { it.count }
+                            } else {
+                                matchCount
+                            }
+                            val displayLabel = if (isFinalStep) " STOCK" else " TYPES"
+                            val isEnabled = matchCount > 0
+                            val isOptionAnomalous = WaveMath.isAnomalousGene(option)
+                            
+                            Box(
+                                modifier = Modifier
+                                    .border(
+                                        1.dp,
+                                        if (isEnabled) {
+                                            if (isOptionAnomalous) Color(0xFFA855F7) else activeColor
+                                        } else Color.DarkGray,
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .background(
+                                        if (isEnabled) {
+                                            if (isOptionAnomalous) Color(0xFF1E0B36) else activePanel
+                                        } else Color.Transparent,
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .clickable(enabled = isEnabled) {
+                                        stepSearchPrefix = tentative
+                                        activeSubSearchCouple = null
+                                        viewModel.synthManager.playSynthesisSuccess()
+                                    }
+                                    .padding(6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = option,
+                                        style = Typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isEnabled) {
+                                            if (isOptionAnomalous) Color(0xFFD8B4FE) else Color.White
+                                        } else Color.Gray.copy(alpha = 0.3f),
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    if (isEnabled) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = "x",
+                                                style = Typography.labelSmall,
+                                                fontFamily = FontFamily.Default,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isOptionAnomalous) Color(0xFFD8B4FE) else activeColor
+                                            )
+                                            Text(
+                                                text = "$displayCount",
+                                                style = Typography.labelSmall,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isOptionAnomalous) Color(0xFFD8B4FE) else activeColor
+                                            )
+                                            Text(
+                                                text = displayLabel,
+                                                style = Typography.labelSmall,
+                                                fontFamily = FontFamily.Default,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isOptionAnomalous) Color(0xFFD8B4FE) else activeColor
+                                            )
+                                        }
+                                    } else {
+                                        Text(
+                                            text = "-",
+                                            style = Typography.labelSmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.Gray.copy(alpha = 0.3f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (isAnomaly) {
                     val options = listOf("X", "Z", "Y", "W", "?", "!", "$", "%", "&", "@", "#")
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(4),
@@ -750,9 +974,9 @@ fun StepSearchView(
                         items(options) { base ->
                             val tentative = stepSearchPrefix + base
                             val isFinalStep = tentative.length == 8
-                            val matchCount = allInventoryGenes.count { it.startsWith(tentative) }
+                            val matchCount = allInventoryGenes.count { matchesPrefix(it, tentative) }
                             val displayCount = if (isFinalStep) {
-                                geneSequences.filter { it.sequence.startsWith(tentative) }.sumOf { it.count }
+                                geneSequences.filter { matchesPrefix(it.sequence, tentative) }.sumOf { it.count }
                             } else {
                                 matchCount
                             }
@@ -837,15 +1061,43 @@ fun StepSearchView(
                         items(couples) { couple ->
                             val tentative = stepSearchPrefix + couple
                             val isFinalStep = tentative.length == 8
-                            val matchCount = allInventoryGenes.count { it.startsWith(tentative) }
+                            val matchCount = allInventoryGenes.count { matchesPrefix(it, tentative) }
                             val displayCount = if (isFinalStep) {
-                                geneSequences.filter { it.sequence.startsWith(tentative) }.sumOf { it.count }
+                                geneSequences.filter { matchesPrefix(it.sequence, tentative) }.sumOf { it.count }
                             } else {
                                 matchCount
                             }
                             val displayLabel = if (isFinalStep) " STOCK" else " TYPES"
                             val isEnabled = matchCount > 0
                             
+                            val hasAnomWindow = anomalousWindowIndex / 2 == activeStep
+                            val anomPos = if (hasAnomWindow) anomalousWindowIndex % 2 else -1
+                            val depthDots = calculateAnomalyDepth(stepSearchPrefix, couple, activeStep, allInventoryGenes)
+
+                            val annotatedText = buildAnnotatedString {
+                                val char1 = couple[0].toString()
+                                val char2 = couple[1].toString()
+                                if (anomPos == 0) {
+                                    withStyle(style = SpanStyle(color = Color(0xFFA855F7), fontWeight = FontWeight.Bold)) {
+                                        append(char1)
+                                    }
+                                    withStyle(style = SpanStyle(color = if (isEnabled) Color.White else Color.Gray.copy(alpha = 0.3f))) {
+                                        append(char2)
+                                    }
+                                } else if (anomPos == 1) {
+                                    withStyle(style = SpanStyle(color = if (isEnabled) Color.White else Color.Gray.copy(alpha = 0.3f))) {
+                                        append(char1)
+                                    }
+                                    withStyle(style = SpanStyle(color = Color(0xFFA855F7), fontWeight = FontWeight.Bold)) {
+                                        append(char2)
+                                    }
+                                } else {
+                                    withStyle(style = SpanStyle(color = if (isEnabled) Color.White else Color.Gray.copy(alpha = 0.3f))) {
+                                        append(couple)
+                                    }
+                                }
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .border(
@@ -857,57 +1109,88 @@ fun StepSearchView(
                                         if (isEnabled) activePanel else Color.Transparent,
                                         RoundedCornerShape(4.dp)
                                     )
-                                    .clickable(enabled = isEnabled) {
-                                        stepSearchPrefix = tentative
-                                        viewModel.synthManager.playCombinatorTick()
-                                    }
+                                    .combinedClickable(
+                                        enabled = isEnabled,
+                                        onClick = {
+                                            stepSearchPrefix = tentative
+                                            viewModel.synthManager.playCombinatorTick()
+                                        },
+                                        onLongClick = {
+                                            if (hasAnomWindow) {
+                                                activeSubSearchCouple = couple
+                                                viewModel.synthManager.playBeep(520f, 0.1f, "sine")
+                                            }
+                                        }
+                                    )
                                     .padding(6.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = couple,
-                                        style = Typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isEnabled) Color.White else Color.Gray.copy(alpha = 0.3f),
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                    if (isEnabled) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    Column(
+                                        modifier = Modifier.align(Alignment.Center),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = annotatedText,
+                                            style = Typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        if (isEnabled) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = "x",
+                                                    style = Typography.labelSmall,
+                                                    fontFamily = FontFamily.Default,
+                                                    fontSize = 9.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = activeColor
+                                                )
+                                                Text(
+                                                    text = "$displayCount",
+                                                    style = Typography.labelSmall,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 9.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = activeColor
+                                                )
+                                                Text(
+                                                    text = displayLabel,
+                                                    style = Typography.labelSmall,
+                                                    fontFamily = FontFamily.Default,
+                                                    fontSize = 9.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = activeColor
+                                                )
+                                            }
+                                        } else {
                                             Text(
-                                                text = "x",
-                                                style = Typography.labelSmall,
-                                                fontFamily = FontFamily.Default,
-                                                fontSize = 9.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = activeColor
-                                            )
-                                            Text(
-                                                text = "$displayCount",
+                                                text = "-",
                                                 style = Typography.labelSmall,
                                                 fontFamily = FontFamily.Monospace,
                                                 fontSize = 9.5.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = activeColor
-                                            )
-                                            Text(
-                                                text = displayLabel,
-                                                style = Typography.labelSmall,
-                                                fontFamily = FontFamily.Default,
-                                                fontSize = 9.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = activeColor
+                                                color = Color.Gray.copy(alpha = 0.3f)
                                             )
                                         }
-                                    } else {
-                                        Text(
-                                            text = "-",
-                                            style = Typography.labelSmall,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 9.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.Gray.copy(alpha = 0.3f)
-                                        )
+                                    }
+                                    
+                                    if (isEnabled && depthDots > 0) {
+                                        Column(
+                                            modifier = Modifier
+                                                .align(Alignment.CenterEnd)
+                                                .padding(end = 2.dp),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            repeat(depthDots) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(3.dp)
+                                                        .background(Color(0xFFA855F7), shape = RoundedCornerShape(1.5.dp))
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }

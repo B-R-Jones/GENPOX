@@ -234,6 +234,60 @@ class MainViewModel(
     val celestialWells get() = reactor.celestialWells
     val selectedHostPlanet get() = reactor.selectedHostPlanet
 
+    // Orrery Time Controls
+    private val _orreryTimeScaleIndex = MutableStateFlow(0)
+    val orreryTimeScaleIndex: StateFlow<Int> = _orreryTimeScaleIndex.asStateFlow()
+
+    fun setOrreryTimeScaleIndex(index: Int) {
+        _orreryTimeScaleIndex.value = index
+        val scale = when (index) {
+            0 -> 1.0
+            1 -> 10.0
+            2 -> 100.0
+            3 -> 1000.0
+            4 -> 10000.0
+            else -> 1.0
+        }
+        WaveMath.setScale(scale)
+        addLog("ORRERY: Timescale set to ${scale.toInt()}x")
+    }
+
+    fun rewindOrreryTime() {
+        viewModelScope.launch {
+            val startOffset = WaveMath.manualOffsetMs
+            if (startOffset == 0L && WaveMath.timeScale == 1.0) {
+                synthManager.playBeep(300f, 0.05f, "sine")
+                return@launch
+            }
+            
+            addLog("ORRERY: Initiating chronological rewind sequence...")
+            _orreryTimeScaleIndex.value = 0
+            WaveMath.timeScale = 1.0
+            
+            val durationMs = 1500L
+            val stepDelay = 16L
+            val steps = durationMs / stepDelay
+            
+            for (i in 1..steps) {
+                val progress = i.toDouble() / steps.toDouble()
+                val easeOutProgress = 1.0 - Math.pow(1.0 - progress, 2.0)
+                val currentOffset = startOffset - (startOffset * easeOutProgress).toLong()
+                WaveMath.manualOffsetMs = currentOffset
+                
+                if (i % 8L == 0L) {
+                    val freq = 180f + (1.0f - easeOutProgress.toFloat()) * 420f
+                    synthManager.playBeep(freq, 0.04f, "sine")
+                }
+                
+                kotlinx.coroutines.delay(stepDelay)
+            }
+            
+            WaveMath.manualOffsetMs = 0L
+            addLog("ORRERY: Temporal alignment restored to standard epoch.")
+            synthManager.playBeep(220f, 0.15f, "sine")
+        }
+    }
+
     fun setReactorTemperature(value: Float) = reactor.setReactorTemperature(value)
     fun setReactorSalt(value: Float) = reactor.setReactorSalt(value)
     fun setActivePolymerase(value: String) = reactor.setActivePolymerase(value)

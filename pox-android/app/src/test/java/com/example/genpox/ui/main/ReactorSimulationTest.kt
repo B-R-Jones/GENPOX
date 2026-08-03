@@ -604,4 +604,70 @@ class ReactorSimulationTest {
         advanceUntilIdle()
         assertTrue("TTH should collapse at <25°C", viewModel.isReactionCollapsed.value)
     }
+
+    @Test
+    fun testCelestialHostPlanetAnomalousBonding() = runTest {
+        // We will test ReactorSimulationEngine.runSynthesis directly.
+        // We want to force a condition where step == hostIndex, QScore is high, Temp is eligible,
+        // and we have a CONJUNCTION alignment state.
+        WaveMath.isTestMode = false
+        
+        // Find a timestamp where Mercury and Venus are in CONJUNCTION
+        var testTimeMs = 1778982840000L // reference time
+        var foundConjunction = false
+        for (i in 0 until 5000) { // check up to 5000 days
+            if (WaveMath.getPairAlignmentState("MERCURY", "VENUS", testTimeMs) == WaveMath.AlignmentState.CONJUNCTION) {
+                foundConjunction = true
+                break
+            }
+            testTimeMs += 3600000L * 24 // +1 day
+        }
+        
+        assertTrue("Should find a conjunction time", foundConjunction)
+        
+        // Set manual offset so that WaveMath.getAdjustedTime() returns this conjunction timestamp
+        WaveMath.setManualOffset(testTimeMs - System.currentTimeMillis())
+        
+        // Now run synthesis. Mercury is step 1. Target sequence: AAAAAAAA.
+        // PFU polymerase is ideal as it has base Q of 35-40 (above 22 threshold).
+        // Temp is 16.0f (perfectly matching target Tm for AAAAAAAA at 0.05 salt).
+        // Host planet is MERCURY, so hostIndex = 1 (step 1).
+        // Under CONJUNCTION: qThreshold = 22.0, anomalousChance = 0.40.
+        // We loop up to 50 times (since it's a 40% chance per run) to find a successful bonding.
+        var anomalousBonded = false
+        var attempts = 0
+        while (!anomalousBonded && attempts < 50) {
+            attempts++
+            val result = ReactorSimulationEngine.runSynthesis(
+                target = "AAAAAAAA",
+                temp = 16.0f,
+                salt = 0.05,
+                poly = "PFU",
+                solute = "None",
+                inletRatioA = 1.0f,
+                inletRatioG = 0.0f,
+                inletRatioT = 0.0f,
+                inletRatioC = 0.0f,
+                stepIntervalMs = 0L,
+                hostPlanet = "MERCURY",
+                onStep = {}
+            )
+            val firstChar = result.finalStrand[0]
+            if (firstChar in listOf('X', 'Z', 'Y', 'W')) {
+                anomalousBonded = true
+                // Verify that the rest of the strand is standard 'A's
+                assertEquals("AAAAAAAA".substring(1), result.finalStrand.substring(1))
+                // Verify that step 1 had isMutated = true and a celestial mutation message
+                val step1 = result.steps[0]
+                assertTrue("Step 1 should be marked mutated", step1.isMutated)
+                assertTrue("Step 1 should have celestial message", step1.mutationMessage?.contains("[CELESTIAL]") == true)
+            }
+        }
+        
+        assertTrue("Anomalous base should have successfully bonded after several runs", anomalousBonded)
+        
+        // Reset settings
+        WaveMath.isTestMode = true
+        WaveMath.setManualOffset(0L)
+    }
 }

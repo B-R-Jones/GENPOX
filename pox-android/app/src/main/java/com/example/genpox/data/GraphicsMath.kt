@@ -258,4 +258,37 @@ object GraphicsMath {
             isBelowHorizon = isBelowHorizon
         )
     }
+
+    // ==========================================
+    // 6. GENOME SPLICER CIRCULAR UI & TAP MATH
+    // ==========================================
+
+    fun calculateCircularPoint(cx: Float, cy: Float, radius: Float, angleRad: Double): Point2D {
+        val x = cx + radius * cos(angleRad).toFloat()
+        val y = cy + radius * sin(angleRad).toFloat()
+        return Point2D(x, y)
+    }
+
+    fun calculateHexagonVertices(cx: Float, cy: Float, hexRadius: Float): List<Point2D> {
+        val vertices = mutableListOf<Point2D>()
+        for (i in 0..5) {
+            val angleRad = i * Math.PI / 3f - Math.PI / 6f
+            val x = cx + hexRadius * cos(angleRad).toFloat()
+            val y = cy + hexRadius * sin(angleRad).toFloat()
+            vertices.add(Point2D(x, y))
+        }
+        return vertices
+    }
+
+    fun calculateTappedSlotIndex(dx: Float, dy: Float, currentSpinRad: Float): Int {
+        val tapAngleRad = kotlin.math.atan2(dy, dx)
+        var tapAngleDeg = Math.toDegrees(tapAngleRad.toDouble()).toFloat()
+        val currentSpinDeg = currentSpinRad * 180f / Math.PI.toFloat()
+        var adjustedAngle = tapAngleDeg - currentSpinDeg
+        var normalizedAngle = (adjustedAngle + 90f) % 360f
+        if (normalizedAngle < 0f) {
+            normalizedAngle += 360f
+        }
+        return (normalizedAngle / 45f).toInt() % 8
+    }
 }

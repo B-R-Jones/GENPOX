@@ -496,7 +496,7 @@ object ConflictEngine {
             "Parasite" -> 'T'
             else -> 'C'
         }
-        val alignState = WaveMath.getBaseAlignmentState(alignmentBase, System.currentTimeMillis())
+        val alignState = WaveMath.getBaseAlignmentState(alignmentBase, WaveMath.getAdjustedTime())
         val alignMult = when (alignState) {
             WaveMath.AlignmentState.CONJUNCTION -> 1.20
             WaveMath.AlignmentState.OPPOSITION -> 0.90

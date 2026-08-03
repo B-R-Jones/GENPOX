@@ -117,7 +117,7 @@ interface PoxDao {
     suspend fun decrementReagentStock(id: String)
 }
 
-@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class, CachedRoadCell::class, CachedBuildingCell::class, ReagentStock::class], version = 17, exportSchema = false)
+@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class, CachedRoadCell::class, CachedBuildingCell::class, ReagentStock::class], version = 18, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class PoxDatabase : RoomDatabase() {
     abstract fun poxDao(): PoxDao

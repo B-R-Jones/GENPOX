@@ -681,20 +681,7 @@ fun VaultView(viewModel: MainViewModel) {
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                                     ) {
-                                                        Canvas(modifier = Modifier.size(12.dp)) {
-                                                            drawCircle(
-                                                                color = Color.Black,
-                                                                radius = 4.dp.toPx(),
-                                                                style = Stroke(width = 1.5.dp.toPx()),
-                                                                center = Offset(5.dp.toPx(), 5.dp.toPx())
-                                                            )
-                                                            drawLine(
-                                                                color = Color.Black,
-                                                                start = Offset(7.5.dp.toPx(), 7.5.dp.toPx()),
-                                                                end = Offset(11.dp.toPx(), 11.dp.toPx()),
-                                                                strokeWidth = 1.5.dp.toPx()
-                                                            )
-                                                        }
+                                                        WireframeSearchIcon(Color.Black)
                                                         Text(
                                                             text = "VIEW SEQUENCES",
                                                             style = Typography.labelLarge,

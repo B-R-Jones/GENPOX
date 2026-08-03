@@ -97,6 +97,40 @@ object WaveMath {
     @Volatile
     var isTestMode: Boolean = false
 
+    @Volatile
+    var timeScale: Double = 1.0
+
+    @Volatile
+    var baseOffsetMs: Long = 0L
+
+    @Volatile
+    var manualOffsetMs: Long = 0L
+
+    @Volatile
+    var appStartTime: Long = System.currentTimeMillis()
+
+    fun getAdjustedTime(realTimeMs: Long = System.currentTimeMillis()): Long {
+        if (isTestMode) return realTimeMs
+        val elapsed = realTimeMs - appStartTime
+        return appStartTime + baseOffsetMs + manualOffsetMs + (elapsed * timeScale).toLong()
+    }
+
+    fun setScale(newScale: Double) {
+        val now = System.currentTimeMillis()
+        val currentAdjustedWithoutManual = now + baseOffsetMs + ((now - appStartTime) * timeScale).toLong()
+        appStartTime = now
+        baseOffsetMs = currentAdjustedWithoutManual - now
+        timeScale = newScale
+    }
+
+    fun setManualOffset(offsetMs: Long) {
+        val now = System.currentTimeMillis()
+        val currentAdjustedWithoutManual = now + baseOffsetMs + ((now - appStartTime) * timeScale).toLong()
+        appStartTime = now
+        baseOffsetMs = currentAdjustedWithoutManual - now
+        manualOffsetMs = offsetMs
+    }
+
     fun getBaseAlignmentState(base: Char, timeMs: Long): AlignmentState {
         if (isTestMode) return AlignmentState.NEUTRAL
         return when (base.uppercaseChar()) {
