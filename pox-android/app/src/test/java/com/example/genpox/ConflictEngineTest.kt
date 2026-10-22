@@ -20,31 +20,29 @@ class ConflictEngineTest {
         isAutoHacker: Boolean = false,
         heatRes: Double = 0.0,
         radRes: Double = 0.0,
-        kineticRes: Double = 0.0
-    ): Creature {
-        return Creature(
-            id = id,
-            sequence = sequence,
-            name = name,
-            faction = faction,
-            type = "Cyborg Hybrid",
-            vitality = vitality,
-            attack = attack,
-            defense = defense,
-            speed = speed,
-            primaryWeapon = "Standard Claws",
-            lore = "Procedural test creature.",
-            asciiArt = "",
-            discoveredAt = System.currentTimeMillis(),
-            origin = "Local Compile",
-            isAutoDefender = isAutoDefender,
-            isAutoHacker = isAutoHacker,
-            telomeres = telomeres,
-            heatResistance = heatRes,
-            radResistance = radRes,
-            kineticResistance = kineticRes
-        )
-    }
+        kineticRes: Double = 0.0,
+    ): Creature = Creature(
+        id = id,
+        sequence = sequence,
+        name = name,
+        faction = faction,
+        type = "Cyborg Hybrid",
+        vitality = vitality,
+        attack = attack,
+        defense = defense,
+        speed = speed,
+        primaryWeapon = "Standard Claws",
+        lore = "Procedural test creature.",
+        asciiArt = "",
+        discoveredAt = System.currentTimeMillis(),
+        origin = "Local Compile",
+        isAutoDefender = isAutoDefender,
+        isAutoHacker = isAutoHacker,
+        telomeres = telomeres,
+        heatResistance = heatRes,
+        radResistance = radRes,
+        kineticResistance = kineticRes,
+    )
 
     @Test
     fun testInitializeCombatantScalingAndResonance() {
@@ -54,7 +52,7 @@ class ConflictEngineTest {
 
         assertEquals(120, combatant100.maxHp)
         assertEquals(20, combatant100.speed)
-        
+
         // Infection faction on New Moon has 0 resonance modifier
         assertEquals(40, combatant100.defense)
 
@@ -63,7 +61,7 @@ class ConflictEngineTest {
         // Infection faction on Waxing Crescent has +15 resonance defense modifier
         val combatant50 = ConflictEngine.initializeCombatant(c50, "Waxing Crescent", 50.0)
 
-        // Scaled stats: 
+        // Scaled stats:
         // HP: 100 * 0.625 = 63
         // Attack: 40 * 0.625 = 25
         // Defense: Base defense = 20 * 0.625 = 13. Waxing Crescent adds +15 -> 28.
@@ -116,7 +114,7 @@ class ConflictEngineTest {
             faction = "Infection",
             distance = 100.0,
             heatZoneDiameter = 1000.0, // Radius = 500 feet
-            density = 0.8
+            density = 0.8,
         )
 
         // Coordinates exactly at epicenter should be contained
@@ -131,7 +129,7 @@ class ConflictEngineTest {
             lng = -74.0060,
             radiusFeet = 200.0,
             type = "GREENHOUSE",
-            hazardPower = 1.2
+            hazardPower = 1.2,
         )
 
         // Center should be contained
@@ -149,19 +147,31 @@ class ConflictEngineTest {
             lng = -74.0060,
             radiusFeet = 1000.0,
             type = "MAGNETOSPHERIC", // Radiation type hazard
-            hazardPower = 1.0
+            hazardPower = 1.0,
         )
 
         // Unprotected creature
         val rawCreature = createDummyCreature("raw", "RawSpecimen", "Infection", telomeres = 100)
         val resultRaw = ConflictEngine.simulateCreatureVsEnvironment(
-            rawCreature, well, 40.7128, -74.0060, totalTicks = 10, lunarAge = 15.0, waveCoupling = 50.0
+            rawCreature,
+            well,
+            40.7128,
+            -74.0060,
+            totalTicks = 10,
+            lunarAge = 15.0,
+            waveCoupling = 50.0,
         )
 
         // Protected creature (100% Radiation Resistance)
         val safeCreature = createDummyCreature("safe", "RadShield", "Infection", telomeres = 100, radRes = 1.0)
         val resultSafe = ConflictEngine.simulateCreatureVsEnvironment(
-            safeCreature, well, 40.7128, -74.0060, totalTicks = 10, lunarAge = 15.0, waveCoupling = 50.0
+            safeCreature,
+            well,
+            40.7128,
+            -74.0060,
+            totalTicks = 10,
+            lunarAge = 15.0,
+            waveCoupling = 50.0,
         )
 
         assertTrue("Protected creature should suffer less telomere decay", resultSafe.finalTelomeres > resultRaw.finalTelomeres)
@@ -183,7 +193,7 @@ class ConflictEngineTest {
             vaultAutoDefenders = emptyList(),
             baseFirewallComplexity = baseComplexity,
             phaseName = "New Moon",
-            waveCoupling = 50.0
+            waveCoupling = 50.0,
         )
 
         assertTrue(resultUndefended.success)
@@ -199,7 +209,7 @@ class ConflictEngineTest {
             vaultAutoDefenders = emptyList(),
             baseFirewallComplexity = baseComplexity,
             phaseName = "New Moon",
-            waveCoupling = 50.0
+            waveCoupling = 50.0,
         )
 
         // Hacking should redirect, initiating combat
@@ -227,7 +237,7 @@ class ConflictEngineTest {
             vaultAutoDefenders = vaultDefenders,
             baseFirewallComplexity = baseComplexity,
             phaseName = "New Moon",
-            waveCoupling = 50.0
+            waveCoupling = 50.0,
         )
 
         // Check if complexity logs show Base (100.0) + (15 + 25) * 2.0 = 180.0

@@ -7,31 +7,29 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.unit.dp
-import kotlin.math.*
 import com.example.genpox.theme.CyberTheme
+import kotlin.math.*
 
 class CreatureGeometry(val dna: String) {
     val vertices = mutableListOf<Vertex3D>()
     val edges = mutableListOf<Pair<Int, Int>>()
-    
+
     val innerVertices = mutableListOf<Vertex3D>()
     val innerEdges = mutableListOf<Pair<Int, Int>>()
-    
+
     var baseRadius = 1.0
     var breatheAmp = 0.1
     var breatheFreq = 2
     var twistRate = 0.0
-    
+
     init {
         generate()
     }
-    
+
     private fun generate() {
         val genes = dna.chunked(8)
         if (genes.size < 8) return
-        
+
         val g1 = genes[0]
         val g2 = genes[1]
         val g3 = genes[2]
@@ -40,22 +38,22 @@ class CreatureGeometry(val dna: String) {
         val g6 = genes[5]
         val g7 = genes[6]
         val g8 = genes[7]
-        
+
         // --- Gene 1: Core Shape ---
         val g1Sum = g1.sumOf { it.code }
         val shapeType = g1Sum % 5
         baseRadius = 60.0 * (0.8 + (g1Sum % 5) * 0.08) // Base model radius around 48-67
-        
+
         val coreVertices = mutableListOf<Vertex3D>()
         val coreEdges = mutableListOf<Pair<Int, Int>>()
-        
+
         when (shapeType) {
             0 -> { // Tetrahedron
                 coreVertices.add(Vertex3D(1.0, 1.0, 1.0))
                 coreVertices.add(Vertex3D(-1.0, -1.0, 1.0))
                 coreVertices.add(Vertex3D(-1.0, 1.0, -1.0))
                 coreVertices.add(Vertex3D(1.0, -1.0, -1.0))
-                
+
                 coreEdges.add(Pair(0, 1))
                 coreEdges.add(Pair(0, 2))
                 coreEdges.add(Pair(0, 3))
@@ -91,7 +89,7 @@ class CreatureGeometry(val dna: String) {
                 coreVertices.add(Vertex3D(0.0, -1.0, 0.0))
                 coreVertices.add(Vertex3D(0.0, 0.0, 1.0))
                 coreVertices.add(Vertex3D(0.0, 0.0, -1.0))
-                
+
                 for (i in 0 until 6) {
                     for (j in i + 1 until 6) {
                         if ((i == 0 && j == 1) || (i == 2 && j == 3) || (i == 4 && j == 5)) continue
@@ -105,17 +103,17 @@ class CreatureGeometry(val dna: String) {
                 coreVertices.add(Vertex3D(1.0, phi, 0.0))
                 coreVertices.add(Vertex3D(-1.0, -phi, 0.0))
                 coreVertices.add(Vertex3D(1.0, -phi, 0.0))
-                
+
                 coreVertices.add(Vertex3D(0.0, -1.0, phi))
                 coreVertices.add(Vertex3D(0.0, 1.0, phi))
                 coreVertices.add(Vertex3D(0.0, -1.0, -phi))
                 coreVertices.add(Vertex3D(0.0, 1.0, -phi))
-                
+
                 coreVertices.add(Vertex3D(phi, 0.0, -1.0))
                 coreVertices.add(Vertex3D(phi, 0.0, 1.0))
                 coreVertices.add(Vertex3D(-phi, 0.0, -1.0))
                 coreVertices.add(Vertex3D(-phi, 0.0, 1.0))
-                
+
                 // Normalize vertices
                 for (v in coreVertices) {
                     val len = sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
@@ -129,7 +127,7 @@ class CreatureGeometry(val dna: String) {
                         val dx = coreVertices[i].x - coreVertices[j].x
                         val dy = coreVertices[i].y - coreVertices[j].y
                         val dz = coreVertices[i].z - coreVertices[j].z
-                        val dist = sqrt(dx*dx + dy*dy + dz*dz)
+                        val dist = sqrt(dx * dx + dy * dy + dz * dz)
                         if (dist < 1.1) {
                             coreEdges.add(Pair(i, j))
                         }
@@ -150,17 +148,17 @@ class CreatureGeometry(val dna: String) {
                 coreVertices.add(Vertex3D(0.0, -invPhi, phi))
                 coreVertices.add(Vertex3D(0.0, invPhi, -phi))
                 coreVertices.add(Vertex3D(0.0, -invPhi, -phi))
-                
+
                 coreVertices.add(Vertex3D(invPhi, phi, 0.0))
                 coreVertices.add(Vertex3D(-invPhi, phi, 0.0))
                 coreVertices.add(Vertex3D(invPhi, -phi, 0.0))
                 coreVertices.add(Vertex3D(-invPhi, -phi, 0.0))
-                
+
                 coreVertices.add(Vertex3D(phi, 0.0, invPhi))
                 coreVertices.add(Vertex3D(-phi, 0.0, invPhi))
                 coreVertices.add(Vertex3D(phi, 0.0, -invPhi))
                 coreVertices.add(Vertex3D(-phi, 0.0, -invPhi))
-                
+
                 // Normalize
                 for (v in coreVertices) {
                     val len = sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
@@ -174,7 +172,7 @@ class CreatureGeometry(val dna: String) {
                         val dx = coreVertices[i].x - coreVertices[j].x
                         val dy = coreVertices[i].y - coreVertices[j].y
                         val dz = coreVertices[i].z - coreVertices[j].z
-                        val dist = sqrt(dx*dx + dy*dy + dz*dz)
+                        val dist = sqrt(dx * dx + dy * dy + dz * dz)
                         if (dist < 0.77) {
                             coreEdges.add(Pair(i, j))
                         }
@@ -182,14 +180,14 @@ class CreatureGeometry(val dna: String) {
                 }
             }
         }
-        
+
         // Scale to base size
         for (v in coreVertices) {
             v.x *= baseRadius
             v.y *= baseRadius
             v.z *= baseRadius
         }
-        
+
         // --- Gene 2: Cephalic (Head) Distortion ---
         val g2Sum = g2.sumOf { it.code }
         val headDisplace = 0.7 + (g2Sum % 8) * 0.12 // 0.7 to 1.66
@@ -200,45 +198,45 @@ class CreatureGeometry(val dna: String) {
                 v.z *= headDisplace
             }
         }
-        
+
         vertices.addAll(coreVertices)
         edges.addAll(coreEdges)
-        
+
         // --- Gene 3: Limb Extrusions ---
         val g3Sum = g3.sumOf { it.code }
         val limbLength = baseRadius * (0.35 + (g3Sum % 6) * 0.12)
         val numLimbPairs = 1 + (g3Sum % 3)
-        
+
         val lateralIndices = coreVertices.indices
             .filter { abs(coreVertices[it].x) > baseRadius * 0.4 }
             .sortedByDescending { abs(coreVertices[it].x) }
-            
+
         for (k in 0 until min(numLimbPairs * 2, lateralIndices.size)) {
             val baseIdx = lateralIndices[k]
             val baseV = coreVertices[baseIdx]
             val signX = if (baseV.x >= 0.0) 1.0 else -1.0
-            
+
             // Joint 1
             val j1 = Vertex3D(
                 baseV.x + signX * limbLength * 0.6,
                 baseV.y - limbLength * 0.2,
-                baseV.z
+                baseV.z,
             )
             vertices.add(j1)
             val j1Idx = vertices.size - 1
             edges.add(Pair(baseIdx, j1Idx))
-            
+
             // Joint 2 (extremity)
             val j2 = Vertex3D(
                 j1.x + signX * limbLength * 0.4,
                 j1.y - limbLength * 0.6,
-                j1.z
+                j1.z,
             )
             vertices.add(j2)
             val j2Idx = vertices.size - 1
             edges.add(Pair(j1Idx, j2Idx))
         }
-        
+
         // --- Gene 4: Armor Plating (Outer concentric cage) ---
         val g4Sum = g4.sumOf { it.code }
         val hasArmor = g4Sum % 2 == 0
@@ -246,7 +244,7 @@ class CreatureGeometry(val dna: String) {
         if (hasArmor) {
             val coreCount = coreVertices.size
             val armorStartIndex = vertices.size
-            
+
             for (i in 0 until coreCount) {
                 val cv = coreVertices[i]
                 vertices.add(Vertex3D(cv.x * armorScale, cv.y * armorScale, cv.z * armorScale))
@@ -258,7 +256,7 @@ class CreatureGeometry(val dna: String) {
                 edges.add(Pair(i, i + armorStartIndex))
             }
         }
-        
+
         // --- Gene 5: Core Energy Reactor ---
         val g5Sum = g5.sumOf { it.code }
         val innerRadius = baseRadius * (0.22 + (g5Sum % 4) * 0.05)
@@ -274,12 +272,12 @@ class CreatureGeometry(val dna: String) {
                 innerEdges.add(Pair(i, j))
             }
         }
-        
+
         // --- Gene 6: Breathing Undulation Config ---
         val g6Sum = g6.sumOf { it.code }
         breatheAmp = 0.04 + (g6Sum % 5) * 0.03
         breatheFreq = 1 + (g6Sum % 3)
-        
+
         // --- Gene 7: Helical Twist Config ---
         val g7Sum = g7.sumOf { it.code }
         twistRate = ((g7Sum % 8) - 4) * 0.003
@@ -292,21 +290,21 @@ data class Vertex3D(var x: Double, var y: Double, var z: Double)
 fun CreatureWireframeView(
     dna: String,
     faction: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val geometry = remember(dna) { CreatureGeometry(dna) }
 
     // Infinite transitions for smooth rotation and breathing cycles
     val infiniteTransition = rememberInfiniteTransition(label = "creature_spin")
-    
+
     val spinAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = (2.0 * Math.PI).toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(18000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "spin"
+        label = "spin",
     )
 
     val breathingPhase by infiniteTransition.animateFloat(
@@ -314,9 +312,9 @@ fun CreatureWireframeView(
         targetValue = (2.0 * Math.PI).toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "breath"
+        label = "breath",
     )
 
     val staticTrigger by infiniteTransition.animateFloat(
@@ -324,9 +322,9 @@ fun CreatureWireframeView(
         targetValue = 100f,
         animationSpec = infiniteRepeatable(
             animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "static"
+        label = "static",
     )
 
     // Holographic faction glow colors
@@ -341,6 +339,15 @@ fun CreatureWireframeView(
     val backColor = factionColor.copy(alpha = 0.22f)
     val innerCoreColor = Color(0xFFFBBF24) // Gold glowing energy core
 
+    val maxVertexCount = 1024
+    val projectedX = remember { FloatArray(maxVertexCount) }
+    val projectedY = remember { FloatArray(maxVertexCount) }
+    val depthZ = remember { DoubleArray(maxVertexCount) }
+
+    val innerProjectedX = remember { FloatArray(maxVertexCount) }
+    val innerProjectedY = remember { FloatArray(maxVertexCount) }
+    val innerDepthZ = remember { DoubleArray(maxVertexCount) }
+
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
@@ -348,7 +355,7 @@ fun CreatureWireframeView(
         val centerY = height / 2f
         val minDimension = min(width, height)
         val densityVal = density
-        
+
         // Scale model to match frame size
         val visualScale = (minDimension / 180f).coerceIn(0.25f, 2.5f)
 
@@ -367,14 +374,14 @@ fun CreatureWireframeView(
             drawCircle(
                 color = factionColor,
                 radius = 4f * densityVal,
-                center = Offset(centerX, centerY)
+                center = Offset(centerX, centerY),
             )
         } else {
-            val projectedPoints = mutableListOf<Offset>()
-            val depthZ = mutableListOf<Double>()
+            val vertexCount = min(geometry.vertices.size, maxVertexCount)
 
             // 1. Project primary creature vertices (Body, limbs, armor)
-            for (v in geometry.vertices) {
+            for (i in 0 until vertexCount) {
+                val v = geometry.vertices[i]
                 // Apply breathing scale
                 val bx = v.x * breathScale * finalScale
                 val by = v.y * breathScale * finalScale
@@ -398,8 +405,9 @@ fun CreatureWireframeView(
                 val finalY = ry * cosT - rz * sinT
                 val finalZ = ry * sinT + rz * cosT
 
-                projectedPoints.add(Offset((centerX + finalX).toFloat(), (centerY - finalY).toFloat()))
-                depthZ.add(finalZ)
+                projectedX[i] = (centerX + finalX).toFloat()
+                projectedY[i] = (centerY - finalY).toFloat()
+                depthZ[i] = finalZ
             }
 
             val maxRadius = (geometry.baseRadius * breathScale * finalScale * 1.4).coerceAtLeast(10.0)
@@ -407,20 +415,20 @@ fun CreatureWireframeView(
             // 2. Draw outer model drop shadows (LOD Tier 1: finalScale > 0.8f)
             if (finalScale > 0.8f) {
                 for (edge in geometry.edges) {
-                    if (edge.first < projectedPoints.size && edge.second < projectedPoints.size) {
+                    if (edge.first < vertexCount && edge.second < vertexCount) {
                         val z1 = depthZ[edge.first]
                         val z2 = depthZ[edge.second]
                         val avgZ = (z1 + z2) / 2.0
-                        
+
                         val depthPct = ((avgZ / maxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
                         val alpha = (0.18f + 0.82f * depthPct).toFloat()
                         val stroke = (0.8f + 1.2f * depthPct).toFloat() * densityVal
 
                         drawLine(
                             color = Color.Black.copy(alpha = alpha * 0.8f),
-                            start = projectedPoints[edge.first] + Offset(1.5f * densityVal, 1.5f * densityVal),
-                            end = projectedPoints[edge.second] + Offset(1.5f * densityVal, 1.5f * densityVal),
-                            strokeWidth = stroke
+                            start = Offset(projectedX[edge.first] + 1.5f * densityVal, projectedY[edge.first] + 1.5f * densityVal),
+                            end = Offset(projectedX[edge.second] + 1.5f * densityVal, projectedY[edge.second] + 1.5f * densityVal),
+                            strokeWidth = stroke,
                         )
                     }
                 }
@@ -428,20 +436,20 @@ fun CreatureWireframeView(
 
             // 3. Draw outer model main lines
             for (edge in geometry.edges) {
-                if (edge.first < projectedPoints.size && edge.second < projectedPoints.size) {
+                if (edge.first < vertexCount && edge.second < vertexCount) {
                     val z1 = depthZ[edge.first]
                     val z2 = depthZ[edge.second]
                     val avgZ = (z1 + z2) / 2.0
-                    
+
                     val depthPct = ((avgZ / maxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
                     val alpha = (0.18f + 0.82f * depthPct).toFloat()
                     val stroke = (0.8f + 1.2f * depthPct).toFloat() * densityVal
 
                     drawLine(
                         color = factionColor.copy(alpha = alpha),
-                        start = projectedPoints[edge.first],
-                        end = projectedPoints[edge.second],
-                        strokeWidth = stroke
+                        start = Offset(projectedX[edge.first], projectedY[edge.first]),
+                        end = Offset(projectedX[edge.second], projectedY[edge.second]),
+                        strokeWidth = stroke,
                     )
                 }
             }
@@ -452,10 +460,10 @@ fun CreatureWireframeView(
                 val cosCs = cos(coreSpinAngle.toDouble())
                 val sinCs = sin(coreSpinAngle.toDouble())
 
-                val projectedInner = mutableListOf<Offset>()
-                val depthInnerZ = mutableListOf<Double>()
+                val innerCount = min(geometry.innerVertices.size, maxVertexCount)
 
-                for (v in geometry.innerVertices) {
+                for (i in 0 until innerCount) {
+                    val v = geometry.innerVertices[i]
                     val vx = v.x * finalScale
                     val vy = v.y * finalScale
                     val vz = v.z * finalScale
@@ -469,48 +477,49 @@ fun CreatureWireframeView(
                     val finalY = ry * cosT - rz * sinT
                     val finalZ = ry * sinT + rz * cosT
 
-                    projectedInner.add(Offset((centerX + finalX).toFloat(), (centerY - finalY).toFloat()))
-                    depthInnerZ.add(finalZ)
+                    innerProjectedX[i] = (centerX + finalX).toFloat()
+                    innerProjectedY[i] = (centerY - finalY).toFloat()
+                    innerDepthZ[i] = finalZ
                 }
 
                 val innerMaxRadius = (geometry.innerVertices.firstOrNull()?.x ?: 10.0) * finalScale * 1.2
 
                 // Inner core shadows
                 for (edge in geometry.innerEdges) {
-                    if (edge.first < projectedInner.size && edge.second < projectedInner.size) {
-                        val z1 = depthInnerZ[edge.first]
-                        val z2 = depthInnerZ[edge.second]
+                    if (edge.first < innerCount && edge.second < innerCount) {
+                        val z1 = innerDepthZ[edge.first]
+                        val z2 = innerDepthZ[edge.second]
                         val avgZ = (z1 + z2) / 2.0
-                        
+
                         val depthPct = ((avgZ / innerMaxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
                         val alpha = (0.2f + 0.8f * depthPct).toFloat()
                         val stroke = (0.6f + 0.8f * depthPct).toFloat() * densityVal
 
                         drawLine(
                             color = Color.Black.copy(alpha = alpha * 0.8f),
-                            start = projectedInner[edge.first] + Offset(1.5f * densityVal, 1.5f * densityVal),
-                            end = projectedInner[edge.second] + Offset(1.5f * densityVal, 1.5f * densityVal),
-                            strokeWidth = stroke
+                            start = Offset(innerProjectedX[edge.first] + 1.5f * densityVal, innerProjectedY[edge.first] + 1.5f * densityVal),
+                            end = Offset(innerProjectedX[edge.second] + 1.5f * densityVal, innerProjectedY[edge.second] + 1.5f * densityVal),
+                            strokeWidth = stroke,
                         )
                     }
                 }
 
                 // Inner core lines
                 for (edge in geometry.innerEdges) {
-                    if (edge.first < projectedInner.size && edge.second < projectedInner.size) {
-                        val z1 = depthInnerZ[edge.first]
-                        val z2 = depthInnerZ[edge.second]
+                    if (edge.first < innerCount && edge.second < innerCount) {
+                        val z1 = innerDepthZ[edge.first]
+                        val z2 = innerDepthZ[edge.second]
                         val avgZ = (z1 + z2) / 2.0
-                        
+
                         val depthPct = ((avgZ / innerMaxRadius).coerceIn(-1.0, 1.0) + 1.0) / 2.0
                         val alpha = (0.2f + 0.8f * depthPct).toFloat()
                         val stroke = (0.6f + 0.8f * depthPct).toFloat() * densityVal
 
                         drawLine(
                             color = innerCoreColor.copy(alpha = alpha),
-                            start = projectedInner[edge.first],
-                            end = projectedInner[edge.second],
-                            strokeWidth = stroke
+                            start = Offset(innerProjectedX[edge.first], innerProjectedY[edge.first]),
+                            end = Offset(innerProjectedX[edge.second], innerProjectedY[edge.second]),
+                            strokeWidth = stroke,
                         )
                     }
                 }
@@ -525,7 +534,7 @@ fun CreatureWireframeView(
                 color = factionColor.copy(alpha = 0.04f),
                 start = Offset(0f, yVal),
                 end = Offset(width, yVal),
-                strokeWidth = 1f
+                strokeWidth = 1f,
             )
             yVal += scanlineSpacing
         }
@@ -536,7 +545,7 @@ fun CreatureWireframeView(
             color = factionColor.copy(alpha = 0.12f),
             start = Offset(0f, beamY),
             end = Offset(width, beamY),
-            strokeWidth = 3f * densityVal
+            strokeWidth = 3f * densityVal,
         )
 
         // Random popping horizontal static lines (flicker)
@@ -547,7 +556,7 @@ fun CreatureWireframeView(
                 color = factionColor.copy(alpha = 0.22f),
                 start = Offset(0f, randomY.toFloat()),
                 end = Offset(width, randomY.toFloat()),
-                strokeWidth = 1f * densityVal
+                strokeWidth = 1f * densityVal,
             )
         }
 
@@ -559,7 +568,7 @@ fun CreatureWireframeView(
             drawCircle(
                 color = factionColor.copy(alpha = 0.25f),
                 radius = 1f * densityVal,
-                center = Offset(dotX.toFloat(), dotY.toFloat())
+                center = Offset(dotX.toFloat(), dotY.toFloat()),
             )
         }
     }

@@ -7,17 +7,13 @@ import kotlinx.serialization.json.Json
 
 class Converters {
     @TypeConverter
-    fun fromStringList(value: List<String>): String {
-        return Json.encodeToString(value)
-    }
+    fun fromStringList(value: List<String>): String = Json.encodeToString(value)
 
     @TypeConverter
-    fun toStringList(value: String): List<String> {
-        return try {
-            Json.decodeFromString(value)
-        } catch (e: Exception) {
-            emptyList()
-        }
+    fun toStringList(value: String): List<String> = try {
+        Json.decodeFromString(value)
+    } catch (e: Exception) {
+        emptyList()
     }
 }
 
@@ -80,32 +76,6 @@ interface PoxDao {
     @Update
     suspend fun updateMission(mission: HarvestMission)
 
-    // Cached Road Cells
-    @Query("SELECT * FROM cached_road_cells WHERE cellKey = :cellKey LIMIT 1")
-    suspend fun getCachedRoadCell(cellKey: String): CachedRoadCell?
-
-    @Query("SELECT * FROM cached_road_cells")
-    suspend fun getAllCachedRoadCells(): List<CachedRoadCell>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCachedRoadCell(cell: CachedRoadCell)
-
-    @Query("DELETE FROM cached_road_cells")
-    suspend fun clearCachedRoadCells()
-
-    // Cached Building Cells
-    @Query("SELECT * FROM cached_building_cells WHERE cellKey = :cellKey LIMIT 1")
-    suspend fun getCachedBuildingCell(cellKey: String): CachedBuildingCell?
-
-    @Query("SELECT * FROM cached_building_cells")
-    suspend fun getAllCachedBuildingCells(): List<CachedBuildingCell>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCachedBuildingCell(cell: CachedBuildingCell)
-
-    @Query("DELETE FROM cached_building_cells")
-    suspend fun clearCachedBuildingCells()
-
     // Reagent Stockpile
     @Query("SELECT * FROM reagent_stock ORDER BY name ASC")
     fun getAllReagentStock(): Flow<List<ReagentStock>>
@@ -117,7 +87,7 @@ interface PoxDao {
     suspend fun decrementReagentStock(id: String)
 }
 
-@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class, CachedRoadCell::class, CachedBuildingCell::class, ReagentStock::class], version = 18, exportSchema = false)
+@Database(entities = [Creature::class, GeneSequence::class, HarvestMission::class, ReagentStock::class], version = 21, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class PoxDatabase : RoomDatabase() {
     abstract fun poxDao(): PoxDao

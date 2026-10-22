@@ -11,7 +11,7 @@ object DnaMetricsCalculator {
         val countA: Int = 0,
         val countG: Int = 0,
         val countT: Int = 0,
-        val countC: Int = 0
+        val countC: Int = 0,
     )
 
     fun calculateInventoryMetrics(list: List<GeneSequence>): GeneInventoryMetrics {
@@ -59,7 +59,7 @@ object DnaMetricsCalculator {
             countA = countA,
             countG = countG,
             countT = countT,
-            countC = countC
+            countC = countC,
         )
     }
 }

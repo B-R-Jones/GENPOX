@@ -1,0 +1,51 @@
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+exceptions:
+  active: false
+
+empty-blocks:
+  active: false
+
+potential-bugs:
+  active: false
+
+style:
+  active: true
+  MaxLineLength:
+    active: false
+  MagicNumber:
+    active: false
+  WildcardImport:
+    active: false
+  UnusedPrivateProperty:
+    active: false
+  UnusedPrivateMember:
+    active: false
+  UnusedParameter:
+    active: false
+  ReturnCount:
+    active: false
+  LoopWithTooManyJumpStatements:
+    active: false
+  ForbiddenComment:
+    active: false
+  FunctionOnlyReturningConstant:
+    active: false
+
+naming:
+  active: false
+
+complexity:
+  active: false
+
+coroutines:
+  active: true
+  GlobalCoroutineUsage:
+    active: true
+
+performance:
+  active: true
+  UnnecessaryTemporaryInstantiation:
+    active: true

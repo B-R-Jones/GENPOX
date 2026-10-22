@@ -1,10 +1,10 @@
 package com.example.genpox
 
 import com.example.genpox.data.GraphicsMath
-import org.junit.Test
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class GraphicsMathTest {
 
@@ -29,7 +29,7 @@ class GraphicsMathTest {
         val variableWidths = listOf(5f, 10f, 15f, 20f)
         val skewnessPositive = GraphicsMath.calculateSkewness(variableWidths)
         assertTrue(skewnessPositive > 0f)
-        
+
         val ampPositive = GraphicsMath.calculateWaveAmplitude(skewnessPositive)
         assertTrue(ampPositive > 0.5f)
     }
@@ -59,7 +59,7 @@ class GraphicsMathTest {
             glitchProgress = 0f,
             isAnomaly = false,
             glitchThresholdPx = 30f,
-            glitchOffsetPx = 10f
+            glitchOffsetPx = 10f,
         )
         assertNotNull(metrics)
         assertTrue(metrics.x1 > 0f)
@@ -73,7 +73,7 @@ class GraphicsMathTest {
     fun test3DBlueprintProjection() {
         val vertices3D = GraphicsMath.generate3DBlueprintVertices(100.0, 0.0)
         assertEquals(6, vertices3D.size)
-        
+
         // Top vertex (0, 100, 0)
         assertEquals(0.0, vertices3D[0].x, 0.001)
         assertEquals(100.0, vertices3D[0].y, 0.001)
@@ -105,7 +105,7 @@ class GraphicsMathTest {
             timeMs = 1778982840000L,
             userLng = -122.4194,
             xE = xE,
-            yE = yE
+            yE = yE,
         )
         assertNotNull(coords)
         assertTrue(coords.declination in -1.0..1.0)

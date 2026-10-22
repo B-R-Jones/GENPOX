@@ -1,8 +1,13 @@
 package com.example.genpox.ui.main
 
+import androidx.lifecycle.viewModelScope
 import com.example.genpox.data.*
+import junit.framework.TestCase.assertEquals
+import junit.framework.TestCase.assertNotNull
+import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -14,13 +19,12 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import junit.framework.TestCase.assertEquals
-import junit.framework.TestCase.assertNotNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainScreenViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val activeViewModels = mutableListOf<MainViewModel>()
 
     @Before
     fun setUp() {
@@ -30,6 +34,11 @@ class MainScreenViewModelTest {
 
     @After
     fun tearDown() {
+        activeViewModels.forEach { vm ->
+            vm.scanner.stopAllTickers()
+            vm.viewModelScope.coroutineContext.cancelChildren()
+        }
+        activeViewModels.clear()
         Dispatchers.resetMain()
         WaveMath.isTestMode = false
     }
@@ -39,12 +48,12 @@ class MainScreenViewModelTest {
         val sequencesList = mutableListOf<GeneSequence>()
         val sequencesFlow = MutableStateFlow<List<GeneSequence>>(emptyList())
         val missionsList = mutableListOf<HarvestMission>()
-        
+
         val apiKeyFlow = MutableStateFlow("")
         val muteFlow = MutableStateFlow(false)
         val radiusFlow = MutableStateFlow(55f)
         val targetSequenceFlow = MutableStateFlow("")
-        
+
         val stockAFlow = MutableStateFlow(10000L)
         val stockGFlow = MutableStateFlow(10000L)
         val stockTFlow = MutableStateFlow(10000L)
@@ -174,24 +183,6 @@ class MainScreenViewModelTest {
             hostPlanetFlow.value = planet
         }
 
-        val cachedRoadCells = mutableListOf<CachedRoadCell>()
-        val cachedBuildingCells = mutableListOf<CachedBuildingCell>()
-
-        override suspend fun getCachedRoadCell(cellKey: String): CachedRoadCell? = cachedRoadCells.find { it.cellKey == cellKey }
-        override suspend fun getAllCachedRoadCells(): List<CachedRoadCell> = cachedRoadCells
-        override suspend fun insertCachedRoadCell(cell: CachedRoadCell) {
-            cachedRoadCells.add(cell)
-        }
-        override suspend fun getCachedBuildingCell(cellKey: String): CachedBuildingCell? = cachedBuildingCells.find { it.cellKey == cellKey }
-        override suspend fun getAllCachedBuildingCells(): List<CachedBuildingCell> = cachedBuildingCells
-        override suspend fun insertCachedBuildingCell(cell: CachedBuildingCell) {
-            cachedBuildingCells.add(cell)
-        }
-        override suspend fun clearMapCache() {
-            cachedRoadCells.clear()
-            cachedBuildingCells.clear()
-        }
-
         val reagentsStockFlow = MutableStateFlow<List<ReagentStock>>(emptyList())
         override val allReagentStock: Flow<List<ReagentStock>> = reagentsStockFlow
         override suspend fun insertReagentStock(reagents: List<ReagentStock>) {
@@ -210,19 +201,41 @@ class MainScreenViewModelTest {
         }
     }
 
+    private fun createMainViewModel(repo: DataRepository = FakeDataRepository()): MainViewModel {
+        val synth = com.example.genpox.audio.PoxSynthManager().apply { isMuted = true }
+        val locRepo = com.example.genpox.util.FakeLocationRepository()
+        val dispatchers = com.example.genpox.util.TestDispatchersProvider(testDispatcher)
+        val tileStreamManager = com.example.genpox.map.tile.TileStreamManager(
+            tileDataProvider = com.example.genpox.map.tile.FakeTileDataProvider(),
+            dispatchers = dispatchers,
+        )
+        val vm = MainViewModel(
+            creatureRepository = repo,
+            geneStockRepository = repo,
+            missionRepository = repo,
+            preferencesRepository = repo,
+            synthManager = synth,
+            locationRepository = locRepo,
+            tileStreamManager = tileStreamManager,
+            dispatchers = dispatchers,
+        )
+        activeViewModels.add(vm)
+        return vm
+    }
+
     @Test
     fun testSelectTab() = runTest {
         val repo = FakeDataRepository()
-        val viewModel = MainViewModel(repo)
-        assertEquals("combinator", viewModel.selectedTab.value)
-        viewModel.selectTab("library")
-        assertEquals("library", viewModel.selectedTab.value)
+        val viewModel = createMainViewModel(repo)
+        assertEquals(com.example.genpox.MainTab.Combinator, viewModel.selectedTab.value)
+        viewModel.selectTab("splicer")
+        assertEquals(com.example.genpox.MainTab.Splicer, viewModel.selectedTab.value)
     }
 
     @Test
     fun testAddLog() = runTest {
         val repo = FakeDataRepository()
-        val viewModel = MainViewModel(repo)
+        val viewModel = createMainViewModel(repo)
         val initialSize = viewModel.terminalLogs.value.size
         viewModel.addLog("TEST_LOG_MESSAGE")
         assertEquals(initialSize + 1, viewModel.terminalLogs.value.size)
@@ -232,11 +245,11 @@ class MainScreenViewModelTest {
     @Test
     fun testOfflineCompilation() = runTest {
         val repo = FakeDataRepository()
-        val viewModel = MainViewModel(repo)
+        val viewModel = createMainViewModel(repo)
         // 64-char valid sequence
         val sequence = "A".repeat(64)
         viewModel.compileCreature(sequence)
-        
+
         // The compilation should execute immediately since we set the main dispatcher to UnconfinedTestDispatcher
         assertEquals(1, repo.creaturesList.size)
         val creature = repo.creaturesList.first()
@@ -248,8 +261,8 @@ class MainScreenViewModelTest {
     @Test
     fun testMissionPhaseTransitions() = runTest {
         val repo = FakeDataRepository()
-        val viewModel = MainViewModel(repo)
-        
+        val viewModel = createMainViewModel(repo)
+
         // Let's manually insert a mission with custom durations to test transition ticking
         val mission = HarvestMission(
             id = "MSN-TEST",
@@ -274,19 +287,19 @@ class MainScreenViewModelTest {
             harvestDuration = 2,
             ascentDuration = 2,
             transitBackDuration = 2,
-            currentPhaseElapsed = 0L
+            currentPhaseElapsed = 0L,
         )
         repo.insertMission(mission)
-        
+
         // Simulate ticking logic similar to the view model heartbeat
         var currentMission = repo.missionsList.first()
-        
+
         fun tick() {
             val nextElapsed = currentMission.elapsedSeconds + 1
             val currentPhaseElapsed = currentMission.currentPhaseElapsed + 1
             var nextPhase = currentMission.phase
             var nextPhaseElapsed = currentPhaseElapsed
-            
+
             when (currentMission.phase) {
                 "TRAVEL" -> {
                     if (currentPhaseElapsed >= currentMission.travelDuration) {
@@ -319,31 +332,31 @@ class MainScreenViewModelTest {
                     }
                 }
             }
-            
+
             val isCompleted = nextPhase == "COMPLETED"
             currentMission = currentMission.copy(
                 elapsedSeconds = nextElapsed,
                 isCompleted = isCompleted,
                 phase = nextPhase,
-                currentPhaseElapsed = nextPhaseElapsed
+                currentPhaseElapsed = nextPhaseElapsed,
             )
         }
-        
+
         // Tick 1 (TRAVEL: elapsed 1, phase elapsed 1)
         tick()
         assertEquals("TRAVEL", currentMission.phase)
         assertEquals(1L, currentMission.currentPhaseElapsed)
-        
+
         // Tick 2 (TRAVEL: elapsed 2, phase elapsed 2 >= 2 -> Transition to DESCENT)
         tick()
         assertEquals("DESCENT", currentMission.phase)
         assertEquals(0L, currentMission.currentPhaseElapsed)
-        
+
         // Tick 3 (DESCENT: elapsed 3, phase elapsed 1)
         tick()
         assertEquals("DESCENT", currentMission.phase)
         assertEquals(1L, currentMission.currentPhaseElapsed)
-        
+
         // Tick 4 (DESCENT: elapsed 4, phase elapsed 2 >= 2 -> Transition to HARVESTING)
         tick()
         assertEquals("HARVESTING", currentMission.phase)
@@ -383,46 +396,46 @@ class MainScreenViewModelTest {
     @Test
     fun testPreCompileReagentsSplicing() = runTest {
         val repo = FakeDataRepository()
-        val viewModel = MainViewModel(repo)
-        
+        val viewModel = createMainViewModel(repo)
+
         val initialReagents = listOf(
             com.example.genpox.data.ReagentStock("REAGENT_LIGASE", "T4 DNA Ligase", 3, "stabilizer", "Whole-Genome Joining Enzyme"),
-            com.example.genpox.data.ReagentStock("REAGENT_TACTICAL_DEFEND", "Silver-Nitrate Catalyst", 3, "tactical", "Autonomous Defender Coating")
+            com.example.genpox.data.ReagentStock("REAGENT_TACTICAL_DEFEND", "Silver-Nitrate Catalyst", 3, "tactical", "Autonomous Defender Coating"),
         )
         repo.insertReagentStock(initialReagents)
-        
+
         repo.saveSplicerState(
             List(8) { "AAAAAAAA" },
             List(8) { 40.0 },
-            List(8) { "TAQ" }
+            List(8) { "TAQ" },
         )
-        
+
         viewModel.selectReagent("REAGENT_LIGASE")
         assertEquals("REAGENT_LIGASE", viewModel.selectedReagent.value)
-        
+
         viewModel.constructSplicedCreature()
         testScheduler.advanceUntilIdle()
-        
+
         viewModel.completeSplicingAndViewInVault()
         testScheduler.advanceUntilIdle()
-        
+
         val creatures = repo.creaturesList
         assertEquals(1, creatures.size)
         val spliced = creatures.first()
         assertEquals(100, spliced.telomeres)
         org.junit.Assert.assertTrue(spliced.origin.contains("Catalyzed"))
-        
+
         val updatedStock = repo.reagentsStockFlow.value
         val ligaseStock = updatedStock.find { it.id == "REAGENT_LIGASE" }?.count ?: 0
         assertEquals(2, ligaseStock)
-        
+
         assertEquals(null, viewModel.selectedReagent.value)
     }
 
     @Test
     fun testCustomScaffoldMode() = runTest {
         val repo = FakeDataRepository()
-        val viewModel = MainViewModel(repo)
+        val viewModel = createMainViewModel(repo)
 
         // Launch collection job to activate the WhileSubscribed stateIn flow
         val collectJob = launch { viewModel.geneSequences.collect {} }
@@ -439,21 +452,23 @@ class MainScreenViewModelTest {
         org.junit.Assert.assertTrue(slots.all { it == null })
 
         // Assign a gene that does NOT match target codon at slot 0
-        repo.saveTargetSequence("AAAAAAAAGGGGGGGGTTTTTTTTCCCCCCCCAAAAAAAAAAAAAAAAGGGGGGGGTTTTTTTT") 
+        repo.saveTargetSequence("AAAAAAAAGGGGGGGGTTTTTTTTCCCCCCCCAAAAAAAAAAAAAAAAGGGGGGGGTTTTTTTT")
         viewModel.selectSplicerSlot(0)
-        repo.insertGeneSequence(GeneSequence(
-            sequence = "GGGGGGGG",
-            count = 1,
-            discoveredAt = System.currentTimeMillis(),
-            averageQScore = 40.0,
-            meltingTemp = 75.0,
-            minimumFreeEnergy = -5.0,
-            polymeraseSignature = "TTH"
-        ))
+        repo.insertGeneSequence(
+            GeneSequence(
+                sequence = "GGGGGGGG",
+                count = 1,
+                discoveredAt = System.currentTimeMillis(),
+                averageQScore = 40.0,
+                meltingTemp = 75.0,
+                minimumFreeEnergy = -5.0,
+                polymeraseSignature = "TTH",
+            ),
+        )
         testScheduler.advanceUntilIdle()
         viewModel.assignGeneToSlot("GGGGGGGG")
         testScheduler.advanceUntilIdle()
-        
+
         // With Custom Scaffold active, it should assign successfully bypassing checks!
         assertEquals("GGGGGGGG", repo.splicerSlotsFlow.value[0])
         assertEquals("TTH", repo.splicerSignaturesFlow.value[0])
@@ -464,7 +479,7 @@ class MainScreenViewModelTest {
     @Test
     fun testCreatureResistancesFromSignatures() = runTest {
         val repo = FakeDataRepository()
-        val viewModel = MainViewModel(repo)
+        val viewModel = createMainViewModel(repo)
 
         // Fill slots with specific enzyme signatures
         // Slot 0, 1: TTH (2 slots) -> 2 * 12.5% = 25% Heat resistance
@@ -473,7 +488,7 @@ class MainScreenViewModelTest {
         repo.saveSplicerState(
             List(8) { "AAAAAAAA" },
             List(8) { 40.0 },
-            listOf("TTH", "TTH", "PFU", "TAQ", "TAQ", "TAQ", "TAQ", "TAQ")
+            listOf("TTH", "TTH", "PFU", "TAQ", "TAQ", "TAQ", "TAQ", "TAQ"),
         )
 
         viewModel.constructSplicedCreature()
@@ -485,7 +500,7 @@ class MainScreenViewModelTest {
         val creatures = repo.creaturesList
         assertEquals(1, creatures.size)
         val creature = creatures.first()
-        
+
         assertEquals(25.0, creature.heatResistance)
         assertEquals(12.5, creature.radResistance)
         assertEquals(62.5, creature.kineticResistance)
@@ -494,7 +509,7 @@ class MainScreenViewModelTest {
     @Test
     fun testCustomScaffoldBackNavigationReset() = runTest {
         val repo = FakeDataRepository()
-        val viewModel = MainViewModel(repo)
+        val viewModel = createMainViewModel(repo)
 
         // Enable custom scaffold mode
         viewModel.setCustomScaffoldMode(true)
@@ -519,5 +534,33 @@ class MainScreenViewModelTest {
         assertEquals("creatures", viewModel.vaultSubTab.value)
         assertEquals("vault", viewModel.creatureCardOpenedFrom.value)
     }
-}
 
+    @Test
+    fun testLogWindowStateManagementAndClearLogs() = runTest {
+        val repo = FakeDataRepository()
+        val viewModel = createMainViewModel(repo)
+
+        // Verify initial state
+        assertEquals(false, viewModel.isLogWindowOpen.value)
+
+        // Verify openLogWindow
+        viewModel.openLogWindow()
+        assertEquals(true, viewModel.isLogWindowOpen.value)
+
+        // Verify closeLogWindow
+        viewModel.closeLogWindow()
+        assertEquals(false, viewModel.isLogWindowOpen.value)
+
+        // Verify toggleLogWindow
+        viewModel.toggleLogWindow()
+        assertEquals(true, viewModel.isLogWindowOpen.value)
+        viewModel.toggleLogWindow()
+        assertEquals(false, viewModel.isLogWindowOpen.value)
+
+        // Verify terminalLogs and clearTerminalLogs
+        assertEquals(1, viewModel.terminalLogs.value.size)
+        viewModel.clearTerminalLogs()
+        assertEquals(1, viewModel.terminalLogs.value.size)
+        assertTrue(viewModel.terminalLogs.value.first().contains("SYS: Terminal cache cleared."))
+    }
+}

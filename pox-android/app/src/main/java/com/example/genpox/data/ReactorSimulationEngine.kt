@@ -13,7 +13,7 @@ object ReactorSimulationEngine {
         val isMutated: Boolean = false,
         val mutationMessage: String? = null,
         val isCollapsed: Boolean = false,
-        val collapseReason: String = ""
+        val collapseReason: String = "",
     )
 
     data class RunResult(
@@ -23,8 +23,47 @@ object ReactorSimulationEngine {
         val mfe: Double,
         val steps: List<StepResult>,
         val isCollapsed: Boolean,
-        val collapseReason: String = ""
+        val collapseReason: String = "",
     )
+
+    data class PolymeraseCost(
+        val costA: Long,
+        val costG: Long,
+        val costT: Long,
+        val costC: Long,
+        val costWaste: Long = 0L,
+    )
+
+    fun calculatePolymeraseCost(poly: String, targetSequence: String): PolymeraseCost {
+        val baseCost = when (poly.uppercase()) {
+            "TTH" -> 100L
+            "PFU" -> 200L
+            else -> 0L
+        }
+        val multiplier = when (poly.uppercase()) {
+            "TTH" -> 100L
+            "PFU" -> 200L
+            else -> 0L
+        }
+
+        val countA = targetSequence.count { it.equals('A', ignoreCase = true) }
+        val countG = targetSequence.count { it.equals('G', ignoreCase = true) }
+        val countT = targetSequence.count { it.equals('T', ignoreCase = true) }
+        val countC = targetSequence.count { it.equals('C', ignoreCase = true) }
+
+        return PolymeraseCost(
+            costA = baseCost + countA * multiplier,
+            costG = baseCost + countG * multiplier,
+            costT = baseCost + countT * multiplier,
+            costC = baseCost + countC * multiplier,
+            costWaste = 0L,
+        )
+    }
+
+    fun calculateSoluteCost(solute: String): Long = when (solute.uppercase()) {
+        "DMSO", "NETROPSIN" -> 100L
+        else -> 0L
+    }
 
     suspend fun runSynthesis(
         target: String,
@@ -38,7 +77,7 @@ object ReactorSimulationEngine {
         inletRatioC: Float,
         stepIntervalMs: Long,
         hostPlanet: String = "EARTH",
-        onStep: (StepResult) -> Unit
+        onStep: (StepResult) -> Unit,
     ): RunResult {
         val sumInlets = inletRatioA + inletRatioG + inletRatioT + inletRatioC
         val normI_A = if (sumInlets > 0) inletRatioA / sumInlets else 0.25f
@@ -53,9 +92,9 @@ object ReactorSimulationEngine {
         val ratioC = target.count { it == 'C' }.toDouble() / targetLen
 
         val deviation = Math.abs(normI_A - ratioA) +
-                        Math.abs(normI_G - ratioG) +
-                        Math.abs(normI_T - ratioT) +
-                        Math.abs(normI_C - ratioC)
+            Math.abs(normI_G - ratioG) +
+            Math.abs(normI_T - ratioT) +
+            Math.abs(normI_C - ratioC)
         val penalty = (deviation * 15.0).coerceAtMost(15.0)
 
         var finalStrand = ""
@@ -194,7 +233,6 @@ object ReactorSimulationEngine {
                 }
             }
 
-
             var failureTriggered = false
             var collapseReason = ""
 
@@ -247,7 +285,7 @@ object ReactorSimulationEngine {
                 isMutated = isMutated,
                 mutationMessage = mutationMessage,
                 isCollapsed = failureTriggered,
-                collapseReason = collapseReason
+                collapseReason = collapseReason,
             )
             stepsList.add(stepRes)
             onStep(stepRes)
@@ -260,7 +298,7 @@ object ReactorSimulationEngine {
                     mfe = mfe,
                     steps = stepsList,
                     isCollapsed = true,
-                    collapseReason = collapseReason
+                    collapseReason = collapseReason,
                 )
             }
         }
@@ -271,7 +309,7 @@ object ReactorSimulationEngine {
             tm = GeneticsEngine.calculateMeltingTemperature(finalStrand, salt),
             mfe = GeneticsEngine.calculateMinimumFreeEnergy(finalStrand),
             steps = stepsList,
-            isCollapsed = false
+            isCollapsed = false,
         )
     }
 }

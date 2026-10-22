@@ -1,139 +1,66 @@
 package com.example.genpox.ui.main
 
-import android.content.Context
-import androidx.annotation.Keep
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.zIndex
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.genpox.data.Creature
-import com.example.genpox.data.GeneSequence
-import com.example.genpox.data.HarvestMission
-import com.example.genpox.data.WaveMath
-import com.example.genpox.data.BuildingStructure
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.*
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
-import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlinx.coroutines.delay
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.coerceAtLeast
-import androidx.compose.ui.unit.coerceIn
-import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.foundation.gestures.forEachGesture
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlin.math.absoluteValue
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.SystemFontFamily
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.runtime.Immutable
-
 
 @Composable
-fun getActiveReagentColor(selectedReagent: String?): Color {
-    return selectedReagent?.let { rId ->
-        when (rId) {
-            "REAGENT_LIGASE" -> Color(0xFF00FF66)
-            "REAGENT_BETAINE" -> Color(0xFFFBBF24)
-            "REAGENT_FORMAMIDE" -> Color(0xFFA855F7)
-            "REAGENT_TU" -> Color(0xFFEF4444)
-            "REAGENT_STAT_VITALITY" -> Color(0xFF38BDF8)
-            "REAGENT_STAT_ATTACK" -> Color(0xFF34D399)
-            "REAGENT_STAT_DEFENSE" -> Color(0xFFFB7185)
-            "REAGENT_STAT_SPEED" -> Color(0xFFFBBF24)
-            "REAGENT_ALIGN_CONTAINMENT" -> Color(0xFF38BDF8)
-            "REAGENT_ALIGN_INFECTION" -> Color(0xFF34D399)
-            "REAGENT_ALIGN_MECH" -> Color(0xFFFB7185)
-            "REAGENT_ALIGN_PARASITE" -> Color(0xFFFBBF24)
-            "REAGENT_TACTICAL_HACK" -> Color(0xFF84CC16)
-            "REAGENT_TACTICAL_DEFEND" -> Color(0xFFCBD5E1)
-            "REAGENT_TACTICAL_TEMP" -> Color(0xFFEC4899)
-            "REAGENT_VISUAL_GLOW" -> Color(0xFF00FF66)
-            "REAGENT_VISUAL_MATRIX" -> Color(0xFF22D3EE)
-            "REAGENT_VISUAL_SHIMMER" -> {
-                val transition = rememberInfiniteTransition(label = "shimmer_transition")
-                val hue by transition.animateFloat(
-                    initialValue = 0f,
-                    targetValue = 360f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(durationMillis = 6000, easing = LinearEasing),
-                        repeatMode = RepeatMode.Restart
-                    ),
-                    label = "shimmer_hue"
-                )
-                Color.hsv(hue, 0.8f, 0.9f)
-            }
-            else -> CyberTheme.green
+fun getActiveReagentColor(selectedReagent: String?): Color = selectedReagent?.let { rId ->
+    when (rId) {
+        "REAGENT_LIGASE" -> Color(0xFF00FF66)
+        "REAGENT_BETAINE" -> Color(0xFFFBBF24)
+        "REAGENT_FORMAMIDE" -> Color(0xFFA855F7)
+        "REAGENT_TU" -> Color(0xFFEF4444)
+        "REAGENT_STAT_VITALITY" -> Color(0xFF38BDF8)
+        "REAGENT_STAT_ATTACK" -> Color(0xFF34D399)
+        "REAGENT_STAT_DEFENSE" -> Color(0xFFFB7185)
+        "REAGENT_STAT_SPEED" -> Color(0xFFFBBF24)
+        "REAGENT_ALIGN_CONTAINMENT" -> Color(0xFF38BDF8)
+        "REAGENT_ALIGN_INFECTION" -> Color(0xFF34D399)
+        "REAGENT_ALIGN_MECH" -> Color(0xFFFB7185)
+        "REAGENT_ALIGN_PARASITE" -> Color(0xFFFBBF24)
+        "REAGENT_TACTICAL_HACK" -> Color(0xFF84CC16)
+        "REAGENT_TACTICAL_DEFEND" -> Color(0xFFCBD5E1)
+        "REAGENT_TACTICAL_TEMP" -> Color(0xFFEC4899)
+        "REAGENT_VISUAL_GLOW" -> Color(0xFF00FF66)
+        "REAGENT_VISUAL_MATRIX" -> Color(0xFF22D3EE)
+        "REAGENT_VISUAL_SHIMMER" -> {
+            val transition = rememberInfiniteTransition(label = "shimmer_transition")
+            val hue by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 6000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart,
+                ),
+                label = "shimmer_hue",
+            )
+            Color.hsv(hue, 0.8f, 0.9f)
         }
-    } ?: CyberTheme.green
-}
+        else -> CyberTheme.green
+    }
+} ?: CyberTheme.green
 
 fun Modifier.cyberglass(
     borderColor: Color,
     glowColor: Color = borderColor.copy(alpha = 0.2f),
-    backgroundColor: Color = Color(0xFF0A0A0F).copy(alpha = 0.75f)
+    backgroundColor: Color = Color(0xFF0A0A0F).copy(alpha = 0.75f),
 ): Modifier = this.then(
     Modifier
         .background(backgroundColor, RoundedCornerShape(4.dp))
@@ -142,38 +69,38 @@ fun Modifier.cyberglass(
             val h = size.height
             val tick = 8.dp.toPx()
             val stroke = 1.dp.toPx()
-            
+
             // Draw background outline border (1.dp)
             drawRoundRect(
                 color = borderColor.copy(alpha = 0.35f),
                 topLeft = Offset(stroke / 2f, stroke / 2f),
                 size = Size(w - stroke, h - stroke),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx(), 4.dp.toPx()),
-                style = Stroke(width = stroke)
+                style = Stroke(width = stroke),
             )
 
             // Top-left
             drawLine(borderColor, Offset(0f, 0f), Offset(tick, 0f), strokeWidth = stroke * 1.5f)
             drawLine(borderColor, Offset(0f, 0f), Offset(0f, tick), strokeWidth = stroke * 1.5f)
-            
+
             // Top-right
             drawLine(borderColor, Offset(w, 0f), Offset(w - tick, 0f), strokeWidth = stroke * 1.5f)
             drawLine(borderColor, Offset(w, 0f), Offset(w, tick), strokeWidth = stroke * 1.5f)
-            
+
             // Bottom-left
             drawLine(borderColor, Offset(0f, h), Offset(tick, h), strokeWidth = stroke * 1.5f)
             drawLine(borderColor, Offset(0f, h), Offset(0f, h - tick), strokeWidth = stroke * 1.5f)
-            
+
             // Bottom-right
             drawLine(borderColor, Offset(w, h), Offset(w - tick, h), strokeWidth = stroke * 1.5f)
             drawLine(borderColor, Offset(w, h), Offset(w, h - tick), strokeWidth = stroke * 1.5f)
-        }
+        },
 )
 
 fun Modifier.cyberglassCircle(
     borderColor: Color,
     glowColor: Color = borderColor.copy(alpha = 0.2f),
-    backgroundColor: Color = Color(0xFF0A0A0F).copy(alpha = 0.75f)
+    backgroundColor: Color = Color(0xFF0A0A0F).copy(alpha = 0.75f),
 ): Modifier = this.then(
     Modifier
         .clip(androidx.compose.foundation.shape.CircleShape)
@@ -184,8 +111,7 @@ fun Modifier.cyberglassCircle(
             drawCircle(
                 color = borderColor.copy(alpha = 0.15f),
                 radius = w / 2f - 3.dp.toPx(),
-                style = Stroke(width = 0.8.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f))
+                style = Stroke(width = 0.8.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f)),
             )
-        }
+        },
 )
-

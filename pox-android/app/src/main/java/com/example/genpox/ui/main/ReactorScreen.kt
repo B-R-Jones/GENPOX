@@ -1,107 +1,47 @@
 package com.example.genpox.ui.main
 
-import com.example.genpox.data.GraphicsMath
-
-
-import android.content.Context
-import androidx.annotation.Keep
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.zIndex
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.ClipOp
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.genpox.data.Creature
-import com.example.genpox.data.GeneSequence
-import com.example.genpox.data.HarvestMission
-import com.example.genpox.data.WaveMath
-import com.example.genpox.data.BuildingStructure
-import com.example.genpox.theme.*
-import com.example.genpox.ui.components.*
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.maps.android.compose.*
-import java.text.SimpleDateFormat
-import java.util.*
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.StateFlow
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.coerceIn
-import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.foundation.gestures.forEachGesture
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlin.math.absoluteValue
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.SystemFontFamily
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.drawText
 import com.example.genpox.data.GeneticsEngine
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.runtime.Immutable
-
-
-
+import com.example.genpox.data.WaveMath
+import com.example.genpox.theme.*
+import com.example.genpox.ui.components.*
+import com.google.maps.android.compose.*
+import kotlinx.coroutines.flow.StateFlow
+import java.util.*
+import kotlin.math.absoluteValue
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 fun TranscriptionDecoderTicker(
@@ -111,9 +51,9 @@ fun TranscriptionDecoderTicker(
     isAnomaly: Boolean,
     activeColor: Color,
     activeColorDim: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    val scrollingGene by scrollingGeneFlow.collectAsState()
+    val scrollingGene by scrollingGeneFlow.collectAsStateWithLifecycle()
     val displayText = remember(scrollingGene, isAnomaly) {
         if (isAnomaly) {
             val active = anomalyEngineActiveProvider()
@@ -143,14 +83,14 @@ fun TranscriptionDecoderTicker(
             .border(1.dp, activeColor, RoundedCornerShape(4.dp)).background(Color.Transparent, RoundedCornerShape(4.dp))
             .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = "TRANSCRIPTION DECODER:",
             color = activeColorDim,
             fontSize = 8.sp,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Default
+            fontFamily = FontFamily.Default,
         )
         Text(
             text = displayText,
@@ -158,7 +98,7 @@ fun TranscriptionDecoderTicker(
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.sp
+            letterSpacing = 1.sp,
         )
     }
 }
@@ -169,14 +109,14 @@ fun ResonanceScopeChamber(
     isActive: Boolean,
     isAnomaly: Boolean,
     activeColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
             .border(1.dp, activeColor, RoundedCornerShape(4.dp)).background(Color.Transparent, RoundedCornerShape(4.dp))
-            .padding(2.dp)
+            .padding(2.dp),
     ) {
         val progress = progressProvider()
         GeneticResonanceScope(
@@ -184,9 +124,9 @@ fun ResonanceScopeChamber(
             isActive = isActive,
             isAnomaly = isAnomaly,
             activeColor = activeColor,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         )
-        
+
         Text(
             text = String.format(Locale.US, "RESONANCE: %d%%", (progress * 100).toInt()),
             color = activeColor.copy(alpha = 0.7f),
@@ -196,7 +136,7 @@ fun ResonanceScopeChamber(
             fontFamily = FontFamily.Monospace,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(4.dp)
+                .padding(4.dp),
         )
     }
 }
@@ -207,19 +147,19 @@ fun ReactorTimerStatus(
     colorProvider: () -> Color,
     boostSecondsLeftProvider: () -> Int,
     activeColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
             text = statusProvider(),
             color = colorProvider(),
             fontFamily = FontFamily.Default,
             fontWeight = FontWeight.Bold,
-            style = Typography.bodySmall
+            style = Typography.bodySmall,
         )
 
         val boostSecondsLeft = boostSecondsLeftProvider()
@@ -233,7 +173,7 @@ fun ReactorTimerStatus(
                 modifier = Modifier
                     .background(activeColor.copy(alpha = 0.15f), RoundedCornerShape(2.dp))
                     .border(1.dp, activeColor, RoundedCornerShape(4.dp))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
             )
         }
     }
@@ -250,7 +190,7 @@ fun BiophysicalResonanceGraph(
     isDenatureThreat: Boolean,
     activeStrand: String,
     isCollapsed: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "graph_oscillation")
     val phase by infiniteTransition.animateFloat(
@@ -258,9 +198,9 @@ fun BiophysicalResonanceGraph(
         targetValue = 4f * Math.PI.toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "phase"
+        label = "phase",
     )
 
     val pulseTransition = rememberInfiniteTransition(label = "boundary_pulse")
@@ -269,9 +209,9 @@ fun BiophysicalResonanceGraph(
         targetValue = 0.85f,
         animationSpec = infiniteRepeatable(
             animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
+            repeatMode = RepeatMode.Reverse,
         ),
-        label = "pulse_alpha"
+        label = "pulse_alpha",
     )
 
     val textMeasurer = rememberTextMeasurer()
@@ -280,15 +220,15 @@ fun BiophysicalResonanceGraph(
         val w = size.width
         val h = size.height
         val cy = h / 2f
-        
+
         // Draw background grid lines
         val gridColor = activeColor.copy(alpha = 0.08f)
         val gridStroke = 0.5.dp.toPx()
-        
+
         drawLine(gridColor, Offset(0f, h * 0.2f), Offset(w, h * 0.2f), strokeWidth = gridStroke)
         drawLine(gridColor, Offset(0f, cy), Offset(w, cy), strokeWidth = gridStroke * 1.5f)
         drawLine(gridColor, Offset(0f, h * 0.8f), Offset(w, h * 0.8f), strokeWidth = gridStroke)
-        
+
         val numVerticalLines = 8
         for (v in 1..numVerticalLines) {
             val vx = w * (v.toFloat() / (numVerticalLines + 1))
@@ -298,7 +238,7 @@ fun BiophysicalResonanceGraph(
         // Draw Boundary Danger Zones (Dashed lines / shaded areas)
         val upperBoundaryY = h * 0.2f
         val lowerBoundaryY = h * 0.8f
-        
+
         val upperAlpha = if (isDenatureThreat) pulseAlpha else 0.3f
         val upperStroke = if (isDenatureThreat) 2.5.dp.toPx() else 1.dp.toPx()
         drawLine(
@@ -306,7 +246,7 @@ fun BiophysicalResonanceGraph(
             start = Offset(0f, upperBoundaryY),
             end = Offset(w, upperBoundaryY),
             strokeWidth = upperStroke,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f),
         )
 
         val lowerAlpha = if (isStallThreat) pulseAlpha else 0.3f
@@ -316,7 +256,7 @@ fun BiophysicalResonanceGraph(
             start = Offset(0f, lowerBoundaryY),
             end = Offset(w, lowerBoundaryY),
             strokeWidth = lowerStroke,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f),
         )
 
         val segments = 100
@@ -330,18 +270,18 @@ fun BiophysicalResonanceGraph(
                 val fraction = i.toFloat() / segments
                 val px = w * fraction
                 val envelope = sin(fraction * Math.PI).toFloat()
-                
+
                 // Frequency is locked
                 val angle = fraction * 4f * Math.PI.toFloat() - phase * transcriptionSpeed
                 val waveVal = sin(angle.toDouble()).toFloat() + 0.2f * sin((angle * 2.1f).toDouble()).toFloat()
-                
+
                 val py = cy + waveVal * maxAmp * envelope
                 if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
             }
             drawPath(
                 path = path,
                 color = CyberGreen,
-                style = Stroke(width = 2.5.dp.toPx())
+                style = Stroke(width = 2.5.dp.toPx()),
             )
         } else {
             // Draw Target Wave (static blue/purple sine wave)
@@ -351,17 +291,17 @@ fun BiophysicalResonanceGraph(
                 val fraction = i.toFloat() / segments
                 val px = w * fraction
                 val envelope = sin(fraction * Math.PI).toFloat()
-                
+
                 val angle = fraction * 4f * Math.PI.toFloat() - phase * 0.5f // constant target speed
                 val waveVal = sin(angle.toDouble()).toFloat()
-                
+
                 val py = cy + waveVal * targetAmp * envelope
                 if (i == 0) targetPath.moveTo(px, py) else targetPath.lineTo(px, py)
             }
             drawPath(
                 path = targetPath,
                 color = Color(0xFF818CF8), // Indigo / Soft Purple-Blue
-                style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f))
+                style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)),
             )
 
             // Draw Environmental Wave (dynamic yellow/orange/red/cyan wave shifting phase and amp)
@@ -369,7 +309,7 @@ fun BiophysicalResonanceGraph(
             val devianceAbs = tempDeviance.absoluteValue
             val maxAmp = (h * 0.3f).coerceAtMost(8.dp.toPx() + devianceAbs * 0.8f)
             val phaseOffset = tempDeviance * 0.1f
-            
+
             val envColor = when {
                 soluteActive.uppercase() == "DMSO" || soluteActive.uppercase() == "NETROPSIN" -> Color(0xFFA855F7) // Purple solute
                 tempDeviance > 15f -> Color(0xFFEF4444) // Excess Heat
@@ -381,10 +321,10 @@ fun BiophysicalResonanceGraph(
                 val fraction = i.toFloat() / segments
                 val px = w * fraction
                 val envelope = sin(fraction * Math.PI).toFloat()
-                
+
                 val angle = fraction * 4f * Math.PI.toFloat() - phase * transcriptionSpeed + phaseOffset
                 var waveVal = sin(angle.toDouble()).toFloat()
-                
+
                 // Add jitter noise if temperature is high
                 if (devianceAbs > 12f) {
                     val noiseAngle = fraction * 25f * Math.PI.toFloat() + phase * 4f
@@ -397,7 +337,7 @@ fun BiophysicalResonanceGraph(
             drawPath(
                 path = envPath,
                 color = envColor,
-                style = Stroke(width = 2.dp.toPx())
+                style = Stroke(width = 2.dp.toPx()),
             )
         }
 
@@ -415,10 +355,10 @@ fun BiophysicalResonanceGraph(
                 val devianceAbs = tempDeviance.absoluteValue
                 val maxAmp = (h * 0.3f).coerceAtMost(8.dp.toPx() + devianceAbs * 0.8f)
                 val phaseOffset = tempDeviance * 0.1f
-                
+
                 val angle = frac * 4f * Math.PI.toFloat() - phase * transcriptionSpeed + phaseOffset
                 var waveVal = sin(angle.toDouble()).toFloat()
-                
+
                 if (devianceAbs > 12f) {
                     val noiseAngle = frac * 25f * Math.PI.toFloat() + phase * 4f
                     waveVal += 0.1f * sin(noiseAngle.toDouble()).toFloat() * (devianceAbs / 30f).coerceAtMost(1.2f)
@@ -438,7 +378,7 @@ fun BiophysicalResonanceGraph(
             val center = points[i]
             val isFilled = i < activeStrand.length
             val char = if (isFilled) activeStrand[i] else null
-            
+
             val hexColor = when (char) {
                 'A' -> Color(0xFF38BDF8) // Cyan
                 'G' -> Color(0xFF34D399) // Green
@@ -446,7 +386,7 @@ fun BiophysicalResonanceGraph(
                 'C' -> Color(0xFFFBBF24) // Yellow
                 else -> if (isCollapsed) Color(0xFFEF4444).copy(alpha = 0.4f) else CyberGreen.copy(alpha = 0.3f)
             }
-            
+
             val hexPath = Path()
             for (j in 0..5) {
                 val angleRad = j * Math.PI / 3f
@@ -455,57 +395,57 @@ fun BiophysicalResonanceGraph(
                 if (j == 0) hexPath.moveTo(hx, hy) else hexPath.lineTo(hx, hy)
             }
             hexPath.close()
-            
+
             // Draw dark background inside hexagon to stand out from the grid/waves
             drawPath(
                 path = hexPath,
                 color = Color.Black.copy(alpha = 0.75f),
-                style = Fill
+                style = Fill,
             )
-            
+
             if (isFilled && char != null) {
                 drawPath(
                     path = hexPath,
                     color = hexColor.copy(alpha = 0.15f),
-                    style = Fill
+                    style = Fill,
                 )
                 drawPath(
                     path = hexPath,
                     color = hexColor,
-                    style = Stroke(width = 2.dp.toPx())
+                    style = Stroke(width = 2.dp.toPx()),
                 )
-                
+
                 val textLayoutResult = textMeasurer.measure(
                     text = char.toString(),
                     style = TextStyle(
                         color = hexColor,
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
+                        fontWeight = FontWeight.Bold,
+                    ),
                 )
                 drawText(
                     textLayoutResult = textLayoutResult,
                     topLeft = Offset(
                         center.x - textLayoutResult.size.width / 2f,
-                        center.y - textLayoutResult.size.height / 2f
-                    )
+                        center.y - textLayoutResult.size.height / 2f,
+                    ),
                 )
-                
+
                 val barWidth = hexRadius * 1.2f
                 val barHeight = 2.5.dp.toPx()
                 val barTop = center.y + hexRadius + 3.dp.toPx()
                 val barColor = if (isCollapsed && i == activeStrand.length - 1) Color.Red else CyberGreen
-                
+
                 drawRect(
                     color = Color.Black.copy(alpha = 0.5f),
                     topLeft = Offset(center.x - barWidth / 2f, barTop),
-                    size = Size(barWidth, barHeight)
+                    size = Size(barWidth, barHeight),
                 )
                 drawRect(
                     color = barColor,
                     topLeft = Offset(center.x - barWidth / 2f, barTop),
-                    size = Size(barWidth * 0.8f, barHeight)
+                    size = Size(barWidth * 0.8f, barHeight),
                 )
             } else {
                 drawPath(
@@ -513,30 +453,29 @@ fun BiophysicalResonanceGraph(
                     color = hexColor,
                     style = Stroke(
                         width = 1.dp.toPx(),
-                        pathEffect = if (isCollapsed) PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f) else null
-                    )
+                        pathEffect = if (isCollapsed) PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f) else null,
+                    ),
                 )
-                
+
                 val textLayoutResult = textMeasurer.measure(
                     text = (i + 1).toString(),
                     style = TextStyle(
                         color = hexColor.copy(alpha = 0.5f),
                         fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
+                        fontFamily = FontFamily.Monospace,
+                    ),
                 )
                 drawText(
                     textLayoutResult = textLayoutResult,
                     topLeft = Offset(
                         center.x - textLayoutResult.size.width / 2f,
-                        center.y - textLayoutResult.size.height / 2f
-                    )
+                        center.y - textLayoutResult.size.height / 2f,
+                    ),
                 )
             }
         }
     }
 }
-
 
 // ==========================================
 // REACTOR DASHBOARD VIEW
@@ -545,35 +484,35 @@ fun BiophysicalResonanceGraph(
 fun ReactorDashboardView(
     viewModel: MainViewModel,
     activeBorder: Color,
-    activePanel: Color
+    activePanel: Color,
 ) {
-    val geneSequences by viewModel.geneSequences.collectAsState()
-    val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
-    
+    val geneSequences by viewModel.geneSequences.collectAsStateWithLifecycle()
+    val devForceAnomaly by viewModel.devForceAnomaly.collectAsStateWithLifecycle()
+
     val uniqueGenesSize = remember(geneSequences) { geneSequences.size }
     val multiCountGenesSize = remember(geneSequences) { geneSequences.count { it.count > 1 } }
-    
+
     val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
     val todayWave = wave
     val tomorrowWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 86400000L)
     val dayAfterWave = WaveMath.getDailyWaveConfig(System.currentTimeMillis() + 172800000L)
 
-    val activeStrand by viewModel.activeSynthesisStrand.collectAsState()
-    val activeStep by viewModel.activeSynthesisStep.collectAsState()
-    val activeQ by viewModel.activeSynthesisQScore.collectAsState()
-    val activeTm by viewModel.activeSynthesisTm.collectAsState()
-    val activeMfe by viewModel.activeSynthesisMfe.collectAsState()
-    val currentTemp by viewModel.reactorTemperature.collectAsState()
-    val currentSalt by viewModel.reactorSalt.collectAsState()
-    val activePoly by viewModel.activePolymerase.collectAsState()
-    val activeSolute by viewModel.activeChemicalSolute.collectAsState()
-    val poxReactorActive by viewModel.poxReactorActive.collectAsState()
+    val activeStrand by viewModel.activeSynthesisStrand.collectAsStateWithLifecycle()
+    val activeStep by viewModel.activeSynthesisStep.collectAsStateWithLifecycle()
+    val activeQ by viewModel.activeSynthesisQScore.collectAsStateWithLifecycle()
+    val activeTm by viewModel.activeSynthesisTm.collectAsStateWithLifecycle()
+    val activeMfe by viewModel.activeSynthesisMfe.collectAsStateWithLifecycle()
+    val currentTemp by viewModel.reactorTemperature.collectAsStateWithLifecycle()
+    val currentSalt by viewModel.reactorSalt.collectAsStateWithLifecycle()
+    val activePoly by viewModel.activePolymerase.collectAsStateWithLifecycle()
+    val activeSolute by viewModel.activeChemicalSolute.collectAsStateWithLifecycle()
+    val poxReactorActive by viewModel.poxReactorActive.collectAsStateWithLifecycle()
 
-    val targetSeq by viewModel.targetSynthesisSequence.collectAsState()
-    val isSynthesisActive by viewModel.isSynthesisActive.collectAsState()
-    val isReactionCollapsed by viewModel.isReactionCollapsed.collectAsState()
-    val bioWaste by viewModel.bioWaste.collectAsState()
-    val isLoopActive by viewModel.isLoopActive.collectAsState()
+    val targetSeq by viewModel.targetSynthesisSequence.collectAsStateWithLifecycle()
+    val isSynthesisActive by viewModel.isSynthesisActive.collectAsStateWithLifecycle()
+    val isReactionCollapsed by viewModel.isReactionCollapsed.collectAsStateWithLifecycle()
+    val bioWaste by viewModel.bioWaste.collectAsStateWithLifecycle()
+    val isLoopActive by viewModel.isLoopActive.collectAsStateWithLifecycle()
 
     val targetTm = remember(targetSeq, currentSalt) {
         GeneticsEngine.calculateMeltingTemperature(targetSeq, currentSalt.toDouble())
@@ -632,12 +571,12 @@ fun ReactorDashboardView(
                 .fillMaxWidth()
                 .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                .padding(8.dp)
+                .padding(8.dp),
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = "PRE-FLIGHT BIO-ANALYSIS",
@@ -645,89 +584,89 @@ fun ReactorDashboardView(
                     style = Typography.labelSmall,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 6.dp)
+                    modifier = Modifier.padding(bottom = 6.dp),
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Column 1: Current Temp
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     ) {
                         Text(
                             text = String.format(Locale.US, "%.1f°C", currentTemp),
                             color = Color.White,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
                             text = "CURR TEMP",
                             color = Color.White.copy(alpha = 0.5f),
                             fontSize = 7.sp,
                             fontWeight = FontWeight.Medium,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
-                    
+
                     // Divider
                     Box(
                         modifier = Modifier
                             .width(1.dp)
                             .height(24.dp)
-                            .background(activeBorder.copy(alpha = 0.3f))
+                            .background(activeBorder.copy(alpha = 0.3f)),
                     )
 
                     // Column 2: Ideal Temp
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     ) {
                         Text(
                             text = String.format(Locale.US, "%.1f°C", targetTm),
                             color = Color.White,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
                             text = "IDEAL TEMP",
                             color = Color.White.copy(alpha = 0.5f),
                             fontSize = 7.sp,
                             fontWeight = FontWeight.Medium,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
-                    
+
                     // Divider
                     Box(
                         modifier = Modifier
                             .width(1.dp)
                             .height(24.dp)
-                            .background(activeBorder.copy(alpha = 0.3f))
+                            .background(activeBorder.copy(alpha = 0.3f)),
                     )
 
                     // Column 3: Safe Temp Range
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1.3f)
+                        modifier = Modifier.weight(1.3f),
                     ) {
                         Text(
                             text = safeRangeText,
                             color = if (isStallThreat || isDenatureThreat) Color(0xFFEF4444) else CyberGreen,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
                             text = "SAFE RANGE",
                             color = Color.White.copy(alpha = 0.5f),
                             fontSize = 7.sp,
                             fontWeight = FontWeight.Medium,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
 
@@ -736,27 +675,27 @@ fun ReactorDashboardView(
                         modifier = Modifier
                             .width(1.dp)
                             .height(24.dp)
-                            .background(activeBorder.copy(alpha = 0.3f))
+                            .background(activeBorder.copy(alpha = 0.3f)),
                     )
 
                     // Column 4: Temp Deviance
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     ) {
                         Text(
                             text = String.format(Locale.US, "%+.1f°C", tempDeviance),
                             color = if (kotlin.math.abs(tempDeviance) > 15f) Color(0xFFEF4444) else CyberGreen,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
                             text = "DEVIANCE",
                             color = Color.White.copy(alpha = 0.5f),
                             fontSize = 7.sp,
                             fontWeight = FontWeight.Medium,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                 }
@@ -770,7 +709,7 @@ fun ReactorDashboardView(
                 .height(140.dp)
                 .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                .padding(4.dp)
+                .padding(4.dp),
         ) {
             BiophysicalResonanceGraph(
                 tempDeviance = tempDeviance,
@@ -782,26 +721,26 @@ fun ReactorDashboardView(
                 isDenatureThreat = isDenatureThreat,
                 activeStrand = activeStrand,
                 isCollapsed = isReactionCollapsed,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
         }
 
         // Compact Feedstock & Bio-Waste Stockpile Row
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            val rawStockA by viewModel.rawStockA.collectAsState()
-            val rawStockG by viewModel.rawStockG.collectAsState()
-            val rawStockT by viewModel.rawStockT.collectAsState()
-            val rawStockC by viewModel.rawStockC.collectAsState()
+            val rawStockA by viewModel.rawStockA.collectAsStateWithLifecycle()
+            val rawStockG by viewModel.rawStockG.collectAsStateWithLifecycle()
+            val rawStockT by viewModel.rawStockT.collectAsStateWithLifecycle()
+            val rawStockC by viewModel.rawStockC.collectAsStateWithLifecycle()
 
             val stocks = listOf(
                 Triple("A", rawStockA, Color(0xFF38BDF8)),
                 Triple("G", rawStockG, Color(0xFF34D399)),
                 Triple("T", rawStockT, Color(0xFFFB7185)),
                 Triple("C", rawStockC, Color(0xFFFBBF24)),
-                Triple("WASTE", bioWaste, Color(0xFFA855F7))
+                Triple("WASTE", bioWaste, Color(0xFFA855F7)),
             )
             stocks.forEach { (label, amt, color) ->
                 Box(
@@ -809,7 +748,7 @@ fun ReactorDashboardView(
                         .weight(1f)
                         .border(1.dp, color, RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
                         .padding(vertical = 4.dp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(text = label, color = color, fontSize = 7.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
@@ -825,20 +764,20 @@ fun ReactorDashboardView(
                 .fillMaxWidth()
                 .border(1.dp, activeBorder, RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                 .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
                 text = "PROGRAM TARGET SEQUENCE (TAP DIALS TO CYCLE)",
                 color = CyberGreenDim,
                 style = Typography.labelSmall,
                 fontSize = 8.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 for (i in 0..7) {
                     val char = targetSeq[i]
@@ -849,7 +788,7 @@ fun ReactorDashboardView(
                         'C' -> Color(0xFFFBBF24) // Yellow
                         else -> Color.Gray
                     }
-                    
+
                     Box(
                         modifier = Modifier
                             .size(34.dp)
@@ -858,19 +797,19 @@ fun ReactorDashboardView(
                             .border(
                                 width = 1.dp,
                                 color = if (isSynthesisActive) Color.Gray else baseColor,
-                                shape = RoundedCornerShape(4.dp)
+                                shape = RoundedCornerShape(4.dp),
                             )
                             .clickable(enabled = !isSynthesisActive) {
                                 viewModel.cycleTargetBase(i)
                             },
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             text = char.toString(),
                             color = if (isSynthesisActive) Color.Gray else baseColor,
                             fontSize = 15.sp,
                             fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -882,12 +821,12 @@ fun ReactorDashboardView(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.dp, activeBorder, RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                .padding(8.dp)
+                .padding(8.dp),
         ) {
-            val rawStockA by viewModel.rawStockA.collectAsState()
-            val rawStockG by viewModel.rawStockG.collectAsState()
-            val rawStockT by viewModel.rawStockT.collectAsState()
-            val rawStockC by viewModel.rawStockC.collectAsState()
+            val rawStockA by viewModel.rawStockA.collectAsStateWithLifecycle()
+            val rawStockG by viewModel.rawStockG.collectAsStateWithLifecycle()
+            val rawStockT by viewModel.rawStockT.collectAsStateWithLifecycle()
+            val rawStockC by viewModel.rawStockC.collectAsStateWithLifecycle()
 
             val hasEnoughStock = remember(targetSeq, rawStockA, rawStockG, rawStockT, rawStockC, activeSolute) {
                 var reqA = 0L
@@ -904,9 +843,9 @@ fun ReactorDashboardView(
                 }
                 val soluteCost = if (activeSolute == "DMSO" || activeSolute == "Netropsin") 100L else 0L
                 rawStockA >= (reqA + soluteCost) &&
-                rawStockG >= (reqG + soluteCost) &&
-                rawStockT >= (reqT + soluteCost) &&
-                rawStockC >= (reqC + soluteCost)
+                    rawStockG >= (reqG + soluteCost) &&
+                    rawStockT >= (reqT + soluteCost) &&
+                    rawStockC >= (reqC + soluteCost)
             }
 
             val buttonEnabled = poxReactorActive && !isSynthesisActive && hasEnoughStock
@@ -914,7 +853,7 @@ fun ReactorDashboardView(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Button(
                     onClick = {
@@ -925,17 +864,17 @@ fun ReactorDashboardView(
                     modifier = Modifier.weight(1f).height(34.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (buttonEnabled) CyberGreen else Color.Transparent,
-                        contentColor = if (buttonEnabled) Color.Black else Color.Gray
+                        contentColor = if (buttonEnabled) Color.Black else Color.Gray,
                     ),
                     border = if (buttonEnabled) null else BorderStroke(1.dp, CyberBorder),
                     shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(0.dp)
+                    contentPadding = PaddingValues(0.dp),
                 ) {
                     Text(
                         text = if (isSynthesisActive) "SYNTHESIZING..." else "INITIATE SYNTHESIS",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Default
+                        fontFamily = FontFamily.Default,
                     )
                 }
 
@@ -947,23 +886,21 @@ fun ReactorDashboardView(
                     modifier = Modifier.width(38.dp).height(34.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isLoopActive) CyberGreen else Color.Transparent,
-                        contentColor = if (isLoopActive) Color.Black else CyberGreen
+                        contentColor = if (isLoopActive) Color.Black else CyberGreen,
                     ),
                     border = BorderStroke(1.dp, CyberGreen),
                     shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(0.dp)
+                    contentPadding = PaddingValues(0.dp),
                 ) {
                     Text(
                         text = "⟲",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Default
+                        fontFamily = FontFamily.Default,
                     )
                 }
             }
         }
-
-
 
         if (devForceAnomaly) {
             Spacer(modifier = Modifier.height(10.dp))
@@ -975,16 +912,16 @@ fun ReactorDashboardView(
                 modifier = Modifier.fillMaxWidth().height(34.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFFBBF24),
-                    contentColor = Color.Black
+                    contentColor = Color.Black,
                 ),
                 shape = RoundedCornerShape(4.dp),
-                contentPadding = PaddingValues(0.dp)
+                contentPadding = PaddingValues(0.dp),
             ) {
                 Text(
                     text = "DEV: INJECT 10K BASES & WASTE",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Default
+                    fontFamily = FontFamily.Default,
                 )
             }
         }
@@ -994,17 +931,17 @@ fun ReactorDashboardView(
 fun adjustInletRatios(changedIndex: Int, newValue: Float, viewModel: MainViewModel) {
     val minVal = 0.05f
     val maxVal = 0.85f
-    
+
     val currentValues = floatArrayOf(
         viewModel.inletRatioA.value,
         viewModel.inletRatioG.value,
         viewModel.inletRatioT.value,
-        viewModel.inletRatioC.value
+        viewModel.inletRatioC.value,
     )
     val oldValue = currentValues[changedIndex]
-    
+
     if (newValue == oldValue) return
-    
+
     if (newValue < oldValue) {
         val clampedVal = newValue.coerceIn(minVal, maxVal)
         when (changedIndex) {
@@ -1034,7 +971,7 @@ fun BioSilo(
     range: ClosedFloatingPointRange<Float>,
     color: Color,
     onValueChange: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val rangeMin = range.start
     val rangeMax = range.endInclusive
@@ -1044,16 +981,16 @@ fun BioSilo(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
+        modifier = modifier,
     ) {
         Text(
             text = label,
             color = color,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
+            fontFamily = FontFamily.Monospace,
         )
-        
+
         Spacer(modifier = Modifier.height(4.dp))
 
         Box(
@@ -1075,13 +1012,13 @@ fun BioSilo(
                             val newValue = rangeMin + newFraction.coerceIn(0f, 1f) * (rangeMax - rangeMin)
                             onValueChange(newValue)
                         }
-                        
+
                         val dragPointerId = down.id
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == dragPointerId }
                             if (change == null || !change.pressed) break
-                            
+
                             val currentY = change.position.y
                             if (componentHeight > 0) {
                                 val newFraction = 1f - (currentY / componentHeight.toFloat())
@@ -1091,7 +1028,7 @@ fun BioSilo(
                             }
                         }
                     }
-                }
+                },
         ) {
             Box(
                 modifier = Modifier
@@ -1101,11 +1038,11 @@ fun BioSilo(
                         Brush.verticalGradient(
                             colors = listOf(
                                 color.copy(alpha = 0.85f),
-                                color.copy(alpha = 0.35f)
-                            )
-                        )
+                                color.copy(alpha = 0.35f),
+                            ),
+                        ),
                     )
-                    .align(Alignment.BottomCenter)
+                    .align(Alignment.BottomCenter),
             )
 
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -1127,12 +1064,12 @@ fun BiophysicalTempSlider(
     value: Float,
     targetTm: Float,
     onValueChange: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val rangeMin = 15f
     val rangeMax = 50f
     val currentFraction = ((value - rangeMin) / (rangeMax - rangeMin)).coerceIn(0f, 1f)
-    
+
     val fTm = ((targetTm - rangeMin) / (rangeMax - rangeMin)).coerceIn(0f, 1f)
     val fIdealStart = ((targetTm - 2f - rangeMin) / (rangeMax - rangeMin)).coerceIn(0f, 1f)
     val fIdealEnd = ((targetTm + 2f - rangeMin) / (rangeMax - rangeMin)).coerceIn(0f, 1f)
@@ -1158,13 +1095,13 @@ fun BiophysicalTempSlider(
                         val newValue = rangeMin + newFraction * (rangeMax - rangeMin)
                         onValueChange(newValue)
                     }
-                    
+
                     val dragPointerId = down.id
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == dragPointerId }
                         if (change == null || !change.pressed) break
-                        
+
                         if (componentWidth > 0) {
                             val newFraction = (change.position.x / componentWidth.toFloat()).coerceIn(0f, 1f)
                             val newValue = rangeMin + newFraction * (rangeMax - rangeMin)
@@ -1173,7 +1110,7 @@ fun BiophysicalTempSlider(
                         }
                     }
                 }
-            }
+            },
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
@@ -1186,16 +1123,16 @@ fun BiophysicalTempSlider(
                     fIdealStart to Color(0xFF34D399),
                     fIdealEnd to Color(0xFF34D399),
                     fHot to Color(0xFFEF4444),
-                    1.0f to Color(0xFFEF4444)
+                    1.0f to Color(0xFFEF4444),
                 ),
                 start = Offset(0f, 0f),
-                end = Offset(w, 0f)
+                end = Offset(w, 0f),
             )
 
             drawRect(
                 brush = gradientBrush,
                 topLeft = Offset(0f, 0f),
-                size = size
+                size = size,
             )
 
             val numTicks = 20
@@ -1212,12 +1149,12 @@ fun BiophysicalTempSlider(
                 color = Color.White,
                 start = Offset(indicatorX, 0f),
                 end = Offset(indicatorX, h),
-                strokeWidth = 2.dp.toPx()
+                strokeWidth = 2.dp.toPx(),
             )
             drawCircle(
                 color = Color.White,
                 radius = 3.dp.toPx(),
-                center = Offset(indicatorX, h / 2f)
+                center = Offset(indicatorX, h / 2f),
             )
         }
     }
@@ -1227,18 +1164,18 @@ fun BiophysicalTempSlider(
 fun ReactorParametersView(
     viewModel: MainViewModel,
     activeBorder: Color,
-    activePanel: Color
+    activePanel: Color,
 ) {
-    val tempState by viewModel.reactorTemperature.collectAsState()
-    val saltState by viewModel.reactorSalt.collectAsState()
-    val activePolyState by viewModel.activePolymerase.collectAsState()
-    val activeSoluteState by viewModel.activeChemicalSolute.collectAsState()
-    val inletRatioAState by viewModel.inletRatioA.collectAsState()
-    val inletRatioGState by viewModel.inletRatioG.collectAsState()
-    val inletRatioTState by viewModel.inletRatioT.collectAsState()
-    val inletRatioCState by viewModel.inletRatioC.collectAsState()
+    val tempState by viewModel.reactorTemperature.collectAsStateWithLifecycle()
+    val saltState by viewModel.reactorSalt.collectAsStateWithLifecycle()
+    val activePolyState by viewModel.activePolymerase.collectAsStateWithLifecycle()
+    val activeSoluteState by viewModel.activeChemicalSolute.collectAsStateWithLifecycle()
+    val inletRatioAState by viewModel.inletRatioA.collectAsStateWithLifecycle()
+    val inletRatioGState by viewModel.inletRatioG.collectAsStateWithLifecycle()
+    val inletRatioTState by viewModel.inletRatioT.collectAsStateWithLifecycle()
+    val inletRatioCState by viewModel.inletRatioC.collectAsStateWithLifecycle()
 
-    val targetSeq by viewModel.targetSynthesisSequence.collectAsState()
+    val targetSeq by viewModel.targetSynthesisSequence.collectAsStateWithLifecycle()
     val targetTm = remember(targetSeq, saltState) {
         GeneticsEngine.calculateMeltingTemperature(targetSeq, saltState.toDouble()).toFloat()
     }
@@ -1253,7 +1190,7 @@ fun ReactorParametersView(
             color = CyberGreenDim,
             style = Typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 6.dp)
+            modifier = Modifier.padding(top = 6.dp),
         )
 
         Box(
@@ -1261,12 +1198,12 @@ fun ReactorParametersView(
                 .fillMaxWidth()
                 .height(180.dp)
                 .border(1.dp, activeBorder, RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
-                .padding(8.dp)
+                .padding(8.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Silo A
                 BioSilo(
@@ -1277,7 +1214,7 @@ fun ReactorParametersView(
                     onValueChange = { newValue ->
                         adjustInletRatios(0, newValue, viewModel)
                     },
-                    modifier = Modifier.weight(1f).fillMaxHeight()
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
 
                 // Silo G
@@ -1289,7 +1226,7 @@ fun ReactorParametersView(
                     onValueChange = { newValue ->
                         adjustInletRatios(1, newValue, viewModel)
                     },
-                    modifier = Modifier.weight(1f).fillMaxHeight()
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
 
                 // Silo T
@@ -1301,7 +1238,7 @@ fun ReactorParametersView(
                     onValueChange = { newValue ->
                         adjustInletRatios(2, newValue, viewModel)
                     },
-                    modifier = Modifier.weight(1f).fillMaxHeight()
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
 
                 // Silo C
@@ -1313,7 +1250,7 @@ fun ReactorParametersView(
                     onValueChange = { newValue ->
                         adjustInletRatios(3, newValue, viewModel)
                     },
-                    modifier = Modifier.weight(1f).fillMaxHeight()
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
 
                 // Silo SALT
@@ -1325,7 +1262,7 @@ fun ReactorParametersView(
                     onValueChange = { newValue ->
                         viewModel.setReactorSalt(newValue)
                     },
-                    modifier = Modifier.weight(1f).fillMaxHeight()
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
             }
         }
@@ -1335,27 +1272,27 @@ fun ReactorParametersView(
             text = "BIOPHYSICAL CHAMBER CONTEXT",
             color = CyberGreenDim,
             style = Typography.labelSmall,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
         )
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.dp, activeBorder, RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
-                .padding(8.dp)
+                .padding(8.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = "CHAMBER TEMPERATURE",
                         color = Color.White,
                         style = Typography.bodySmall,
                         fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
                     )
                     val devianceAbs = kotlin.math.abs(tempDeviance)
                     val displayColor = when {
@@ -1368,13 +1305,13 @@ fun ReactorParametersView(
                         color = displayColor,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp
+                        fontSize = 10.sp,
                     )
                 }
                 BiophysicalTempSlider(
                     value = tempState,
                     targetTm = targetTm,
-                    onValueChange = { viewModel.setReactorTemperature(it) }
+                    onValueChange = { viewModel.setReactorTemperature(it) },
                 )
             }
         }
@@ -1385,7 +1322,7 @@ fun ReactorParametersView(
                 text = "POLYMERASE ENZYME",
                 color = CyberGreenDim,
                 style = Typography.labelSmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Row(
@@ -1393,15 +1330,15 @@ fun ReactorParametersView(
                     .fillMaxWidth()
                     .border(1.dp, activeBorder, RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                     .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 val polymerases = listOf("Taq", "Tth", "Pfu")
                 polymerases.forEach { poly ->
                     val isSelected = activePolyState.equals(poly, ignoreCase = true)
                     val btnText = when (poly.uppercase()) {
                         "TAQ" -> "TAQ (FREE)"
-                        "TTH" -> "TTH (25/ALL + 30w)"
-                        "PFU" -> "PFU (50/ALL + 1000w)"
+                        "TTH" -> "TTH (100+100x)"
+                        "PFU" -> "PFU (200+200x)"
                         else -> poly.uppercase()
                     }
                     Button(
@@ -1412,17 +1349,17 @@ fun ReactorParametersView(
                         modifier = Modifier.weight(1f).height(28.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isSelected) CyberGreen else Color.Transparent,
-                            contentColor = if (isSelected) Color.Black else CyberGreen
+                            contentColor = if (isSelected) Color.Black else CyberGreen,
                         ),
                         border = BorderStroke(1.dp, CyberGreen),
                         shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        contentPadding = PaddingValues(0.dp),
                     ) {
                         Text(
                             text = btnText,
-                            fontSize = 8.sp,
+                            fontSize = 7.5.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                 }
@@ -1435,7 +1372,7 @@ fun ReactorParametersView(
                 text = "CHEMICAL SOLUTE COFACTOR",
                 color = CyberGreenDim,
                 style = Typography.labelSmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Row(
@@ -1443,11 +1380,17 @@ fun ReactorParametersView(
                     .fillMaxWidth()
                     .border(1.dp, activeBorder, RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                     .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 val solutes = listOf("None", "DMSO", "Netropsin")
                 solutes.forEach { solute ->
                     val isSelected = activeSoluteState.equals(solute, ignoreCase = true)
+                    val soluteText = when (solute.uppercase()) {
+                        "NONE" -> "NONE (0)"
+                        "DMSO" -> "DMSO (100 ALL)"
+                        "NETROPSIN" -> "NETROPSIN (100 ALL)"
+                        else -> solute.uppercase()
+                    }
                     Button(
                         onClick = {
                             viewModel.synthManager.playCombinatorTick()
@@ -1456,17 +1399,89 @@ fun ReactorParametersView(
                         modifier = Modifier.weight(1f).height(28.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isSelected) CyberGreen else Color.Transparent,
-                            contentColor = if (isSelected) Color.Black else CyberGreen
+                            contentColor = if (isSelected) Color.Black else CyberGreen,
                         ),
                         border = BorderStroke(1.dp, CyberGreen),
                         shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        contentPadding = PaddingValues(0.dp),
                     ) {
                         Text(
-                            text = solute.uppercase(),
-                            fontSize = 8.sp,
+                            text = soluteText,
+                            fontSize = 6.5.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
+                        )
+                    }
+                }
+            }
+        }
+
+        // 5. CYBER-ORRERY CALIBRATION
+        val selectedHostPlanet by viewModel.selectedHostPlanet.collectAsStateWithLifecycle()
+
+        val alignmentState = remember(selectedHostPlanet, WaveMath.manualOffsetMs) {
+            val (p1, p2) = when (selectedHostPlanet.uppercase()) {
+                "MERCURY", "VENUS" -> Pair("MERCURY", "VENUS")
+                "EARTH", "MARS" -> Pair("EARTH", "MARS")
+                "JUPITER", "SATURN" -> Pair("JUPITER", "SATURN")
+                "URANUS", "NEPTUNE" -> Pair("URANUS", "NEPTUNE")
+                else -> Pair("EARTH", "MARS")
+            }
+            WaveMath.getPairAlignmentState(p1, p2, System.currentTimeMillis() + WaveMath.manualOffsetMs)
+        }
+
+        val alignmentColor = when (alignmentState) {
+            WaveMath.AlignmentState.CONJUNCTION -> CyberGreen
+            WaveMath.AlignmentState.OPPOSITION -> Color(0xFFEF4444)
+            WaveMath.AlignmentState.QUADRATURE -> Color(0xFFFBBF24)
+            WaveMath.AlignmentState.NEUTRAL -> Color(0xFF38BDF8)
+        }
+
+        Column {
+            Text(
+                text = "CYBER-ORRERY CALIBRATION",
+                color = CyberGreenDim,
+                style = Typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                    .padding(8.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "HOST PLANET: ${selectedHostPlanet.uppercase()}",
+                        color = Color.White,
+                        style = Typography.bodySmall,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = "ALIGNMENT:",
+                            color = CyberGreenDim,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = alignmentState.name.uppercase(),
+                            color = alignmentColor,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -1477,15 +1492,15 @@ fun ReactorParametersView(
 
 @Composable
 fun BioLabTestView(viewModel: MainViewModel) {
-    val scrollingGene by viewModel.scrollingGene.collectAsState()
-    val poxIdleTime by viewModel.poxIdleTime.collectAsState()
-    val discoveredPacketsLog by viewModel.discoveredPacketsLog.collectAsState()
-    val poxReactorActive by viewModel.poxReactorActive.collectAsState()
+    val scrollingGene by viewModel.scrollingGene.collectAsStateWithLifecycle()
+    val poxIdleTime by viewModel.poxIdleTime.collectAsStateWithLifecycle()
+    val discoveredPacketsLog by viewModel.discoveredPacketsLog.collectAsStateWithLifecycle()
+    val poxReactorActive by viewModel.poxReactorActive.collectAsStateWithLifecycle()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(rememberScrollState()),
     ) {
         DualPaneConsoleFrame(
             theme = "green",
@@ -1498,9 +1513,9 @@ fun BioLabTestView(viewModel: MainViewModel) {
                     text = "Observe live single-node cybernetic synthesis values and ticks below.",
                     color = CyberGreen.copy(alpha = 0.8f),
                     style = Typography.bodySmall,
-                    fontFamily = FontFamily.Default
+                    fontFamily = FontFamily.Default,
                 )
-                
+
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Box(
@@ -1509,7 +1524,7 @@ fun BioLabTestView(viewModel: MainViewModel) {
                         .background(Color.Black)
                         .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                         .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = scrollingGene,
@@ -1518,7 +1533,7 @@ fun BioLabTestView(viewModel: MainViewModel) {
                         fontSize = 26.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 4.sp
+                        letterSpacing = 4.sp,
                     )
                 }
 
@@ -1527,19 +1542,19 @@ fun BioLabTestView(viewModel: MainViewModel) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = "REACTOR STATE: ${if (poxReactorActive) "ACTIVE" else "IDLE"}",
                         color = CyberGreenDim,
                         style = Typography.labelSmall,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
                     )
                     Text(
                         text = "NEXT CYCLE IN: ${poxIdleTime}S",
                         color = CyberGreenDim,
                         style = Typography.labelSmall,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
                     )
                 }
             },
@@ -1549,7 +1564,7 @@ fun BioLabTestView(viewModel: MainViewModel) {
                     text = "Live telemetry transcription feed from the active synthesis processor.",
                     color = CyberGreen.copy(alpha = 0.8f),
                     style = Typography.bodySmall,
-                    fontFamily = FontFamily.Default
+                    fontFamily = FontFamily.Default,
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -1560,7 +1575,7 @@ fun BioLabTestView(viewModel: MainViewModel) {
                         .background(Color.Black.copy(alpha = 0.6f))
                         .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                         .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     if (discoveredPacketsLog.isEmpty()) {
                         Text(
@@ -1568,7 +1583,7 @@ fun BioLabTestView(viewModel: MainViewModel) {
                             color = Color.Gray,
                             style = Typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 9.sp
+                            fontSize = 9.sp,
                         )
                     } else {
                         discoveredPacketsLog.takeLast(3).reversed().forEach { packet ->
@@ -1578,12 +1593,12 @@ fun BioLabTestView(viewModel: MainViewModel) {
                                 color = if (packet.isAnomalous) Color(0xFFA855F7) else CyberGreen,
                                 style = Typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp
+                                fontSize = 9.sp,
                             )
                         }
                     }
                 }
-            }
+            },
         )
     }
 }

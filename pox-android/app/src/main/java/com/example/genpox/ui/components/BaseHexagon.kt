@@ -26,7 +26,7 @@ fun BaseHexagon(
     char: Char,
     isPlaceholder: Boolean,
     sizeDp: Dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val color = when (char) {
         'A' -> Color(0xFF38BDF8) // Cyan
@@ -39,24 +39,24 @@ fun BaseHexagon(
 
     Box(
         modifier = modifier.size(sizeDp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
             val hexRadius = w / 2f
             val center = Offset(w / 2f, h / 2f)
-            
+
             // Centralized vertex calculation in GraphicsMath
             val vertices = GraphicsMath.calculateHexagonVertices(center.x, center.y, hexRadius)
-            
+
             val path = Path().apply {
                 vertices.forEachIndexed { i, pt ->
                     if (i == 0) moveTo(pt.x, pt.y) else lineTo(pt.x, pt.y)
                 }
                 close()
             }
-            
+
             if (!isPlaceholder) {
                 drawPath(path, color = hexColor.copy(alpha = 0.15f), style = Fill)
                 drawPath(path, color = hexColor, style = Stroke(width = 1.2.dp.toPx()))
@@ -68,9 +68,15 @@ fun BaseHexagon(
             Text(
                 text = char.toString(),
                 color = if (isPlaceholder) Color.Gray else hexColor,
-                fontSize = if (sizeDp < 20.dp) 7.sp else if (sizeDp > 26.dp) 11.sp else 10.sp,
+                fontSize = if (sizeDp < 20.dp) {
+                    7.sp
+                } else if (sizeDp > 26.dp) {
+                    11.sp
+                } else {
+                    10.sp
+                },
                 fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
         }
     }

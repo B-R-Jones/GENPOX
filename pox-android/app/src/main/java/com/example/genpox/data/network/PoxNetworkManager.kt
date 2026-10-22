@@ -1,21 +1,20 @@
 package com.example.genpox.data.network
 
 import android.content.Context
-import com.example.genpox.data.Creature
-import android.util.Log
 import com.example.genpox.audio.PoxSynthManager
+import com.example.genpox.data.Creature
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.*
-import kotlinx.serialization.Serializable
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.SerialName
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 @Serializable
 sealed class HydraPacket {
@@ -24,7 +23,7 @@ sealed class HydraPacket {
         val nodeName: String,
         val sector: String,
         val appVersion: Int,
-        val publicKey: String
+        val publicKey: String,
     ) : HydraPacket()
 
     @Serializable
@@ -36,13 +35,13 @@ sealed class HydraPacket {
         val creatureDna: String,
         val creatureName: String,
         val faction: String,
-        val signature: String
+        val signature: String,
     ) : HydraPacket()
 
     @Serializable
     data class SpecimenResponse(
         val transactionId: String,
-        val accept: Boolean
+        val accept: Boolean,
     ) : HydraPacket()
 
     @Serializable
@@ -55,13 +54,13 @@ sealed class HydraPacket {
         val attachedCreatureFaction: String? = null,
         val attachedGeneSequence: String? = null,
         val transferGenes: Int = 0,
-        val transferWaste: Int = 0
+        val transferWaste: Int = 0,
     ) : HydraPacket()
 
     @Serializable
     data class HackingIntrusion(
         val hacker: Creature,
-        val targetNodeId: String
+        val targetNodeId: String,
     ) : HydraPacket()
 
     @Serializable
@@ -69,7 +68,7 @@ sealed class HydraPacket {
         val targetNodeId: String,
         val defender: Creature?,
         val vaultAutoDefenders: List<Creature>,
-        val baseFirewallComplexity: Double
+        val baseFirewallComplexity: Double,
     ) : HydraPacket()
 
     @Serializable
@@ -79,7 +78,7 @@ sealed class HydraPacket {
         val logs: List<String>,
         val siphonedPayload: List<String>,
         val hackerFinalTelomeres: Int,
-        val defenderFinalTelomeres: Int?
+        val defenderFinalTelomeres: Int?,
     ) : HydraPacket()
 }
 
@@ -95,7 +94,7 @@ interface PoxNetworkInterface {
 
 class PoxNetworkManager(
     private val context: Context,
-    private val synthManager: PoxSynthManager
+    private val synthManager: PoxSynthManager,
 ) : PoxNetworkInterface {
     private val connectionsClient = Nearby.getConnectionsClient(context)
     private val serviceId = "com.example.genpox.HYDRA_NET"
@@ -175,7 +174,7 @@ class PoxNetworkManager(
     data class DiscoveredPeer(
         val endpointId: String,
         val name: String,
-        val info: String
+        val info: String,
     )
 
     private fun log(message: String) {
@@ -221,7 +220,7 @@ class PoxNetworkManager(
             localPlayerName,
             serviceId,
             connectionLifecycleCallback,
-            options
+            options,
         ).addOnSuccessListener {
             _isAdvertising.value = true
             log("SYS: Beacon active. Broadcasting Node ID: $localPlayerName")
@@ -244,7 +243,7 @@ class PoxNetworkManager(
                 if (_isDiscovering.value && isSimulationActive) {
                     val mockPeers = listOf(
                         DiscoveredPeer("MOCK-PEER-1", "MOCK-PEER-ALPHA", "P2P Segment"),
-                        DiscoveredPeer("MOCK-PEER-2", "MOCK-PEER-BETA", "P2P Segment")
+                        DiscoveredPeer("MOCK-PEER-2", "MOCK-PEER-BETA", "P2P Segment"),
                     )
                     val currentPeers = _discoveredPeers.value.toMutableList()
                     mockPeers.forEach { peer ->
@@ -269,7 +268,7 @@ class PoxNetworkManager(
         connectionsClient.startDiscovery(
             serviceId,
             endpointDiscoveryCallback,
-            options
+            options,
         ).addOnSuccessListener {
             _isDiscovering.value = true
             log("SYS: Scan loop activated. Searching for peer beacons...")
@@ -309,7 +308,6 @@ class PoxNetworkManager(
         synthManager.playBeep(330f, 0.15f, "triangle")
     }
 
-
     fun requestConnection(endpointId: String, localPlayerName: String) {
         if (isSimulationActive && endpointId.startsWith("MOCK-")) {
             log("DIAL: Requesting simulated link connection to endpoint $endpointId...")
@@ -324,7 +322,7 @@ class PoxNetworkManager(
         connectionsClient.requestConnection(
             localPlayerName,
             endpointId,
-            connectionLifecycleCallback
+            connectionLifecycleCallback,
         ).addOnFailureListener { e ->
             log("ERR: Direct dial failure to endpoint: ${e.message}")
         }
@@ -349,7 +347,7 @@ class PoxNetworkManager(
                     delay(2000)
                     val senderName = _activeConnections.value[endpointId] ?: "MOCK-PEER-ALPHA"
                     val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-                    
+
                     val requestText = packet.messageText.trim().lowercase()
                     val mockReply = when (requestText) {
                         "test specimen" -> {
@@ -368,7 +366,7 @@ class PoxNetworkManager(
                                 messageText = "Here is your specimen! [$timeStr]",
                                 attachedCreatureDna = randomDna,
                                 attachedCreatureName = name,
-                                attachedCreatureFaction = faction
+                                attachedCreatureFaction = faction,
                             )
                         }
                         "test gs" -> {
@@ -376,7 +374,7 @@ class PoxNetworkManager(
                             HydraPacket.NetworkMessage(
                                 senderName = senderName,
                                 messageText = "Here is your gene sequence! [$timeStr]",
-                                attachedGeneSequence = randomGene
+                                attachedGeneSequence = randomGene,
                             )
                         }
                         "test qs" -> {
@@ -384,13 +382,13 @@ class PoxNetworkManager(
                                 senderName = senderName,
                                 messageText = "Quantum shipment dispatched! [$timeStr]",
                                 transferGenes = 10,
-                                transferWaste = 25
+                                transferWaste = 25,
                             )
                         }
                         else -> {
                             HydraPacket.NetworkMessage(
                                 senderName = senderName,
-                                messageText = "Hello player! [$timeStr]"
+                                messageText = "Hello player! [$timeStr]",
                             )
                         }
                     }
@@ -480,7 +478,6 @@ class PoxNetworkManager(
             resetInactivityTimeout()
         }
     }
-
 
     private val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {

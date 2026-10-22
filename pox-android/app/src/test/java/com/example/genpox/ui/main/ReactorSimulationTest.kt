@@ -2,24 +2,23 @@ package com.example.genpox.ui.main
 
 import com.example.genpox.data.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.test.advanceUntilIdle
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
-import org.junit.Assert.assertFalse
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReactorSimulationTest {
@@ -31,12 +30,12 @@ class ReactorSimulationTest {
         val creaturesList = mutableListOf<Creature>()
         val sequencesList = mutableListOf<GeneSequence>()
         val missionsList = mutableListOf<HarvestMission>()
-        
+
         val apiKeyFlow = MutableStateFlow("")
         val muteFlow = MutableStateFlow(false)
         val radiusFlow = MutableStateFlow(55f)
         val targetSequenceFlow = MutableStateFlow("")
-        
+
         val stockAFlow = MutableStateFlow(10000L)
         val stockGFlow = MutableStateFlow(10000L)
         val stockTFlow = MutableStateFlow(10000L)
@@ -62,7 +61,7 @@ class ReactorSimulationTest {
 
         val sequencesFlow = MutableStateFlow<List<GeneSequence>>(emptyList())
         override val allGeneSequences: Flow<List<GeneSequence>> = sequencesFlow
-        
+
         override suspend fun insertGeneSequence(sequence: GeneSequence) {
             sequencesList.add(sequence)
             sequencesFlow.value = sequencesList.toList()
@@ -166,14 +165,6 @@ class ReactorSimulationTest {
             hostPlanetFlow.value = planet
         }
 
-        override suspend fun getCachedRoadCell(cellKey: String): CachedRoadCell? = null
-        override suspend fun getAllCachedRoadCells(): List<CachedRoadCell> = emptyList()
-        override suspend fun insertCachedRoadCell(cell: CachedRoadCell) {}
-        override suspend fun getCachedBuildingCell(cellKey: String): CachedBuildingCell? = null
-        override suspend fun getAllCachedBuildingCells(): List<CachedBuildingCell> = emptyList()
-        override suspend fun insertCachedBuildingCell(cell: CachedBuildingCell) {}
-        override suspend fun clearMapCache() {}
-
         val reagentsStockFlow = MutableStateFlow<List<ReagentStock>>(emptyList())
         override val allReagentStock: Flow<List<ReagentStock>> = reagentsStockFlow
         override suspend fun insertReagentStock(reagents: List<ReagentStock>) {
@@ -199,44 +190,72 @@ class ReactorSimulationTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         repository = FakeReactorRepository()
-        viewModel = MainViewModel(repository)
+        val synth = com.example.genpox.audio.PoxSynthManager().apply { isMuted = true }
+        val locRepo = com.example.genpox.util.FakeLocationRepository()
+        val dispatchers = com.example.genpox.util.TestDispatchersProvider()
+        val tileStreamManager = com.example.genpox.map.tile.TileStreamManager(
+            tileDataProvider = com.example.genpox.map.tile.FakeTileDataProvider(),
+            dispatchers = dispatchers,
+        )
+        viewModel = MainViewModel(
+            creatureRepository = repository,
+            geneStockRepository = repository,
+            missionRepository = repository,
+            preferencesRepository = repository,
+            synthManager = synth,
+            locationRepository = locRepo,
+            tileStreamManager = tileStreamManager,
+            dispatchers = dispatchers,
+        )
+
+        viewModel.setReactorSalt(0.05f)
+        viewModel.setReactorTemperature(16.0f)
+        resetReactionCollapsedState()
         WaveMath.isTestMode = true
+    }
+
+    private fun resetReactionCollapsedState() {
+        val collapsedField = viewModel.reactor.javaClass.getDeclaredField("_isReactionCollapsed")
+        collapsedField.isAccessible = true
+        val collapsedFlow = collapsedField.get(viewModel.reactor) as MutableStateFlow<Boolean>
+        collapsedFlow.value = false
     }
 
     @After
     fun tearDown() {
+        viewModel.reactor.stopReactorHeartbeat()
         Dispatchers.resetMain()
         WaveMath.isTestMode = false
     }
 
     @Test
     fun testPolymeraseSwapCosts() = runTest {
-        // Set stock levels: 100 of each base, 1200 biowaste
-        repository.saveRawStocks(100L, 100L, 100L, 100L)
+        // Set stock levels: 2000 of each base, 3000 biowaste
+        repository.saveRawStocks(2000L, 2000L, 2000L, 2000L)
         // Manually set bio-waste in viewModel
-        val bioWasteField = viewModel.javaClass.getDeclaredField("_bioWaste")
+        val bioWasteField = viewModel.reactor.javaClass.getDeclaredField("_bioWaste")
         bioWasteField.isAccessible = true
-        val bioWasteFlow = bioWasteField.get(viewModel) as MutableStateFlow<Long>
-        bioWasteFlow.value = 1200L
+        val bioWasteFlow = bioWasteField.get(viewModel.reactor) as MutableStateFlow<Long>
+        bioWasteFlow.value = 3000L
 
         assertEquals("Taq", viewModel.activePolymerase.value)
 
-        // Swap to Tth (Costs 25 of all bases, 30 bio-waste - BUT timing is deferred to synthesis start!)
+        // Set target sequence to GGGGAAAA (8 bases, 4 G, 4 A, 0 T, 0 C)
+        val targetField = viewModel.reactor.javaClass.getDeclaredField("_targetSynthesisSequence")
+        targetField.isAccessible = true
+        val targetFlow = targetField.get(viewModel.reactor) as MutableStateFlow<String>
+        targetFlow.value = "GGGGAAAA"
+
+        // Swap to Tth (Costs 100 of all bases + 100 per base count, 0 bio-waste - timing deferred to synthesis start!)
         viewModel.setActivePolymerase("Tth")
         advanceUntilIdle()
         // Selection succeeds but NO bases or waste are deducted yet
         assertEquals("Tth", viewModel.activePolymerase.value)
-        assertEquals(100L, viewModel.rawStockA.value)
-        assertEquals(100L, viewModel.rawStockG.value)
-        assertEquals(100L, viewModel.rawStockT.value)
-        assertEquals(100L, viewModel.rawStockC.value)
-        assertEquals(1200L, bioWasteFlow.value)
-
-        // Set target sequence to GGGGAAAA (8 bases, balanced GC/AT, MFE=0.0)
-        val targetField = viewModel.javaClass.getDeclaredField("_targetSynthesisSequence")
-        targetField.isAccessible = true
-        val targetFlow = targetField.get(viewModel) as MutableStateFlow<String>
-        targetFlow.value = "GGGGAAAA"
+        assertEquals(2000L, viewModel.rawStockA.value)
+        assertEquals(2000L, viewModel.rawStockG.value)
+        assertEquals(2000L, viewModel.rawStockT.value)
+        assertEquals(2000L, viewModel.rawStockC.value)
+        assertEquals(3000L, bioWasteFlow.value)
 
         // Set temperature and salt (0.15M salt raises AT denaturation threshold to 26.5°C)
         viewModel.setReactorTemperature(25.0f)
@@ -248,77 +267,248 @@ class ReactorSimulationTest {
         viewModel.setInletRatioT(0.00f)
         viewModel.setInletRatioC(0.00f)
 
-        // Now initiate synthesis - should deduct sequence (4 A, 4 G, 0 T, 0 C) + Tth cost (25 of all bases, 30 bio-waste)
+        // Now initiate synthesis - should deduct sequence (4 A, 4 G, 0 T, 0 C) + Tth cost (100 base + count * 100, 0 bio-waste)
+        // Tth costs: A=500, G=500, T=100, C=100, Waste=0
         // Total deduction:
-        // A: 4 (sequence) + 25 (Tth) = 29
-        // G: 4 (sequence) + 25 (Tth) = 29
-        // T: 0 (sequence) + 25 (Tth) = 25
-        // C: 0 (sequence) + 25 (Tth) = 25
-        // Waste: 30 (Tth)
+        // A: 4 (sequence) + 500 (Tth) = 504
+        // G: 4 (sequence) + 500 (Tth) = 504
+        // T: 0 (sequence) + 100 (Tth) = 100
+        // C: 0 (sequence) + 100 (Tth) = 100
+        // Waste: 0 (Tth)
         viewModel.initiateStandardSynthesis()
         advanceUntilIdle()
 
         // Verify remaining stocks:
-        // A: 100 - 29 = 71
-        // G: 100 - 29 = 71
-        // T: 100 - 25 = 75
-        // C: 100 - 25 = 75
-        // Waste: 1200 - 30 = 1170
-        assertEquals(71L, viewModel.rawStockA.value)
-        assertEquals(71L, viewModel.rawStockG.value)
-        assertEquals(75L, viewModel.rawStockT.value)
-        assertEquals(75L, viewModel.rawStockC.value)
-        assertEquals(1170L, viewModel.bioWaste.value)
-        // Tth is still engaged because remaining stocks (A=71, G=71, T=75, C=75, Waste=1170)
-        // are >= Tth requirements (25 of each base, 30 waste)
+        // A: 2000 - 504 = 1496
+        // G: 2000 - 504 = 1496
+        // T: 2000 - 100 = 1900
+        // C: 2000 - 100 = 1900
+        // Waste: 3000 - 0 = 3000
+        assertEquals(1496L, viewModel.rawStockA.value)
+        assertEquals(1496L, viewModel.rawStockG.value)
+        assertEquals(1900L, viewModel.rawStockT.value)
+        assertEquals(1900L, viewModel.rawStockC.value)
+        assertEquals(3000L, viewModel.bioWaste.value)
+        // Tth is still engaged because remaining stocks (A=1496, G=1496, T=1900, C=1900, Waste=3000)
+        // are >= Tth requirements (A:500, G:500, T:100, C:100, Waste:0)
         assertEquals("Tth", viewModel.activePolymerase.value)
 
-        // Swap to Pfu (timing is deferred, requirements: 50 of each base, 1000 waste)
-        // Current: A=71, G=71, T=75, C=75, Waste=1170. Enough to swap!
+        // Swap to Pfu (timing is deferred, requirements: 200 all + count * 200 -> A:1000, G:1000, T:200, C:200, 0 waste)
+        // Current: A=1496, G=1496, T=1900, C=1900, Waste=3000. Enough to swap!
         viewModel.setActivePolymerase("Pfu")
         advanceUntilIdle()
         assertEquals("Pfu", viewModel.activePolymerase.value)
 
         // Run synthesis again with Pfu. Sequence: GGGGAAAA
+        // Pfu costs: A=1000, G=1000, T=200, C=200, Waste=0
         // Total deduction:
-        // A: 4 (sequence) + 50 (Pfu) = 54
-        // G: 4 (sequence) + 50 (Pfu) = 54
-        // T: 0 (sequence) + 50 (Pfu) = 50
-        // C: 0 (sequence) + 50 (Pfu) = 50
-        // Waste: 1000 (Pfu)
+        // A: 4 (sequence) + 1000 (Pfu) = 1004
+        // G: 4 (sequence) + 1000 (Pfu) = 1004
+        // T: 0 (sequence) + 200 (Pfu) = 200
+        // C: 0 (sequence) + 200 (Pfu) = 200
+        // Waste: 0 (Pfu)
         viewModel.initiateStandardSynthesis()
         advanceUntilIdle()
 
         // Verify remaining stocks:
-        // A: 71 - 54 = 17
-        // G: 71 - 54 = 17
-        // T: 75 - 50 = 25
-        // C: 75 - 50 = 25
-        // Waste: 1170 - 1000 = 170
-        assertEquals(17L, viewModel.rawStockA.value)
-        assertEquals(17L, viewModel.rawStockG.value)
-        assertEquals(25L, viewModel.rawStockT.value)
-        assertEquals(25L, viewModel.rawStockC.value)
-        assertEquals(170L, viewModel.bioWaste.value)
+        // A: 1496 - 1004 = 492
+        // G: 1496 - 1004 = 492
+        // T: 1900 - 200 = 1700
+        // C: 1900 - 200 = 1700
+        // Waste: 3000 - 0 = 3000
+        assertEquals(492L, viewModel.rawStockA.value)
+        assertEquals(492L, viewModel.rawStockG.value)
+        assertEquals(1700L, viewModel.rawStockT.value)
+        assertEquals(1700L, viewModel.rawStockC.value)
+        assertEquals(3000L, viewModel.bioWaste.value)
 
-        // Post-synthesis check: Pfu requirements are 50 of each base and 1000 waste.
-        // Current: A=19, G=21, T=23, C=21, Waste=170. This is less than Pfu requirements!
+        // Post-synthesis check: Pfu requirements for GGGGAAAA are A=1000, G=1000.
+        // Current A = 492 < 1000 and G = 492 < 1000.
         // It must have been reset to Taq!
         assertEquals("Taq", viewModel.activePolymerase.value)
 
-        // Try swapping back to Tth (Requires 25 all, 30 waste - but we have A=9, Waste=170)
-        viewModel.setActivePolymerase("Tth")
+        // Try swapping back to Pfu (Requires A=1000, G=1000, but we have A=492, G=492)
+        viewModel.setActivePolymerase("Pfu")
         advanceUntilIdle()
         // Should reject and remain Taq
         assertEquals("Taq", viewModel.activePolymerase.value)
     }
 
     @Test
+    fun testTargetBaseSpecificPolymeraseCosts() = runTest {
+        // 1. Direct Engine Cost Verification across bases using the exact user example sequence: AATGCGTG
+        // Sequence: AATGCGTG -> A=2, C=1, G=3, T=2
+        val tthCost = com.example.genpox.data.ReactorSimulationEngine.calculatePolymeraseCost("TTH", "AATGCGTG")
+        assertEquals(300L, tthCost.costA) // 100 base + 2 * 100
+        assertEquals(200L, tthCost.costC) // 100 base + 1 * 100
+        assertEquals(400L, tthCost.costG) // 100 base + 3 * 100
+        assertEquals(300L, tthCost.costT) // 100 base + 2 * 100
+        assertEquals(0L, tthCost.costWaste) // Zero biowaste required
+
+        val pfuCost = com.example.genpox.data.ReactorSimulationEngine.calculatePolymeraseCost("PFU", "AATGCGTG")
+        assertEquals(600L, pfuCost.costA) // 200 base + 2 * 200
+        assertEquals(400L, pfuCost.costC) // 200 base + 1 * 200
+        assertEquals(800L, pfuCost.costG) // 200 base + 3 * 200
+        assertEquals(600L, pfuCost.costT) // 200 base + 2 * 200
+        assertEquals(0L, pfuCost.costWaste) // Zero biowaste required
+
+        val taqCost = com.example.genpox.data.ReactorSimulationEngine.calculatePolymeraseCost("TAQ", "AATGCGTG")
+        assertEquals(0L, taqCost.costA)
+        assertEquals(0L, taqCost.costG)
+        assertEquals(0L, taqCost.costT)
+        assertEquals(0L, taqCost.costC)
+        assertEquals(0L, taqCost.costWaste)
+
+        assertEquals(100L, com.example.genpox.data.ReactorSimulationEngine.calculateSoluteCost("DMSO"))
+        assertEquals(100L, com.example.genpox.data.ReactorSimulationEngine.calculateSoluteCost("Netropsin"))
+        assertEquals(0L, com.example.genpox.data.ReactorSimulationEngine.calculateSoluteCost("None"))
+
+        // 2. Integration with ViewModel synthesis using sequence AATGCGTG and Tth
+        repository.saveRawStocks(5000L, 5000L, 5000L, 5000L)
+        val bioWasteField = viewModel.reactor.javaClass.getDeclaredField("_bioWaste")
+        bioWasteField.isAccessible = true
+        val bioWasteFlow = bioWasteField.get(viewModel.reactor) as MutableStateFlow<Long>
+        bioWasteFlow.value = 2000L
+
+        val targetField = viewModel.reactor.javaClass.getDeclaredField("_targetSynthesisSequence")
+        targetField.isAccessible = true
+        val targetFlow = targetField.get(viewModel.reactor) as MutableStateFlow<String>
+        targetFlow.value = "AATGCGTG" // 2 A, 1 C, 3 G, 2 T
+
+        viewModel.setInletRatioA(0.25f)
+        viewModel.setInletRatioC(0.25f)
+        viewModel.setInletRatioG(0.25f)
+        viewModel.setInletRatioT(0.25f)
+        viewModel.setReactorTemperature(25.0f)
+        viewModel.setReactorSalt(0.15f)
+
+        viewModel.setActivePolymerase("Tth")
+        advanceUntilIdle()
+        assertEquals("Tth", viewModel.activePolymerase.value)
+
+        viewModel.initiateStandardSynthesis()
+        advanceUntilIdle()
+
+        // Deductions:
+        // A: 2 (seq) + 300 (poly) = 302 -> 4698
+        // C: 1 (seq) + 200 (poly) = 201 -> 4799
+        // G: 3 (seq) + 400 (poly) = 403 -> 4597
+        // T: 2 (seq) + 300 (poly) = 302 -> 4698
+        // Waste: 0 enzyme deduction; synthesis completes without stalling -> 2000L
+        assertEquals(4698L, viewModel.rawStockA.value)
+        assertEquals(4799L, viewModel.rawStockC.value)
+        assertEquals(4597L, viewModel.rawStockG.value)
+        assertEquals(4698L, viewModel.rawStockT.value)
+        assertEquals(2000L, viewModel.bioWaste.value)
+    }
+
+    @Test
+    fun testPolymeraseAndSoluteCombinedCostDeduction() = runTest {
+        repository.saveRawStocks(5000L, 5000L, 5000L, 5000L)
+        val bioWasteField = viewModel.reactor.javaClass.getDeclaredField("_bioWaste")
+        bioWasteField.isAccessible = true
+        val bioWasteFlow = bioWasteField.get(viewModel.reactor) as MutableStateFlow<Long>
+        bioWasteFlow.value = 2000L
+
+        val targetField = viewModel.reactor.javaClass.getDeclaredField("_targetSynthesisSequence")
+        targetField.isAccessible = true
+        val targetFlow = targetField.get(viewModel.reactor) as MutableStateFlow<String>
+        targetFlow.value = "ACGTACGT" // 2 A, 2 C, 2 G, 2 T
+
+        viewModel.setInletRatioA(0.25f)
+        viewModel.setInletRatioC(0.25f)
+        viewModel.setInletRatioG(0.25f)
+        viewModel.setInletRatioT(0.25f)
+        viewModel.setReactorTemperature(25.0f)
+        viewModel.setReactorSalt(0.15f)
+
+        // Select Tth and DMSO
+        viewModel.setActivePolymerase("Tth")
+        viewModel.setActiveChemicalSolute("DMSO")
+        advanceUntilIdle()
+        assertEquals("Tth", viewModel.activePolymerase.value)
+        assertEquals("DMSO", viewModel.activeChemicalSolute.value)
+
+        viewModel.initiateStandardSynthesis()
+        advanceUntilIdle()
+
+        // Combined deductions for ACGTACGT (2 of each base):
+        // Tth poly cost = 100 base + 2 * 100 = 300 each base
+        // Solute DMSO = 100 each base
+        // Sequence = 2 each base
+        // Total deduction per base = 2 + 100 + 300 = 402 -> 5000 - 402 = 4598
+        // Waste = 0 deducted -> 2000L
+        assertEquals(4598L, viewModel.rawStockA.value)
+        assertEquals(4598L, viewModel.rawStockC.value)
+        assertEquals(4598L, viewModel.rawStockG.value)
+        assertEquals(4598L, viewModel.rawStockT.value)
+        assertEquals(2000L, viewModel.bioWaste.value)
+    }
+
+    @Test
+    fun testChemicalSoluteStockCheckAndDepletionReset() = runTest {
+        // 1. Rejection when stock < 100
+        repository.saveRawStocks(50L, 50L, 50L, 50L)
+        viewModel.setActiveChemicalSolute("Netropsin")
+        advanceUntilIdle()
+        assertEquals("None", viewModel.activeChemicalSolute.value)
+
+        // 2. Acceptance when stock >= 100
+        repository.saveRawStocks(500L, 500L, 500L, 500L)
+        viewModel.setActiveChemicalSolute("Netropsin")
+        advanceUntilIdle()
+        assertEquals("Netropsin", viewModel.activeChemicalSolute.value)
+
+        // 3. Depletion reset: perform synthesis that leaves stocks < 100
+        // Target: 8 C's (80% C). Set stocks such that after synthesis, remaining stock < 100
+        val targetField = viewModel.reactor.javaClass.getDeclaredField("_targetSynthesisSequence")
+        targetField.isAccessible = true
+        val targetFlow = targetField.get(viewModel.reactor) as MutableStateFlow<String>
+        targetFlow.value = "CCCCCCCC"
+
+        // Stock: A=100, G=100, T=100, C=108.
+        // Netropsin costs 100 each. Seq costs 8 C. Remaining after synthesis: A=0, G=0, T=0, C=0.
+        repository.saveRawStocks(100L, 100L, 100L, 108L)
+        viewModel.setInletRatioC(0.85f)
+        viewModel.setInletRatioA(0.05f)
+        viewModel.setInletRatioG(0.05f)
+        viewModel.setInletRatioT(0.05f)
+        viewModel.setReactorTemperature(35.0f)
+        viewModel.setReactorSalt(0.05f)
+        viewModel.setActivePolymerase("Taq")
+
+        viewModel.initiateStandardSynthesis()
+        advanceUntilIdle()
+
+        // Stock depleted to 0, so active solute should reset to "None"
+        assertEquals("None", viewModel.activeChemicalSolute.value)
+    }
+
+    @Test
+    fun testPfuCostTargetBaseBonus() = runTest {
+        // GCTA -> G=1, C=1, T=1, A=1
+        val pfuCostG = com.example.genpox.data.ReactorSimulationEngine.calculatePolymeraseCost("PFU", "GCTA")
+        assertEquals(400L, pfuCostG.costA) // 200 + 1 * 200
+        assertEquals(400L, pfuCostG.costG) // 200 + 1 * 200
+        assertEquals(400L, pfuCostG.costT) // 200 + 1 * 200
+        assertEquals(400L, pfuCostG.costC) // 200 + 1 * 200
+        assertEquals(0L, pfuCostG.costWaste)
+
+        // CGTAA -> C=1, G=1, T=1, A=2
+        val pfuCostC = com.example.genpox.data.ReactorSimulationEngine.calculatePolymeraseCost("pfu", "CGTAA")
+        assertEquals(600L, pfuCostC.costA) // 200 + 2 * 200
+        assertEquals(400L, pfuCostC.costG) // 200 + 1 * 200
+        assertEquals(400L, pfuCostC.costT) // 200 + 1 * 200
+        assertEquals(400L, pfuCostC.costC) // 200 + 1 * 200
+        assertEquals(0L, pfuCostC.costWaste)
+    }
+
+    @Test
     fun testSaltDependentDenaturation() = runTest {
         // Target: AAAAAAAT (High AT)
-        val targetField = viewModel.javaClass.getDeclaredField("_targetSynthesisSequence")
+        val targetField = viewModel.reactor.javaClass.getDeclaredField("_targetSynthesisSequence")
         targetField.isAccessible = true
-        val targetFlow = targetField.get(viewModel) as MutableStateFlow<String>
+        val targetFlow = targetField.get(viewModel.reactor) as MutableStateFlow<String>
         targetFlow.value = "AAAAAAAT"
 
         // Set inlets high to prevent inlet deprivation
@@ -351,15 +541,15 @@ class ReactorSimulationTest {
     @Test
     fun testSaltDependentStalling() = runTest {
         // Target: GCGCGCGC (GC rich, triggers fold stalling)
-        val targetField = viewModel.javaClass.getDeclaredField("_targetSynthesisSequence")
+        val targetField = viewModel.reactor.javaClass.getDeclaredField("_targetSynthesisSequence")
         targetField.isAccessible = true
-        val targetFlow = targetField.get(viewModel) as MutableStateFlow<String>
+        val targetFlow = targetField.get(viewModel.reactor) as MutableStateFlow<String>
         targetFlow.value = "GCGCGCGC"
 
         // Set waste high and swap to Pfu to prevent mutations during biophysical checks
-        val bioWasteField = viewModel.javaClass.getDeclaredField("_bioWaste")
+        val bioWasteField = viewModel.reactor.javaClass.getDeclaredField("_bioWaste")
         bioWasteField.isAccessible = true
-        val bioWasteFlow = bioWasteField.get(viewModel) as MutableStateFlow<Long>
+        val bioWasteFlow = bioWasteField.get(viewModel.reactor) as MutableStateFlow<Long>
         bioWasteFlow.value = 2000L
         viewModel.setActivePolymerase("Pfu")
         advanceUntilIdle()
@@ -392,10 +582,14 @@ class ReactorSimulationTest {
 
     @Test
     fun testInletStoichiometricFidelity() = runTest {
+        repository.saveRawStocks(1000L, 1000L, 1000L, 1000L)
+        viewModel.setReactorSalt(0.05f)
+        viewModel.setActiveChemicalSolute("DMSO")
+        resetReactionCollapsedState()
         // Target: AAAAAAAA (100% A)
-        val targetField = viewModel.javaClass.getDeclaredField("_targetSynthesisSequence")
+        val targetField = viewModel.reactor.javaClass.getDeclaredField("_targetSynthesisSequence")
         targetField.isAccessible = true
-        val targetFlow = targetField.get(viewModel) as MutableStateFlow<String>
+        val targetFlow = targetField.get(viewModel.reactor) as MutableStateFlow<String>
         targetFlow.value = "AAAAAAAA"
 
         // Taq polymerase (proofreading disabled)
@@ -406,19 +600,22 @@ class ReactorSimulationTest {
         viewModel.setInletRatioT(0.05f)
         viewModel.setInletRatioG(0.05f)
         viewModel.setInletRatioC(0.05f)
-        viewModel.setReactorTemperature(16.0f) // aligned with target Tm
+        viewModel.setReactorTemperature(20.0f)
 
         viewModel.initiateStandardSynthesis()
         advanceUntilIdle()
-        assertFalse("Synthesis should succeed", viewModel.isReactionCollapsed.value)
+        val logs = viewModel.terminalLogs.value.joinToString(" | ")
+        assertFalse("Synthesis should succeed: logs=$logs", viewModel.isReactionCollapsed.value)
         val qMatched = viewModel.activeSynthesisQScore.value
         assertTrue("Q score should be high for aligned inlets", qMatched > 10.0)
 
         // Inlets heavily mismatched (A=0.10f, G/T/C higher) -> Q-score penalized
+        resetReactionCollapsedState()
         viewModel.setInletRatioA(0.10f)
         viewModel.setInletRatioG(0.40f)
         viewModel.setInletRatioT(0.40f)
         viewModel.setInletRatioC(0.15f)
+        viewModel.setReactorTemperature(20.0f)
 
         viewModel.initiateStandardSynthesis()
         advanceUntilIdle()
@@ -429,16 +626,16 @@ class ReactorSimulationTest {
     @Test
     fun testPfuProofreadingActiveOverride() = runTest {
         // Target: AAAAAAAA
-        val targetField = viewModel.javaClass.getDeclaredField("_targetSynthesisSequence")
+        val targetField = viewModel.reactor.javaClass.getDeclaredField("_targetSynthesisSequence")
         targetField.isAccessible = true
-        val targetFlow = targetField.get(viewModel) as MutableStateFlow<String>
+        val targetFlow = targetField.get(viewModel.reactor) as MutableStateFlow<String>
         targetFlow.value = "AAAAAAAA"
 
-        // Give plenty of stock/biowaste to allow Pfu swap
-        repository.saveRawStocks(1000L, 1000L, 1000L, 1000L)
-        val bioWasteField = viewModel.javaClass.getDeclaredField("_bioWaste")
+        // Give plenty of stock/biowaste to allow Pfu swap (Pfu requires 2200 A for target AAAAAAAA)
+        repository.saveRawStocks(5000L, 5000L, 5000L, 5000L)
+        val bioWasteField = viewModel.reactor.javaClass.getDeclaredField("_bioWaste")
         bioWasteField.isAccessible = true
-        val bioWasteFlow = bioWasteField.get(viewModel) as MutableStateFlow<Long>
+        val bioWasteFlow = bioWasteField.get(viewModel.reactor) as MutableStateFlow<Long>
         bioWasteFlow.value = 2000L
 
         // Swap to Pfu (Costs 50 base, 1000 biowaste)
@@ -458,7 +655,7 @@ class ReactorSimulationTest {
         viewModel.initiateStandardSynthesis()
         advanceUntilIdle()
         assertFalse(viewModel.isReactionCollapsed.value)
-        
+
         // Assert that the compiled gene block exactly matches target "AAAAAAAA" with no mutations
         val lastCompiled = repository.sequencesList.lastOrNull()
         assertTrue("Compiled sequence must be present", lastCompiled != null)
@@ -468,9 +665,9 @@ class ReactorSimulationTest {
     @Test
     fun testInletBlockPrevention() = runTest {
         // Setup target sequence requiring 'A'
-        val targetField = viewModel.javaClass.getDeclaredField("_targetSynthesisSequence")
+        val targetField = viewModel.reactor.javaClass.getDeclaredField("_targetSynthesisSequence")
         targetField.isAccessible = true
-        val targetFlow = targetField.get(viewModel) as MutableStateFlow<String>
+        val targetFlow = targetField.get(viewModel.reactor) as MutableStateFlow<String>
         targetFlow.value = "AAAAAAAA"
 
         // Set Inlet A to 0.05f (absolute minimum / restricted)
@@ -492,9 +689,9 @@ class ReactorSimulationTest {
     @Test
     fun testProratedBioWasteRecovery() = runTest {
         // Target: AAAAAAAT (High AT)
-        val targetField = viewModel.javaClass.getDeclaredField("_targetSynthesisSequence")
+        val targetField = viewModel.reactor.javaClass.getDeclaredField("_targetSynthesisSequence")
         targetField.isAccessible = true
-        val targetFlow = targetField.get(viewModel) as MutableStateFlow<String>
+        val targetFlow = targetField.get(viewModel.reactor) as MutableStateFlow<String>
         targetFlow.value = "AAAAAAAT"
 
         // Set inlets > 5% to pass pre-flight block checks
@@ -505,9 +702,9 @@ class ReactorSimulationTest {
 
         // Give plenty of stock, zero out waste initial
         repository.saveRawStocks(1000L, 1000L, 1000L, 1000L)
-        val bioWasteField = viewModel.javaClass.getDeclaredField("_bioWaste")
+        val bioWasteField = viewModel.reactor.javaClass.getDeclaredField("_bioWaste")
         bioWasteField.isAccessible = true
-        val bioWasteFlow = bioWasteField.get(viewModel) as MutableStateFlow<Long>
+        val bioWasteFlow = bioWasteField.get(viewModel.reactor) as MutableStateFlow<Long>
         bioWasteFlow.value = 0L
 
         // Trigger denaturation collapse at step 4: Low Salt (0.01M), Temp (25°C). T_denature = 22.3°C.
@@ -540,9 +737,9 @@ class ReactorSimulationTest {
         advanceUntilIdle()
 
         // Zero out initial waste
-        val bioWasteField = viewModel.javaClass.getDeclaredField("_bioWaste")
+        val bioWasteField = viewModel.reactor.javaClass.getDeclaredField("_bioWaste")
         bioWasteField.isAccessible = true
-        val bioWasteFlow = bioWasteField.get(viewModel) as MutableStateFlow<Long>
+        val bioWasteFlow = bioWasteField.get(viewModel.reactor) as MutableStateFlow<Long>
         bioWasteFlow.value = 0L
 
         // Trigger bulk recycle for prefix "AAAA"
@@ -563,9 +760,9 @@ class ReactorSimulationTest {
     @Test
     fun testEnzymeThermalLimits() = runTest {
         // Target: AAAAAAAA
-        val targetField = viewModel.javaClass.getDeclaredField("_targetSynthesisSequence")
+        val targetField = viewModel.reactor.javaClass.getDeclaredField("_targetSynthesisSequence")
         targetField.isAccessible = true
-        val targetFlow = targetField.get(viewModel) as MutableStateFlow<String>
+        val targetFlow = targetField.get(viewModel.reactor) as MutableStateFlow<String>
         targetFlow.value = "AAAAAAAA"
 
         // Set inputs to prevent other failures
@@ -573,12 +770,12 @@ class ReactorSimulationTest {
         viewModel.setInletRatioT(0.05f)
         viewModel.setInletRatioG(0.05f)
         viewModel.setInletRatioC(0.05f)
-        repository.saveRawStocks(1000L, 1000L, 1000L, 1000L)
+        repository.saveRawStocks(5000L, 5000L, 5000L, 5000L)
 
         // Case 1: Pfu denatures at > 40°C
-        val bioWasteField = viewModel.javaClass.getDeclaredField("_bioWaste")
+        val bioWasteField = viewModel.reactor.javaClass.getDeclaredField("_bioWaste")
         bioWasteField.isAccessible = true
-        val bioWasteFlow = bioWasteField.get(viewModel) as MutableStateFlow<Long>
+        val bioWasteFlow = bioWasteField.get(viewModel.reactor) as MutableStateFlow<Long>
         bioWasteFlow.value = 2000L
 
         viewModel.setActivePolymerase("Pfu")
@@ -611,7 +808,7 @@ class ReactorSimulationTest {
         // We want to force a condition where step == hostIndex, QScore is high, Temp is eligible,
         // and we have a CONJUNCTION alignment state.
         WaveMath.isTestMode = false
-        
+
         // Find a timestamp where Mercury and Venus are in CONJUNCTION
         var testTimeMs = 1778982840000L // reference time
         var foundConjunction = false
@@ -622,12 +819,12 @@ class ReactorSimulationTest {
             }
             testTimeMs += 3600000L * 24 // +1 day
         }
-        
+
         assertTrue("Should find a conjunction time", foundConjunction)
-        
+
         // Set manual offset so that WaveMath.getAdjustedTime() returns this conjunction timestamp
         WaveMath.setManualOffset(testTimeMs - System.currentTimeMillis())
-        
+
         // Now run synthesis. Mercury is step 1. Target sequence: AAAAAAAA.
         // PFU polymerase is ideal as it has base Q of 35-40 (above 22 threshold).
         // Temp is 16.0f (perfectly matching target Tm for AAAAAAAA at 0.05 salt).
@@ -650,7 +847,7 @@ class ReactorSimulationTest {
                 inletRatioC = 0.0f,
                 stepIntervalMs = 0L,
                 hostPlanet = "MERCURY",
-                onStep = {}
+                onStep = {},
             )
             val firstChar = result.finalStrand[0]
             if (firstChar in listOf('X', 'Z', 'Y', 'W')) {
@@ -663,9 +860,9 @@ class ReactorSimulationTest {
                 assertTrue("Step 1 should have celestial message", step1.mutationMessage?.contains("[CELESTIAL]") == true)
             }
         }
-        
+
         assertTrue("Anomalous base should have successfully bonded after several runs", anomalousBonded)
-        
+
         // Reset settings
         WaveMath.isTestMode = true
         WaveMath.setManualOffset(0L)

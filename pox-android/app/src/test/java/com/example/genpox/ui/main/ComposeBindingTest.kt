@@ -1,8 +1,7 @@
 package com.example.genpox.ui.main
 
-import org.junit.Test
-import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import org.junit.Test
 import java.io.File
 import java.io.FileNotFoundException
 
@@ -12,7 +11,7 @@ class ComposeBindingTest {
         "androidx.compose.ui",
         "android.view.View",
         "android.widget.",
-        "androidx.activity.ComponentActivity"
+        "androidx.activity.ComponentActivity",
     )
 
     private fun findUiMainSourceFile(fileName: String): File {
@@ -22,7 +21,7 @@ class ComposeBindingTest {
             File("app/$relativePath"),
             File("../app/$relativePath"),
             File("pox-android/app/$relativePath"),
-            File("../../pox-android/app/$relativePath")
+            File("../../pox-android/app/$relativePath"),
         )
         for (file in searchPaths) {
             if (file.exists() && file.isFile) {
@@ -49,8 +48,10 @@ class ComposeBindingTest {
         }
 
         if (violations.isNotEmpty()) {
-            fail("Compose binding architecture violation in ${file.name}: ViewModel references UI/View packages directly:\n" +
-                 violations.joinToString("\n"))
+            fail(
+                "Compose binding architecture violation in ${file.name}: ViewModel references UI/View packages directly:\n" +
+                    violations.joinToString("\n"),
+            )
         }
     }
 

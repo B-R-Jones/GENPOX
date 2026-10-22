@@ -8,3 +8,4 @@ coverage/
 !.env.example
 search_results*
 scratch/
+scratch_*

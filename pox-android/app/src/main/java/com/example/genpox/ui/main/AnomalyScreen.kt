@@ -1,96 +1,38 @@
 package com.example.genpox.ui.main
 
-import android.content.Context
-import androidx.annotation.Keep
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.zIndex
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.ClipOp
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.genpox.data.AnomalyLifecyclePhase
 import com.example.genpox.data.Creature
-import com.example.genpox.data.GeneSequence
 import com.example.genpox.data.HarvestMission
-import com.example.genpox.data.WaveMath
 import com.example.genpox.data.PoxAnomaly
-import com.example.genpox.data.BuildingStructure
+import com.example.genpox.data.WaveMath
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.*
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
-import java.text.SimpleDateFormat
+import kotlinx.coroutines.delay
 import java.util.*
 import kotlin.math.cos
-import kotlin.math.sin
-import kotlinx.coroutines.delay
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.coerceAtLeast
-import androidx.compose.ui.unit.coerceIn
-import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.foundation.gestures.forEachGesture
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlin.math.absoluteValue
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.SystemFontFamily
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.runtime.Immutable
-
 
 // ==========================================
 // ANOMALY DASHBOARD VIEW
@@ -98,15 +40,15 @@ import androidx.compose.runtime.Immutable
 @Composable
 fun AnomalyDashboardView(
     viewModel: MainViewModel,
-    onAnomalyLogClick: () -> Unit
+    onAnomalyLogClick: () -> Unit,
 ) {
-    val anomalyEngineActive by viewModel.anomalyEngineActive.collectAsState()
-    val grandTotalStandardNucleotides by viewModel.grandTotalStandardNucleotides.collectAsState()
-    val geneSequences by viewModel.geneSequences.collectAsState()
-    
+    val anomalyEngineActive by viewModel.anomalyEngineActive.collectAsStateWithLifecycle()
+    val grandTotalStandardNucleotides by viewModel.grandTotalStandardNucleotides.collectAsStateWithLifecycle()
+    val geneSequences by viewModel.geneSequences.collectAsStateWithLifecycle()
+
     val anomalousGenesSize = remember(geneSequences) { geneSequences.count { WaveMath.isAnomalousGene(it.sequence) } }
     val multiCountAnomalousGenesSize = remember(geneSequences) { geneSequences.count { WaveMath.isAnomalousGene(it.sequence) && it.count > 1 } }
-    
+
     val coupling = remember(grandTotalStandardNucleotides) { WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis()) }
     val chanceMetrics = remember(grandTotalStandardNucleotides, coupling) {
         WaveMath.getAnomalyEngineSuccessChance(grandTotalStandardNucleotides, coupling)
@@ -119,23 +61,23 @@ fun AnomalyDashboardView(
                 .fillMaxWidth()
                 .cyberglass(borderColor = CyberTheme.purpleBorder, backgroundColor = Color.Black.copy(alpha = 0.4f))
                 .padding(vertical = 10.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { onAnomalyLogClick() }
+                    .clickable { onAnomalyLogClick() },
             ) {
                 Text(
                     text = "UNIQUE ANOMALOUS GENE IDS",
                     color = CyberTheme.purpleDim,
                     style = Typography.labelSmall,
                     fontFamily = FontFamily.Default,
-                    fontSize = 9.sp
+                    fontSize = 9.sp,
                 )
                 Row(
                     modifier = Modifier.padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(text = "⬢ ", color = CyberTheme.purple, fontSize = 14.sp)
                     Text(
@@ -143,7 +85,7 @@ fun AnomalyDashboardView(
                         color = Color.White,
                         style = Typography.bodyLarge,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
             }
@@ -152,24 +94,24 @@ fun AnomalyDashboardView(
                 modifier = Modifier
                     .width(1.dp)
                     .height(35.dp)
-                    .background(CyberTheme.purpleBorder)
+                    .background(CyberTheme.purpleBorder),
             )
 
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 12.dp)
+                    .padding(start = 12.dp),
             ) {
                 Text(
                     text = "MULTI-COUNT ANOMALOUS GENE IDS",
                     color = CyberTheme.purpleDim,
                     style = Typography.labelSmall,
                     fontFamily = FontFamily.Default,
-                    fontSize = 9.sp
+                    fontSize = 9.sp,
                 )
                 Row(
                     modifier = Modifier.padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(text = "⬢ ", color = CyberTheme.purple, fontSize = 14.sp)
                     Text(
@@ -177,7 +119,7 @@ fun AnomalyDashboardView(
                         color = Color.White,
                         style = Typography.bodyLarge,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
             }
@@ -191,24 +133,24 @@ fun AnomalyDashboardView(
                 .fillMaxWidth()
                 .cyberglass(
                     borderColor = if (meetsRequirement) Color(0xFFA855F7) else Color(0xFF4A125E),
-                    backgroundColor = Color.Black.copy(alpha = 0.6f)
+                    backgroundColor = Color.Black.copy(alpha = 0.6f),
                 )
-                .padding(8.dp)
+                .padding(8.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier.weight(1f, fill = false),
                 ) {
                     Text(
                         text = "~",
                         color = Color(0xFFA855F7),
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
                     )
                     Column {
                         Text(
@@ -217,14 +159,14 @@ fun AnomalyDashboardView(
                             style = Typography.labelSmall,
                             fontFamily = FontFamily.Default,
                             fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
                             text = "$formattedCount / 250,000 NUCLEOTIDES",
                             color = Color.White,
                             style = Typography.bodySmall,
                             fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -235,7 +177,7 @@ fun AnomalyDashboardView(
                         color = Color(0xFFA855F7),
                         style = Typography.bodySmall,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
                     )
                     Text(
                         text = "RESETS STABILITY",
@@ -243,7 +185,7 @@ fun AnomalyDashboardView(
                         style = Typography.labelSmall,
                         fontFamily = FontFamily.Default,
                         fontSize = 7.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
             }
@@ -255,19 +197,19 @@ fun AnomalyDashboardView(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Left: Consolidation Chance
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color.Black.copy(alpha = 0.45f))
-                    .padding(6.dp)
+                    .padding(6.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column {
                         Text(
@@ -276,7 +218,7 @@ fun AnomalyDashboardView(
                             style = Typography.labelSmall,
                             fontFamily = FontFamily.Default,
                             fontSize = 7.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
                             text = "SUCCESS PROB",
@@ -284,7 +226,7 @@ fun AnomalyDashboardView(
                             style = Typography.labelSmall,
                             fontFamily = FontFamily.Default,
                             fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                     Text(
@@ -293,7 +235,7 @@ fun AnomalyDashboardView(
                         style = Typography.labelSmall,
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
                     )
                 }
             }
@@ -303,12 +245,12 @@ fun AnomalyDashboardView(
                 modifier = Modifier
                     .weight(1f)
                     .cyberglass(borderColor = Color(0xFF4A125E), backgroundColor = Color.Black.copy(alpha = 0.45f))
-                    .padding(6.dp)
+                    .padding(6.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column {
                         Text(
@@ -317,7 +259,7 @@ fun AnomalyDashboardView(
                             style = Typography.labelSmall,
                             fontFamily = FontFamily.Default,
                             fontSize = 7.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
                             text = "HARMONIC MODIFIER",
@@ -325,7 +267,7 @@ fun AnomalyDashboardView(
                             style = Typography.labelSmall,
                             fontFamily = FontFamily.Default,
                             fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                     Text(
@@ -334,7 +276,7 @@ fun AnomalyDashboardView(
                         style = Typography.labelSmall,
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
                     )
                 }
             }
@@ -349,26 +291,26 @@ fun AnomalyDashboardView(
 fun AnomalyVaultView(
     viewModel: MainViewModel,
     onSelectGene: (String) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
 ) {
-    val geneSequences by viewModel.geneSequences.collectAsState()
-    
+    val geneSequences by viewModel.geneSequences.collectAsStateWithLifecycle()
+
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "ANOMALY DISCOVERY LOG",
                 color = Color(0xFFD8B4FE).copy(alpha = 0.75f),
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Default
+                fontFamily = FontFamily.Default,
             )
             Box(
                 modifier = Modifier
@@ -378,14 +320,14 @@ fun AnomalyVaultView(
                         onClose()
                     }
                     .padding(horizontal = 8.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "CLOSE",
                     color = Color.Black,
                     fontSize = 8.sp,
                     fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
         }
@@ -403,13 +345,13 @@ fun AnomalyVaultView(
                     style = Typography.bodySmall,
                     fontFamily = FontFamily.Default,
                     textAlign = TextAlign.Center,
-                    lineHeight = 16.sp
+                    lineHeight = 16.sp,
                 )
             }
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 items(anomalousGenes) { gene ->
                     val benefit = WaveMath.getBenefitForAnomalousGene(gene.sequence)
@@ -421,12 +363,12 @@ fun AnomalyVaultView(
                                 onSelectGene(gene.sequence)
                                 viewModel.synthManager.playBeep(587f, 0.05f, "triangle")
                             }
-                            .padding(8.dp)
+                            .padding(8.dp),
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
@@ -434,21 +376,21 @@ fun AnomalyVaultView(
                                     style = Typography.bodyMedium,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFD8B4FE)
+                                    color = Color(0xFFD8B4FE),
                                 )
                                 Text(
                                     text = benefit.name.uppercase(),
                                     style = Typography.bodySmall,
                                     fontFamily = FontFamily.Default,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFA855F7)
+                                    color = Color(0xFFA855F7),
                                 )
                                 Text(
                                     text = benefit.description.uppercase(),
                                     style = Typography.labelSmall,
                                     fontFamily = FontFamily.Default,
                                     color = Color(0xFFCCC2DC),
-                                    lineHeight = 12.sp
+                                    lineHeight = 12.sp,
                                 )
                             }
                             Spacer(modifier = Modifier.width(6.dp))
@@ -458,14 +400,14 @@ fun AnomalyVaultView(
                                     style = Typography.bodyMedium,
                                     fontFamily = FontFamily.Default,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFD8B4FE)
+                                    color = Color(0xFFD8B4FE),
                                 )
                                 Text(
                                     text = "x${gene.count}",
                                     style = Typography.bodyMedium,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFD8B4FE)
+                                    color = Color(0xFFD8B4FE),
                                 )
                             }
                         }
@@ -479,9 +421,9 @@ fun AnomalyVaultView(
 @Composable
 fun HarvestingCountdownTimer(
     viewModel: MainViewModel,
-    creatureId: String
+    creatureId: String,
 ) {
-    val activeMissions by viewModel.activeMissions.collectAsState()
+    val activeMissions by viewModel.activeMissions.collectAsStateWithLifecycle()
     val m = remember(activeMissions, creatureId) {
         activeMissions.find { it.creatureId == creatureId && !it.isReturned }
     }
@@ -499,7 +441,7 @@ fun HarvestingCountdownTimer(
                 buttonType = PoxButtonType.CYAN_CELESTIAL,
                 buttonSize = PoxButtonSize.LARGE,
                 sound = PoxButtonSound.BEEP_HIGH,
-                viewModel = viewModel
+                viewModel = viewModel,
             )
         } else {
             // HARVESTING TEXT
@@ -512,7 +454,7 @@ fun HarvestingCountdownTimer(
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 6.dp, start = 4.dp)
+                modifier = Modifier.padding(bottom = 6.dp, start = 4.dp),
             )
         }
     }
@@ -525,13 +467,13 @@ fun HarvestingCountdownTimer(
 fun AnomalyItemStatus(
     viewModel: MainViewModel,
     anomaly: PoxAnomaly,
-    factionColor: Color
+    factionColor: Color,
 ) {
-    val activeMissions by viewModel.activeMissions.collectAsState()
+    val activeMissions by viewModel.activeMissions.collectAsStateWithLifecycle()
     val activeMission = remember(activeMissions, anomaly) {
         activeMissions.find { Math.abs(it.lat - anomaly.lat) < 0.0001 && Math.abs(it.lng - anomaly.lng) < 0.0001 && !it.isReturned }
     }
-    
+
     val statusText = if (activeMission == null) {
         "NO ACTIVE HARVESTER"
     } else {
@@ -545,7 +487,7 @@ fun AnomalyItemStatus(
         color = statusColor,
         fontSize = 8.sp,
         fontWeight = FontWeight.Bold,
-        fontFamily = FontFamily.Monospace
+        fontFamily = FontFamily.Monospace,
     )
 }
 
@@ -555,7 +497,7 @@ fun AnomalyItemRow(
     userLat: Double,
     userLng: Double,
     viewModel: MainViewModel,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val latDiff = anomaly.lat - userLat
     val lngDiff = anomaly.lng - userLng
@@ -574,123 +516,127 @@ fun AnomalyItemRow(
         }
     }
 
-    val factionColor = when (anomaly.faction) {
-        "Infection" -> Color(0xFFEF4444)
-        "Mech" -> Color(0xFFFBBF24)
-        "Parasite" -> Color(0xFFA855F7)
-        else -> Color(0xFF22D3EE) // Containment
+    val anomalyColor = when (anomaly.lifecyclePhase) {
+        AnomalyLifecyclePhase.INCEPTION -> Color(0xFF22D3EE)
+        AnomalyLifecyclePhase.ACTIVE_NEXUS -> Color(0xFFEC4899)
+        AnomalyLifecyclePhase.DESTABILIZING -> Color(0xFFFBBF24)
+        AnomalyLifecyclePhase.VOID_COLLAPSE -> Color(0xFFA855F7)
     }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .border(1.dp, factionColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+            .border(1.dp, anomalyColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
             .background(CyberPanel)
             .padding(10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Box(
                     modifier = Modifier
                         .size(6.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(factionColor)
+                        .background(anomalyColor),
                 )
                 Text(
                     text = anomaly.name.uppercase(),
                     style = Typography.bodySmall,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = Color.White,
                 )
+                val phaseLabel = when (anomaly.lifecyclePhase) {
+                    AnomalyLifecyclePhase.INCEPTION -> "INCEPTION"
+                    AnomalyLifecyclePhase.ACTIVE_NEXUS -> "ACTIVE"
+                    AnomalyLifecyclePhase.DESTABILIZING -> "DESTABILIZING"
+                    AnomalyLifecyclePhase.VOID_COLLAPSE -> "COLLAPSE"
+                }
                 Text(
-                    text = "[${anomaly.faction.uppercase()}]",
+                    text = "[$phaseLabel]",
                     style = Typography.labelSmall,
                     fontSize = 8.sp,
-                    color = factionColor
+                    color = anomalyColor,
                 )
             }
             val densityVal = Math.round(anomaly.density * 100.0).toInt()
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
                     text = "DIST: ${anomaly.distance.toInt()} FT",
                     style = Typography.bodySmall,
                     color = CyberGreenDim,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 9.sp
+                    fontSize = 9.sp,
                 )
                 Text(
                     text = "DIR: $direction",
                     style = Typography.bodySmall,
                     color = CyberGreenDim,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 9.sp
+                    fontSize = 9.sp,
                 )
                 Text(
                     text = "DENSITY: ${if (densityVal >= 0) "+" else ""}$densityVal%",
                     style = Typography.bodySmall,
                     color = CyberGreenDim,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 9.sp
+                    fontSize = 9.sp,
                 )
             }
-            
+
             AnomalyItemStatus(
                 viewModel = viewModel,
                 anomaly = anomaly,
-                factionColor = factionColor
+                factionColor = anomalyColor,
             )
         }
 
         Box(
             modifier = Modifier
-                .border(1.dp, factionColor.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                .border(1.dp, anomalyColor.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
                 .background(Color.Black.copy(alpha = 0.4f))
-                .padding(horizontal = 6.dp, vertical = 3.dp)
+                .padding(horizontal = 6.dp, vertical = 3.dp),
         ) {
             Text(
                 text = anomaly.gene,
-                color = factionColor,
+                color = anomalyColor,
                 style = Typography.bodySmall,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
-                fontSize = 10.sp
+                fontSize = 10.sp,
             )
         }
     }
 }
 
 @Composable
-private fun getPhaseLabel(phase: String): String {
-    return when (phase) {
-        "TRAVEL" -> "TRANSIT TO BOUNDARY"
-        "DESCENT" -> "DESCENT INTO WELL"
-        "HARVESTING" -> "ACTIVE EXTRACTION"
-        "ASCENT" -> "ASCENT TO BOUNDARY"
-        "TRANST_BACK" -> "TRANSIT TO BASE"
-        else -> "EXTRACTION COMPLETED"
-    }
+private fun getPhaseLabel(phase: String): String = when (phase) {
+    "TRAVEL" -> "TRANSIT TO BOUNDARY"
+    "DESCENT" -> "DESCENT INTO WELL"
+    "HARVESTING" -> "ACTIVE EXTRACTION"
+    "ASCENT" -> "ASCENT TO BOUNDARY"
+    "TRANST_BACK" -> "TRANSIT TO BASE"
+    else -> "EXTRACTION COMPLETED"
 }
 
 @Composable
 fun LockedAnomalyActiveMissionContent(
     viewModel: MainViewModel,
     anomaly: PoxAnomaly,
-    factionColor: Color,
+    anomalyColor: Color,
     activeAnomalyTab: String,
-    creatures: List<Creature>
+    creatures: List<Creature>,
 ) {
-    val activeMissions by viewModel.activeMissions.collectAsState()
+    val activeMissions by viewModel.activeMissions.collectAsStateWithLifecycle()
     val activeMission = remember(activeMissions, anomaly) {
         activeMissions.find { Math.abs(it.lat - anomaly.lat) < 0.0001 && Math.abs(it.lng - anomaly.lng) < 0.0001 && !it.isReturned }
     }
@@ -704,19 +650,19 @@ fun LockedAnomalyActiveMissionContent(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                .padding(12.dp)
+                .padding(12.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = "[ MISSION TELEMETRY LOGS ACTIVE ]",
-                    color = factionColor,
+                    color = anomalyColor,
                     style = Typography.labelSmall,
                     fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -725,7 +671,7 @@ fun LockedAnomalyActiveMissionContent(
                 color = Color.White,
                 style = Typography.bodyMedium,
                 fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -735,7 +681,7 @@ fun LockedAnomalyActiveMissionContent(
                     displayedLogs.clear()
                 } else {
                     val isNewRun = displayedLogs.size > activeMission.missionLogs.size ||
-                            (displayedLogs.isNotEmpty() && activeMission.missionLogs.firstOrNull() != displayedLogs.firstOrNull())
+                        (displayedLogs.isNotEmpty() && activeMission.missionLogs.firstOrNull() != displayedLogs.firstOrNull())
                     val startIdx = if (isNewRun) {
                         displayedLogs.clear()
                         0
@@ -764,7 +710,7 @@ fun LockedAnomalyActiveMissionContent(
                     .border(1.dp, Color(0xFF2D0A0A), RoundedCornerShape(2.dp))
                     .padding(6.dp),
                 state = listState,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(displayedLogs) { log ->
                     val isAlert = log.contains("FAILED") || log.contains("WARNING") || log.contains("Failed") || log.contains("stalled") || log.contains("STALL") || log.contains("stalling")
@@ -773,7 +719,7 @@ fun LockedAnomalyActiveMissionContent(
                         color = if (isAlert) Color(0xFFFCA5A5) else Color(0xFF34D399),
                         style = Typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 9.sp
+                        fontSize = 9.sp,
                     )
                 }
             }
@@ -786,46 +732,46 @@ fun LockedAnomalyActiveMissionContent(
 
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
                 text = "HARVEST DISPATCH IN PROGRESS",
                 color = Color.White,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
+                fontFamily = FontFamily.Monospace,
             )
 
             // Progress bar
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .height(8.dp)
                         .background(Color.Black, RoundedCornerShape(4.dp))
-                        .border(1.dp, factionColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                        .border(1.dp, anomalyColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp)),
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
                             .fillMaxWidth(progressPercent)
-                            .background(Color(0xFF00E1FF), RoundedCornerShape(4.dp))
+                            .background(Color(0xFF00E1FF), RoundedCornerShape(4.dp)),
                     )
                 }
                 Text(
                     text = "${(progressPercent * 100).toInt()}%",
                     color = Color.White,
                     fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
                 )
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(text = "MISSION PHASE:", color = CyberGreenDim, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
                 Text(
@@ -833,13 +779,13 @@ fun LockedAnomalyActiveMissionContent(
                     color = Color(0xFF00E1FF),
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
                 )
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(text = "EST. REMAINING:", color = CyberGreenDim, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
                 Text(
@@ -847,13 +793,13 @@ fun LockedAnomalyActiveMissionContent(
                     color = Color.White,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
                 )
             }
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            val trackedMissionId by viewModel.trackedMissionId.collectAsState()
+            val trackedMissionId by viewModel.trackedMissionId.collectAsStateWithLifecycle()
             val isTrackingThis = trackedMissionId == activeMission.id
 
             PoxButton(
@@ -869,17 +815,17 @@ fun LockedAnomalyActiveMissionContent(
                 buttonType = if (isTrackingThis) PoxButtonType.GREEN_PHOSPHOR else PoxButtonType.GREEN_MUTED,
                 buttonSize = PoxButtonSize.COMPACT,
                 sound = PoxButtonSound.BEEP_DEFAULT,
-                viewModel = viewModel
+                viewModel = viewModel,
             )
 
             Spacer(modifier = Modifier.height(4.dp))
 
             if (activeMission.isCompleted) {
-                val recallButtonType = when (anomaly.faction) {
-                    "Infection" -> PoxButtonType.RED_DANGER
-                    "Mech" -> PoxButtonType.YELLOW_WARNING
-                    "Parasite" -> PoxButtonType.PURPLE_ANOMALY
-                    else -> PoxButtonType.CYAN_CELESTIAL
+                val recallButtonType = when (anomaly.lifecyclePhase) {
+                    AnomalyLifecyclePhase.INCEPTION -> PoxButtonType.CYAN_CELESTIAL
+                    AnomalyLifecyclePhase.ACTIVE_NEXUS -> PoxButtonType.PURPLE_ANOMALY
+                    AnomalyLifecyclePhase.DESTABILIZING -> PoxButtonType.YELLOW_WARNING
+                    AnomalyLifecyclePhase.VOID_COLLAPSE -> PoxButtonType.PURPLE_ANOMALY
                 }
                 PoxButton(
                     modifier = Modifier.fillMaxWidth(),
@@ -891,7 +837,7 @@ fun LockedAnomalyActiveMissionContent(
                     buttonType = recallButtonType,
                     buttonSize = PoxButtonSize.LARGE,
                     sound = PoxButtonSound.BEEP_HIGH,
-                    viewModel = viewModel
+                    viewModel = viewModel,
                 )
             } else {
                 Spacer(modifier = Modifier.height(2.dp))
@@ -900,7 +846,7 @@ fun LockedAnomalyActiveMissionContent(
                     color = Color.Gray,
                     fontSize = 7.5.sp,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 
@@ -914,7 +860,7 @@ fun LockedAnomalyActiveMissionContent(
 
             DnaComparisonGrid(
                 original = originalSeq,
-                current = currentSeq
+                current = currentSeq,
             )
         }
     }
@@ -929,16 +875,16 @@ fun LockedAnomalyDetails(
     activeMissionCoords: Set<String>,
     depletedAnomalyCoords: Set<String>,
     activeAnomalyTab: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    val factionColor = when (anomaly.faction) {
-        "Infection" -> Color(0xFFEF4444)
-        "Mech" -> Color(0xFFFBBF24)
-        "Parasite" -> Color(0xFFA855F7)
-        else -> Color(0xFF22D3EE)
+    val anomalyColor = when (anomaly.lifecyclePhase) {
+        AnomalyLifecyclePhase.INCEPTION -> Color(0xFF22D3EE)
+        AnomalyLifecyclePhase.ACTIVE_NEXUS -> Color(0xFFEC4899)
+        AnomalyLifecyclePhase.DESTABILIZING -> Color(0xFFFBBF24)
+        AnomalyLifecyclePhase.VOID_COLLAPSE -> Color(0xFFA855F7)
     }
 
-    val creatures by viewModel.creatures.collectAsState()
+    val creatures by viewModel.creatures.collectAsStateWithLifecycle()
 
     val isHarvesting = remember(activeMissionCoords, anomaly) {
         activeMissionCoords.contains("${anomaly.lat},${anomaly.lng}")
@@ -948,39 +894,39 @@ fun LockedAnomalyDetails(
         depletedAnomalyCoords.contains("${anomaly.lat},${anomaly.lng}")
     }
 
-    val scanRadius by viewModel.scanRadius.collectAsState()
+    val scanRadius by viewModel.scanRadius.collectAsStateWithLifecycle()
     val isHarvestable = anomaly.distance <= scanRadius
 
     val isLogTab = isHarvesting && activeAnomalyTab == "logs"
 
     Column(
         modifier = modifier
-            .border(1.dp, factionColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+            .border(1.dp, anomalyColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
             .background(CyberPanel)
             .padding(if (isLogTab) 0.dp else 8.dp),
-        verticalArrangement = Arrangement.spacedBy(if (isLogTab) 0.dp else 6.dp)
+        verticalArrangement = Arrangement.spacedBy(if (isLogTab) 0.dp else 6.dp),
     ) {
         if (isLogTab) {
             LockedAnomalyActiveMissionContent(
                 viewModel = viewModel,
                 anomaly = anomaly,
-                factionColor = factionColor,
+                anomalyColor = anomalyColor,
                 activeAnomalyTab = activeAnomalyTab,
-                creatures = creatures
+                creatures = creatures,
             )
         } else {
             // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = "[ TARGET ZONE LOCK: ${anomaly.id} ]",
-                    color = factionColor,
+                    color = anomalyColor,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
                 )
                 Box(
                     modifier = Modifier
@@ -989,14 +935,14 @@ fun LockedAnomalyDetails(
                             viewModel.synthManager.playBeep(450f, 0.05f, "sine")
                             viewModel.setSelectedAnomalyId(null)
                         }
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     Text(
                         text = "CLOSE",
                         color = Color.Black,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
                     )
                 }
             }
@@ -1008,19 +954,15 @@ fun LockedAnomalyDetails(
                     .background(Color.Black.copy(alpha = 0.4f))
                     .border(1.dp, CyberBorder.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
                     .padding(6.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = "CLASSIFICATION:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                    Text(text = anomaly.faction.uppercase(), color = factionColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(text = "COORDINATES:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                     Text(
                         text = String.format(java.util.Locale.US, "%.5f, %.5f", anomaly.lat, anomaly.lng),
                         color = Color.White,
                         fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
                     )
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1035,14 +977,54 @@ fun LockedAnomalyDetails(
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(text = "GENE CARRIER:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                    Text(text = anomaly.gene, color = factionColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Text(text = anomaly.gene, color = anomalyColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+
+                val phaseName = when (anomaly.lifecyclePhase) {
+                    AnomalyLifecyclePhase.INCEPTION -> "INCEPTION"
+                    AnomalyLifecyclePhase.ACTIVE_NEXUS -> "ACTIVE NEXUS"
+                    AnomalyLifecyclePhase.DESTABILIZING -> "DESTABILIZING"
+                    AnomalyLifecyclePhase.VOID_COLLAPSE -> "VOID COLLAPSE"
+                }
+                val phaseBadgeColor = anomalyColor
+                val remSec = (anomaly.timeRemainingMs / 1000L).coerceAtLeast(0L)
+                val remHours = remSec / 3600L
+                val remMins = (remSec % 3600L) / 60L
+                val remSecs = remSec % 60L
+                val timeRemStr = if (remHours > 0) {
+                    String.format(java.util.Locale.US, "%02dh %02dm %02ds", remHours, remMins, remSecs)
+                } else {
+                    String.format(java.util.Locale.US, "%02dm %02ds", remMins, remSecs)
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "LIFECYCLE PHASE:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    Text(text = phaseName, color = phaseBadgeColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "PHASE REMAINING:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    Text(text = timeRemStr, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "SUMMIT ALTITUDE:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    Text(text = "${anomaly.peakAltitudeMeters.toInt()} M", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "MUTATION FLUX:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    val fluxColor = if (anomaly.mutationFluxMod > 1.0f) Color(0xFFEF4444) else CyberGreenDim
+                    Text(text = String.format(java.util.Locale.US, "%.1fx", anomaly.mutationFluxMod), color = fluxColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "HARVEST MULTIPLIER:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    val yieldColor = if (anomaly.harvestYieldMod > 1.0f) Color(0xFFFBBF24) else Color.White
+                    Text(text = String.format(java.util.Locale.US, "%.1fx", anomaly.harvestYieldMod), color = yieldColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(text = "EST. ACCURACY:", color = CyberGreenDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                    val activeCreature by viewModel.activeCreature.collectAsState()
-                    val creaturesList by viewModel.creatures.collectAsState()
+                    val activeCreature by viewModel.activeCreature.collectAsStateWithLifecycle()
+                    val creaturesList by viewModel.creatures.collectAsStateWithLifecycle()
                     val selectedCreature = activeCreature ?: creaturesList.maxByOrNull { it.defense }
-                    
+
                     val yieldChance = if (selectedCreature != null) {
                         val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
                         val phaseFraction = wave.lunarAge / WaveMath.LUNAR_MONTH_DAYS
@@ -1070,9 +1052,9 @@ fun LockedAnomalyDetails(
                     LockedAnomalyActiveMissionContent(
                         viewModel = viewModel,
                         anomaly = anomaly,
-                        factionColor = factionColor,
+                        anomalyColor = anomalyColor,
                         activeAnomalyTab = activeAnomalyTab,
-                        creatures = creatures
+                        creatures = creatures,
                     )
                 }
                 isDepleted -> {
@@ -1082,23 +1064,23 @@ fun LockedAnomalyDetails(
                             .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
                             .background(Color.Black.copy(alpha = 0.4f))
                             .padding(10.dp),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             text = "ANOMALY SIGNATURE DEPLETED",
                             color = Color.Gray,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
                         )
                     }
                 }
                 else -> {
-                    val dispatchButtonType = when (anomaly.faction) {
-                        "Infection" -> PoxButtonType.RED_DANGER
-                        "Mech" -> PoxButtonType.YELLOW_WARNING
-                        "Parasite" -> PoxButtonType.PURPLE_ANOMALY
-                        else -> PoxButtonType.CYAN_CELESTIAL
+                    val dispatchButtonType = when (anomaly.lifecyclePhase) {
+                        AnomalyLifecyclePhase.INCEPTION -> PoxButtonType.CYAN_CELESTIAL
+                        AnomalyLifecyclePhase.ACTIVE_NEXUS -> PoxButtonType.PURPLE_ANOMALY
+                        AnomalyLifecyclePhase.DESTABILIZING -> PoxButtonType.YELLOW_WARNING
+                        AnomalyLifecyclePhase.VOID_COLLAPSE -> PoxButtonType.PURPLE_ANOMALY
                     }
                     PoxButton(
                         modifier = Modifier.fillMaxWidth(),
@@ -1111,7 +1093,7 @@ fun LockedAnomalyDetails(
                         buttonType = dispatchButtonType,
                         buttonSize = PoxButtonSize.LARGE,
                         sound = PoxButtonSound.BEEP_HIGH,
-                        viewModel = viewModel
+                        viewModel = viewModel,
                     )
                 }
             }
@@ -1123,7 +1105,7 @@ fun LockedAnomalyDetails(
 fun ActiveDeployedSequencesList(
     activeMissions: List<HarvestMission>,
     onSelectAnomalyByLatLng: (Double, Double) -> Unit,
-    viewModel: MainViewModel
+    viewModel: MainViewModel,
 ) {
     if (activeMissions.isEmpty()) return
 
@@ -1133,14 +1115,14 @@ fun ActiveDeployedSequencesList(
             .border(1.dp, CyberBorder.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
             .background(CyberPanel)
             .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = "ACTIVE DEPLOYED SEQUENCES (${activeMissions.size})",
             color = Color.White,
             style = Typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
+            fontFamily = FontFamily.Monospace,
         )
 
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1162,31 +1144,31 @@ fun ActiveDeployedSequencesList(
                         .clickable { onSelectAnomalyByLatLng(m.lat, m.lng) }
                         .padding(8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Text(
                             text = m.creatureName.uppercase(),
                             color = Color.White,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(
                                 text = String.format(java.util.Locale.US, "REM: %02dm %02ds", remaining / 60, remaining % 60),
                                 color = CyberGreenDim,
                                 fontSize = 8.sp,
-                                fontFamily = FontFamily.Monospace
+                                fontFamily = FontFamily.Monospace,
                             )
                             Text(
                                 text = String.format(java.util.Locale.US, "STALL: %3d%%", m.stalledDepth.toInt()),
                                 color = CyberGreenDim,
                                 fontSize = 8.sp,
-                                fontFamily = FontFamily.Monospace
+                                fontFamily = FontFamily.Monospace,
                             )
                         }
                         Spacer(modifier = Modifier.height(2.dp))
@@ -1194,20 +1176,20 @@ fun ActiveDeployedSequencesList(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(4.dp)
-                                .background(Color.DarkGray, RoundedCornerShape(2.dp))
+                                .background(Color.DarkGray, RoundedCornerShape(2.dp)),
                         ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .fillMaxWidth(progressPercent)
-                                    .background(Color(0xFF00E1FF), RoundedCornerShape(2.dp))
+                                    .background(Color(0xFF00E1FF), RoundedCornerShape(2.dp)),
                             )
                         }
                     }
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    val trackedMissionId by viewModel.trackedMissionId.collectAsState()
+                    val trackedMissionId by viewModel.trackedMissionId.collectAsStateWithLifecycle()
                     val isTrackingThis = trackedMissionId == m.id
 
                     Box(
@@ -1222,14 +1204,14 @@ fun ActiveDeployedSequencesList(
                                     viewModel.setTrackedMissionId(m.id)
                                 }
                             }
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
                     ) {
                         Text(
                             text = if (isTrackingThis) "TRK_ON" else "TRACK",
                             color = if (isTrackingThis) CyberGreen else Color.Gray,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
                         )
                     }
 
@@ -1240,16 +1222,16 @@ fun ActiveDeployedSequencesList(
                             .border(
                                 1.dp,
                                 if (m.isCompleted) factionColor else Color.Gray.copy(alpha = 0.4f),
-                                RoundedCornerShape(2.dp)
+                                RoundedCornerShape(2.dp),
                             )
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
                     ) {
                         Text(
                             text = if (m.isCompleted) "READY" else "HARVESTING",
                             color = if (m.isCompleted) factionColor else Color.Gray,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
                         )
                     }
                 }
@@ -1265,6 +1247,5 @@ class PrecomputedMissionState(
     val boundLat: Double,
     val boundLng: Double,
     val startLat: Double,
-    val startLng: Double
+    val startLng: Double,
 )
-

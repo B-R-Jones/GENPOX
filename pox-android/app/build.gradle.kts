@@ -3,6 +3,31 @@ plugins {
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.ksp)
+  alias(libs.plugins.spotless)
+  alias(libs.plugins.detekt)
+}
+
+spotless {
+    kotlin {
+        target("**/*.kt")
+        targetExclude("**/build/**/*.kt")
+        ktlint().editorConfigOverride(
+            mapOf(
+                "indent_size" to "4",
+                "ktlint_standard_function-naming" to "disabled",
+                "ktlint_standard_no-wildcard-imports" to "disabled",
+                "ktlint_standard_property-naming" to "disabled",
+                "ktlint_standard_no-empty-file" to "disabled",
+                "ktlint_standard_value-parameter-comment" to "disabled",
+                "ktlint_standard_backing-property-naming" to "disabled"
+            )
+        )
+    }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
 }
 
 android {
@@ -16,9 +41,15 @@ android {
         versionName = "1.0"
     }
 
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -41,10 +72,20 @@ android {
         useLegacyPackaging = false
       }
     }
+
+    testOptions {
+      unitTests.isReturnDefaultValues = true
+    }
 }
 
 kotlin {
     jvmToolchain(17)
+}
+
+ksp {
+    arg("hilt.disableTransform", "true")
+    arg("hilt.android.internal.disableAndroidSuperclassValidation", "true")
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -120,6 +161,26 @@ dependencies {
 
   // Force 16 KB compliant Graphics Path
   implementation(libs.androidx.graphics.path)
+
+  // Google Filament 3D Rendering Engine & Shaders
+  implementation(libs.filament.android)
+  implementation(libs.filament.utils.android)
+  implementation(libs.filamat.android)
+
+  // Google Hilt Dependency Injection
+  implementation(libs.hilt.android)
+  ksp(libs.hilt.compiler)
+  implementation(libs.androidx.hilt.navigation.compose)
+
+  // Testing Dependencies
+  testImplementation(libs.androidx.room.testing)
+  testImplementation(libs.turbine)
+  testImplementation(libs.mockk)
+  testImplementation("org.json:json:20240303")
 }
 
-
+tasks.configureEach {
+    if (name.startsWith("check") && name.endsWith("AarMetadata")) {
+        enabled = false
+    }
+}

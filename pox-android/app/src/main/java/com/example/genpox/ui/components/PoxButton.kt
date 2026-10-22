@@ -1,12 +1,13 @@
 package com.example.genpox.ui.components
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -24,11 +25,11 @@ enum class PoxButtonSize(
     val height: Dp,
     val fontSize: TextUnit,
     val horizontalPadding: Dp,
-    val verticalPadding: Dp
+    val verticalPadding: Dp,
 ) {
     COMPACT(28.dp, 8.sp, 8.dp, 2.dp),
     STANDARD(34.dp, 9.sp, 12.dp, 4.dp),
-    LARGE(42.dp, 11.sp, 16.dp, 6.dp)
+    LARGE(42.dp, 11.sp, 16.dp, 6.dp),
 }
 
 /**
@@ -37,33 +38,27 @@ enum class PoxButtonSize(
 enum class PoxButtonType(
     val getBorderColor: () -> Color,
     val getTextColor: () -> Color,
-    val getBgColor: () -> Color
+    val getBgColor: () -> Color,
 ) {
-    GREEN_PHOSPHOR({ CyberTheme.green }, { CyberTheme.green }, { CyberTheme.greenPanel.copy(alpha = 0.85f) }),
-    PURPLE_ANOMALY({ CyberTheme.purple }, { CyberTheme.purple }, { CyberTheme.purplePanel.copy(alpha = 0.85f) }),
-    CYAN_CELESTIAL({ CyberTheme.cyan }, { CyberTheme.cyan }, { CyberTheme.cyanPanel.copy(alpha = 0.85f) }),
-    RED_DANGER({ CyberTheme.red }, { CyberTheme.red }, { CyberTheme.redPanel.copy(alpha = 0.85f) }),
-    YELLOW_WARNING({ Color.Yellow }, { Color.Yellow }, { Color.Black.copy(alpha = 0.85f) }),
-    GRAY_UTILITY({ Color.Gray }, { Color.LightGray }, { Color.Black.copy(alpha = 0.85f) }),
-    
-    // Muted/Secondary versions
-    GREEN_MUTED({ CyberTheme.greenDim }, { CyberTheme.greenDim }, { CyberTheme.greenPanel.copy(alpha = 0.5f) }),
-    PURPLE_MUTED({ CyberTheme.purpleDim }, { CyberTheme.purpleDim }, { CyberTheme.purplePanel.copy(alpha = 0.5f) }),
-    CYAN_MUTED({ CyberTheme.cyanDim }, { CyberTheme.cyanDim }, { CyberTheme.cyanPanel.copy(alpha = 0.5f) }),
-    RED_MUTED({ CyberTheme.redDim }, { CyberTheme.redDim }, { CyberTheme.redPanel.copy(alpha = 0.5f) })
+    GREEN_PHOSPHOR({ CyberTheme.green }, { CyberTheme.green }, { CyberTheme.green.copy(alpha = 0.15f) }),
+    GREEN_MUTED({ CyberTheme.greenDim }, { CyberTheme.greenDim }, { CyberTheme.greenDim.copy(alpha = 0.10f) }),
+    CYAN_CELESTIAL({ CyberTheme.cyan }, { CyberTheme.cyan }, { CyberTheme.cyan.copy(alpha = 0.15f) }),
+    PURPLE_ANOMALY({ CyberTheme.purple }, { CyberTheme.purple }, { CyberTheme.purple.copy(alpha = 0.15f) }),
+    RED_DANGER({ CyberTheme.red }, { CyberTheme.red }, { CyberTheme.red.copy(alpha = 0.15f) }),
+    YELLOW_WARNING({ Color.Yellow }, { Color.Yellow }, { Color.Yellow.copy(alpha = 0.15f) }),
 }
 
 /**
- * Audio feedback variants for button clicks.
+ * Preset audio feedback triggers for button interactions.
  */
 enum class PoxButtonSound {
     NONE,
-    BEEP_DEFAULT,     // 440Hz sine beep
-    BEEP_HIGH,        // 600Hz high beep
-    BEEP_LOW,         // 400Hz low beep
-    COMBINATOR_TICK,  // Tech tick sound
-    REJECT_BEEP,      // Fail/Reject sound
-    SUCCESS_CHIME     // Success notification sound
+    BEEP_DEFAULT,
+    BEEP_HIGH,
+    BEEP_LOW,
+    COMBINATOR_TICK,
+    REJECT_BEEP,
+    SUCCESS_CHIME,
 }
 
 /**
@@ -78,7 +73,7 @@ fun PoxButton(
     buttonType: PoxButtonType = PoxButtonType.GREEN_PHOSPHOR,
     buttonSize: PoxButtonSize = PoxButtonSize.STANDARD,
     sound: PoxButtonSound = PoxButtonSound.BEEP_DEFAULT,
-    viewModel: MainViewModel? = null
+    viewModel: MainViewModel? = null,
 ) {
     // Dim the styling when disabled
     val activeBorderColor = if (enabled) buttonType.getBorderColor() else Color.Gray.copy(alpha = 0.25f)
@@ -90,32 +85,38 @@ fun PoxButton(
             .height(buttonSize.height)
             .cyberglass(
                 borderColor = activeBorderColor,
-                backgroundColor = activeBgColor
+                backgroundColor = activeBgColor,
             )
-            .clickable(enabled = enabled) {
-                // Play audio feedback
-                if (viewModel != null) {
-                    when (sound) {
-                        PoxButtonSound.BEEP_DEFAULT -> viewModel.synthManager.playBeep(440f, 0.05f, "sine")
-                        PoxButtonSound.BEEP_HIGH -> viewModel.synthManager.playBeep(600f, 0.05f, "sine")
-                        PoxButtonSound.BEEP_LOW -> viewModel.synthManager.playBeep(400f, 0.08f, "sine")
-                        PoxButtonSound.COMBINATOR_TICK -> viewModel.synthManager.playCombinatorTick()
-                        PoxButtonSound.REJECT_BEEP -> viewModel.synthManager.playReject()
-                        PoxButtonSound.SUCCESS_CHIME -> viewModel.synthManager.playSynthesisSuccess()
-                        PoxButtonSound.NONE -> {}
-                    }
-                }
-                onClick()
+            .pointerInput(enabled, sound, viewModel, onClick) {
+                if (!enabled) return@pointerInput
+                detectTapGestures(
+                    onPress = {
+                        if (viewModel != null) {
+                            when (sound) {
+                                PoxButtonSound.BEEP_DEFAULT -> viewModel.synthManager.playBeep(440f, 0.05f, "sine")
+                                PoxButtonSound.BEEP_HIGH -> viewModel.synthManager.playBeep(600f, 0.05f, "sine")
+                                PoxButtonSound.BEEP_LOW -> viewModel.synthManager.playBeep(400f, 0.08f, "sine")
+                                PoxButtonSound.COMBINATOR_TICK -> viewModel.synthManager.playCombinatorTick()
+                                PoxButtonSound.REJECT_BEEP -> viewModel.synthManager.playReject()
+                                PoxButtonSound.SUCCESS_CHIME -> viewModel.synthManager.playSynthesisSuccess()
+                                PoxButtonSound.NONE -> {}
+                            }
+                        }
+                    },
+                    onTap = {
+                        onClick()
+                    },
+                )
             }
             .padding(horizontal = buttonSize.horizontalPadding, vertical = buttonSize.verticalPadding),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text.uppercase(), // Enforce uppercase standard
             color = activeTextColor,
             fontSize = buttonSize.fontSize,
             fontFamily = FontFamily.Default, // Enforce Sans-serif standard for commands
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
         )
     }
 }

@@ -27,7 +27,7 @@ fun DualPaneConsoleFrame(
     primaryTitle: String? = null,
     primaryContent: @Composable ColumnScope.() -> Unit,
     secondaryTitle: String? = null,
-    secondaryContent: (@Composable ColumnScope.() -> Unit)? = null
+    secondaryContent: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     val activeBorder = if (theme == "purple") CyberTheme.purple.copy(alpha = 0.4f) else CyberBorder
     val activePanel = if (theme == "purple") CyberTheme.purplePanel else CyberPanel
@@ -35,20 +35,20 @@ fun DualPaneConsoleFrame(
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // Universal Header row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = flavorTitle.uppercase(),
                 color = headerColor,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Default
+                fontFamily = FontFamily.Default,
             )
             if (statusText != null) {
                 val textModifier = if (statusClickable != null) {
@@ -62,7 +62,7 @@ fun DualPaneConsoleFrame(
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Default,
-                    modifier = textModifier
+                    modifier = textModifier,
                 )
             }
         }
@@ -73,11 +73,11 @@ fun DualPaneConsoleFrame(
                 .fillMaxWidth()
                 .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
                 .background(activePanel)
-                .padding(12.dp)
+                .padding(12.dp),
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.Start
+                horizontalAlignment = Alignment.Start,
             ) {
                 if (primaryTitle != null) {
                     Text(
@@ -85,7 +85,7 @@ fun DualPaneConsoleFrame(
                         color = Color.White,
                         style = Typography.bodyMedium,
                         fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
                 primaryContent()
@@ -99,11 +99,11 @@ fun DualPaneConsoleFrame(
                     .fillMaxWidth()
                     .border(1.dp, activeBorder, RoundedCornerShape(4.dp))
                     .background(activePanel)
-                    .padding(12.dp)
+                    .padding(12.dp),
             ) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.Start
+                    horizontalAlignment = Alignment.Start,
                 ) {
                     if (secondaryTitle != null) {
                         Text(
@@ -111,7 +111,7 @@ fun DualPaneConsoleFrame(
                             color = Color.White,
                             style = Typography.bodyMedium,
                             fontFamily = FontFamily.Default,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                     secondaryContent()

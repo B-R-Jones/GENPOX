@@ -1,9 +1,9 @@
 package com.example.genpox
 
 import com.example.genpox.data.GeneticsEngine
-import org.junit.Test
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class GeneticsEngineTest {
 
@@ -11,15 +11,15 @@ class GeneticsEngineTest {
     fun testWallaceMeltingTemperatureWithSalt() {
         val seq = "AAGCTAGC" // 8-bp: 4 GC, 4 AT
         // Base Tm = 2 * 4 + 4 * 4 = 24.0°C
-        
+
         // Salt = 0.05M (correction should be 0.0)
         val tm05 = GeneticsEngine.calculateMeltingTemperature(seq, 0.05)
         assertEquals(24.0, tm05, 0.001)
-        
+
         // Salt = 0.20M (correction shifts Tm up)
         val tm20 = GeneticsEngine.calculateMeltingTemperature(seq, 0.20)
         assertTrue("Tm with higher salt should be greater than base Tm", tm20 > tm05)
-        
+
         // Salt = 0.01M (correction shifts Tm down)
         val tm01 = GeneticsEngine.calculateMeltingTemperature(seq, 0.01)
         assertTrue("Tm with lower salt should be lower than base Tm", tm01 < tm05)
@@ -31,7 +31,7 @@ class GeneticsEngineTest {
         val gcHairpin = "GGGGCCCC" // complementary GC pairs
         val energyGc = GeneticsEngine.calculateMinimumFreeEnergy(gcHairpin)
         assertTrue("Complementary GC sequence should have negative folding energy", energyGc < 0.0)
-        
+
         // Non-complementary sequence (no pairing)
         val nonPairing = "GGGGGGGG"
         val energyNone = GeneticsEngine.calculateMinimumFreeEnergy(nonPairing)
@@ -41,7 +41,7 @@ class GeneticsEngineTest {
     @Test
     fun testCodonAdaptationIndexBounds() {
         val seq = "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG" // 64-bp
-        
+
         val factions = listOf("INFECTION", "MECH", "PARASITE", "CONTAINMENT")
         for (faction in factions) {
             val cai = GeneticsEngine.calculateCodonAdaptationIndex(seq, faction)

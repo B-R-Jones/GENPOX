@@ -1,8 +1,5 @@
 package com.example.genpox.ui.components
 
-import android.graphics.Path as AndroidPath
-import android.graphics.RectF as AndroidRectF
-import android.graphics.Paint as AndroidPaint
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -17,11 +14,19 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.example.genpox.data.Creature
 import com.example.genpox.data.GraphicsMath
 import com.example.genpox.data.WaveMath
-import com.example.genpox.data.Creature
+import android.graphics.Paint as AndroidPaint
+import android.graphics.Path as AndroidPath
+import android.graphics.RectF as AndroidRectF
 
 object HolographicRenderEngine {
+
+    private val reusableAndroidPath = AndroidPath()
+    private val reusableAndroidRectF = AndroidRectF()
+    private val reusableGridPath = Path()
+    private val reusableDatePaint = android.graphics.Paint()
 
     /**
      * Draws concentric helper and grid circles.
@@ -31,7 +36,7 @@ object HolographicRenderEngine {
         cy: Float,
         rPx: Float,
         color: Color,
-        density: Density
+        density: Density,
     ) {
         val strokeWidth = with(density) { 1.dp.toPx() }
         // Outer/inner circular borders of the track
@@ -39,20 +44,20 @@ object HolographicRenderEngine {
             color = color.copy(alpha = 0.3f),
             radius = rPx * 0.86f,
             center = Offset(cx, cy),
-            style = Stroke(width = strokeWidth)
+            style = Stroke(width = strokeWidth),
         )
         drawCircle(
             color = color.copy(alpha = 0.3f),
             radius = rPx * 1.04f,
             center = Offset(cx, cy),
-            style = Stroke(width = strokeWidth)
+            style = Stroke(width = strokeWidth),
         )
         // Central core glowing outline
         drawCircle(
             color = color.copy(alpha = 0.5f),
             radius = rPx * 0.4f,
             center = Offset(cx, cy),
-            style = Stroke(width = strokeWidth)
+            style = Stroke(width = strokeWidth),
         )
     }
 
@@ -66,21 +71,21 @@ object HolographicRenderEngine {
         sweepAngleRad: Float,
         activeColor: Color,
         activeColorDim: Color,
-        density: Density
+        density: Density,
     ) {
         val numSweepTailLines = 6
         for (t in 0 until numSweepTailLines) {
             val tailAngleRad = sweepAngleRad - t * 0.08f // trailing angles
             val tailAlpha = (1f - t.toFloat() / numSweepTailLines) * 0.25f
-            
+
             // Centralize with GraphicsMath
             val tailPt = GraphicsMath.calculateCircularPoint(cx, cy, rPx * 0.4f, tailAngleRad.toDouble())
-            
+
             drawLine(
                 color = activeColorDim.copy(alpha = tailAlpha),
                 start = Offset(cx, cy),
                 end = Offset(tailPt.x, tailPt.y),
-                strokeWidth = with(density) { (if (t == 0) 1.5.dp.toPx() else 1.dp.toPx()) }
+                strokeWidth = with(density) { (if (t == 0) 1.5.dp.toPx() else 1.dp.toPx()) },
             )
         }
 
@@ -89,7 +94,7 @@ object HolographicRenderEngine {
         drawCircle(
             color = activeColor,
             radius = with(density) { 2.5.dp.toPx() },
-            center = Offset(cursorPt.x, cursorPt.y)
+            center = Offset(cursorPt.x, cursorPt.y),
         )
     }
 
@@ -106,19 +111,19 @@ object HolographicRenderEngine {
         wavePhase: Float,
         activeColor: Color,
         activeColorDim: Color,
-        density: Density
+        density: Density,
     ) {
         val strokeWidth = with(density) { 1.dp.toPx() }
         val glowStrokeWidth = with(density) { 1.5.dp.toPx() }
         val currentSpinDeg = currentSpin * 180f / Math.PI.toFloat()
-        
+
         for (a in 0 until 360 step 4) {
             // Map the screen-space angle back to the rotating slot index
             var normalizedA = (a + 90f - currentSpinDeg) % 360f
             if (normalizedA < 0f) normalizedA += 360f
             val slotIdx = (normalizedA / 45f).toInt().coerceIn(0, 7)
             val slotGene = splicerSlots.getOrNull(slotIdx)
-            
+
             val startIdx = slotIdx * 8
             val endIdx = (slotIdx + 1) * 8
             val requiredSegment = if (startIdx < targetSequence.length) {
@@ -126,7 +131,7 @@ object HolographicRenderEngine {
             } else {
                 ""
             }
-            
+
             val isAnom = slotGene?.let { WaveMath.isAnomalousGene(it) } ?: false
             val isCoherent = slotGene == requiredSegment
 
@@ -163,7 +168,7 @@ object HolographicRenderEngine {
                 color = waveColor,
                 start = Offset(startPt.x, startPt.y),
                 end = Offset(endPt.x, endPt.y),
-                strokeWidth = strokeWidth
+                strokeWidth = strokeWidth,
             )
 
             // Draw white glowing peak highlights for excited states
@@ -173,7 +178,7 @@ object HolographicRenderEngine {
                     color = Color.White.copy(alpha = glowAlpha),
                     start = Offset(startPt.x, startPt.y),
                     end = Offset(endPt.x, endPt.y),
-                    strokeWidth = glowStrokeWidth
+                    strokeWidth = glowStrokeWidth,
                 )
             }
         }
@@ -197,7 +202,7 @@ object HolographicRenderEngine {
         density: Density,
         labelPaint: AndroidPaint,
         geneTextPaint: AndroidPaint,
-        getBaseColor: (Char) -> Color
+        getBaseColor: (Char) -> Color,
     ) {
         val currentSpinDeg = currentSpin * 180f / Math.PI.toFloat()
         val tickStrokeWidth = with(density) { 1.dp.toPx() }
@@ -236,7 +241,7 @@ object HolographicRenderEngine {
                     useCenter = false,
                     topLeft = Offset(cx - rPx * 0.95f, cy - rPx * 0.95f),
                     size = Size(rPx * 1.9f, rPx * 1.9f),
-                    style = Stroke(width = rPx * 0.18f)
+                    style = Stroke(width = rPx * 0.18f),
                 )
             }
 
@@ -245,10 +250,10 @@ object HolographicRenderEngine {
             for (b in 0 until 8) {
                 val baseChar = segmentGeneString.getOrNull(b) ?: '-'
                 val baseColor = getBaseColor(baseChar)
-                
+
                 val baseStartAngle = startAngle + b * 5.125f
                 val baseSweepAngle = 4.6f // leaves a 0.525 degree gap
-                
+
                 drawArc(
                     color = baseColor.copy(alpha = if (slotGene != null) 0.6f else 0.15f),
                     startAngle = baseStartAngle,
@@ -256,7 +261,7 @@ object HolographicRenderEngine {
                     useCenter = false,
                     topLeft = Offset(cx - rPx * 0.95f, cy - rPx * 0.95f),
                     size = Size(rPx * 1.9f, rPx * 1.9f),
-                    style = Stroke(width = rPx * 0.18f)
+                    style = Stroke(width = rPx * 0.18f),
                 )
             }
 
@@ -268,7 +273,7 @@ object HolographicRenderEngine {
                 useCenter = false,
                 topLeft = Offset(cx - rPx * 1.04f, cy - rPx * 1.04f),
                 size = Size(rPx * 2.08f, rPx * 2.08f),
-                style = Stroke(width = with(density) { (if (activeSlotSelection == i) 3.5.dp.toPx() else 1.5.dp.toPx()) })
+                style = Stroke(width = with(density) { (if (activeSlotSelection == i) 3.5.dp.toPx() else 1.5.dp.toPx()) }),
             )
 
             // Draw inner boundary highlight arc for selected slot
@@ -280,13 +285,13 @@ object HolographicRenderEngine {
                     useCenter = false,
                     topLeft = Offset(cx - rPx * 0.86f, cy - rPx * 0.86f),
                     size = Size(rPx * 1.72f, rPx * 1.72f),
-                    style = Stroke(width = with(density) { 2.dp.toPx() })
+                    style = Stroke(width = with(density) { 2.dp.toPx() }),
                 )
             }
 
             // Draw segment division spoke (radial divider) at slot boundaries
             val divisionAngleRad = ((i * 45 - 90) * Math.PI / 180.0) + currentSpin
-            
+
             // Centralize position calculations in GraphicsMath
             val dsPt = GraphicsMath.calculateCircularPoint(cx, cy, rPx * 0.86f, divisionAngleRad)
             val dePt = GraphicsMath.calculateCircularPoint(cx, cy, rPx * 1.04f, divisionAngleRad)
@@ -294,7 +299,7 @@ object HolographicRenderEngine {
                 color = activeColorDim.copy(alpha = 0.25f),
                 start = Offset(dsPt.x, dsPt.y),
                 end = Offset(dePt.x, dePt.y),
-                strokeWidth = tickStrokeWidth
+                strokeWidth = tickStrokeWidth,
             )
 
             // Draw outer coordinate tick marks
@@ -304,7 +309,7 @@ object HolographicRenderEngine {
                 color = activeColorDim.copy(alpha = 0.4f),
                 start = Offset(tsPt.x, tsPt.y),
                 end = Offset(tePt.x, tePt.y),
-                strokeWidth = tickStrokeWidth
+                strokeWidth = tickStrokeWidth,
             )
 
             // Draw outer base-pair coordinate label (0, 8, 16 ... 56 bp)
@@ -314,22 +319,26 @@ object HolographicRenderEngine {
                     "${i * 8} bp",
                     labelPt.x,
                     labelPt.y + arcLabelVOffset,
-                    labelPaint
+                    labelPaint,
                 )
             }
 
             // Draw gene sequence text along the arc segment path (clockwise direction)
             val textRadius = rPx * 0.95f
-            val androidPath = AndroidPath()
-            val oval = AndroidRectF(cx - textRadius, cy - textRadius, cx + textRadius, cy + textRadius)
-            androidPath.addArc(oval, startAngle, sweepAngle)
+            reusableAndroidPath.reset()
+            reusableAndroidRectF.set(cx - textRadius, cy - textRadius, cx + textRadius, cy + textRadius)
+            reusableAndroidPath.addArc(reusableAndroidRectF, startAngle, sweepAngle)
 
             val isTargetAnom = WaveMath.isAnomalousGene(requiredSegment)
             val textPaintColor = when {
                 slotGene == null -> {
-                    if (isCustomScaffoldMode) Color(0xFF22D3EE).copy(alpha = 0.3f)
-                    else if (isTargetAnom) Color(0xFFA855F7).copy(alpha = 0.22f)
-                    else activeColorDim.copy(alpha = 0.22f)
+                    if (isCustomScaffoldMode) {
+                        Color(0xFF22D3EE).copy(alpha = 0.3f)
+                    } else if (isTargetAnom) {
+                        Color(0xFFA855F7).copy(alpha = 0.22f)
+                    } else {
+                        activeColorDim.copy(alpha = 0.22f)
+                    }
                 }
                 isAnom -> Color(0xFFC084FC)
                 isCustomScaffoldMode -> Color(0xFF22D3EE)
@@ -342,10 +351,10 @@ object HolographicRenderEngine {
             drawIntoCanvas { canvas ->
                 canvas.nativeCanvas.drawTextOnPath(
                     textToDraw,
-                    androidPath,
+                    reusableAndroidPath,
                     0f, // hOffset - centered automatically by Paint.Align.CENTER
                     arcLabelVOffset, // vOffset
-                    geneTextPaint
+                    geneTextPaint,
                 )
             }
         }
@@ -364,23 +373,23 @@ object HolographicRenderEngine {
         activeColor: Color,
         activeColorDim: Color,
         density: Density,
-        getBaseColor: (Char) -> Color
+        getBaseColor: (Char) -> Color,
     ) {
         val strokeWidth = with(density) { 1.dp.toPx() }
         val outlineStrokeWidth = with(density) { 1.5.dp.toPx() }
-        
+
         // Draw outer/inner circular borders of the track
         drawCircle(
             color = activeColorDim.copy(alpha = 0.2f),
             radius = rPx * 0.86f,
             center = Offset(cx, cy),
-            style = Stroke(width = strokeWidth)
+            style = Stroke(width = strokeWidth),
         )
         drawCircle(
             color = activeColorDim.copy(alpha = 0.2f),
             radius = rPx * 1.04f,
             center = Offset(cx, cy),
-            style = Stroke(width = strokeWidth)
+            style = Stroke(width = strokeWidth),
         )
 
         // Draw 8 Arc segments (each with 8 bases)
@@ -408,7 +417,7 @@ object HolographicRenderEngine {
                     useCenter = false,
                     topLeft = Offset(cx - rPx * 0.95f, cy - rPx * 0.95f),
                     size = Size(rPx * 1.9f, rPx * 1.9f),
-                    style = Stroke(width = rPx * 0.18f)
+                    style = Stroke(width = rPx * 0.18f),
                 )
             }
 
@@ -422,7 +431,7 @@ object HolographicRenderEngine {
                 useCenter = false,
                 topLeft = Offset(cx - rPx * 1.04f, cy - rPx * 1.04f),
                 size = Size(rPx * 2.08f, rPx * 2.08f),
-                style = Stroke(width = outlineStrokeWidth)
+                style = Stroke(width = outlineStrokeWidth),
             )
         }
     }
@@ -452,7 +461,7 @@ object HolographicRenderEngine {
         p2Color: Color,
         dateText: String,
         alignmentState: WaveMath.AlignmentState,
-        density: Density
+        density: Density,
     ) {
         clipRect {
             val r1 = maxRadius * 0.78f
@@ -463,23 +472,22 @@ object HolographicRenderEngine {
                 color = Color.Gray.copy(alpha = 0.3f),
                 start = Offset(w * 0.02f, cy),
                 end = Offset(w * 0.98f, cy),
-                strokeWidth = with(density) { 1.5.dp.toPx() }
+                strokeWidth = with(density) { 1.5.dp.toPx() },
             )
 
             // Horizon Date Watermark
-            val datePaint = android.graphics.Paint().apply {
-                color = Color.White.copy(alpha = 0.15f).toArgb()
-                textSize = with(density) { 10.dp.toPx() }
-                typeface = android.graphics.Typeface.MONOSPACE
-                textAlign = android.graphics.Paint.Align.CENTER
-            }
+            reusableDatePaint.reset()
+            reusableDatePaint.color = Color.White.copy(alpha = 0.15f).toArgb()
+            reusableDatePaint.textSize = with(density) { 10.dp.toPx() }
+            reusableDatePaint.typeface = android.graphics.Typeface.MONOSPACE
+            reusableDatePaint.textAlign = android.graphics.Paint.Align.CENTER
 
             drawIntoCanvas { canvas ->
                 canvas.nativeCanvas.drawText(
                     dateText,
                     cx,
                     cy + with(density) { 14.dp.toPx() },
-                    datePaint
+                    reusableDatePaint,
                 )
             }
 
@@ -487,17 +495,17 @@ object HolographicRenderEngine {
             val gridAngles = listOf(0.4f, 0.7f, 1.0f)
             gridAngles.forEach { ratio ->
                 val rGrid = maxRadius * ratio
-                val gridPath = Path().apply {
-                    val oval = Rect(cx - rGrid, cy - rGrid, cx + rGrid, cy + rGrid)
-                    addArc(oval, 180f, 180f)
-                }
+                reusableGridPath.reset()
+                val oval = Rect(cx - rGrid, cy - rGrid, cx + rGrid, cy + rGrid)
+                reusableGridPath.addArc(oval, 180f, 180f)
+
                 drawPath(
-                    path = gridPath,
+                    path = reusableGridPath,
                     color = Color(0x8000FF41).copy(alpha = 0.15f), // CyberGreenDim copy
                     style = Stroke(
                         width = with(density) { 0.8.dp.toPx() },
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
-                    )
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f),
+                    ),
                 )
             }
 
@@ -507,7 +515,7 @@ object HolographicRenderEngine {
                 start = Offset(cx, cy),
                 end = Offset(cx, cy - maxRadius),
                 strokeWidth = with(density) { 0.8.dp.toPx() },
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f)
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f),
             )
 
             // 3. Draw Clock Face Elements
@@ -522,7 +530,7 @@ object HolographicRenderEngine {
                 color = angleColor.copy(alpha = 0.5f),
                 start = Offset(cx, cy),
                 end = Offset(dx1, dy1),
-                strokeWidth = with(density) { 1.2.dp.toPx() }
+                strokeWidth = with(density) { 1.2.dp.toPx() },
             )
 
             // Clock line 2
@@ -530,15 +538,18 @@ object HolographicRenderEngine {
                 color = angleColor.copy(alpha = 0.5f),
                 start = Offset(cx, cy),
                 end = Offset(dx2, dy2),
-                strokeWidth = with(density) { 1.2.dp.toPx() }
+                strokeWidth = with(density) { 1.2.dp.toPx() },
             )
 
             // Clock wedge / sector of separation
             val deg1 = Math.toDegrees(kotlin.math.atan2((dy1 - cy).toDouble(), (dx1 - cx).toDouble()))
             val deg2 = Math.toDegrees(kotlin.math.atan2((dy2 - cy).toDouble(), (dx2 - cx).toDouble()))
             var sweep = (deg2 - deg1) % 360.0
-            if (sweep > 180.0) sweep -= 360.0
-            else if (sweep < -180.0) sweep += 360.0
+            if (sweep > 180.0) {
+                sweep -= 360.0
+            } else if (sweep < -180.0) {
+                sweep += 360.0
+            }
 
             val rWedge = maxRadius * 0.25f
 
@@ -548,7 +559,7 @@ object HolographicRenderEngine {
                 sweepAngle = sweep.toFloat(),
                 useCenter = true,
                 size = Size(rWedge * 2f, rWedge * 2f),
-                topLeft = Offset(cx - rWedge, cy - rWedge)
+                topLeft = Offset(cx - rWedge, cy - rWedge),
             )
             drawArc(
                 color = angleColor.copy(alpha = 0.25f),
@@ -557,7 +568,7 @@ object HolographicRenderEngine {
                 useCenter = false,
                 size = Size(rWedge * 2f, rWedge * 2f),
                 topLeft = Offset(cx - rWedge, cy - rWedge),
-                style = Stroke(width = with(density) { 1.dp.toPx() })
+                style = Stroke(width = with(density) { 1.dp.toPx() }),
             )
 
             // 4. Draw Planet 1 Path
@@ -567,7 +578,7 @@ object HolographicRenderEngine {
                     color = Color(0xFF00E5FF),
                     radius = rp1,
                     center = Offset(cx, cy1),
-                    style = Stroke(width = with(density) { (if (isSel1) 2.dp.toPx() else 1.dp.toPx()) })
+                    style = Stroke(width = with(density) { (if (isSel1) 2.dp.toPx() else 1.dp.toPx()) }),
                 )
             }
 
@@ -579,8 +590,8 @@ object HolographicRenderEngine {
                     center = Offset(cx, cy1),
                     style = Stroke(
                         width = with(density) { (if (isSel1) 1.5.dp.toPx() else 0.8.dp.toPx()) },
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
-                    )
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f),
+                    ),
                 )
             }
 
@@ -591,7 +602,7 @@ object HolographicRenderEngine {
                     color = Color(0xFF00E5FF),
                     radius = rp2,
                     center = Offset(cx, cy2),
-                    style = Stroke(width = with(density) { (if (isSel2) 2.dp.toPx() else 1.dp.toPx()) })
+                    style = Stroke(width = with(density) { (if (isSel2) 2.dp.toPx() else 1.dp.toPx()) }),
                 )
             }
 
@@ -603,8 +614,8 @@ object HolographicRenderEngine {
                     center = Offset(cx, cy2),
                     style = Stroke(
                         width = with(density) { (if (isSel2) 1.5.dp.toPx() else 0.8.dp.toPx()) },
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
-                    )
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f),
+                    ),
                 )
             }
 
@@ -612,7 +623,7 @@ object HolographicRenderEngine {
             drawCircle(
                 color = if (isBelowHorizon1) p1Color.copy(alpha = 0.4f) else p1Color,
                 radius = with(density) { (if (isSel1) 6.dp.toPx() else 4.dp.toPx()) },
-                center = Offset(dx1, dy1)
+                center = Offset(dx1, dy1),
             )
 
             if (isSel1) {
@@ -620,7 +631,7 @@ object HolographicRenderEngine {
                     color = p1Color,
                     radius = with(density) { 9.5.dp.toPx() },
                     center = Offset(dx1, dy1),
-                    style = Stroke(width = with(density) { 1.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f))
+                    style = Stroke(width = with(density) { 1.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f)),
                 )
             }
 
@@ -628,7 +639,7 @@ object HolographicRenderEngine {
             drawCircle(
                 color = if (isBelowHorizon2) p2Color.copy(alpha = 0.4f) else p2Color,
                 radius = with(density) { (if (isSel2) 6.dp.toPx() else 4.dp.toPx()) },
-                center = Offset(dx2, dy2)
+                center = Offset(dx2, dy2),
             )
 
             if (isSel2) {
@@ -636,7 +647,7 @@ object HolographicRenderEngine {
                     color = p2Color,
                     radius = with(density) { 9.5.dp.toPx() },
                     center = Offset(dx2, dy2),
-                    style = Stroke(width = with(density) { 1.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f))
+                    style = Stroke(width = with(density) { 1.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f)),
                 )
             }
         }

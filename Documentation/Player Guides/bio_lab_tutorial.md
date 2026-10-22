@@ -76,7 +76,7 @@ This document serves as an interactive tutorial skeleton designed to be translat
   A higher final average Q-score directly boosts creature stats: Starting Telomeres (lifespan) $= Q \times 2.5$, and Max HP $= \text{Base HP} \times (0.5 + 0.5 \times \frac{Q}{40.0})$.
 * **Tutorial Action**:
   1. Locate the **Enzyme Chamber Selector** row.
-  2. Select **Pfu Polymerase**. (Note the cost changes: Pfu consumes $50$ of each sequence base and $1000$ Bio-Waste).
+  2. Select **Pfu Polymerase**. (Note the cost: Pfu costs $200$ units from all bases + $200$ units per base instance in the target sequence; no bio-waste).
   3. Pfu's built-in proofreading mechanism is now active, raising baseline accuracy to a minimum of $Q35$.
 
 ---
@@ -86,7 +86,7 @@ This document serves as an interactive tutorial skeleton designed to be translat
 * **Concept**: All polymerases suffer from a Q-score quality penalty (up to **$-15.0$**) if the raw base feed rate does not match the target strand's nucleotide ratios. Additionally, standard polymerases (Taq and Tth) will suffer from physical sequence errors (crosstalk mutations) when inlets are unbalanced.
   *Note: While Pfu's proofreading prevents physical sequence mutations, you still need to balance the inlets to avoid the Q-score quality penalty.*
 * **Tutorial Action**:
-  1. Swap to **Tth Polymerase**.
+  1. Swap to **Tth Polymerase** (costs $100$ units from all bases + $100$ units per base instance in the target sequence; no bio-waste).
   2. Program the target sequence: `A A A A G G G G`. (50% Adenine, 50% Guanine).
   3. Locate the **4-Channel Feedstock Inlet Bias** dial and slider.
   4. Use the spinnable dial to select **Inlet A** and set its slider to `50%`. Then select **Inlet G** and set its slider to `50%` (ensure $I_T$ and $I_C$ are at `0%`).

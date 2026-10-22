@@ -1,7 +1,6 @@
 package com.example.genpox.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,7 +16,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.genpox.theme.*
 import com.example.genpox.ui.main.MainViewModel
 import com.example.genpox.ui.main.cyberglass
@@ -48,9 +47,9 @@ fun PoxTabFrame(
     showHeader: Boolean = true,
     useDynamicReagentColor: Boolean = false,
     headerBadges: (@Composable () -> Unit)? = null,
-    content: (@Composable ColumnScope.() -> Unit)? = null
+    content: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
-    val selectedReagentState = if (useDynamicReagentColor) viewModel?.selectedReagent?.collectAsState() else null
+    val selectedReagentState = if (useDynamicReagentColor) viewModel?.selectedReagent?.collectAsStateWithLifecycle() else null
     val selectedReagent = selectedReagentState?.value
     val dynamicColor = if (useDynamicReagentColor && viewModel != null) getActiveReagentColor(selectedReagent) else null
     val baseBorderColor = dynamicColor ?: if (borderColor == CyberBorder) CyberGreen else borderColor
@@ -65,8 +64,10 @@ fun PoxTabFrame(
                 if (drawFrame) {
                     Modifier.cyberglass(borderColor = resolvedBorder, backgroundColor = backgroundColor)
                         .padding(12.dp)
-                } else Modifier
-            )
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Column(
             modifier = Modifier
@@ -76,44 +77,46 @@ fun PoxTabFrame(
                 .then(
                     if (!drawFrame) {
                         Modifier.padding(12.dp)
-                    } else Modifier
+                    } else {
+                        Modifier
+                    },
                 ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalAlignment = Alignment.Start
+            horizontalAlignment = Alignment.Start,
         ) {
             if (showHeader) {
                 // Top header row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                       text = flavorTitle.uppercase(),
-                       color = when (resolvedBorder) {
-                           CyberBorder -> CyberGreenDim
-                           CyberTheme.purpleBorder -> CyberTheme.purpleDim
-                           CyberTheme.cyanBorder -> CyberTheme.cyanDim
-                           CyberTheme.redBorder -> CyberTheme.redDim
-                           else -> baseBorderColor.copy(alpha = 0.6f)
-                       },
-                       fontSize = 9.sp,
-                       fontWeight = FontWeight.Bold,
-                       fontFamily = FontFamily.Default
+                        text = flavorTitle.uppercase(),
+                        color = when (resolvedBorder) {
+                            CyberBorder -> CyberGreenDim
+                            CyberTheme.purpleBorder -> CyberTheme.purpleDim
+                            CyberTheme.cyanBorder -> CyberTheme.cyanDim
+                            CyberTheme.redBorder -> CyberTheme.redDim
+                            else -> baseBorderColor.copy(alpha = 0.6f)
+                        },
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Default,
                     )
                     if (statusText == "CLOSE") {
                         Box(
                             modifier = Modifier
                                 .background(CyberRed, RoundedCornerShape(4.dp))
                                 .clickable { onStatusClick?.invoke() }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {
                             Text(
                                 text = "CLOSE",
                                 color = Color.Black,
                                 fontSize = 8.sp,
                                 fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                         }
                     } else {
@@ -123,7 +126,7 @@ fun PoxTabFrame(
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Default,
-                            modifier = if (onStatusClick != null) Modifier.clickable(onClick = onStatusClick) else Modifier
+                            modifier = if (onStatusClick != null) Modifier.clickable(onClick = onStatusClick) else Modifier,
                         )
                     }
                 }
@@ -134,7 +137,7 @@ fun PoxTabFrame(
                         .fillMaxWidth()
                         .requiredHeight(24.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = headerTitle.uppercase(),
@@ -142,7 +145,7 @@ fun PoxTabFrame(
                         style = Typography.bodyMedium,
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     )
                 }
 
@@ -160,7 +163,7 @@ fun PoxTabFrame(
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight.Normal,
-                    modifier = Modifier.padding(bottom = if (content != null && headerBadges == null) 4.dp else 0.dp)
+                    modifier = Modifier.padding(bottom = if (content != null && headerBadges == null) 4.dp else 0.dp),
                 )
 
                 if (headerBadges != null) {
@@ -186,7 +189,7 @@ fun PoxTabFrame(
                 onSubTabClick = onSubTabClick,
                 viewModel = viewModel,
                 activeColor = activeColor,
-                inactiveColor = inactiveColor
+                inactiveColor = inactiveColor,
             )
         }
     }

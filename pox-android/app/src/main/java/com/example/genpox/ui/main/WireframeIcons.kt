@@ -1,96 +1,28 @@
 package com.example.genpox.ui.main
 
-import android.content.Context
-import androidx.annotation.Keep
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.zIndex
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.ClipOp
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.genpox.data.Creature
-import com.example.genpox.data.GeneSequence
-import com.example.genpox.data.HarvestMission
-import com.example.genpox.data.WaveMath
-import com.example.genpox.data.BuildingStructure
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.*
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlinx.coroutines.delay
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.coerceAtLeast
-import androidx.compose.ui.unit.coerceIn
-import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.foundation.gestures.forEachGesture
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlin.math.absoluteValue
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.SystemFontFamily
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.runtime.Immutable
-
 
 // ==========================================
 // CUSTOM WIREFRAME RETRO ICONS & VISUALS
@@ -180,10 +112,10 @@ fun WireframeGalaxy(color: Color, modifier: Modifier = Modifier) {
         val h = size.height
         val center = Offset(w * 0.5f, h * 0.5f)
         drawCircle(color, radius = w * 0.12f, center = center)
-        
+
         val armPath1 = Path()
         val armPath2 = Path()
-        
+
         for (i in 0..30) {
             val t = i / 30f
             val angle = t * 2f * Math.PI.toFloat()
@@ -192,7 +124,7 @@ fun WireframeGalaxy(color: Color, modifier: Modifier = Modifier) {
             val y = (center.y + radius * sin(angle)).toFloat()
             if (i == 0) armPath1.moveTo(x, y) else armPath1.lineTo(x, y)
         }
-        
+
         for (i in 0..30) {
             val t = i / 30f
             val angle = t * 2f * Math.PI.toFloat() + Math.PI.toFloat()
@@ -201,7 +133,7 @@ fun WireframeGalaxy(color: Color, modifier: Modifier = Modifier) {
             val y = (center.y + radius * sin(angle)).toFloat()
             if (i == 0) armPath2.moveTo(x, y) else armPath2.lineTo(x, y)
         }
-        
+
         drawPath(armPath1, color, style = Stroke(width = 1.2.dp.toPx()))
         drawPath(armPath2, color, style = Stroke(width = 1.2.dp.toPx()))
     }
@@ -241,8 +173,8 @@ fun WireframeDna(color: Color, modifier: Modifier = Modifier) {
             wave2.add(Offset(x, h * 0.5f - yOffset))
         }
         for (i in 0 until steps) {
-            drawLine(color, wave1[i], wave1[i+1], strokeWidth = 1.5.dp.toPx())
-            drawLine(color, wave2[i], wave2[i+1], strokeWidth = 1.5.dp.toPx())
+            drawLine(color, wave1[i], wave1[i + 1], strokeWidth = 1.5.dp.toPx())
+            drawLine(color, wave2[i], wave2[i + 1], strokeWidth = 1.5.dp.toPx())
         }
         for (i in listOf(2, 5, 8)) {
             drawLine(color, wave1[i], wave2[i], strokeWidth = 1.dp.toPx())
@@ -297,11 +229,11 @@ fun WireframeGear(color: Color, modifier: Modifier = Modifier) {
             val angle = i * Math.PI / 3
             val start = Offset(
                 (center.x + rOuter * cos(angle)).toFloat(),
-                (center.y + rOuter * sin(angle)).toFloat()
+                (center.y + rOuter * sin(angle)).toFloat(),
             )
             val end = Offset(
                 (center.x + (rOuter + w * 0.12f) * cos(angle)).toFloat(),
-                (center.y + (rOuter + w * 0.12f) * sin(angle)).toFloat()
+                (center.y + (rOuter + w * 0.12f) * sin(angle)).toFloat(),
             )
             drawLine(color, start, end, strokeWidth = 1.5.dp.toPx())
         }
@@ -354,7 +286,7 @@ fun WireframeTransfer(color: Color, modifier: Modifier = Modifier) {
         val y1 = h * 0.35f
         val y2 = h * 0.65f
         val stroke = 1.2.dp.toPx()
-        
+
         drawLine(color, Offset(w * 0.2f, y1), Offset(w * 0.8f, y1), strokeWidth = stroke)
         drawLine(color, Offset(w * 0.8f, y1), Offset(w * 0.6f, y1 - h * 0.15f), strokeWidth = stroke)
         drawLine(color, Offset(w * 0.8f, y1), Offset(w * 0.6f, y1 + h * 0.15f), strokeWidth = stroke)
@@ -421,15 +353,15 @@ fun HoloDnaSlotIcon(color: Color, modifier: Modifier = Modifier) {
         val w = size.width
         val h = size.height
         val strokeW = 1.2.dp.toPx()
-        
+
         // Draw the outer square box
         drawRect(
             color = color,
             topLeft = Offset(0f, 0f),
             size = Size(w, h),
-            style = Stroke(width = strokeW)
+            style = Stroke(width = strokeW),
         )
-        
+
         // Draw the vertical DNA strand inside the box
         val cx = w / 2f
         val amplitude = w * 0.2f
@@ -443,12 +375,12 @@ fun HoloDnaSlotIcon(color: Color, modifier: Modifier = Modifier) {
             wave1.add(Offset(cx + xOffset, y))
             wave2.add(Offset(cx - xOffset, y))
         }
-        
+
         for (i in 0 until steps) {
-            drawLine(color, wave1[i], wave1[i+1], strokeWidth = strokeW)
-            drawLine(color, wave2[i], wave2[i+1], strokeWidth = strokeW)
+            drawLine(color, wave1[i], wave1[i + 1], strokeWidth = strokeW)
+            drawLine(color, wave2[i], wave2[i + 1], strokeWidth = strokeW)
         }
-        
+
         for (i in listOf(2, 6, 10)) {
             drawLine(color, wave1[i], wave2[i], strokeWidth = strokeW * 0.7f)
         }
@@ -462,7 +394,7 @@ fun HoloDnaForceIcon(color: Color, modifier: Modifier = Modifier) {
         val h = size.height
         val strokeW = 1.2.dp.toPx()
         val cx = w / 2f
-        
+
         // Draw the vertical DNA strand in the center
         val amplitude = w * 0.15f
         val steps = 12
@@ -475,15 +407,15 @@ fun HoloDnaForceIcon(color: Color, modifier: Modifier = Modifier) {
             wave1.add(Offset(cx + xOffset, y))
             wave2.add(Offset(cx - xOffset, y))
         }
-        
+
         for (i in 0 until steps) {
-            drawLine(color, wave1[i], wave1[i+1], strokeWidth = strokeW)
-            drawLine(color, wave2[i], wave2[i+1], strokeWidth = strokeW)
+            drawLine(color, wave1[i], wave1[i + 1], strokeWidth = strokeW)
+            drawLine(color, wave2[i], wave2[i + 1], strokeWidth = strokeW)
         }
         for (i in listOf(2, 6, 10)) {
             drawLine(color, wave1[i], wave2[i], strokeWidth = strokeW * 0.7f)
         }
-        
+
         // Draw two inward facing chevrons on the left and right sides
         val leftPath = Path().apply {
             moveTo(w * 0.1f, h * 0.35f)
@@ -495,7 +427,7 @@ fun HoloDnaForceIcon(color: Color, modifier: Modifier = Modifier) {
             lineTo(w * 0.75f, h * 0.5f)
             lineTo(w * 0.9f, h * 0.65f)
         }
-        
+
         drawPath(leftPath, color, style = Stroke(width = strokeW))
         drawPath(rightPath, color, style = Stroke(width = strokeW))
     }
@@ -509,7 +441,7 @@ fun HoloDnaAutoLoopIcon(color: Color, modifier: Modifier = Modifier) {
         val strokeW = 1.2.dp.toPx()
         val cx = w / 2f
         val cy = h / 2f
-        
+
         // Draw the vertical DNA strand in the center (scaled down slightly to fit loop arrows)
         val amplitude = w * 0.11f
         val steps = 10
@@ -522,15 +454,15 @@ fun HoloDnaAutoLoopIcon(color: Color, modifier: Modifier = Modifier) {
             wave1.add(Offset(cx + xOffset, y))
             wave2.add(Offset(cx - xOffset, y))
         }
-        
+
         for (i in 0 until steps) {
-            drawLine(color, wave1[i], wave1[i+1], strokeWidth = strokeW)
-            drawLine(color, wave2[i], wave2[i+1], strokeWidth = strokeW)
+            drawLine(color, wave1[i], wave1[i + 1], strokeWidth = strokeW)
+            drawLine(color, wave2[i], wave2[i + 1], strokeWidth = strokeW)
         }
         for (i in listOf(2, 5, 8)) {
             drawLine(color, wave1[i], wave2[i], strokeWidth = strokeW * 0.7f)
         }
-        
+
         // Draw two inward facing chevrons on the left and right sides (scaled down to fit)
         val leftPath = Path().apply {
             moveTo(w * 0.22f, h * 0.38f)
@@ -542,7 +474,7 @@ fun HoloDnaAutoLoopIcon(color: Color, modifier: Modifier = Modifier) {
             lineTo(w * 0.68f, h * 0.5f)
             lineTo(w * 0.78f, h * 0.62f)
         }
-        
+
         drawPath(leftPath, color, style = Stroke(width = strokeW))
         drawPath(rightPath, color, style = Stroke(width = strokeW))
 
@@ -551,7 +483,7 @@ fun HoloDnaAutoLoopIcon(color: Color, modifier: Modifier = Modifier) {
         val arcSize = Size(w - arcPadding * 2, h - arcPadding * 2)
         val arcTopLeft = Offset(arcPadding, arcPadding)
         val rx = (w - arcPadding * 2) / 2f
-        
+
         // Left arc: starts at 100 degrees, sweeps 170 degrees (clockwise to 270 degrees)
         drawArc(
             color = color,
@@ -560,9 +492,9 @@ fun HoloDnaAutoLoopIcon(color: Color, modifier: Modifier = Modifier) {
             useCenter = false,
             topLeft = arcTopLeft,
             size = arcSize,
-            style = Stroke(width = strokeW, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            style = Stroke(width = strokeW, cap = androidx.compose.ui.graphics.StrokeCap.Round),
         )
-        
+
         // Right arc: starts at 280 degrees, sweeps 170 degrees (clockwise to 90 degrees)
         drawArc(
             color = color,
@@ -571,7 +503,7 @@ fun HoloDnaAutoLoopIcon(color: Color, modifier: Modifier = Modifier) {
             useCenter = false,
             topLeft = arcTopLeft,
             size = arcSize,
-            style = Stroke(width = strokeW, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            style = Stroke(width = strokeW, cap = androidx.compose.ui.graphics.StrokeCap.Round),
         )
 
         // Arrowheads:
@@ -599,7 +531,7 @@ fun HoloDnaAutoSlotIcon(color: Color, modifier: Modifier = Modifier) {
         val w = size.width
         val h = size.height
         val strokeW = 1.2.dp.toPx()
-        
+
         // Draw the slot box (U-shape container)
         val boxPath = Path().apply {
             moveTo(w * 0.25f, h * 0.45f)
@@ -608,7 +540,7 @@ fun HoloDnaAutoSlotIcon(color: Color, modifier: Modifier = Modifier) {
             lineTo(w * 0.75f, h * 0.45f)
         }
         drawPath(boxPath, color, style = Stroke(width = strokeW))
-        
+
         // Draw the down-pointing arrow
         val arrowPath = Path().apply {
             moveTo(w * 0.5f, h * 0.15f)
@@ -639,16 +571,16 @@ fun TagBadge(tag: String, modifier: Modifier = Modifier) {
         "MUTATED" -> Color(0xFFF97316) to @Composable { WireframeMutated(Color(0xFFF97316), modifier = modifier.size(10.dp)) }
         else -> return
     }
-    
+
     Box(
         modifier = Modifier
             .background(color.copy(alpha = 0.1f), RoundedCornerShape(2.dp))
             .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
-            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             content()
         }
@@ -658,7 +590,7 @@ fun TagBadge(tag: String, modifier: Modifier = Modifier) {
 @Composable
 fun WireframePickaxeIcon(
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier.size(24.dp)) {
         val w = size.width
@@ -670,7 +602,7 @@ fun WireframePickaxeIcon(
             color = color,
             start = Offset(w * 0.15f, h * 0.85f),
             end = Offset(w * 0.65f, h * 0.35f),
-            strokeWidth = strokeW
+            strokeWidth = strokeW,
         )
 
         // 2. Draw the pickaxe head: a curved diamond-like hollow blade.
@@ -694,7 +626,7 @@ fun WireframePickaxeIcon(
             color = color,
             topLeft = Offset(w * 0.61f, h * 0.29f),
             size = Size(w * 0.08f, h * 0.08f),
-            style = Stroke(width = strokeW * 0.7f)
+            style = Stroke(width = strokeW * 0.7f),
         )
     }
 }
@@ -714,7 +646,7 @@ fun WireframeBugIcon(color: Color, modifier: Modifier = Modifier) {
             topLeft = Offset(cx - w * 0.15f, cy - h * 0.25f),
             size = Size(w * 0.3f, h * 0.5f),
             cornerRadius = CornerRadius(w * 0.1f, h * 0.1f),
-            style = Stroke(width = strokeW)
+            style = Stroke(width = strokeW),
         )
 
         // Head
@@ -722,7 +654,7 @@ fun WireframeBugIcon(color: Color, modifier: Modifier = Modifier) {
             color = color,
             radius = w * 0.1f,
             center = Offset(cx, cy - h * 0.35f),
-            style = Stroke(width = strokeW)
+            style = Stroke(width = strokeW),
         )
 
         // Antennae
@@ -762,7 +694,7 @@ fun WireframeStepSearchIcon(color: Color, modifier: Modifier = Modifier) {
         drawPath(
             path = stairPath,
             color = color.copy(alpha = 0.5f),
-            style = Stroke(width = strokeW)
+            style = Stroke(width = strokeW),
         )
 
         // 2. Draw magnifying glass over it
@@ -774,7 +706,7 @@ fun WireframeStepSearchIcon(color: Color, modifier: Modifier = Modifier) {
             color = color,
             radius = glassRadius,
             center = glassCenter,
-            style = Stroke(width = strokeW)
+            style = Stroke(width = strokeW),
         )
 
         // Handle
@@ -782,7 +714,7 @@ fun WireframeStepSearchIcon(color: Color, modifier: Modifier = Modifier) {
             color = color,
             start = Offset(glassCenter.x + glassRadius * 0.707f, glassCenter.y + glassRadius * 0.707f),
             end = Offset(w * 0.82f, h * 0.82f),
-            strokeWidth = strokeW + 0.5.dp.toPx()
+            strokeWidth = strokeW + 0.5.dp.toPx(),
         )
     }
 }
@@ -790,7 +722,7 @@ fun WireframeStepSearchIcon(color: Color, modifier: Modifier = Modifier) {
 @Composable
 fun WireframeReactorParametersIcon(
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier.size(24.dp)) {
         val w = size.width
@@ -811,11 +743,11 @@ fun WireframeReactorParametersIcon(
             val angle = i * Math.PI / 3
             val start = Offset(
                 (cx + rOuter * cos(angle)).toFloat(),
-                (cy + rOuter * sin(angle)).toFloat()
+                (cy + rOuter * sin(angle)).toFloat(),
             )
             val end = Offset(
                 (cx + (rOuter + w * 0.08f) * cos(angle)).toFloat(),
-                (cy + (rOuter + w * 0.08f) * sin(angle)).toFloat()
+                (cy + (rOuter + w * 0.08f) * sin(angle)).toFloat(),
             )
             drawLine(color, start, end, strokeWidth = strokeW)
         }
@@ -831,13 +763,13 @@ fun WireframeReactorParametersIcon(
 @Composable
 fun WireframeCloudIcon(
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier.size(24.dp)) {
         val w = size.width
         val h = size.height
         val strokeW = 1.5.dp.toPx()
-        
+
         val path = Path().apply {
             moveTo(w * 0.25f, h * 0.7f)
             // Left arch
@@ -848,11 +780,11 @@ fun WireframeCloudIcon(
             cubicTo(w * 0.9f, h * 0.45f, w * 0.9f, h * 0.7f, w * 0.75f, h * 0.7f)
             close()
         }
-        
+
         drawPath(
             path = path,
             color = color,
-            style = Stroke(width = strokeW)
+            style = Stroke(width = strokeW),
         )
     }
 }
@@ -860,7 +792,7 @@ fun WireframeCloudIcon(
 @Composable
 fun WireframeRadarIcon(
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier.size(24.dp)) {
         val w = size.width
@@ -881,7 +813,7 @@ fun WireframeRadarIcon(
 @Composable
 fun WireframeListIcon(
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier.size(24.dp)) {
         val w = size.width
@@ -903,14 +835,14 @@ fun WireframeListIcon(
                 color = color,
                 start = Offset(lineStartX, y),
                 end = Offset(lineEndX, y),
-                strokeWidth = strokeW
+                strokeWidth = strokeW,
             )
             // Draw bullet
             drawRect(
                 color = color,
                 topLeft = Offset(bulletX, y - bulletSize / 2f),
                 size = Size(bulletSize, bulletSize),
-                style = Stroke(width = strokeW)
+                style = Stroke(width = strokeW),
             )
         }
     }
@@ -919,7 +851,7 @@ fun WireframeListIcon(
 @Composable
 fun WireframeAnomalyIcon(
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier.size(24.dp)) {
         val w = size.width
@@ -949,7 +881,7 @@ fun WireframeAnomalyIcon(
 @Composable
 fun WireframeFontIcon(
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier.size(24.dp)) {
         val w = size.width
@@ -977,7 +909,7 @@ fun WireframeFontIcon(
 @Composable
 fun WireframeWellIcon(
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier.size(24.dp)) {
         val w = size.width
@@ -995,8 +927,8 @@ fun WireframeWellIcon(
             center = center,
             style = Stroke(
                 width = strokeW,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
-            )
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f),
+            ),
         )
 
         // Center solid core
@@ -1007,7 +939,7 @@ fun WireframeWellIcon(
 @Composable
 fun WireframeTargetedIcon(
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier.size(24.dp)) {
         val w = size.width
@@ -1029,7 +961,7 @@ fun WireframeTargetedIcon(
 @Composable
 fun WireframeCustomIcon(
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier.size(24.dp)) {
         val w = size.width
@@ -1050,11 +982,11 @@ fun WireframeCustomIcon(
             val angle = i * Math.PI.toFloat() / 4f
             val start = Offset(
                 (center.x + innerRadius * cos(angle)).toFloat(),
-                (center.y + innerRadius * sin(angle)).toFloat()
+                (center.y + innerRadius * sin(angle)).toFloat(),
             )
             val end = Offset(
                 (center.x + (outerRadius + w * 0.08f) * cos(angle)).toFloat(),
-                (center.y + (outerRadius + w * 0.08f) * sin(angle)).toFloat()
+                (center.y + (outerRadius + w * 0.08f) * sin(angle)).toFloat(),
             )
             drawLine(color, start, end, strokeWidth = strokeW * 1.2f)
         }
@@ -1069,58 +1001,58 @@ fun WireframeSolarSystemIcon(color: Color, modifier: Modifier = Modifier) {
         val cx = w / 2f
         val cy = h / 2f
         val px = 1.2.dp.toPx()
-        
+
         // Center Sun
         drawCircle(
             color = color,
             radius = 3.dp.toPx(),
             center = Offset(cx, cy),
-            style = Stroke(width = px)
+            style = Stroke(width = px),
         )
-        
+
         // Inner Orbit (Radius 5.dp)
         drawCircle(
             color = color.copy(alpha = 0.5f),
             radius = 5.dp.toPx(),
             center = Offset(cx, cy),
-            style = Stroke(width = px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f))
+            style = Stroke(width = px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 3f), 0f)),
         )
         // Inner planet
         drawCircle(
             color = color,
             radius = 1.2.dp.toPx(),
             center = Offset(cx + 5.dp.toPx() * kotlin.math.cos(0.5f).toFloat(), cy + 5.dp.toPx() * kotlin.math.sin(0.5f).toFloat()),
-            style = Fill
+            style = Fill,
         )
-        
+
         // Middle Orbit (Radius 8.dp)
         drawCircle(
             color = color.copy(alpha = 0.5f),
             radius = 8.dp.toPx(),
             center = Offset(cx, cy),
-            style = Stroke(width = px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f))
+            style = Stroke(width = px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)),
         )
         // Middle planet
         drawCircle(
             color = color,
             radius = 1.8.dp.toPx(),
             center = Offset(cx + 8.dp.toPx() * kotlin.math.cos(2.2f).toFloat(), cy + 8.dp.toPx() * kotlin.math.sin(2.2f).toFloat()),
-            style = Fill
+            style = Fill,
         )
-        
+
         // Outer Orbit (Radius 11.dp)
         drawCircle(
             color = color.copy(alpha = 0.4f),
             radius = 11.dp.toPx(),
             center = Offset(cx, cy),
-            style = Stroke(width = px)
+            style = Stroke(width = px),
         )
         // Outer planet
         drawCircle(
             color = color,
             radius = 1.5.dp.toPx(),
             center = Offset(cx + 11.dp.toPx() * kotlin.math.cos(4.1f).toFloat(), cy + 11.dp.toPx() * kotlin.math.sin(4.1f).toFloat()),
-            style = Fill
+            style = Fill,
         )
     }
 }
@@ -1131,7 +1063,7 @@ fun WireframeAdenineIcon(color: Color, modifier: Modifier = Modifier) {
         val w = size.width
         val h = size.height
         val px = 1.2.dp.toPx()
-        
+
         val path = Path().apply {
             // Hexagon (left)
             moveTo(w * 0.15f, h * 0.35f)
@@ -1141,7 +1073,7 @@ fun WireframeAdenineIcon(color: Color, modifier: Modifier = Modifier) {
             lineTo(w * 0.35f, h * 0.82f)
             lineTo(w * 0.15f, h * 0.65f)
             close()
-            
+
             // Pentagon (right)
             moveTo(w * 0.55f, h * 0.35f)
             lineTo(w * 0.78f, h * 0.25f)
@@ -1150,7 +1082,7 @@ fun WireframeAdenineIcon(color: Color, modifier: Modifier = Modifier) {
             lineTo(w * 0.55f, h * 0.65f)
         }
         drawPath(path, color, style = Stroke(width = px))
-        
+
         // Stylized 'A'
         val aPath = Path().apply {
             moveTo(w * 0.3f, h * 0.58f)
@@ -1169,7 +1101,7 @@ fun WireframeGuanineIcon(color: Color, modifier: Modifier = Modifier) {
         val w = size.width
         val h = size.height
         val px = 1.2.dp.toPx()
-        
+
         val path = Path().apply {
             // Hexagon (left)
             moveTo(w * 0.15f, h * 0.35f)
@@ -1179,7 +1111,7 @@ fun WireframeGuanineIcon(color: Color, modifier: Modifier = Modifier) {
             lineTo(w * 0.35f, h * 0.82f)
             lineTo(w * 0.15f, h * 0.65f)
             close()
-            
+
             // Pentagon (right)
             moveTo(w * 0.55f, h * 0.35f)
             lineTo(w * 0.78f, h * 0.25f)
@@ -1188,7 +1120,7 @@ fun WireframeGuanineIcon(color: Color, modifier: Modifier = Modifier) {
             lineTo(w * 0.55f, h * 0.65f)
         }
         drawPath(path, color, style = Stroke(width = px))
-        
+
         // Stylized 'G'
         val gPath = Path().apply {
             moveTo(w * 0.42f, h * 0.46f)
@@ -1207,7 +1139,7 @@ fun WireframeThymineIcon(color: Color, modifier: Modifier = Modifier) {
         val w = size.width
         val h = size.height
         val px = 1.2.dp.toPx()
-        
+
         val path = Path().apply {
             moveTo(w * 0.28f, h * 0.35f)
             lineTo(w * 0.5f, h * 0.18f)
@@ -1218,7 +1150,7 @@ fun WireframeThymineIcon(color: Color, modifier: Modifier = Modifier) {
             close()
         }
         drawPath(path, color, style = Stroke(width = px))
-        
+
         // Stylized 'T'
         val tPath = Path().apply {
             moveTo(w * 0.42f, h * 0.42f)
@@ -1236,7 +1168,7 @@ fun WireframeCytosineIcon(color: Color, modifier: Modifier = Modifier) {
         val w = size.width
         val h = size.height
         val px = 1.2.dp.toPx()
-        
+
         val path = Path().apply {
             moveTo(w * 0.28f, h * 0.35f)
             lineTo(w * 0.5f, h * 0.18f)
@@ -1247,7 +1179,7 @@ fun WireframeCytosineIcon(color: Color, modifier: Modifier = Modifier) {
             close()
         }
         drawPath(path, color, style = Stroke(width = px))
-        
+
         // Stylized 'C'
         val cPath = Path().apply {
             moveTo(w * 0.58f, h * 0.46f)
@@ -1264,21 +1196,21 @@ fun WireframeMailIcon(color: Color, modifier: Modifier = Modifier) {
         val w = size.width
         val h = size.height
         val strokeW = 1.5.dp.toPx()
-        
+
         val paddingX = w * 0.15f
         val paddingY = h * 0.26f
         val left = paddingX
         val right = w - paddingX
         val top = paddingY
         val bottom = h - paddingY
-        
+
         drawRect(
             color = color,
             topLeft = Offset(left, top),
             size = Size(right - left, bottom - top),
-            style = Stroke(width = strokeW)
+            style = Stroke(width = strokeW),
         )
-        
+
         val cx = w / 2f
         val cy = h * 0.54f
         drawLine(color, Offset(left, top), Offset(cx, cy), strokeWidth = strokeW)
@@ -1290,13 +1222,13 @@ fun WireframeMailIcon(color: Color, modifier: Modifier = Modifier) {
 fun WireframeFriendsIcon(
     color: Color,
     modifier: Modifier = Modifier,
-    buttonBackgroundColor: Color = Color(0xFF0F172A)
+    buttonBackgroundColor: Color = Color(0xFF0F172A),
 ) {
     Canvas(modifier = modifier.size(22.dp)) {
         val w = size.width
         val h = size.height
         val strokeW = 1.5.dp.toPx()
-        
+
         val c1x = w * 0.35f
         val c1y = h * 0.40f
         val r1 = w * 0.11f
@@ -1308,16 +1240,16 @@ fun WireframeFriendsIcon(
             useCenter = false,
             topLeft = Offset(c1x - r1 * 1.4f, c1y + r1 * 0.7f),
             size = Size(r1 * 2.8f, r1 * 2f),
-            style = Stroke(width = strokeW * 0.8f)
+            style = Stroke(width = strokeW * 0.8f),
         )
-        
+
         val c2x = w * 0.65f
         val c2y = h * 0.45f
         val r2 = w * 0.13f
-        
+
         drawCircle(buttonBackgroundColor, radius = r2 + 2.dp.toPx(), center = Offset(c2x, c2y))
         drawRect(buttonBackgroundColor, topLeft = Offset(c2x - r2 * 2f, c2y + r2 * 0.5f), size = Size(r2 * 4f, r2 * 2.5f))
-        
+
         drawCircle(color, radius = r2, center = Offset(c2x, c2y), style = Stroke(width = strokeW))
         drawArc(
             color = color,
@@ -1326,7 +1258,7 @@ fun WireframeFriendsIcon(
             useCenter = false,
             topLeft = Offset(c2x - r2 * 1.7f, c2y + r2 * 0.7f),
             size = Size(r2 * 3.4f, r2 * 2.2f),
-            style = Stroke(width = strokeW)
+            style = Stroke(width = strokeW),
         )
     }
 }
@@ -1340,13 +1272,13 @@ fun WireframeSearchIcon(color: Color, modifier: Modifier = Modifier) {
             color = color,
             radius = w * 0.333f,
             style = Stroke(width = 1.5.dp.toPx()),
-            center = Offset(w * 0.417f, h * 0.417f)
+            center = Offset(w * 0.417f, h * 0.417f),
         )
         drawLine(
             color = color,
             start = Offset(w * 0.625f, h * 0.625f),
             end = Offset(w * 0.917f, h * 0.917f),
-            strokeWidth = 1.5.dp.toPx()
+            strokeWidth = 1.5.dp.toPx(),
         )
     }
 }

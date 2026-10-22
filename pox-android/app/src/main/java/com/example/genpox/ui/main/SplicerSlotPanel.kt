@@ -25,7 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.genpox.data.GeneSequence
-import com.example.genpox.data.WaveMath
 import com.example.genpox.theme.CyberBorder
 import com.example.genpox.theme.CyberGreen
 import com.example.genpox.theme.CyberGreenDim
@@ -39,7 +38,7 @@ fun SplicerSlotPanel(
     targetSequence: String,
     slotSequenceFilter: String,
     inventoryGenes: List<GeneSequence>,
-    isWide: Boolean
+    isWide: Boolean,
 ) {
     if (activeSlotSelection == null) return
 
@@ -49,36 +48,36 @@ fun SplicerSlotPanel(
         modifier = Modifier
             .fillMaxWidth()
             .wrapContentHeight(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "ASSIGN GENE BLOCK TO SLOT #${activeSlotSelection + 1}",
                 color = CyberGreenDim,
                 fontSize = 9.sp,
                 fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
             Button(
                 onClick = { viewModel.selectSplicerSlot(null) },
                 modifier = Modifier.height(28.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CyberRed,
-                    contentColor = Color.Black
+                    contentColor = Color.Black,
                 ),
                 shape = RoundedCornerShape(4.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp)
+                contentPadding = PaddingValues(horizontal = 8.dp),
             ) {
                 Text(
                     text = "CLOSE",
                     color = Color.Black,
                     fontSize = 8.sp,
                     fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
         }
@@ -89,14 +88,14 @@ fun SplicerSlotPanel(
                 .fillMaxWidth()
                 .background(CyberGreen.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
-                .padding(6.dp)
+                .padding(6.dp),
         ) {
             Text(
                 text = "REQUIRED SEGMENT FOR SLOT #${activeSlotSelection + 1}",
                 color = CyberGreenDim,
                 fontSize = 9.sp,
                 fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
@@ -106,7 +105,7 @@ fun SplicerSlotPanel(
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
-                letterSpacing = 1.sp
+                letterSpacing = 1.sp,
             )
         }
 
@@ -119,19 +118,19 @@ fun SplicerSlotPanel(
                     .fillMaxWidth()
                     .background(CyberGreen.copy(alpha = 0.05f), RoundedCornerShape(4.dp))
                     .border(1.dp, CyberGreenDim, RoundedCornerShape(4.dp))
-                    .padding(6.dp)
+                    .padding(6.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = "AVAILABLE STOCK",
                         color = CyberGreenDim,
                         fontSize = 9.sp,
                         fontFamily = FontFamily.Default,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = "MUTATE READY",
@@ -139,14 +138,14 @@ fun SplicerSlotPanel(
                         style = Typography.bodySmall,
                         fontFamily = FontFamily.Default,
                         fontSize = 7.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = matchingGene.sequence,
@@ -155,7 +154,7 @@ fun SplicerSlotPanel(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp,
-                        letterSpacing = 1.sp
+                        letterSpacing = 1.sp,
                     )
                     Text(
                         text = "x${matchingGene.count}",
@@ -163,7 +162,7 @@ fun SplicerSlotPanel(
                         style = Typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
             }
@@ -175,10 +174,10 @@ fun SplicerSlotPanel(
                 modifier = Modifier.fillMaxWidth().height(32.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CyberGreen,
-                    contentColor = Color.Black
+                    contentColor = Color.Black,
                 ),
                 shape = RoundedCornerShape(4.dp),
-                contentPadding = PaddingValues(0.dp)
+                contentPadding = PaddingValues(0.dp),
             ) {
                 Text(
                     text = "LOAD GENE BLOCK",
@@ -186,7 +185,7 @@ fun SplicerSlotPanel(
                     style = Typography.bodySmall,
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 9.sp
+                    fontSize = 9.sp,
                 )
             }
         } else {
@@ -196,14 +195,14 @@ fun SplicerSlotPanel(
                     .fillMaxWidth()
                     .background(Color(0x15EF4444), RoundedCornerShape(4.dp))
                     .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(4.dp))
-                    .padding(6.dp)
+                    .padding(6.dp),
             ) {
                 Text(
                     text = "AVAILABLE STOCK",
                     color = Color(0xFFEF4444).copy(alpha = 0.8f),
                     fontSize = 9.sp,
                     fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
@@ -213,7 +212,7 @@ fun SplicerSlotPanel(
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight.Bold,
                     fontSize = 9.sp,
-                    letterSpacing = 0.5.sp
+                    letterSpacing = 0.5.sp,
                 )
             }
         }
@@ -225,11 +224,11 @@ fun SplicerSlotPanel(
             modifier = Modifier.fillMaxWidth().height(32.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.Transparent,
-                contentColor = Color(0xFF22D3EE)
+                contentColor = Color(0xFF22D3EE),
             ),
             border = BorderStroke(1.dp, Color(0xFF22D3EE)),
             shape = RoundedCornerShape(4.dp),
-            contentPadding = PaddingValues(0.dp)
+            contentPadding = PaddingValues(0.dp),
         ) {
             Text(
                 text = "TARGET IN BIO-LAB",
@@ -237,7 +236,7 @@ fun SplicerSlotPanel(
                 style = Typography.bodySmall,
                 fontFamily = FontFamily.Default,
                 fontWeight = FontWeight.Bold,
-                fontSize = 8.5.sp
+                fontSize = 8.5.sp,
             )
         }
     }

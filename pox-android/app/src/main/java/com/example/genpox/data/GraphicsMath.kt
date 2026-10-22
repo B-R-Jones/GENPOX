@@ -1,11 +1,10 @@
 package com.example.genpox.data
 
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.exp
-import kotlin.math.pow
-import kotlin.math.sqrt
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 object GraphicsMath {
 
@@ -16,10 +15,8 @@ object GraphicsMath {
     // ==========================================
     // 1. NODE CRYSTAL CANVAS MATH
     // ==========================================
-    
-    fun calculateLunarBaselineMod(lunarPhase: Double): Float {
-        return 1.0f + lunarPhase.toFloat() * 0.15f
-    }
+
+    fun calculateLunarBaselineMod(lunarPhase: Double): Float = 1.0f + lunarPhase.toFloat() * 0.15f
 
     fun calculateSkewness(widths: List<Float>): Float {
         if (widths.isEmpty()) return 0f
@@ -28,13 +25,9 @@ object GraphicsMath {
         return sqrt(variance)
     }
 
-    fun calculateWaveAmplitude(skewness: Float): Float {
-        return 0.5f + skewness * 12.0f
-    }
+    fun calculateWaveAmplitude(skewness: Float): Float = 0.5f + skewness * 12.0f
 
-    fun calculateWaveFrequency(totalDepth: Float): Float {
-        return 0.05f + totalDepth * 0.08f
-    }
+    fun calculateWaveFrequency(totalDepth: Float): Float = 0.05f + totalDepth * 0.08f
 
     fun calculateCrystalVertices(
         cx: Float,
@@ -43,15 +36,13 @@ object GraphicsMath {
         subWidthG: Float,
         subWidthT: Float,
         subWidthC: Float,
-        subWidthA: Float
-    ): List<Point2D> {
-        return listOf(
-            Point2D(cx, cy - r * subWidthG),   // ptG
-            Point2D(cx + r * subWidthT, cy),   // ptT
-            Point2D(cx, cy + r * subWidthC),   // ptC
-            Point2D(cx - r * subWidthA, cy)    // ptA
-        )
-    }
+        subWidthA: Float,
+    ): List<Point2D> = listOf(
+        Point2D(cx, cy - r * subWidthG), // ptG
+        Point2D(cx + r * subWidthT, cy), // ptT
+        Point2D(cx, cy + r * subWidthC), // ptC
+        Point2D(cx - r * subWidthA, cy), // ptA
+    )
 
     // ==========================================
     // 2. HOLOGRAPHIC HELIX REACTOR MATH
@@ -65,7 +56,7 @@ object GraphicsMath {
         val x2: Float,
         val alpha2: Float,
         val radius2Dp: Float,
-        val barAlpha: Float
+        val barAlpha: Float,
     )
 
     fun calculateHelixStrand(
@@ -79,7 +70,7 @@ object GraphicsMath {
         glitchProgress: Float,
         isAnomaly: Boolean,
         glitchThresholdPx: Float,
-        glitchOffsetPx: Float
+        glitchOffsetPx: Float,
     ): HelixStrandMetrics {
         val cx = w / 2f
         val t = index.toFloat() / (numStrands - 1).coerceAtLeast(1)
@@ -96,7 +87,7 @@ object GraphicsMath {
 
         var gx1 = x1
         var gx2 = x2
-        
+
         val glitchCenterY = glitchProgress * h
         if (isGlitching && abs(cyPos - glitchCenterY) < glitchThresholdPx) {
             val offsetVal = (sin(cyPos * 0.1f) * glitchOffsetPx)
@@ -120,7 +111,7 @@ object GraphicsMath {
             x2 = gx2,
             alpha2 = alpha2,
             radius2Dp = radius2Dp,
-            barAlpha = barAlpha
+            barAlpha = barAlpha,
         )
     }
 
@@ -134,9 +125,9 @@ object GraphicsMath {
             Point3D(0.0, crystalRadius, 0.0), // 0: Top
             Point3D(0.0, -crystalRadius, 0.0), // 1: Bottom
             Point3D(crystalRadius * cos(rotationVal), 0.0, crystalRadius * sin(rotationVal)), // 2
-            Point3D(crystalRadius * cos(rotationVal + Math.PI/2), 0.0, crystalRadius * sin(rotationVal + Math.PI/2)), // 3
+            Point3D(crystalRadius * cos(rotationVal + Math.PI / 2), 0.0, crystalRadius * sin(rotationVal + Math.PI / 2)), // 3
             Point3D(crystalRadius * cos(rotationVal + Math.PI), 0.0, crystalRadius * sin(rotationVal + Math.PI)), // 4
-            Point3D(crystalRadius * cos(rotationVal + 3*Math.PI/2), 0.0, crystalRadius * sin(rotationVal + 3*Math.PI/2)) // 5
+            Point3D(crystalRadius * cos(rotationVal + 3 * Math.PI / 2), 0.0, crystalRadius * sin(rotationVal + 3 * Math.PI / 2)), // 5
         )
     }
 
@@ -144,7 +135,7 @@ object GraphicsMath {
         pt: Point3D,
         tiltVal: Double,
         centerX: Double,
-        centerY: Double
+        centerY: Double,
     ): Point2D {
         val yt = pt.y * cos(tiltVal) - pt.z * sin(tiltVal)
         return Point2D((centerX + pt.x).toFloat(), (centerY - yt).toFloat())
@@ -158,7 +149,7 @@ object GraphicsMath {
         angleDeg: Int,
         slotGene: String?,
         targetSegment: String,
-        wavePhase: Float
+        wavePhase: Float,
     ): Float {
         val isAnom = slotGene?.let { WaveMath.isAnomalousGene(it) } ?: false
         val isCoherent = slotGene == targetSegment
@@ -193,7 +184,7 @@ object GraphicsMath {
     data class OrreryPlanetCoordinates(
         val lambda: Double,
         val declination: Double,
-        val hourAngle: Double
+        val hourAngle: Double,
     )
 
     fun calculateOrreryCoordinates(
@@ -201,7 +192,7 @@ object GraphicsMath {
         timeMs: Long,
         userLng: Double,
         xE: Double,
-        yE: Double
+        yE: Double,
     ): OrreryPlanetCoordinates {
         val (x, y) = WaveMath.getHeliocentricPosition(planetName, timeMs)
         val lambda = if (planetName.uppercase() == "EARTH") {
@@ -214,7 +205,7 @@ object GraphicsMath {
         val lambdaSun = kotlin.math.atan2(-yE, -xE)
         val lngOffsetRad = Math.toRadians(userLng)
         val hourAngle = ((phiRot + lngOffsetRad + lambdaSun - lambda) % (2.0 * Math.PI) + 2.0 * Math.PI) % (2.0 * Math.PI)
-        
+
         return OrreryPlanetCoordinates(lambda, declination, hourAngle)
     }
 
@@ -231,7 +222,7 @@ object GraphicsMath {
         val projectedRadius: Float,
         val dx: Float,
         val dy: Float,
-        val isBelowHorizon: Boolean
+        val isBelowHorizon: Boolean,
     )
 
     fun projectOrreryPlanet(
@@ -241,7 +232,7 @@ object GraphicsMath {
         radiusScale: Float,
         latRad: Double,
         declination: Double,
-        hourAngle: Double
+        hourAngle: Double,
     ): OrreryProjectionMetrics {
         val r = maxRadius * radiusScale
         val cyShift = cy - r * sin(latRad).toFloat() * sin(declination).toFloat()
@@ -255,7 +246,7 @@ object GraphicsMath {
             projectedRadius = rp,
             dx = dx,
             dy = dy,
-            isBelowHorizon = isBelowHorizon
+            isBelowHorizon = isBelowHorizon,
         )
     }
 

@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,21 +22,17 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.genpox.data.GeneSequence
-import com.example.genpox.data.WaveMath
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.DualPaneConsoleFrame
 import com.example.genpox.ui.components.HoloNavButton
+import com.example.genpox.ui.components.PoxSubTab
 import com.example.genpox.ui.components.PoxTabFrame
 import com.example.genpox.ui.components.PoxUnifiedHoloNav
-import com.example.genpox.ui.components.PoxSubTab
 
 @Composable
 fun GeneticResonanceScope(
@@ -45,7 +40,7 @@ fun GeneticResonanceScope(
     isActive: Boolean,
     isAnomaly: Boolean,
     activeColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "scope_oscillation")
     val wavePhaseState = infiniteTransition.animateFloat(
@@ -53,19 +48,19 @@ fun GeneticResonanceScope(
         targetValue = 2f * Math.PI.toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(2500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "phase"
+        label = "phase",
     )
-    
+
     val ambientNoiseState = infiniteTransition.animateFloat(
         initialValue = -1f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(120, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
+            repeatMode = RepeatMode.Reverse,
         ),
-        label = "noise"
+        label = "noise",
     )
 
     val scopePath = remember { Path() }
@@ -74,62 +69,62 @@ fun GeneticResonanceScope(
         val w = size.width
         val h = size.height
         val cy = h / 2f
-        
+
         val wavePhase = wavePhaseState.value
         val ambientNoise = ambientNoiseState.value
-        
+
         val gridStroke = 0.5.dp.toPx()
         val gridColor = activeColor.copy(alpha = 0.1f)
-        
+
         drawLine(gridColor, Offset(0f, h * 0.25f), Offset(w, h * 0.25f), strokeWidth = gridStroke)
         drawLine(gridColor, Offset(0f, cy), Offset(w, cy), strokeWidth = gridStroke * 1.5f)
         drawLine(gridColor, Offset(0f, h * 0.75f), Offset(w, h * 0.75f), strokeWidth = gridStroke)
-        
+
         val numVerticalLines = 8
         for (v in 1..numVerticalLines) {
             val vx = w * (v.toFloat() / (numVerticalLines + 1))
             drawLine(gridColor, Offset(vx, 0f), Offset(vx, h), strokeWidth = gridStroke)
         }
-        
+
         if (isActive) {
             scopePath.reset()
             val segments = 50
             val amp = h * 0.35f
             val freq = 3.5f * Math.PI.toFloat() / w
-            
+
             for (x in 0..segments) {
                 val px = w * (x.toFloat() / segments)
                 val angle = px * freq - wavePhase
                 var sinVal = kotlin.math.sin(angle.toDouble()).toFloat()
-                
+
                 val angle2 = px * freq * 2f - wavePhase * 2f
                 sinVal += 0.25f * kotlin.math.sin(angle2.toDouble()).toFloat()
-                
+
                 if (isAnomaly) {
                     val angle3 = angle * 10f
                     sinVal += 0.12f * ambientNoise * kotlin.math.sin(angle3.toDouble()).toFloat()
                 }
-                
+
                 val edgeEnvelope = kotlin.math.sin((x.toFloat() / segments * Math.PI.toFloat()).toDouble()).toFloat()
                 val finalY = cy + sinVal * amp * edgeEnvelope
-                
+
                 if (x == 0) {
                     scopePath.moveTo(px, finalY)
                 } else {
                     scopePath.lineTo(px, finalY)
                 }
             }
-            
+
             drawPath(
                 path = scopePath,
                 color = activeColor,
-                style = Stroke(width = 1.8.dp.toPx())
+                style = Stroke(width = 1.8.dp.toPx()),
             )
-            
+
             drawPath(
                 path = scopePath,
                 color = activeColor.copy(alpha = 0.2f),
-                style = Stroke(width = 4.dp.toPx())
+                style = Stroke(width = 4.dp.toPx()),
             )
         } else {
             scopePath.reset()
@@ -146,7 +141,7 @@ fun GeneticResonanceScope(
             drawPath(
                 path = scopePath,
                 color = Color.Red.copy(alpha = 0.5f),
-                style = Stroke(width = 1.dp.toPx())
+                style = Stroke(width = 1.dp.toPx()),
             )
         }
     }
@@ -154,23 +149,23 @@ fun GeneticResonanceScope(
 
 @Composable
 fun SplicerView(viewModel: MainViewModel) {
-    val targetSequence by viewModel.targetSequence.collectAsState()
-    val splicerSlots by viewModel.splicerSlots.collectAsState()
-    val activeSlotSelection by viewModel.activeSlotSelection.collectAsState()
-    val slotSequenceFilter by viewModel.slotSequenceFilter.collectAsState()
-    val isReactorFrozen by viewModel.isReactorFrozen.collectAsState()
-    val reactorFreezeTimeLeft by viewModel.reactorFreezeTimeLeft.collectAsState()
-    val isForcedConstructionActive by viewModel.isForcedConstructionActive.collectAsState()
-    val isForcedLoopActive by viewModel.isForcedLoopActive.collectAsState()
-    val forcedConstructionLogs by viewModel.forcedConstructionLogs.collectAsState()
-    val isSplicing by viewModel.isSplicing.collectAsState()
-    val splicingProgress by viewModel.splicingProgress.collectAsState()
-    val sequencedBasesCount by viewModel.sequencedBasesCount.collectAsState()
-    val newlySplicedCreature by viewModel.newlySplicedCreature.collectAsState()
-    val inventoryGenes by viewModel.geneSequences.collectAsState()
-    val splicerSubTab by viewModel.splicerSubTab.collectAsState()
-    
-    val selectedReagent by viewModel.selectedReagent.collectAsState()
+    val targetSequence by viewModel.targetSequence.collectAsStateWithLifecycle()
+    val splicerSlots by viewModel.splicerSlots.collectAsStateWithLifecycle()
+    val activeSlotSelection by viewModel.activeSlotSelection.collectAsStateWithLifecycle()
+    val slotSequenceFilter by viewModel.slotSequenceFilter.collectAsStateWithLifecycle()
+    val isReactorFrozen by viewModel.isReactorFrozen.collectAsStateWithLifecycle()
+    val reactorFreezeTimeLeft by viewModel.reactorFreezeTimeLeft.collectAsStateWithLifecycle()
+    val isForcedConstructionActive by viewModel.isForcedConstructionActive.collectAsStateWithLifecycle()
+    val isForcedLoopActive by viewModel.isForcedLoopActive.collectAsStateWithLifecycle()
+    val forcedConstructionLogs by viewModel.forcedConstructionLogs.collectAsStateWithLifecycle()
+    val isSplicing by viewModel.isSplicing.collectAsStateWithLifecycle()
+    val splicingProgress by viewModel.splicingProgress.collectAsStateWithLifecycle()
+    val sequencedBasesCount by viewModel.sequencedBasesCount.collectAsStateWithLifecycle()
+    val newlySplicedCreature by viewModel.newlySplicedCreature.collectAsStateWithLifecycle()
+    val inventoryGenes by viewModel.geneSequences.collectAsStateWithLifecycle()
+    val splicerSubTab by viewModel.splicerSubTab.collectAsStateWithLifecycle()
+
+    val selectedReagent by viewModel.selectedReagent.collectAsStateWithLifecycle()
 
     val reagentColor = selectedReagent?.let { rId ->
         when (rId) {
@@ -198,9 +193,9 @@ fun SplicerView(viewModel: MainViewModel) {
                     targetValue = 360f,
                     animationSpec = infiniteRepeatable(
                         animation = tween(durationMillis = 6000, easing = LinearEasing),
-                        repeatMode = RepeatMode.Restart
+                        repeatMode = RepeatMode.Restart,
                     ),
-                    label = "shimmer_hue"
+                    label = "shimmer_hue",
                 )
                 Color.hsv(hue, 0.8f, 0.9f)
             }
@@ -222,17 +217,17 @@ fun SplicerView(viewModel: MainViewModel) {
             PoxSubTab("terminal", "TERMINAL", icon = { iconColor ->
                 Box(
                     modifier = Modifier.size(24.dp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = ">_",
                         color = iconColor,
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
-            })
+            }),
         )
     }
 
@@ -265,7 +260,7 @@ fun SplicerView(viewModel: MainViewModel) {
             },
             viewModel = viewModel,
             useDynamicReagentColor = true,
-            drawSubTabs = false
+            drawSubTabs = false,
         ) {
             when (splicerSubTab) {
                 "splicer" -> {
@@ -288,7 +283,7 @@ fun SplicerView(viewModel: MainViewModel) {
                             onEjectActiveGene = eject
                         },
                         activeColor = activeColor,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
                 "terminal" -> {
@@ -296,13 +291,13 @@ fun SplicerView(viewModel: MainViewModel) {
                         viewModel = viewModel,
                         forcedConstructionLogs = forcedConstructionLogs,
                         isForcedLoopActive = isForcedLoopActive,
-                        activeBorder = activeBorder
+                        activeBorder = activeBorder,
                     )
                 }
             }
         }
 
-        val isCustomScaffoldMode by viewModel.isCustomScaffoldMode.collectAsState()
+        val isCustomScaffoldMode by viewModel.isCustomScaffoldMode.collectAsStateWithLifecycle()
 
         val mainRow = subTabs.map { tab ->
             val isActive = splicerSubTab == tab.id
@@ -321,7 +316,7 @@ fun SplicerView(viewModel: MainViewModel) {
                 bounce = tab.bounce,
                 content = { iconColor ->
                     tab.icon(iconColor)
-                }
+                },
             )
         }
 
@@ -331,7 +326,7 @@ fun SplicerView(viewModel: MainViewModel) {
             },
             PoxSubTab("custom", "CUSTOM") { iconColor ->
                 WireframeCustomIcon(color = iconColor, modifier = Modifier.size(24.dp))
-            }
+            },
         )
 
         val secondaryRow = splicerSecondaryTabs.map { tab ->
@@ -353,7 +348,7 @@ fun SplicerView(viewModel: MainViewModel) {
                 bounce = tab.bounce,
                 content = { iconColor ->
                     tab.icon(iconColor)
-                }
+                },
             )
         }
 
@@ -372,7 +367,7 @@ fun SplicerView(viewModel: MainViewModel) {
             rows = rows,
             activeButtonIds = setOf(splicerSubTab, activeModeId),
             allowStacking = true,
-            viewModel = viewModel
+            viewModel = viewModel,
         )
 
         // Slotting UI Floating Panel (holographic popup overlay)
@@ -382,7 +377,7 @@ fun SplicerView(viewModel: MainViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.5f))
-                    .clickable { viewModel.selectSplicerSlot(null) }
+                    .clickable { viewModel.selectSplicerSlot(null) },
             )
 
             // Centered overlay card
@@ -394,7 +389,7 @@ fun SplicerView(viewModel: MainViewModel) {
                     .clickable(enabled = false) {} // block clicks to background
                     .border(1.dp, CyberGreen, RoundedCornerShape(4.dp))
                     .background(Color(0xFF060B07), RoundedCornerShape(4.dp))
-                    .padding(16.dp)
+                    .padding(16.dp),
             ) {
                 SplicerSlotPanel(
                     viewModel = viewModel,
@@ -402,7 +397,7 @@ fun SplicerView(viewModel: MainViewModel) {
                     targetSequence = targetSequence,
                     slotSequenceFilter = slotSequenceFilter,
                     inventoryGenes = inventoryGenes,
-                    isWide = false
+                    isWide = false,
                 )
             }
         }
@@ -418,7 +413,7 @@ fun SplicerView(viewModel: MainViewModel) {
                 onClose = {
                     selectedGeneDetails = null
                     onEjectActiveGene = null
-                }
+                },
             )
         }
     }
@@ -426,8 +421,8 @@ fun SplicerView(viewModel: MainViewModel) {
 
 @Composable
 fun SplicerTestView(viewModel: MainViewModel) {
-    val targetSequence by viewModel.targetSequence.collectAsState()
-    val splicerSlots by viewModel.splicerSlots.collectAsState()
+    val targetSequence by viewModel.targetSequence.collectAsStateWithLifecycle()
+    val splicerSlots by viewModel.splicerSlots.collectAsStateWithLifecycle()
 
     val targetBlocks = remember(targetSequence) {
         (0 until 8).map { i ->
@@ -438,7 +433,7 @@ fun SplicerTestView(viewModel: MainViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(rememberScrollState()),
     ) {
         DualPaneConsoleFrame(
             theme = "purple",
@@ -451,7 +446,7 @@ fun SplicerTestView(viewModel: MainViewModel) {
                     text = "Observe the 8 slots representing raw blocks cached to compile the target sequence.",
                     color = Color(0xFFA855F7).copy(alpha = 0.8f),
                     style = Typography.bodySmall,
-                    fontFamily = FontFamily.Default
+                    fontFamily = FontFamily.Default,
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -462,21 +457,21 @@ fun SplicerTestView(viewModel: MainViewModel) {
                         .background(Color.Black)
                         .border(1.dp, Color(0xFFA855F7), RoundedCornerShape(4.dp))
                         .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     for (i in 0 until 8) {
                         val slotGene = splicerSlots.getOrNull(i)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
                                 text = "SLOT #${i + 1}",
                                 color = Color.Gray,
                                 style = Typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp
+                                fontSize = 9.sp,
                             )
                             Text(
                                 text = slotGene ?: "--------",
@@ -484,7 +479,7 @@ fun SplicerTestView(viewModel: MainViewModel) {
                                 style = Typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                         }
                     }
@@ -496,7 +491,7 @@ fun SplicerTestView(viewModel: MainViewModel) {
                     text = "Required target sequence broken down into 8-character blocks.",
                     color = Color(0xFFA855F7).copy(alpha = 0.8f),
                     style = Typography.bodySmall,
-                    fontFamily = FontFamily.Default
+                    fontFamily = FontFamily.Default,
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -507,12 +502,12 @@ fun SplicerTestView(viewModel: MainViewModel) {
                         .background(Color.Black.copy(alpha = 0.6f))
                         .border(1.dp, Color(0xFFA855F7), RoundedCornerShape(4.dp))
                         .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     targetBlocks.chunked(4).forEach { rowBlocks ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             rowBlocks.forEach { block ->
                                 Box(
@@ -520,7 +515,7 @@ fun SplicerTestView(viewModel: MainViewModel) {
                                         .weight(1f)
                                         .border(1.dp, Color(0xFFA855F7), RoundedCornerShape(4.dp))
                                         .padding(vertical = 4.dp),
-                                    contentAlignment = Alignment.Center
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         text = block,
@@ -528,14 +523,14 @@ fun SplicerTestView(viewModel: MainViewModel) {
                                         style = Typography.bodySmall,
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                             }
                         }
                     }
                 }
-            }
+            },
         )
     }
 }

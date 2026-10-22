@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.genpox.audio.PoxSynthManager
 import com.example.genpox.data.*
+import com.example.genpox.data.repository.*
+import com.example.genpox.util.DispatchersProvider
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -11,12 +14,17 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import javax.inject.Inject
 
-class SplicerViewModel(
-    private val repository: DataRepository,
+@HiltViewModel
+class SplicerViewModel @Inject constructor(
+    private val geneStockRepository: GeneStockRepository,
+    private val preferencesRepository: UserPreferencesRepository,
+    private val creatureRepository: CreatureRepository,
     private val synthManager: PoxSynthManager,
-    val reactorSalt: StateFlow<Float>
+    private val dispatchers: DispatchersProvider,
 ) : ViewModel() {
+    val reactorSalt: StateFlow<Float> = MutableStateFlow(0.05f)
 
     var onLog: ((String) -> Unit)? = null
     var onSetActiveCreature: ((Creature?, String) -> Unit)? = null
@@ -82,10 +90,10 @@ class SplicerViewModel(
     val selectedGeneToAppend: StateFlow<String?> = _selectedGeneToAppend.asStateFlow()
 
     // Local caches collected from DB
-    val geneSequences = repository.allGeneSequences.stateIn(
+    val geneSequences = geneStockRepository.allGeneSequences.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
-        emptyList()
+        emptyList(),
     )
 
     private val _rawStockA = MutableStateFlow(10000L)
@@ -102,10 +110,10 @@ class SplicerViewModel(
 
     init {
         viewModelScope.launch {
-            repository.targetSequence.collect { seq ->
+            preferencesRepository.targetSequence.collect { seq ->
                 if (seq.isEmpty()) {
                     val initialSeq = generateRandom64Sequence()
-                    repository.saveTargetSequence(initialSeq)
+                    preferencesRepository.saveTargetSequence(initialSeq)
                     _targetSequence.value = initialSeq
                 } else {
                     _targetSequence.value = seq
@@ -113,28 +121,28 @@ class SplicerViewModel(
             }
         }
         viewModelScope.launch {
-            repository.splicerSlots.collect { _splicerSlots.value = it }
+            preferencesRepository.splicerSlots.collect { _splicerSlots.value = it }
         }
         viewModelScope.launch {
-            repository.splicerQScores.collect { _splicerQScores.value = it }
+            preferencesRepository.splicerQScores.collect { _splicerQScores.value = it }
         }
         viewModelScope.launch {
-            repository.splicerSignatures.collect { _splicerSignatures.value = it }
+            preferencesRepository.splicerSignatures.collect { _splicerSignatures.value = it }
         }
         viewModelScope.launch {
-            repository.rawStockA.collect { _rawStockA.value = it }
+            preferencesRepository.rawStockA.collect { _rawStockA.value = it }
         }
         viewModelScope.launch {
-            repository.rawStockG.collect { _rawStockG.value = it }
+            preferencesRepository.rawStockG.collect { _rawStockG.value = it }
         }
         viewModelScope.launch {
-            repository.rawStockT.collect { _rawStockT.value = it }
+            preferencesRepository.rawStockT.collect { _rawStockT.value = it }
         }
         viewModelScope.launch {
-            repository.rawStockC.collect { _rawStockC.value = it }
+            preferencesRepository.rawStockC.collect { _rawStockC.value = it }
         }
         viewModelScope.launch {
-            repository.bioWaste.collect { _bioWaste.value = it }
+            preferencesRepository.bioWaste.collect { _bioWaste.value = it }
         }
         viewModelScope.launch {
             reactorSalt.collect { _reactorSalt.value = it }
@@ -158,15 +166,15 @@ class SplicerViewModel(
                     val qScore = _splicerQScores.value.getOrNull(i) ?: 25.0
                     val tm = GeneticsEngine.calculateMeltingTemperature(existing, _reactorSalt.value.toDouble())
                     val mfe = GeneticsEngine.calculateMinimumFreeEnergy(existing)
-                    repository.insertGeneSequence(
+                    geneStockRepository.insertGeneSequence(
                         GeneSequence(
                             sequence = existing,
                             count = 1,
                             discoveredAt = System.currentTimeMillis(),
                             averageQScore = qScore,
                             meltingTemp = tm,
-                            minimumFreeEnergy = mfe
-                        )
+                            minimumFreeEnergy = mfe,
+                        ),
                     )
                 }
             }
@@ -176,7 +184,7 @@ class SplicerViewModel(
             _splicerSlots.value = clearedSlots
             _splicerQScores.value = clearedQScores
             _splicerSignatures.value = clearedSignatures
-            repository.saveSplicerState(clearedSlots, clearedQScores, clearedSignatures)
+            preferencesRepository.saveSplicerState(clearedSlots, clearedQScores, clearedSignatures)
             addLog("SPLICER: Custom Scaffold Mode ${if (active) "ENGAGED" else "DISENGAGED"}. Splicer slots reset.")
         }
     }
@@ -206,7 +214,7 @@ class SplicerViewModel(
                 return@launch
             }
 
-            repository.deleteGeneSequence(match)
+            geneStockRepository.deleteGeneSequence(match)
 
             val existing = _splicerSlots.value[slotIdx]
             if (existing != null) {
@@ -214,7 +222,7 @@ class SplicerViewModel(
                 val tm = GeneticsEngine.calculateMeltingTemperature(existing, _reactorSalt.value.toDouble())
                 val mfe = GeneticsEngine.calculateMinimumFreeEnergy(existing)
                 val sig = _splicerSignatures.value.getOrNull(slotIdx) ?: "TAQ"
-                repository.insertGeneSequence(
+                geneStockRepository.insertGeneSequence(
                     GeneSequence(
                         sequence = existing,
                         count = 1,
@@ -222,8 +230,8 @@ class SplicerViewModel(
                         averageQScore = qScore,
                         meltingTemp = tm,
                         minimumFreeEnergy = mfe,
-                        polymeraseSignature = sig
-                    )
+                        polymeraseSignature = sig,
+                    ),
                 )
             }
 
@@ -239,7 +247,7 @@ class SplicerViewModel(
             updatedSignatures[slotIdx] = match.polymeraseSignature
             _splicerSignatures.value = updatedSignatures
 
-            repository.saveSplicerState(updatedSlots, updatedQScores, updatedSignatures)
+            preferencesRepository.saveSplicerState(updatedSlots, updatedQScores, updatedSignatures)
 
             if (_isCustomScaffoldMode.value) {
                 _activeSlotSelection.value = null
@@ -260,7 +268,7 @@ class SplicerViewModel(
             val tm = GeneticsEngine.calculateMeltingTemperature(existing, _reactorSalt.value.toDouble())
             val mfe = GeneticsEngine.calculateMinimumFreeEnergy(existing)
             val signature = _splicerSignatures.value.getOrNull(slotIdx) ?: "TAQ"
-            repository.insertGeneSequence(
+            geneStockRepository.insertGeneSequence(
                 GeneSequence(
                     sequence = existing,
                     count = 1,
@@ -268,8 +276,8 @@ class SplicerViewModel(
                     averageQScore = qScore,
                     meltingTemp = tm,
                     minimumFreeEnergy = mfe,
-                    polymeraseSignature = signature
-                )
+                    polymeraseSignature = signature,
+                ),
             )
 
             val updatedSlots = _splicerSlots.value.toMutableList()
@@ -284,7 +292,7 @@ class SplicerViewModel(
             updatedSignatures[slotIdx] = "TAQ"
             _splicerSignatures.value = updatedSignatures
 
-            repository.saveSplicerState(updatedSlots, updatedQScores, updatedSignatures)
+            preferencesRepository.saveSplicerState(updatedSlots, updatedQScores, updatedSignatures)
 
             addLog("Returned gene segment #${slotIdx + 1} to archive stock")
         }
@@ -292,7 +300,7 @@ class SplicerViewModel(
 
     fun autofillSplicerSlots() {
         synthManager.playBeep(880f, 0.05f, "sine")
-        viewModelScope.launch(Dispatchers.Default) {
+        viewModelScope.launch(dispatchers.default) {
             val target = _targetSequence.value
             if (target.length != 64) return@launch
 
@@ -339,13 +347,13 @@ class SplicerViewModel(
                 }
 
                 withContext(Dispatchers.IO) {
-                    repository.updateGeneStock(toUpdate, toDelete)
+                    geneStockRepository.updateGeneStock(toUpdate, toDelete)
                 }
 
                 _splicerSlots.value = updatedSlots
                 _splicerQScores.value = updatedQScores
                 _splicerSignatures.value = updatedSignatures
-                repository.saveSplicerState(updatedSlots, updatedQScores, updatedSignatures)
+                preferencesRepository.saveSplicerState(updatedSlots, updatedQScores, updatedSignatures)
                 addLog("AUTO GENE: Filled $autoFilledCount matching slots with verified stock segments.")
             } else {
                 addLog("AUTO GENE: No matching segments found in stock for any unfilled slots.")
@@ -381,15 +389,15 @@ class SplicerViewModel(
                             discoveredAt = System.currentTimeMillis(),
                             averageQScore = 30.0,
                             meltingTemp = tm,
-                            minimumFreeEnergy = mfe
-                        )
+                            minimumFreeEnergy = mfe,
+                        ),
                     )
                     addedAny = true
                 }
             }
 
             if (addedAny) {
-                repository.insertGeneSequences(existingList)
+                geneStockRepository.insertGeneSequences(existingList)
                 addLog("DEV: Injected missing target genes into stock archive.")
                 synthManager.playSynthesisSuccess()
             } else {
@@ -429,18 +437,18 @@ class SplicerViewModel(
 
             val updatedGene = match.copy(count = match.count - 1)
             if (updatedGene.count == 0) {
-                repository.deleteGeneSequence(match)
+                geneStockRepository.deleteGeneSequence(match)
             } else {
-                repository.insertGeneSequence(updatedGene)
+                geneStockRepository.insertGeneSequence(updatedGene)
             }
 
             val newAppended = creature.appendedGenes + gene
             val restoredTelomeres = creature.telomeres + 10
             val updatedCreature = creature.copy(
                 appendedGenes = newAppended,
-                telomeres = restoredTelomeres.coerceAtMost(100)
+                telomeres = restoredTelomeres.coerceAtMost(100),
             )
-            repository.insertCreature(updatedCreature)
+            creatureRepository.insertCreature(updatedCreature)
 
             _selectedSplicerCreature.value = updatedCreature
             _selectedGeneToAppend.value = null
@@ -599,11 +607,11 @@ class SplicerViewModel(
                 isAutoDefender = isAutoDefenderVal,
                 heatResistance = heatRes,
                 radResistance = radRes,
-                kineticResistance = kineticRes
+                kineticResistance = kineticRes,
             )
 
-            repository.insertCreature(finalCreature)
-            selectedReagent?.let { repository.decrementReagentStock(it) }
+            creatureRepository.insertCreature(finalCreature)
+            selectedReagent?.let { geneStockRepository.decrementReagentStock(it) }
             _newlySplicedCreature.value = finalCreature
 
             for (k in 1..64) {
@@ -635,7 +643,7 @@ class SplicerViewModel(
 
             if (matchesTarget) {
                 val nextTarget = generateRandom64Sequence()
-                repository.saveTargetSequence(nextTarget)
+                preferencesRepository.saveTargetSequence(nextTarget)
                 addLog("GEN-NET: Target sequence fully compiled! Generating new Synodic Sequence matrix.")
             }
         }
@@ -663,7 +671,7 @@ class SplicerViewModel(
         _splicerSlots.value = clearedSlots
         _splicerQScores.value = clearedQScores
         _splicerSignatures.value = clearedSignatures
-        repository.saveSplicerState(clearedSlots, clearedQScores, clearedSignatures)
+        preferencesRepository.saveSplicerState(clearedSlots, clearedQScores, clearedSignatures)
         _isSplicing.value = false
         _splicingProgress.value = 0
         _sequencedBasesCount.value = 0
@@ -697,7 +705,7 @@ class SplicerViewModel(
 
     private fun runForcedConstructionCycle(dnaSeq: String, isCustom: Boolean, reagent: String?) {
         forcedLoopJob?.cancel()
-        forcedLoopJob = viewModelScope.launch(Dispatchers.Default) {
+        forcedLoopJob = viewModelScope.launch(dispatchers.default) {
             val wave = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
             _reactorFreezeTimeLeft.value = 8.0f
 
@@ -724,7 +732,7 @@ class SplicerViewModel(
                 } else {
                     "[WARNING] >> P.O.X. REACTOR LOCKED FOR SEQUENCING."
                 },
-                "[LUNAR STATUS] >> Phase: ${wave.phaseName} | Effective Debuff Mod: $moonStatusLog"
+                "[LUNAR STATUS] >> Phase: ${wave.phaseName} | Effective Debuff Mod: $moonStatusLog",
             ).filterNotNull().toMutableList()
 
             val currentStock = geneSequences.value.map { it.copy() }.toMutableList()
@@ -824,10 +832,22 @@ class SplicerViewModel(
 
                         var available = false
                         when (expectedChar) {
-                            'A' -> if (tempRawA > 0) { tempRawA--; available = true }
-                            'G' -> if (tempRawG > 0) { tempRawG--; available = true }
-                            'T' -> if (tempRawT > 0) { tempRawT--; available = true }
-                            'C' -> if (tempRawC > 0) { tempRawC--; available = true }
+                            'A' -> if (tempRawA > 0) {
+                                tempRawA--
+                                available = true
+                            }
+                            'G' -> if (tempRawG > 0) {
+                                tempRawG--
+                                available = true
+                            }
+                            'T' -> if (tempRawT > 0) {
+                                tempRawT--
+                                available = true
+                            }
+                            'C' -> if (tempRawC > 0) {
+                                tempRawC--
+                                available = true
+                            }
                         }
 
                         if (available) {
@@ -837,10 +857,22 @@ class SplicerViewModel(
                             val candidatesForDeduction = mutableListOf<Char>()
                             for (rep in 1..2) {
                                 when {
-                                    tempRawA > 0 -> { tempRawA--; candidatesForDeduction.add('A') }
-                                    tempRawG > 0 -> { tempRawG--; candidatesForDeduction.add('G') }
-                                    tempRawT > 0 -> { tempRawT--; candidatesForDeduction.add('T') }
-                                    tempRawC > 0 -> { tempRawC--; candidatesForDeduction.add('C') }
+                                    tempRawA > 0 -> {
+                                        tempRawA--
+                                        candidatesForDeduction.add('A')
+                                    }
+                                    tempRawG > 0 -> {
+                                        tempRawG--
+                                        candidatesForDeduction.add('G')
+                                    }
+                                    tempRawT > 0 -> {
+                                        tempRawT--
+                                        candidatesForDeduction.add('T')
+                                    }
+                                    tempRawC > 0 -> {
+                                        tempRawC--
+                                        candidatesForDeduction.add('C')
+                                    }
                                 }
                             }
 
@@ -909,7 +941,7 @@ class SplicerViewModel(
                 }
 
                 if (toDelete.isNotEmpty() || toUpdate.isNotEmpty()) {
-                    repository.updateGeneStock(toUpdate, toDelete)
+                    geneStockRepository.updateGeneStock(toUpdate, toDelete)
                 }
 
                 val clearedSlots = List<String?>(8) { null }
@@ -918,9 +950,9 @@ class SplicerViewModel(
                 _splicerSlots.value = clearedSlots
                 _splicerQScores.value = clearedQScores
                 _splicerSignatures.value = clearedSignatures
-                repository.saveSplicerState(clearedSlots, clearedQScores, clearedSignatures)
+                preferencesRepository.saveSplicerState(clearedSlots, clearedQScores, clearedSignatures)
 
-                repository.saveRawStocks(tempRawA, tempRawG, tempRawT, tempRawC)
+                preferencesRepository.saveRawStocks(tempRawA, tempRawG, tempRawT, tempRawC)
 
                 val avgQ = recruitedQScores.average()
                 val scaledTelomeres = (avgQ * 2.5).toInt().coerceIn(10, 100)
@@ -941,10 +973,10 @@ class SplicerViewModel(
                     coherenceType = if (matchesTarget) "Forced" else null,
                     codonAdaptationIndex = cai,
                     telomeres = scaledTelomeres,
-                    vitality = scaledVitality
+                    vitality = scaledVitality,
                 )
 
-                repository.insertCreature(finalCreature)
+                creatureRepository.insertCreature(finalCreature)
                 synthManager.playSynthesisSuccess()
 
                 if (_isForcedLoopActive.value) {
@@ -953,7 +985,7 @@ class SplicerViewModel(
                     var nextDna = dnaSeq
                     if (!isCustom) {
                         nextDna = generateRandom64Sequence()
-                        repository.saveTargetSequence(nextDna)
+                        preferencesRepository.saveTargetSequence(nextDna)
                     }
 
                     delay(1000L)
@@ -972,7 +1004,7 @@ class SplicerViewModel(
 
                     if (!isCustom) {
                         val nextTarget = generateRandom64Sequence()
-                        repository.saveTargetSequence(nextTarget)
+                        preferencesRepository.saveTargetSequence(nextTarget)
                     }
 
                     addLog("FORCED CONSTRUCTION COMPLETED. Produced sequence: \"${finalCreature.name}\"!")
@@ -1075,7 +1107,7 @@ class SplicerViewModel(
             lore = lore,
             asciiArt = grid.toString(),
             discoveredAt = System.currentTimeMillis(),
-            origin = "Local Compiled Unit"
+            origin = "Local Compiled Unit",
         )
     }
 

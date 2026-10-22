@@ -1,7 +1,6 @@
 package com.example.genpox.ui.components
 
 import android.graphics.Bitmap
-import android.graphics.Color as AndroidColor
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -19,32 +18,30 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.genpox.theme.CyberBorder
 import com.example.genpox.theme.CyberGreen
 import com.example.genpox.theme.CyberGreenDim
 import com.example.genpox.theme.CyberPanel
-import com.example.genpox.theme.CyberBorder
 import com.example.genpox.theme.CyberTheme
 import com.example.genpox.theme.Typography
 import com.example.genpox.ui.main.MainViewModel
 import com.example.genpox.ui.main.getActiveReagentColor
 import java.util.Random
-import kotlin.math.sqrt
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
+import android.graphics.Color as AndroidColor
 
 /**
  * A modifier that applies a real-time retro CRT phosphor-monitor filter to any Composable content.
@@ -56,9 +53,9 @@ fun Modifier.phosphorMonitor(
     grilleOpacity: Float = 0.15f,
     bloomIntensity: Float = 0.3f,
     curvatureBezel: Float = 0.05f, // Amount of screen curvature bulge simulation
-    jitterSpeed: Float = 0.5f,     // Animation hum speed
+    jitterSpeed: Float = 0.5f, // Animation hum speed
     glitchIntensity: Float = 0.1f, // Static ticks & horizontal sync aberration
-    timeMs: Long = 0L
+    timeMs: Long = 0L,
 ): Modifier = this.then(
     Modifier.drawWithContent {
         // 1. Draw the underlying Composable content
@@ -80,7 +77,7 @@ fun Modifier.phosphorMonitor(
                 1f to Color.Transparent,
                 startY = 0f,
                 endY = scanlineSpacing,
-                tileMode = TileMode.Repeated
+                tileMode = TileMode.Repeated,
             )
             drawRect(brush = scanlineBrush, size = size, blendMode = BlendMode.Multiply)
         }
@@ -94,7 +91,7 @@ fun Modifier.phosphorMonitor(
                 1f to Color.Transparent,
                 startX = 0f,
                 endX = grilleSpacing,
-                tileMode = TileMode.Repeated
+                tileMode = TileMode.Repeated,
             )
             drawRect(brush = grilleBrush, size = size, blendMode = BlendMode.Multiply)
         }
@@ -105,41 +102,25 @@ fun Modifier.phosphorMonitor(
             drawRect(
                 color = baseColor.copy(alpha = bloomIntensity * 0.12f),
                 size = size,
-                blendMode = BlendMode.Plus
+                blendMode = BlendMode.Plus,
             )
         }
 
         // 6. Draw Jitter / Glitch Artifacts & Screen Noise
-        if (glitchIntensity > 0f && timeMs > 0L) {
-            val rand = Random(timeMs / 150)
-            
-            // Random analog sync-tear lines
-            if (rand.nextFloat() < 0.2f * glitchIntensity) {
+        if (glitchIntensity > 0.05f) {
+            val currTime = if (timeMs > 0L) timeMs else System.currentTimeMillis()
+            val rand = Random(currTime / 250)
+
+            // Subtle analog sync-tear lines
+            if (rand.nextFloat() < 0.08f * glitchIntensity) {
                 val lineY = rand.nextFloat() * h
-                val lineH = rand.nextFloat() * 4.dp.toPx() + 1.dp.toPx()
+                val lineH = rand.nextFloat() * 2.dp.toPx() + 1.dp.toPx()
                 drawRect(
-                    color = baseColor.copy(alpha = rand.nextFloat() * 0.15f * glitchIntensity),
+                    color = baseColor.copy(alpha = rand.nextFloat() * 0.08f * glitchIntensity),
                     topLeft = Offset(0f, lineY),
                     size = Size(w, lineH),
-                    blendMode = BlendMode.Plus
+                    blendMode = BlendMode.Plus,
                 )
-            }
-
-            // CRT Snow/Phosphor particle static ticks
-            if (rand.nextFloat() < 0.4f) {
-                val ticksCount = (4 * glitchIntensity).toInt().coerceAtLeast(1)
-                for (i in 0 until ticksCount) {
-                    val px = rand.nextFloat() * w
-                    val py = rand.nextFloat() * h
-                    val tickLen = rand.nextFloat() * 8.dp.toPx() + 2.dp.toPx()
-                    drawLine(
-                        color = Color.White.copy(alpha = rand.nextFloat() * 0.3f),
-                        start = Offset(px, py),
-                        end = Offset(px + tickLen, py),
-                        strokeWidth = 1.dp.toPx(),
-                        blendMode = BlendMode.Plus
-                    )
-                }
             }
         }
 
@@ -149,13 +130,13 @@ fun Modifier.phosphorMonitor(
                 Color.White.copy(alpha = 0.08f),
                 Color.White.copy(alpha = 0.02f),
                 Color.Transparent,
-                Color.Transparent
+                Color.Transparent,
             ),
             start = Offset(0f, 0f),
-            end = Offset(w, h)
+            end = Offset(w, h),
         )
         drawRect(brush = glareBrush, size = size, blendMode = BlendMode.Plus)
-    }
+    },
 )
 
 /**
@@ -163,20 +144,18 @@ fun Modifier.phosphorMonitor(
  */
 private fun DrawScope.drawCrtVignette(w: Float, h: Float, color: Color, curveFactor: Float) {
     if (curveFactor <= 0f) return
-    
+
     // Draw corner vignette darkening
     val radialVignette = Brush.radialGradient(
         colors = listOf(
             Color.Transparent,
             Color.Black.copy(alpha = 0.3f),
-            Color.Black.copy(alpha = 0.9f)
+            Color.Black.copy(alpha = 0.9f),
         ),
         center = Offset(w / 2f, h / 2f),
-        radius = sqrt(w * w + h * h) / 2f
+        radius = sqrt(w * w + h * h) / 2f,
     )
     drawRect(brush = radialVignette, size = size, blendMode = BlendMode.Multiply)
-
-
 }
 
 /**
@@ -187,15 +166,17 @@ fun getPhosphorColorMatrix(baseColor: Color): ColorMatrix {
     val r = baseColor.red
     val g = baseColor.green
     val b = baseColor.blue
-    
+
     // Convert source pixels to luminance (0.2126R + 0.7152G + 0.0722B),
     // then scale and project onto target R, G, B channels to map monochromatic tone.
-    return ColorMatrix(floatArrayOf(
-        0.2126f * r, 0.7152f * r, 0.0722f * r, 0f, 0f,
-        0.2126f * g, 0.7152f * g, 0.0722f * g, 0f, 0f,
-        0.2126f * b, 0.7152f * b, 0.0722f * b, 0f, 0f,
-        0f,          0f,          0f,          1f, 0f
-    ))
+    return ColorMatrix(
+        floatArrayOf(
+            0.2126f * r, 0.7152f * r, 0.0722f * r, 0f, 0f,
+            0.2126f * g, 0.7152f * g, 0.0722f * g, 0f, 0f,
+            0.2126f * b, 0.7152f * b, 0.0722f * b, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f,
+        ),
+    )
 }
 
 /**
@@ -206,10 +187,10 @@ fun applySobelEdgeDetection(src: Bitmap, threshold: Float = 0.12f): Bitmap {
     val width = src.width
     val height = src.height
     val dest = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    
+
     val pixels = IntArray(width * height)
     src.getPixels(pixels, 0, width, 0, 0, width, height)
-    
+
     val gray = FloatArray(width * height)
     for (i in pixels.indices) {
         val p = pixels[i]
@@ -219,31 +200,31 @@ fun applySobelEdgeDetection(src: Bitmap, threshold: Float = 0.12f): Bitmap {
         // Compute Rec. 709 luminance
         gray[i] = 0.2126f * rVal + 0.7152f * gVal + 0.0722f * bVal
     }
-    
+
     val outPixels = IntArray(width * height)
-    
+
     for (y in 1 until height - 1) {
         for (x in 1 until width - 1) {
             val idx = y * width + x
-            
+
             // Grab 3x3 grid around pixel
             val v00 = gray[(y - 1) * width + (x - 1)]
             val v01 = gray[(y - 1) * width + x]
             val v02 = gray[(y - 1) * width + (x + 1)]
-            
+
             val v10 = gray[y * width + (x - 1)]
             val v12 = gray[y * width + (x + 1)]
-            
+
             val v20 = gray[(y + 1) * width + (x - 1)]
             val v21 = gray[(y + 1) * width + x]
             val v22 = gray[(y + 1) * width + (x + 1)]
-            
+
             // Sobel horizontal (Gx) and vertical (Gy) gradients
             val gx = (v02 + 2f * v12 + v22) - (v00 + 2f * v10 + v20)
             val gy = (v20 + 2f * v21 + v22) - (v00 + 2f * v01 + v02)
-            
+
             val gMag = sqrt(gx * gx + gy * gy)
-            
+
             if (gMag > threshold * 255f) {
                 outPixels[idx] = AndroidColor.WHITE
             } else {
@@ -251,7 +232,7 @@ fun applySobelEdgeDetection(src: Bitmap, threshold: Float = 0.12f): Bitmap {
             }
         }
     }
-    
+
     dest.setPixels(outPixels, 0, width, 0, 0, width, height)
     return dest
 }
@@ -264,7 +245,7 @@ fun applySobelEdgeDetection(src: Bitmap, threshold: Float = 0.12f): Bitmap {
 fun PhosphorMockRadarScreen(
     baseColor: Color,
     timeMs: Long,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "radar_anim")
     val radarAngle by infiniteTransition.animateFloat(
@@ -272,15 +253,15 @@ fun PhosphorMockRadarScreen(
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
             animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "radar_angle"
+        label = "radar_angle",
     )
 
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Color.Black),
     ) {
         val w = size.width
         val h = size.height
@@ -296,14 +277,14 @@ fun PhosphorMockRadarScreen(
                 color = baseColor.copy(alpha = 0.08f),
                 start = Offset(gx, 0f),
                 end = Offset(gx, h),
-                strokeWidth = 1.dp.toPx()
+                strokeWidth = 1.dp.toPx(),
             )
             val gy = (h / gridCount) * i
             drawLine(
                 color = baseColor.copy(alpha = 0.08f),
                 start = Offset(0f, gy),
                 end = Offset(w, gy),
-                strokeWidth = 1.dp.toPx()
+                strokeWidth = 1.dp.toPx(),
             )
         }
 
@@ -313,7 +294,7 @@ fun PhosphorMockRadarScreen(
                 color = baseColor.copy(alpha = 0.2f),
                 radius = maxRadius * r,
                 center = Offset(cx, cy),
-                style = Stroke(width = 1.5.dp.toPx())
+                style = Stroke(width = 1.5.dp.toPx()),
             )
         }
 
@@ -322,13 +303,13 @@ fun PhosphorMockRadarScreen(
             color = baseColor.copy(alpha = 0.3f),
             start = Offset(cx - maxRadius * 1.1f, cy),
             end = Offset(cx + maxRadius * 1.1f, cy),
-            strokeWidth = 1.dp.toPx()
+            strokeWidth = 1.dp.toPx(),
         )
         drawLine(
             color = baseColor.copy(alpha = 0.3f),
             start = Offset(cx, cy - maxRadius * 1.1f),
             end = Offset(cx, cy + maxRadius * 1.1f),
-            strokeWidth = 1.dp.toPx()
+            strokeWidth = 1.dp.toPx(),
         )
 
         // Draw sweeping radar ray
@@ -339,25 +320,25 @@ fun PhosphorMockRadarScreen(
             color = baseColor.copy(alpha = 0.7f),
             start = Offset(cx, cy),
             end = Offset(rx, ry),
-            strokeWidth = 2.dp.toPx()
+            strokeWidth = 2.dp.toPx(),
         )
 
         // Draw simulated blip points
         val blips = listOf(
             Offset(cx + maxRadius * 0.4f, cy - maxRadius * 0.3f) to 0.8f,
             Offset(cx - maxRadius * 0.6f, cy + maxRadius * 0.2f) to 0.4f,
-            Offset(cx + maxRadius * 0.1f, cy + maxRadius * 0.5f) to 0.9f
+            Offset(cx + maxRadius * 0.1f, cy + maxRadius * 0.5f) to 0.9f,
         )
         for ((pos, alpha) in blips) {
             drawCircle(
                 color = baseColor.copy(alpha = alpha),
                 radius = 6.dp.toPx(),
-                center = pos
+                center = pos,
             )
             drawCircle(
                 color = Color.White.copy(alpha = alpha * 0.8f),
                 radius = 2.dp.toPx(),
-                center = pos
+                center = pos,
             )
         }
     }
@@ -375,20 +356,20 @@ fun createSampleBitmap(): Bitmap {
         strokeWidth = 3f
         isAntiAlias = true
     }
-    
+
     // Background clear
     canvas.drawColor(AndroidColor.BLACK)
-    
+
     // Draw calibration circles and crosses
     canvas.drawCircle(128f, 128f, 100f, paint)
     canvas.drawCircle(128f, 128f, 60f, paint)
     paint.strokeWidth = 1.5f
     canvas.drawLine(128f, 10f, 128f, 246f, paint)
     canvas.drawLine(10f, 128f, 246f, 128f, paint)
-    
+
     // Draw some box outlines
     canvas.drawRect(48f, 48f, 208f, 208f, paint)
-    
+
     // Draw text readout details
     paint.color = AndroidColor.WHITE
     paint.style = android.graphics.Paint.Style.FILL
@@ -396,43 +377,43 @@ fun createSampleBitmap(): Bitmap {
     paint.typeface = android.graphics.Typeface.MONOSPACE
     canvas.drawText("GENPOX CRT", 62f, 96f, paint)
     canvas.drawText("TEST PATTERN", 54f, 172f, paint)
-    
+
     return bmp
 }
 
 @Composable
 fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
-    val scanlineOpacity by viewModel.crtScanlineOpacity.collectAsState()
-    val grilleOpacity by viewModel.crtGrilleOpacity.collectAsState()
-    val bloomIntensity by viewModel.crtBloomIntensity.collectAsState()
-    val curvatureBezel by viewModel.crtCurvatureBezel.collectAsState()
-    val glitchIntensity by viewModel.crtGlitchIntensity.collectAsState()
+    val scanlineOpacity by viewModel.crtScanlineOpacity.collectAsStateWithLifecycle()
+    val grilleOpacity by viewModel.crtGrilleOpacity.collectAsStateWithLifecycle()
+    val bloomIntensity by viewModel.crtBloomIntensity.collectAsStateWithLifecycle()
+    val curvatureBezel by viewModel.crtCurvatureBezel.collectAsStateWithLifecycle()
+    val glitchIntensity by viewModel.crtGlitchIntensity.collectAsStateWithLifecycle()
     var isVectorMode by remember { mutableStateOf(false) }
     var isAnimatedSource by remember { mutableStateOf(true) }
-    
+
     // Theme Color indexing
     var selectedColorIndex by remember { mutableStateOf(0) }
-    
+
     // Continuous time hum animation ticker
     val infiniteTransition = rememberInfiniteTransition(label = "jitter_time")
     val timeMsFloat by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 100000f,
         animationSpec = infiniteRepeatable(
-            animation = tween(100000, easing = LinearEasing)
+            animation = tween(100000, easing = LinearEasing),
         ),
-        label = "time_ms"
+        label = "time_ms",
     )
     val timeMs = timeMsFloat.toLong()
 
     // Base colors mapped from GENPOX core palettes & active reagent slot
-    val activeReagent by viewModel.selectedReagent.collectAsState()
+    val activeReagent by viewModel.selectedReagent.collectAsStateWithLifecycle()
     val colors = listOf(
         CyberTheme.green to "CYBER-GREEN",
         CyberTheme.purple to "CYBER-PURPLE",
         CyberTheme.cyan to "CYBER-CYAN",
         CyberTheme.red to "CYBER-RED",
-        getActiveReagentColor(activeReagent) to "ACTIVE REAGENT"
+        getActiveReagentColor(activeReagent) to "ACTIVE REAGENT",
     )
     val baseColor = colors[selectedColorIndex].first
 
@@ -441,11 +422,11 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
     val baseBmp = remember {
         android.graphics.BitmapFactory.decodeResource(
             context.resources,
-            com.example.genpox.R.drawable.venus_art
+            com.example.genpox.R.drawable.venus_art,
         ) ?: createSampleBitmap()
     }
     val edgeBmp = remember(baseBmp) { applySobelEdgeDetection(baseBmp, 0.12f) }
-    
+
     val displayBmp = if (isVectorMode) edgeBmp else baseBmp
     val displayImageBitmap = remember(displayBmp) { displayBmp.asImageBitmap() }
 
@@ -454,13 +435,13 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(text = "PHOSPHOR CRT MONITOR EMULATOR", style = Typography.titleMedium, color = CyberGreen)
         Text(
             text = "Fine-tune cathode-ray emission, grid masks, phosphor decay bloom, and edge-extracted vector graphics.",
             style = Typography.bodySmall,
-            color = CyberGreenDim
+            color = CyberGreenDim,
         )
 
         // 1. Live CRT Display Preview Box (4:3 aspect ratio bezel)
@@ -468,7 +449,7 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1.33f)
-                .background(Color.Black)
+                .background(Color.Black),
         ) {
             if (isAnimatedSource) {
                 // Animated Vector Radar Feed
@@ -479,7 +460,7 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                     bitmap = displayImageBitmap,
                     contentDescription = "CRT Source",
                     modifier = Modifier.fillMaxSize(),
-                    colorFilter = ColorFilter.colorMatrix(getPhosphorColorMatrix(baseColor))
+                    colorFilter = ColorFilter.colorMatrix(getPhosphorColorMatrix(baseColor)),
                 )
             }
         }
@@ -490,7 +471,7 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                 .fillMaxWidth()
                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(CyberPanel)
-                .padding(10.dp)
+                .padding(10.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(text = "MONITOR CONFIGURATION CONTROLS", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberGreen)
@@ -499,7 +480,7 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(text = "Input Signal Source:", style = Typography.bodySmall, color = CyberGreenDim)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -512,12 +493,12 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (active) baseColor else CyberPanel,
-                                    contentColor = if (active) Color.Black else baseColor.copy(alpha = 0.6f)
+                                    contentColor = if (active) Color.Black else baseColor.copy(alpha = 0.6f),
                                 ),
                                 border = BorderStroke(1.dp, baseColor.copy(alpha = 0.4f)),
                                 shape = RoundedCornerShape(2.dp),
                                 modifier = Modifier.height(28.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp)
+                                contentPadding = PaddingValues(horizontal = 8.dp),
                             ) {
                                 Text(label, style = Typography.labelSmall, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                             }
@@ -530,7 +511,7 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(text = "Vector CRT Outline Mode (Sobel):", style = Typography.bodySmall, color = CyberGreenDim)
                         Switch(
@@ -543,8 +524,8 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                                 checkedThumbColor = Color.Black,
                                 checkedTrackColor = baseColor,
                                 uncheckedThumbColor = baseColor.copy(alpha = 0.5f),
-                                uncheckedTrackColor = Color.Black
-                            )
+                                uncheckedTrackColor = Color.Black,
+                            ),
                         )
                     }
                 }
@@ -554,7 +535,7 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                     Text(text = "Select Monitor Phosphor Tint:", style = Typography.bodySmall, color = CyberGreenDim)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         colors.forEachIndexed { idx, (color, name) ->
                             val active = selectedColorIndex == idx
@@ -566,11 +547,11 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                                 modifier = Modifier.weight(1f).height(28.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (active) color else CyberPanel,
-                                    contentColor = if (active) Color.Black else color.copy(alpha = 0.7f)
+                                    contentColor = if (active) Color.Black else color.copy(alpha = 0.7f),
                                 ),
                                 border = BorderStroke(1.dp, color.copy(alpha = 0.4f)),
                                 shape = RoundedCornerShape(2.dp),
-                                contentPadding = PaddingValues(horizontal = 2.dp)
+                                contentPadding = PaddingValues(horizontal = 2.dp),
                             ) {
                                 Text(name.take(6), style = Typography.labelSmall, fontSize = 7.sp, fontWeight = FontWeight.Bold)
                             }
@@ -586,11 +567,11 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                 .fillMaxWidth()
                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(CyberPanel)
-                .padding(10.dp)
+                .padding(10.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(text = "PHYSICAL EMISSION PARAMETERS", style = Typography.bodyMedium, fontWeight = FontWeight.Bold, color = CyberGreen)
-                
+
                 // Scanline opacity
                 Text(text = "Scanline Grid Density (${(scanlineOpacity * 100).toInt()}%):", style = Typography.bodySmall, color = CyberGreenDim)
                 PoxSlider(
@@ -599,7 +580,7 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                         viewModel.setCrtScanlineOpacity(it)
                         CyberTheme.savePreset(context, "active_colors")
                     },
-                    activeColor = baseColor
+                    activeColor = baseColor,
                 )
 
                 // Grille opacity
@@ -610,7 +591,7 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                         viewModel.setCrtGrilleOpacity(it)
                         CyberTheme.savePreset(context, "active_colors")
                     },
-                    activeColor = baseColor
+                    activeColor = baseColor,
                 )
 
                 // Bloom strength
@@ -621,7 +602,7 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                         viewModel.setCrtBloomIntensity(it)
                         CyberTheme.savePreset(context, "active_colors")
                     },
-                    activeColor = baseColor
+                    activeColor = baseColor,
                 )
 
                 // Curvature bezel factor
@@ -633,7 +614,7 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                         CyberTheme.savePreset(context, "active_colors")
                     },
                     valueRange = 0f..0.15f,
-                    activeColor = baseColor
+                    activeColor = baseColor,
                 )
 
                 // Sync Jitter
@@ -644,7 +625,7 @@ fun PhosphorMonitorSettingsView(viewModel: MainViewModel) {
                         viewModel.setCrtGlitchIntensity(it)
                         CyberTheme.savePreset(context, "active_colors")
                     },
-                    activeColor = baseColor
+                    activeColor = baseColor,
                 )
             }
         }

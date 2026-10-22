@@ -24,6 +24,13 @@ camerax = "1.5.3"
 mlkitBarcode = "17.3.0"
 kotlinxSerializationJson = "1.6.3"
 zxing = "3.5.3"
+hilt = "2.55"
+hiltNavigationCompose = "1.2.0"
+turbine = "1.2.0"
+mockk = "1.13.17"
+detekt = "1.23.8"
+spotless = "7.0.2"
+filament = "1.77.0"
 
 
 [libraries]
@@ -51,6 +58,7 @@ androidx-lifecycle-viewmodel-navigation3 = { module = "androidx.lifecycle:lifecy
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 google-generativeai = { module = "com.google.ai.client.generativeai:generativeai", version.ref = "generativeai" }
 play-services-maps = { module = "com.google.android.gms:play-services-maps", version.ref = "playServicesMaps" }
@@ -67,6 +75,17 @@ zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 androidx-graphics-path = { module = "androidx.graphics:graphics-path", version = "1.1.0" }
 
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
+hilt-android-gradle-plugin = { module = "com.google.dagger:hilt-android-gradle-plugin", version.ref = "hilt" }
+androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+
+filament-android = { module = "com.google.android.filament:filament-android", version.ref = "filament" }
+filament-utils-android = { module = "com.google.android.filament:filament-utils-android", version.ref = "filament" }
+filamat-android = { module = "com.google.android.filament:filamat-android", version.ref = "filament" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
@@ -74,3 +93,6 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

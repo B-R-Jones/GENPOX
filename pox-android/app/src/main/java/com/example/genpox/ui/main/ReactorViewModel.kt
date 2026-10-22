@@ -1,25 +1,31 @@
 package com.example.genpox.ui.main
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.genpox.audio.PoxSynthManager
 import com.example.genpox.data.*
+import com.example.genpox.data.repository.*
+import com.example.genpox.util.DispatchersProvider
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.UUID
+import javax.inject.Inject
 
-class ReactorViewModel(
-    private val repository: DataRepository,
-    private val synthManager: PoxSynthManager = PoxSynthManager(),
-    val _bioWaste: MutableStateFlow<Long> = MutableStateFlow(0L),
-    val _targetSynthesisSequence: MutableStateFlow<String> = MutableStateFlow("GCAATAGC")
+@HiltViewModel
+class ReactorViewModel @Inject constructor(
+    private val geneStockRepository: GeneStockRepository,
+    private val preferencesRepository: UserPreferencesRepository,
+    private val creatureRepository: CreatureRepository,
+    private val synthManager: PoxSynthManager,
+    private val dispatchers: DispatchersProvider,
 ) : ViewModel() {
+    val _bioWaste = MutableStateFlow(0L)
+    val _targetSynthesisSequence = MutableStateFlow("GCAATAGC")
 
     // Log callback to post back to MainViewModel
     var onLog: ((String) -> Unit)? = null
@@ -147,21 +153,21 @@ class ReactorViewModel(
     private val _longitude = MutableStateFlow(-122.0841)
 
     // Gene sequences from repository (held locally for standard/anomalous checking)
-    private val geneSequences = repository.allGeneSequences.stateIn(
+    private val geneSequences = geneStockRepository.allGeneSequences.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
-        emptyList()
+        emptyList(),
     )
 
-    val selectedHostPlanet = repository.selectedHostPlanet.stateIn(
+    val selectedHostPlanet = preferencesRepository.selectedHostPlanet.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
-        "EARTH"
+        "EARTH",
     )
 
     fun changeHostPlanet(planet: String) {
         viewModelScope.launch {
-            repository.saveSelectedHostPlanet(planet)
+            preferencesRepository.saveSelectedHostPlanet(planet)
         }
     }
 
@@ -172,22 +178,22 @@ class ReactorViewModel(
     init {
         // Collect DB resources
         viewModelScope.launch {
-            repository.rawStockA.collect { _rawStockA.value = it }
+            preferencesRepository.rawStockA.collect { _rawStockA.value = it }
         }
         viewModelScope.launch {
-            repository.rawStockG.collect { _rawStockG.value = it }
+            preferencesRepository.rawStockG.collect { _rawStockG.value = it }
         }
         viewModelScope.launch {
-            repository.rawStockT.collect { _rawStockT.value = it }
+            preferencesRepository.rawStockT.collect { _rawStockT.value = it }
         }
         viewModelScope.launch {
-            repository.rawStockC.collect { _rawStockC.value = it }
+            preferencesRepository.rawStockC.collect { _rawStockC.value = it }
         }
         viewModelScope.launch {
-            repository.bioWaste.collect { _bioWaste.value = it }
+            preferencesRepository.bioWaste.collect { _bioWaste.value = it }
         }
         viewModelScope.launch {
-            repository.allReagentStock.collect { list ->
+            geneStockRepository.allReagentStock.collect { list ->
                 if (list.isNotEmpty()) {
                     _reagents.value = list
                 }
@@ -207,11 +213,13 @@ class ReactorViewModel(
         _celestialWells.value = listOf(
             CelestialWell("WELL-GH", "Venusian Greenhouse Anomaly", startLat + ghDLat, startLng + ghDLng, 800.0, "GREENHOUSE", 1.0),
             CelestialWell("WELL-MAG", "Jovian Magnetospheric Anomaly", startLat + magDLat, startLng + magDLng, 1000.0, "MAGNETOSPHERIC", 1.0),
-            CelestialWell("WELL-GRAV", "Asteroid Gravitational Anomaly", startLat + gravDLat, startLng + gravDLng, 600.0, "GRAVITATIONAL", 1.0)
+            CelestialWell("WELL-GRAV", "Asteroid Gravitational Anomaly", startLat + gravDLat, startLng + gravDLng, 600.0, "GRAVITATIONAL", 1.0),
         )
 
-        startReactorHeartbeat()
-        startScrollingGeneTicker()
+        if (!WaveMath.isTestMode) {
+            startReactorHeartbeat()
+            startScrollingGeneTicker()
+        }
     }
 
     fun updateLocation(lat: Double, lng: Double) {
@@ -228,40 +236,55 @@ class ReactorViewModel(
     }
 
     fun setActivePolymerase(value: String) {
-        var costBase = 0L
-        var costWaste = 0L
-        if (value == "Tth") {
-            costBase = 25L
-            costWaste = 30L
-        } else if (value == "Pfu") {
-            costBase = 50L
-            costWaste = 1000L
-        }
-        
+        val polyCost = com.example.genpox.data.ReactorSimulationEngine.calculatePolymeraseCost(value, _targetSynthesisSequence.value)
+
         val currentA = _rawStockA.value
         val currentG = _rawStockG.value
         val currentT = _rawStockT.value
         val currentC = _rawStockC.value
-        
-        if (currentA < costBase || currentG < costBase || currentT < costBase || currentC < costBase || _bioWaste.value < costWaste) {
-            addLog("ERR: Insufficient resources to program $value (Requires $costBase of all bases, $costWaste bio-waste).")
+        val currentWaste = _bioWaste.value
+
+        if (currentA < polyCost.costA || currentG < polyCost.costG || currentT < polyCost.costT || currentC < polyCost.costC) {
+            addLog("ERR: Insufficient resources to program $value (Requires ${polyCost.costA}A/${polyCost.costG}G/${polyCost.costT}T/${polyCost.costC}C).")
             synthManager.playReject()
             return
         }
-        
+
         _activePolymerase.value = value
         addLog("REACTOR: Selected polymerase engine: $value")
         synthManager.playCombinatorTick()
     }
 
     fun setActiveChemicalSolute(value: String) {
+        val soluteCost = com.example.genpox.data.ReactorSimulationEngine.calculateSoluteCost(value)
+        val currentA = _rawStockA.value
+        val currentG = _rawStockG.value
+        val currentT = _rawStockT.value
+        val currentC = _rawStockC.value
+
+        if (currentA < soluteCost || currentG < soluteCost || currentT < soluteCost || currentC < soluteCost) {
+            addLog("ERR: Insufficient resources to program $value (Requires $soluteCost of all bases A/G/T/C).")
+            synthManager.playReject()
+            return
+        }
+
         _activeChemicalSolute.value = value
+        addLog("REACTOR: Selected chemical solute buffer: $value")
+        synthManager.playCombinatorTick()
     }
 
-    fun setInletRatioA(value: Float) { _inletRatioA.value = value }
-    fun setInletRatioG(value: Float) { _inletRatioG.value = value }
-    fun setInletRatioT(value: Float) { _inletRatioT.value = value }
-    fun setInletRatioC(value: Float) { _inletRatioC.value = value }
+    fun setInletRatioA(value: Float) {
+        _inletRatioA.value = value
+    }
+    fun setInletRatioG(value: Float) {
+        _inletRatioG.value = value
+    }
+    fun setInletRatioT(value: Float) {
+        _inletRatioT.value = value
+    }
+    fun setInletRatioC(value: Float) {
+        _inletRatioC.value = value
+    }
 
     fun setReactorDialIndex(index: Int) {
         synthManager.playCombinatorTick()
@@ -296,7 +319,7 @@ class ReactorViewModel(
             _rawStockG.value = g
             _rawStockT.value = t
             _rawStockC.value = c
-            repository.saveRawStocks(a, g, t, c)
+            preferencesRepository.saveRawStocks(a, g, t, c)
             addLog("DEV: Injected +10k of all raw bases.")
         }
     }
@@ -307,21 +330,21 @@ class ReactorViewModel(
             _rawStockG.value = 0L
             _rawStockT.value = 0L
             _rawStockC.value = 0L
-            repository.saveRawStocks(0, 0, 0, 0)
+            preferencesRepository.saveRawStocks(0, 0, 0, 0)
             addLog("DEV: Cleared all raw bases stocks.")
         }
     }
 
     fun clearDevGenes() {
         viewModelScope.launch(Dispatchers.IO) {
-            repository.deleteAllGeneSequences()
+            geneStockRepository.deleteAllGeneSequences()
             addLog("DEV: Cleared local genetic archive.")
         }
     }
 
     fun clearDevCreatures() {
         viewModelScope.launch(Dispatchers.IO) {
-            repository.deleteAllCreatures()
+            creatureRepository.deleteAllCreatures()
             addLog("DEV: Cleared active creature hangar.")
         }
     }
@@ -355,13 +378,13 @@ class ReactorViewModel(
             var totalCount = 0L
             matches.forEach { gene ->
                 totalCount += gene.count
-                repository.deleteGeneSequence(gene)
+                geneStockRepository.deleteGeneSequence(gene)
             }
 
             val wasteYield = totalCount * 2
             val newWaste = _bioWaste.value + wasteYield
             _bioWaste.value = newWaste
-            repository.saveBioWaste(newWaste)
+            preferencesRepository.saveBioWaste(newWaste)
 
             addLog("VAULT RECYCLING: Bulk deconstructed $totalCount matching gene blocks. Recovered +$wasteYield Bio-Waste.")
             synthManager.playSynthesisSuccess()
@@ -381,9 +404,9 @@ class ReactorViewModel(
                 val takeFromThis = Math.min(gene.count, remainingToDecompose)
                 val nextCount = gene.count - takeFromThis
                 if (nextCount == 0) {
-                    repository.deleteGeneSequence(gene)
+                    geneStockRepository.deleteGeneSequence(gene)
                 } else {
-                    repository.insertGeneSequence(gene.copy(count = nextCount))
+                    geneStockRepository.insertGeneSequence(gene.copy(count = nextCount))
                 }
                 remainingToDecompose -= takeFromThis
             }
@@ -415,7 +438,7 @@ class ReactorViewModel(
             val yieldG = localG * actualCount
             val yieldT = localT * actualCount
             val yieldC = localC * actualCount
-            val wasteYield = 2L * actualCount
+            val wasteYield = actualCount * 2L
 
             val newA = _rawStockA.value + yieldA
             val newG = _rawStockG.value + yieldG
@@ -429,8 +452,8 @@ class ReactorViewModel(
             _rawStockC.value = newC
             _bioWaste.value = newWaste
 
-            repository.saveRawStocks(newA, newG, newT, newC)
-            repository.saveBioWaste(newWaste)
+            preferencesRepository.saveRawStocks(newA, newG, newT, newC)
+            preferencesRepository.saveBioWaste(newWaste)
 
             addLog("RECYCLED: Deconstructed $actualCount blocks of $sequence into raw bases: +$yieldA A, +$yieldG G, +$yieldT T, +$yieldC C, and +$wasteYield Bio-Waste.")
             synthManager.playCombinatorTick()
@@ -471,26 +494,13 @@ class ReactorViewModel(
                 return@launch
             }
 
-            var soluteCost = 0L
-            if (solute == "DMSO" || solute == "Netropsin") {
-                soluteCost = 100L
-            }
+            val soluteCost = com.example.genpox.data.ReactorSimulationEngine.calculateSoluteCost(solute)
+            val polyCost = com.example.genpox.data.ReactorSimulationEngine.calculatePolymeraseCost(poly, target)
 
-            val enzymeBaseCost = when (poly.uppercase()) {
-                "TTH" -> 25L
-                "PFU" -> 50L
-                else -> 0L
-            }
-            val enzymeWasteCost = when (poly.uppercase()) {
-                "TTH" -> 30L
-                "PFU" -> 1000L
-                else -> 0L
-            }
-
-            val totalReqA = reqA + soluteCost + enzymeBaseCost
-            val totalReqG = reqG + soluteCost + enzymeBaseCost
-            val totalReqT = reqT + soluteCost + enzymeBaseCost
-            val totalReqC = reqC + soluteCost + enzymeBaseCost
+            val totalReqA = reqA + soluteCost + polyCost.costA
+            val totalReqG = reqG + soluteCost + polyCost.costG
+            val totalReqT = reqT + soluteCost + polyCost.costT
+            val totalReqC = reqC + soluteCost + polyCost.costC
             val currentWaste = _bioWaste.value
 
             val currentA = _rawStockA.value
@@ -498,8 +508,8 @@ class ReactorViewModel(
             val currentT = _rawStockT.value
             val currentC = _rawStockC.value
 
-            if (currentA < totalReqA || currentG < totalReqG || currentT < totalReqT || currentC < totalReqC || currentWaste < enzymeWasteCost) {
-                addLog("SYNTHESIS RUNTIME ERROR: Insufficient stocks for sequence, solutes, or enzyme swap cost ($poly requires $enzymeBaseCost bases & $enzymeWasteCost waste).")
+            if (currentA < totalReqA || currentG < totalReqG || currentT < totalReqT || currentC < totalReqC) {
+                addLog("SYNTHESIS RUNTIME ERROR: Insufficient stocks for sequence, solutes, or enzyme cost ($poly requires ${polyCost.costA}A/${polyCost.costG}G/${polyCost.costT}T/${polyCost.costC}C).")
                 _isLoopActive.value = false
                 synthManager.playReject()
                 return@launch
@@ -515,21 +525,18 @@ class ReactorViewModel(
             val afterG = currentG - totalReqG
             val afterT = currentT - totalReqT
             val afterC = currentC - totalReqC
-            val afterWaste = currentWaste - enzymeWasteCost
 
             _rawStockA.value = afterA
             _rawStockG.value = afterG
             _rawStockT.value = afterT
             _rawStockC.value = afterC
-            _bioWaste.value = afterWaste
-            repository.saveRawStocks(afterA, afterG, afterT, afterC)
-            repository.saveBioWaste(afterWaste)
+            preferencesRepository.saveRawStocks(afterA, afterG, afterT, afterC)
 
             if (soluteCost > 0) {
-                addLog("SOLUTE INJECTION: Consumed 100 units of each base for active chemical solute buffer ($solute).")
+                addLog("SOLUTE INJECTION: Consumed $soluteCost units of each base for active chemical solute buffer ($solute).")
             }
-            if (enzymeBaseCost > 0 || enzymeWasteCost > 0) {
-                addLog("ENZYME CHARGE: Consumed $enzymeBaseCost of all bases & $enzymeWasteCost Bio-Waste for $poly.")
+            if (polyCost.costA > 0 || polyCost.costG > 0 || polyCost.costT > 0 || polyCost.costC > 0) {
+                addLog("ENZYME CHARGE: Consumed ${polyCost.costA}A/${polyCost.costG}G/${polyCost.costT}T/${polyCost.costC}C for $poly.")
             }
 
             addLog("REACTOR: Initializing stepped transcription of target sequence \"$target\"...")
@@ -575,12 +582,12 @@ class ReactorViewModel(
                         val newWaste = _bioWaste.value + stepRes.step
                         _bioWaste.value = newWaste
                         viewModelScope.launch {
-                            repository.saveBioWaste(newWaste)
+                            preferencesRepository.saveBioWaste(newWaste)
                         }
                         addLog("CRITICAL COLLAPSE: Halted at step ${stepRes.step} due to ${stepRes.collapseReason}. converted to bio-waste.")
                         synthManager.playReject()
                     }
-                }
+                },
             )
 
             if (!simResult.isCollapsed) {
@@ -592,7 +599,7 @@ class ReactorViewModel(
                     newGenesList.add(simResult.finalStrand)
                 }
 
-                repository.insertGeneSequence(
+                geneStockRepository.insertGeneSequence(
                     GeneSequence(
                         sequence = simResult.finalStrand,
                         count = 1,
@@ -600,8 +607,8 @@ class ReactorViewModel(
                         averageQScore = qScore,
                         meltingTemp = simResult.tm,
                         minimumFreeEnergy = simResult.mfe,
-                        polymeraseSignature = poly.uppercase()
-                    )
+                        polymeraseSignature = poly.uppercase(),
+                    ),
                 )
 
                 val packet = GenePacket(
@@ -609,7 +616,7 @@ class ReactorViewModel(
                     genes = listOf(simResult.finalStrand),
                     timestamp = System.currentTimeMillis(),
                     isAnomalous = false,
-                    newGenes = newGenesList
+                    newGenes = newGenesList,
                 )
                 _discoveredPacketsLog.update { current ->
                     (listOf(packet) + current).take(50)
@@ -627,38 +634,26 @@ class ReactorViewModel(
             val remT = _rawStockT.value
             val remC = _rawStockC.value
             val remWaste = _bioWaste.value
-            val currentEnz = _activePolymerase.value.uppercase()
+            val currentEnz = _activePolymerase.value
+            val currentEnzCost = com.example.genpox.data.ReactorSimulationEngine.calculatePolymeraseCost(currentEnz, target)
 
-            val costBase = when (currentEnz) {
-                "TTH" -> 25L
-                "PFU" -> 50L
-                else -> 0L
-            }
-            val costWaste = when (currentEnz) {
-                "TTH" -> 30L
-                "PFU" -> 1000L
-                else -> 0L
-            }
-
-            if (remA < costBase || remG < costBase || remT < costBase || remC < costBase || remWaste < costWaste) {
+            if (remA < currentEnzCost.costA || remG < currentEnzCost.costG || remT < currentEnzCost.costT || remC < currentEnzCost.costC) {
                 _activePolymerase.value = "Taq"
                 addLog("SYS WARNING: Selected enzyme reset to Taq due to stock depletion.")
                 synthManager.playReject()
             }
 
+            val currentSolute = _activeChemicalSolute.value
+            val currentSoluteCost = com.example.genpox.data.ReactorSimulationEngine.calculateSoluteCost(currentSolute)
+            if (remA < currentSoluteCost || remG < currentSoluteCost || remT < currentSoluteCost || remC < currentSoluteCost) {
+                _activeChemicalSolute.value = "None"
+                addLog("SYS WARNING: Selected solute reset to None due to stock depletion.")
+            }
+
             // Loop synthesis handling
             if (_isLoopActive.value) {
-                val nextEnz = _activePolymerase.value.uppercase()
-                val nextEnzBaseCost = when (nextEnz) {
-                    "TTH" -> 25L
-                    "PFU" -> 50L
-                    else -> 0L
-                }
-                val nextEnzWasteCost = when (nextEnz) {
-                    "TTH" -> 30L
-                    "PFU" -> 1000L
-                    else -> 0L
-                }
+                val nextEnz = _activePolymerase.value
+                val nextPolyCost = com.example.genpox.data.ReactorSimulationEngine.calculatePolymeraseCost(nextEnz, target)
 
                 var nextReqA = 0L
                 var nextReqG = 0L
@@ -673,33 +668,46 @@ class ReactorViewModel(
                     }
                 }
 
-                var nextSoluteCost = 0L
-                val nextSolute = _activeChemicalSolute.value
-                if (nextSolute == "DMSO" || nextSolute == "Netropsin") {
-                    nextSoluteCost = 100L
-                }
+                val nextSoluteCost = com.example.genpox.data.ReactorSimulationEngine.calculateSoluteCost(_activeChemicalSolute.value)
 
-                val nextTotalA = nextReqA + nextSoluteCost + nextEnzBaseCost
-                val nextTotalG = nextReqG + nextSoluteCost + nextEnzBaseCost
-                val nextTotalT = nextReqT + nextSoluteCost + nextEnzBaseCost
-                val nextTotalC = nextReqC + nextSoluteCost + nextEnzBaseCost
+                val nextTotalA = nextReqA + nextSoluteCost + nextPolyCost.costA
+                val nextTotalG = nextReqG + nextSoluteCost + nextPolyCost.costG
+                val nextTotalT = nextReqT + nextSoluteCost + nextPolyCost.costT
+                val nextTotalC = nextReqC + nextSoluteCost + nextPolyCost.costC
 
                 val nextRemA = _rawStockA.value
                 val nextRemG = _rawStockG.value
                 val nextRemT = _rawStockT.value
                 val nextRemC = _rawStockC.value
-                val nextRemWaste = _bioWaste.value
 
-                if (nextRemA >= nextTotalA && nextRemG >= nextTotalG && nextRemT >= nextTotalT && nextRemC >= nextTotalC && nextRemWaste >= nextEnzWasteCost) {
+                if (nextRemA >= nextTotalA && nextRemG >= nextTotalG && nextRemT >= nextTotalT && nextRemC >= nextTotalC) {
                     delay(500L)
                     initiateStandardSynthesis()
                 } else {
                     _isLoopActive.value = false
-                    addLog("SYS: Synthesis loop halted due to insufficient feedstock/biowaste.")
+                    addLog("SYS: Synthesis loop halted due to insufficient feedstock.")
                     synthManager.playReject()
                 }
             }
         }
+    }
+
+    fun stopReactorHeartbeat() {
+        heartbeatJob?.cancel()
+    }
+
+    fun stopScrollingGeneTicker() {
+        scrollingTickerJob?.cancel()
+    }
+
+    fun stopAllTickers() {
+        heartbeatJob?.cancel()
+        scrollingTickerJob?.cancel()
+    }
+
+    public override fun onCleared() {
+        super.onCleared()
+        stopAllTickers()
     }
 
     private fun startReactorHeartbeat() {
@@ -769,12 +777,12 @@ class ReactorViewModel(
                             'T' -> _rawStockT.value = (_rawStockT.value - gatherRate).coerceAtLeast(0L)
                             'C' -> _rawStockC.value = (_rawStockC.value - gatherRate).coerceAtLeast(0L)
                         }
-                        repository.saveRawStocks(_rawStockA.value, _rawStockG.value, _rawStockT.value, _rawStockC.value)
+                        preferencesRepository.saveRawStocks(_rawStockA.value, _rawStockG.value, _rawStockT.value, _rawStockC.value)
 
                         val wasteAdded = gatherRate / 6
                         if (wasteAdded > 0) {
                             _bioWaste.value += wasteAdded
-                            repository.saveBioWaste(_bioWaste.value)
+                            preferencesRepository.saveBioWaste(_bioWaste.value)
                         }
                         if (siphonLogTicks >= 3) {
                             siphonLogTicks = 0
@@ -794,7 +802,7 @@ class ReactorViewModel(
                             'T' -> _rawStockT.value += gatherRate
                             'C' -> _rawStockC.value += gatherRate
                         }
-                        repository.saveRawStocks(_rawStockA.value, _rawStockG.value, _rawStockT.value, _rawStockC.value)
+                        preferencesRepository.saveRawStocks(_rawStockA.value, _rawStockG.value, _rawStockT.value, _rawStockC.value)
                         if (siphonLogTicks >= 3) {
                             siphonLogTicks = 0
                             val baseName = when (currentSiphonFont.baseType) {
@@ -849,7 +857,7 @@ class ReactorViewModel(
                     ticksSinceLastSave++
                     if (ticksSinceLastSave >= 10) {
                         ticksSinceLastSave = 0
-                        repository.saveRawStocks(nextA, nextG, nextT, nextC)
+                        preferencesRepository.saveRawStocks(nextA, nextG, nextT, nextC)
                     }
                 }
 
@@ -942,16 +950,7 @@ class ReactorViewModel(
         _discoveredPacketsLog.value = emptyList()
     }
 
-    private fun calculateDistanceInFeet(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLng = Math.toRadians(lng2 - lng1)
-        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                Math.sin(dLng / 2) * Math.sin(dLng / 2)
-        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        val earthRadiusFeet = 20902231.0
-        return earthRadiusFeet * c
-    }
+    private fun calculateDistanceInFeet(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double = GeoMath.calculateHaversineDistanceInFeet(lat1, lng1, lat2, lng2)
 
     fun triggerAnomalousSynthesisStub() {
         viewModelScope.launch {
@@ -973,24 +972,22 @@ class ReactorViewModel(
             _rawStockG.value = currentG
             _rawStockT.value = currentT
             _rawStockC.value = currentC
-            repository.saveRawStocks(currentA, currentG, currentT, currentC)
+            preferencesRepository.saveRawStocks(currentA, currentG, currentT, currentC)
 
             _anomalyConsumedBases.value += 10000L
 
-            val currentEnz = _activePolymerase.value.uppercase()
-            val costBase = when (currentEnz) {
-                "TTH" -> 25L
-                "PFU" -> 50L
-                else -> 0L
-            }
-            val costWaste = when (currentEnz) {
-                "TTH" -> 50L
-                "PFU" -> 150L
-                else -> 0L
-            }
-            if (currentA < costBase || currentG < costBase || currentT < costBase || currentC < costBase || _bioWaste.value < costWaste) {
+            val currentEnz = _activePolymerase.value
+            val polyCost = com.example.genpox.data.ReactorSimulationEngine.calculatePolymeraseCost(currentEnz, _targetSynthesisSequence.value)
+            if (currentA < polyCost.costA || currentG < polyCost.costG || currentT < polyCost.costT || currentC < polyCost.costC) {
                 _activePolymerase.value = "Taq"
                 addLog("SYS WARNING: Selected enzyme reset to Taq due to stock depletion from anomalous synthesis.")
+            }
+
+            val currentSolute = _activeChemicalSolute.value
+            val soluteCost = com.example.genpox.data.ReactorSimulationEngine.calculateSoluteCost(currentSolute)
+            if (currentA < soluteCost || currentG < soluteCost || currentT < soluteCost || currentC < soluteCost) {
+                _activeChemicalSolute.value = "None"
+                addLog("SYS WARNING: Selected solute reset to None due to stock depletion from anomalous synthesis.")
             }
 
             val coupling = WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis())
@@ -1014,7 +1011,7 @@ class ReactorViewModel(
             if (isNewSequence) {
                 newGenesList.add(anomalousGene)
             }
-            repository.insertGeneSequence(
+            geneStockRepository.insertGeneSequence(
                 GeneSequence(
                     sequence = anomalousGene,
                     count = 1,
@@ -1022,8 +1019,8 @@ class ReactorViewModel(
                     averageQScore = q,
                     meltingTemp = tm,
                     minimumFreeEnergy = mfe,
-                    polymeraseSignature = _activePolymerase.value.uppercase()
-                )
+                    polymeraseSignature = _activePolymerase.value.uppercase(),
+                ),
             )
             anomalousGene
         } else {
@@ -1035,7 +1032,7 @@ class ReactorViewModel(
             genes = listOf(generated),
             timestamp = System.currentTimeMillis(),
             isAnomalous = true,
-            newGenes = newGenesList
+            newGenes = newGenesList,
         )
         _discoveredPacketsLog.update { current ->
             (listOf(packet) + current).take(50)

@@ -14,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -22,9 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.compose.foundation.BorderStroke
 import com.example.genpox.theme.CyberGreen
-import com.example.genpox.theme.CyberPanel
 import com.example.genpox.theme.CyberRed
 import com.example.genpox.theme.Typography
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -37,7 +34,7 @@ import java.util.concurrent.Executors
 fun PoxCameraScanner(
     onBarcodeScanned: (String) -> Unit,
     onClose: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -46,13 +43,13 @@ fun PoxCameraScanner(
         mutableStateOf(
             ContextCompat.checkSelfPermission(
                 context,
-                android.Manifest.permission.CAMERA
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                android.Manifest.permission.CAMERA,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED,
         )
     }
 
     val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
     ) { granted ->
         hasCameraPermission = granted
     }
@@ -67,37 +64,37 @@ fun PoxCameraScanner(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         if (hasCameraPermission) {
             AndroidView(
                 factory = { ctx ->
                     val previewView = PreviewView(ctx)
                     val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-                    
+
                     cameraProviderFuture.addListener({
                         val cameraProvider = cameraProviderFuture.get()
                         val preview = Preview.Builder().build().also {
                             it.setSurfaceProvider(previewView.surfaceProvider)
                         }
-                        
+
                         val imageAnalysis = ImageAnalysis.Builder()
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                             .build()
-                        
+
                         val scannerOptions = BarcodeScannerOptions.Builder()
                             .setBarcodeFormats(Barcode.FORMAT_QR_CODE, Barcode.FORMAT_ALL_FORMATS)
                             .build()
                         val scanner = BarcodeScanning.getClient(scannerOptions)
-                        
+
                         imageAnalysis.setAnalyzer(
-                            Executors.newSingleThreadExecutor()
+                            Executors.newSingleThreadExecutor(),
                         ) { imageProxy ->
                             processImageProxy(imageProxy, scanner) { barcodeText ->
                                 onBarcodeScanned(barcodeText)
                             }
                         }
-                        
+
                         val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                         try {
                             cameraProvider.unbindAll()
@@ -105,7 +102,7 @@ fun PoxCameraScanner(
                                 lifecycleOwner,
                                 cameraSelector,
                                 preview,
-                                imageAnalysis
+                                imageAnalysis,
                             )
                         } catch (e: Exception) {
                             e.printStackTrace()
@@ -113,14 +110,14 @@ fun PoxCameraScanner(
                     }, ContextCompat.getMainExecutor(ctx))
                     previewView
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
 
             // Scanning targeting reticle
             Box(
                 modifier = Modifier
                     .size(160.dp)
-                    .border(2.dp, CyberGreen, RoundedCornerShape(12.dp))
+                    .border(2.dp, CyberGreen, RoundedCornerShape(12.dp)),
             )
 
             // Close button at bottom
@@ -130,24 +127,24 @@ fun PoxCameraScanner(
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 24.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = CyberRed, contentColor = Color.Black),
-                shape = RoundedCornerShape(4.dp)
+                shape = RoundedCornerShape(4.dp),
             ) {
                 Text("CLOSE SCANNER", style = Typography.labelSmall)
             }
         } else {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
                     text = "CAMERA PERMISSION REQUIRED FOR TRANSPONDER SCAN",
                     color = Color.Red,
                     style = Typography.bodySmall,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
                 Button(
                     onClick = { launcher.launch(android.Manifest.permission.CAMERA) },
-                    colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = Color.Black)
+                    colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = Color.Black),
                 ) {
                     Text("GRANT PERMISSION", style = Typography.labelSmall)
                 }
@@ -160,7 +157,7 @@ fun PoxCameraScanner(
 private fun processImageProxy(
     imageProxy: ImageProxy,
     scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
-    onBarcodeScanned: (String) -> Unit
+    onBarcodeScanned: (String) -> Unit,
 ) {
     val mediaImage = imageProxy.image
     if (mediaImage != null) {

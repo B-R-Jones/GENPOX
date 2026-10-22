@@ -1,6 +1,5 @@
 package com.example.genpox.ui.main
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -39,7 +38,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +48,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -60,10 +57,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.genpox.data.Creature
 import com.example.genpox.data.GraphicsMath
-import com.example.genpox.data.WaveMath
-import com.example.genpox.theme.CyberBorder
 import com.example.genpox.theme.CyberGreen
 import com.example.genpox.theme.CyberGreenDim
 import com.example.genpox.theme.CyberOrange
@@ -90,7 +86,7 @@ fun SplicerMatrixPanel(
     newlySplicedCreature: Creature?,
     onShowGeneDetails: (String, (() -> Unit)?) -> Unit,
     activeColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val activeColorDim = activeColor.copy(alpha = 0.5f)
     val getBaseColor = { base: Char ->
@@ -102,15 +98,15 @@ fun SplicerMatrixPanel(
             else -> Color.Gray
         }
     }
-    val selectedReagent by viewModel.selectedReagent.collectAsState()
-    val reagents by viewModel.reagents.collectAsState()
-    val splicerQScores by viewModel.splicerQScores.collectAsState()
-    val isCustomScaffoldMode by viewModel.isCustomScaffoldMode.collectAsState()
+    val selectedReagent by viewModel.selectedReagent.collectAsStateWithLifecycle()
+    val reagents by viewModel.reagents.collectAsStateWithLifecycle()
+    val splicerQScores by viewModel.splicerQScores.collectAsStateWithLifecycle()
+    val isCustomScaffoldMode by viewModel.isCustomScaffoldMode.collectAsStateWithLifecycle()
     var showReagentDrawer by remember { mutableStateOf(false) }
     val infoAlpha by animateFloatAsState(
         targetValue = if (showReagentDrawer) 0f else 1f,
         animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-        label = "info_sectors_fade"
+        label = "info_sectors_fade",
     )
     val infiniteTransition = rememberInfiniteTransition(label = "hex_wave")
     val wavePhase by infiniteTransition.animateFloat(
@@ -118,9 +114,9 @@ fun SplicerMatrixPanel(
         targetValue = 2f * Math.PI.toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "phase"
+        label = "phase",
     )
 
     val allFull = splicerSlots.none { it == null }
@@ -143,7 +139,7 @@ fun SplicerMatrixPanel(
             animate(
                 initialValue = currentSpin,
                 targetValue = target,
-                animationSpec = spring(stiffness = Spring.StiffnessLow)
+                animationSpec = spring(stiffness = Spring.StiffnessLow),
             ) { value, _ ->
                 currentSpin = value
             }
@@ -154,10 +150,9 @@ fun SplicerMatrixPanel(
         // Emergency Forced Compile Terminal Screen
         Column(
             modifier = modifier,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-
                 // CRT scrolling terminal logs container
                 val displayedLogs = remember { mutableStateListOf<String>() }
                 LaunchedEffect(forcedConstructionLogs) {
@@ -165,7 +160,7 @@ fun SplicerMatrixPanel(
                         displayedLogs.clear()
                     } else {
                         val isNewRun = displayedLogs.size > forcedConstructionLogs.size ||
-                                (displayedLogs.isNotEmpty() && forcedConstructionLogs.firstOrNull() != displayedLogs.firstOrNull())
+                            (displayedLogs.isNotEmpty() && forcedConstructionLogs.firstOrNull() != displayedLogs.firstOrNull())
                         val startIdx = if (isNewRun) {
                             displayedLogs.clear()
                             0
@@ -193,7 +188,7 @@ fun SplicerMatrixPanel(
                         .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(4.dp))
                         .padding(6.dp),
                     state = listState,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     items(displayedLogs) { log ->
                         val isAlert = log.contains("FAILED") || log.contains("WARNING") || log.contains("Failed") || log.contains("Sacrificed")
@@ -202,7 +197,7 @@ fun SplicerMatrixPanel(
                             color = if (isAlert) Color(0xFFFCA5A5) else Color(0xFF34D399),
                             style = Typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 9.sp
+                            fontSize = 9.sp,
                         )
                     }
                 }
@@ -219,13 +214,13 @@ fun SplicerMatrixPanel(
                             .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(4.dp))
                             .padding(6.dp),
                         horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(Color.Red)
+                                .background(Color.Red),
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
@@ -234,7 +229,7 @@ fun SplicerMatrixPanel(
                             style = Typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
@@ -248,17 +243,17 @@ fun SplicerMatrixPanel(
                         modifier = Modifier.fillMaxWidth().height(34.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CyberRed,
-                            contentColor = Color.Black
+                            contentColor = Color.Black,
                         ),
                         shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        contentPadding = PaddingValues(0.dp),
                     ) {
                         Text(
                             text = "EXIT AUTO-SYNTHESIS LOOP CASCADE",
                             color = Color.Black,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                 }
@@ -270,7 +265,7 @@ fun SplicerMatrixPanel(
         Column(
             modifier = modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Header / Title (Minimalist)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -280,7 +275,7 @@ fun SplicerMatrixPanel(
                     style = Typography.bodyMedium,
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
             }
 
@@ -289,7 +284,7 @@ fun SplicerMatrixPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 val widthDp = with(density) { constraints.maxWidth.toDp() }.value
                 val heightDp = with(density) { constraints.maxHeight.toDp() }.value
@@ -305,23 +300,23 @@ fun SplicerMatrixPanel(
                 val wireframeFaction = newlySplicedCreature?.faction ?: "Infection"
                 val wireframeSizeDp = (radius * 1.5f).dp
                 val wireframeAlpha = 0.2f + 0.8f * (sequencedBasesCount / 64f)
-                
+
                 Box(
                     modifier = Modifier
                         .size(wireframeSizeDp)
                         .graphicsLayer(alpha = wireframeAlpha),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     CreatureWireframeView(
                         dna = wireframeDna,
                         faction = wireframeFaction,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
 
                 // Now draw the Circular Genome Map around it using HolographicRenderEngine
                 Canvas(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 ) {
                     val w = size.width
                     val h = size.height
@@ -339,7 +334,7 @@ fun SplicerMatrixPanel(
                             activeColor = activeColor,
                             activeColorDim = activeColorDim,
                             density = density,
-                            getBaseColor = getBaseColor
+                            getBaseColor = getBaseColor,
                         )
                     }
                 }
@@ -350,14 +345,14 @@ fun SplicerMatrixPanel(
             // Progress text and/or buttons
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = if (sequencedBasesCount < 64) "SEQUENCING P.O.X. CYBERGENOME: $splicingProgress%" else "P.O.X. CYBERGENOME SEQUENCED",
                     color = if (sequencedBasesCount < 64) activeColor else CyberGreen,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -365,14 +360,14 @@ fun SplicerMatrixPanel(
                     color = if (sequencedBasesCount < 64) activeColorDim else CyberGreenDim,
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Normal
+                    fontWeight = FontWeight.Normal,
                 )
 
                 if (sequencedBasesCount == 64) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Button(
                             onClick = {
@@ -382,19 +377,19 @@ fun SplicerMatrixPanel(
                             modifier = Modifier.weight(1f).height(38.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = activeColor,
-                                contentColor = Color.Black
+                                contentColor = Color.Black,
                             ),
                             shape = RoundedCornerShape(4.dp),
-                            contentPadding = PaddingValues(0.dp)
+                            contentPadding = PaddingValues(0.dp),
                         ) {
                             Text(
                                 text = "VIEW IN GEN-VAULT",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Default
+                                fontFamily = FontFamily.Default,
                             )
                         }
-                        
+
                         Button(
                             onClick = {
                                 viewModel.synthManager.playCombinatorTick()
@@ -403,17 +398,17 @@ fun SplicerMatrixPanel(
                             modifier = Modifier.weight(1f).height(38.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent,
-                                contentColor = Color.LightGray
+                                contentColor = Color.LightGray,
                             ),
                             border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.5f)),
                             shape = RoundedCornerShape(4.dp),
-                            contentPadding = PaddingValues(0.dp)
+                            contentPadding = PaddingValues(0.dp),
                         ) {
                             Text(
                                 text = "RETURN TO SPLICER",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Default
+                                fontFamily = FontFamily.Default,
                             )
                         }
                     }
@@ -445,21 +440,21 @@ fun SplicerMatrixPanel(
             targetValue = 0.7f,
             animationSpec = infiniteRepeatable(
                 animation = tween(1000, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
+                repeatMode = RepeatMode.Reverse,
             ),
-            label = "segment_pulse"
+            label = "segment_pulse",
         )
 
         Column(
             modifier = modifier,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
             // Main workspace with Circular Splicing Matrix
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 val densityVal = density.density
                 val widthDp = with(density) { constraints.maxWidth.toDp() }.value
@@ -503,7 +498,7 @@ fun SplicerMatrixPanel(
                                     }
                                 }
                             }
-                        }
+                        },
                 ) {
                     val w = size.width
                     val h = size.height
@@ -517,7 +512,7 @@ fun SplicerMatrixPanel(
                             cy = cy,
                             rPx = rPx,
                             color = activeColorDim,
-                            density = density
+                            density = density,
                         )
 
                         drawRadarSweep(
@@ -527,7 +522,7 @@ fun SplicerMatrixPanel(
                             sweepAngleRad = wavePhase,
                             activeColor = activeColor,
                             activeColorDim = activeColorDim,
-                            density = density
+                            density = density,
                         )
 
                         drawOscilloscopeWave(
@@ -540,7 +535,7 @@ fun SplicerMatrixPanel(
                             wavePhase = wavePhase,
                             activeColor = activeColor,
                             activeColorDim = activeColorDim,
-                            density = density
+                            density = density,
                         )
 
                         drawCircularGenomeSlots(
@@ -558,7 +553,7 @@ fun SplicerMatrixPanel(
                             density = density,
                             labelPaint = labelPaint,
                             geneTextPaint = geneTextPaint,
-                            getBaseColor = getBaseColor
+                            getBaseColor = getBaseColor,
                         )
                     }
                 }
@@ -566,7 +561,7 @@ fun SplicerMatrixPanel(
                 // 2. Central coherence status telemetry readout
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     val coherentCount = if (isCustomScaffoldMode) {
                         splicerSlots.count { it != null }
@@ -582,18 +577,24 @@ fun SplicerMatrixPanel(
                         color = if (isCustomScaffoldMode) Color(0xFF22D3EE).copy(alpha = 0.7f) else activeColorDim,
                         fontSize = 7.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = "$coherencePct%",
                         color = if (isCustomScaffoldMode) {
                             if (coherencePct == 100) Color(0xFF22D3EE) else Color(0xFF22D3EE).copy(alpha = 0.5f)
                         } else {
-                            if (coherencePct == 100) activeColor else if (coherencePct > 0) activeColorDim else Color.Gray
+                            if (coherencePct == 100) {
+                                activeColor
+                            } else if (coherencePct > 0) {
+                                activeColorDim
+                            } else {
+                                Color.Gray
+                            }
                         },
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
                     )
                 }
 
@@ -620,7 +621,7 @@ fun SplicerMatrixPanel(
                         var attackMod = 1.0
                         var defenseMod = 1.0
                         var speedMod = 1.0
-                        
+
                         var vitModText = ""
                         var atkModText = ""
                         var defModText = ""
@@ -701,14 +702,14 @@ fun SplicerMatrixPanel(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(12.dp)
-                                .graphicsLayer(alpha = infoAlpha)
+                                .graphicsLayer(alpha = infoAlpha),
                         ) {
                             // Left Overlay: Stats
                             Column(
                                 modifier = Modifier
                                     .align(Alignment.TopStart)
                                     .background(Color.Black.copy(alpha = 0.6f))
-                                    .padding(4.dp)
+                                    .padding(4.dp),
                             ) {
                                 Text("SPECIMEN SPECS", color = activeColor, fontSize = 7.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                                 Spacer(modifier = Modifier.height(2.dp))
@@ -736,7 +737,7 @@ fun SplicerMatrixPanel(
                                     .align(Alignment.TopEnd)
                                     .background(Color.Black.copy(alpha = 0.6f))
                                     .padding(4.dp),
-                                horizontalAlignment = Alignment.End
+                                horizontalAlignment = Alignment.End,
                             ) {
                                 Text("REAGENT MODIFIER", color = activeColor, fontSize = 7.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                                 Spacer(modifier = Modifier.height(2.dp))
@@ -764,13 +765,13 @@ fun SplicerMatrixPanel(
             }
 
             Spacer(modifier = Modifier.height(6.dp))
-            
+
             // Synthesizer Actions and Forced Overrides
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val hasEmpty = splicerSlots.contains(null)
                     Button(
@@ -782,17 +783,17 @@ fun SplicerMatrixPanel(
                         modifier = Modifier.weight(1f).height(34.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (!hasEmpty) activeColor else Color.Transparent,
-                            contentColor = if (!hasEmpty) Color.Black else Color.Gray
+                            contentColor = if (!hasEmpty) Color.Black else Color.Gray,
                         ),
                         border = if (!hasEmpty) null else BorderStroke(1.dp, activeColorDim),
                         shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        contentPadding = PaddingValues(0.dp),
                     ) {
                         Text(
                             text = "CONSTRUCT SPECIMEN",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                     Button(
@@ -803,11 +804,11 @@ fun SplicerMatrixPanel(
                         modifier = Modifier.width(38.dp).height(34.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.Transparent,
-                            contentColor = activeColorDim
+                            contentColor = activeColorDim,
                         ),
                         border = BorderStroke(1.dp, activeColorDim),
                         shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        contentPadding = PaddingValues(0.dp),
                     ) {
                         HoloDnaAutoSlotIcon(color = activeColorDim)
                     }
@@ -816,7 +817,7 @@ fun SplicerMatrixPanel(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val forcedEnabled = !isForcedConstructionActive && !isSplicing
                     Button(
@@ -828,16 +829,16 @@ fun SplicerMatrixPanel(
                         modifier = Modifier.weight(1f).height(34.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (forcedEnabled) CyberOrange else Color(0xFF2E2E2E),
-                            contentColor = if (forcedEnabled) Color.Black else Color.Gray
+                            contentColor = if (forcedEnabled) Color.Black else Color.Gray,
                         ),
                         shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        contentPadding = PaddingValues(0.dp),
                     ) {
                         Text(
                             text = "FORCED CONSTRUCTION",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                     Button(
@@ -848,22 +849,22 @@ fun SplicerMatrixPanel(
                         modifier = Modifier.width(38.dp).height(34.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isForcedLoopActive) CyberOrange else Color(0xFF2E2E2E),
-                            contentColor = if (isForcedLoopActive) Color.Black else CyberOrange
+                            contentColor = if (isForcedLoopActive) Color.Black else CyberOrange,
                         ),
                         border = BorderStroke(1.dp, if (isForcedLoopActive) CyberOrange else CyberOrange.copy(alpha = 0.35f)),
                         shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        contentPadding = PaddingValues(0.dp),
                     ) {
                         Text(
                             text = "⟲",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                 }
 
-                val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
+                val devForceAnomaly by viewModel.devForceAnomaly.collectAsStateWithLifecycle()
                 if (devForceAnomaly) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Button(
@@ -874,15 +875,15 @@ fun SplicerMatrixPanel(
                         modifier = Modifier.fillMaxWidth().height(34.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFFBBF24),
-                            contentColor = Color.Black
+                            contentColor = Color.Black,
                         ),
-                        shape = RoundedCornerShape(4.dp)
+                        shape = RoundedCornerShape(4.dp),
                     ) {
                         Text(
                             text = "DEV: INJECT MISSING GENES",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                 }

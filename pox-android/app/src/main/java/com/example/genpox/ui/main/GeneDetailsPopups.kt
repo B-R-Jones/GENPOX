@@ -1,97 +1,28 @@
 package com.example.genpox.ui.main
 
-import android.content.Context
-import androidx.annotation.Keep
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.zIndex
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.ClipOp
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.genpox.data.Creature
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.genpox.data.GeneSequence
-import com.example.genpox.data.HarvestMission
-import com.example.genpox.data.WaveMath
-import com.example.genpox.data.BuildingStructure
 import com.example.genpox.data.GeneticsEngine
+import com.example.genpox.data.WaveMath
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.*
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
-import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlinx.coroutines.delay
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.coerceAtLeast
-import androidx.compose.ui.unit.coerceIn
-import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.foundation.gestures.forEachGesture
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.runtime.collectAsState
-import kotlin.math.absoluteValue
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.SystemFontFamily
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.runtime.Immutable
-
 
 // ==========================================
 // SUB-DIAGNOSTIC POPUPS
@@ -103,57 +34,57 @@ fun GeneDetailsPopup(
     activeColor: Color,
     activePanel: Color,
     onEject: (() -> Unit)? = null,
-    onClose: () -> Unit
+    onClose: () -> Unit,
 ) {
     val isAnom = WaveMath.isAnomalousGene(gene)
     val benefit = if (isAnom) WaveMath.getBenefitForAnomalousGene(gene) else null
-    
+
     AlertDialog(
         onDismissRequest = onClose,
         modifier = Modifier
             .border(
                 1.dp,
                 if (isAnom) CyberTheme.purple else activeColor,
-                RoundedCornerShape(4.dp)
+                RoundedCornerShape(4.dp),
             )
             .background(
                 if (isAnom) CyberTheme.purplePanel else activePanel,
-                RoundedCornerShape(4.dp)
+                RoundedCornerShape(4.dp),
             ),
         containerColor = Color.Transparent,
         title = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     if (isAnom) {
                         WireframeGalaxy(
                             color = Color(0xFFD8B4FE),
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(16.dp),
                         )
                         Text(
                             text = "ANOMALOUS GENE",
                             style = Typography.titleMedium,
                             fontFamily = FontFamily.Default,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFD8B4FE)
+                            color = Color(0xFFD8B4FE),
                         )
                     } else {
                         WireframeDna(
                             color = activeColor,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(16.dp),
                         )
                         Text(
                             text = "STANDARD GENE",
                             style = Typography.titleMedium,
                             fontFamily = FontFamily.Default,
                             fontWeight = FontWeight.Bold,
-                            color = activeColor
+                            color = activeColor,
                         )
                     }
                 }
@@ -163,13 +94,13 @@ fun GeneDetailsPopup(
                         .size(24.dp)
                         .background(CyberRed, RoundedCornerShape(4.dp))
                         .clickable { onClose() },
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = "✕",
                         color = Color.Black,
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
             }
@@ -181,12 +112,13 @@ fun GeneDetailsPopup(
                     style = Typography.bodyMedium,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = if (isAnom) Color(0xFFD8B4FE) else activeColor
+                    color = if (isAnom) Color(0xFFD8B4FE) else activeColor,
                 )
 
                 // Biophysical parameters
-                val geneSequence = remember(gene, viewModel.geneSequences.collectAsState().value) {
-                    viewModel.geneSequences.value.find { it.sequence == gene }
+                val geneSequencesState by viewModel.geneSequences.collectAsStateWithLifecycle()
+                val geneSequence = remember(gene, geneSequencesState) {
+                    geneSequencesState.find { it.sequence == gene }
                 }
                 val tm = remember(gene, geneSequence) {
                     geneSequence?.meltingTemp ?: GeneticsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
@@ -205,28 +137,28 @@ fun GeneDetailsPopup(
                         .border(1.dp, if (isAnom) Color(0xFFD8B4FE) else activeColor, RoundedCornerShape(4.dp))
                         .background(Color.Black.copy(alpha = 0.5f))
                         .padding(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         text = "THERMODYNAMIC Tm: " + String.format(Locale.US, "%.2f°C", tm),
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = "MIN FREE ENERGY: " + String.format(Locale.US, "%.2f kcal/mol", mfe),
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = "ACCURATE Q-SCORE: " + String.format(Locale.US, "%.1f (Phred)", qScore),
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 
@@ -236,21 +168,21 @@ fun GeneDetailsPopup(
                         style = Typography.bodySmall,
                         fontFamily = FontFamily.Default,
                         color = Color(0xFFA855F7),
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = "PASSIVE ACTION: ${benefit.name.uppercase()}",
                         style = Typography.bodySmall,
                         fontFamily = FontFamily.Default,
                         color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = benefit.description.uppercase(),
                         style = Typography.labelSmall,
                         fontFamily = FontFamily.Default,
                         color = Color.LightGray,
-                        lineHeight = 12.sp
+                        lineHeight = 12.sp,
                     )
                 } else {
                     Text(
@@ -258,14 +190,14 @@ fun GeneDetailsPopup(
                         style = Typography.bodySmall,
                         fontFamily = FontFamily.Default,
                         color = activeColor.copy(alpha = 0.6f),
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = "THIS SYNTHETIC BASE HAS SUCCESSFULLY BONDED WITH ORGANIC NUCLEOTIDES IN THE REACTOR. STABILITY OF FURTHER SPLICING WILL NOT BE ADVERSELY AFFECTED.",
                         style = Typography.labelSmall,
                         fontFamily = FontFamily.Default,
                         color = Color.LightGray,
-                        lineHeight = 12.sp
+                        lineHeight = 12.sp,
                     )
                 }
 
@@ -280,17 +212,17 @@ fun GeneDetailsPopup(
                         modifier = Modifier.fillMaxWidth().height(34.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.Transparent,
-                            contentColor = Color.Red
+                            contentColor = Color.Red,
                         ),
                         border = BorderStroke(1.dp, Color.Red),
-                        shape = RoundedCornerShape(4.dp)
+                        shape = RoundedCornerShape(4.dp),
                     ) {
                         Text(
                             text = "✕ EJECT GENE BLOCK FROM SPLICER",
                             color = Color.Red,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                 }
@@ -306,19 +238,19 @@ fun GeneDetailsPopup(
                 modifier = Modifier.fillMaxWidth().height(34.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CyberCyan,
-                    contentColor = Color.Black
+                    contentColor = Color.Black,
                 ),
-                shape = RoundedCornerShape(4.dp)
+                shape = RoundedCornerShape(4.dp),
             ) {
                 Text(
                     text = "TARGET IN BIO-LAB",
                     color = Color.Black,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Default
+                    fontFamily = FontFamily.Default,
                 )
             }
-        }
+        },
     )
 }
 
@@ -329,14 +261,14 @@ fun StepSearchGeneDetailsPopup(
     activeColor: Color,
     activePanel: Color,
     onClose: () -> Unit,
-    onDeconstructGene: ((GeneSequence) -> Unit)? = null
+    onDeconstructGene: ((GeneSequence) -> Unit)? = null,
 ) {
     val isAnom = WaveMath.isAnomalousGene(gene)
     val benefit = if (isAnom) WaveMath.getBenefitForAnomalousGene(gene) else null
-    val openedFromState = viewModel.creatureCardOpenedFrom.collectAsState()
-    val isCustomScaffoldModeState = viewModel.isCustomScaffoldMode.collectAsState()
-    val openedFrom = openedFromState.value
-    val isCustomScaffoldMode = isCustomScaffoldModeState.value
+    val openedFromState by viewModel.creatureCardOpenedFrom.collectAsStateWithLifecycle()
+    val isCustomScaffoldModeState by viewModel.isCustomScaffoldMode.collectAsStateWithLifecycle()
+    val openedFrom = openedFromState
+    val isCustomScaffoldMode = isCustomScaffoldModeState
 
     AlertDialog(
         onDismissRequest = onClose,
@@ -344,22 +276,22 @@ fun StepSearchGeneDetailsPopup(
             .border(
                 1.dp,
                 if (isAnom) CyberTheme.purple else activeColor,
-                RoundedCornerShape(4.dp)
+                RoundedCornerShape(4.dp),
             )
             .background(
                 if (isAnom) CyberTheme.purplePanel else activePanel,
-                RoundedCornerShape(4.dp)
+                RoundedCornerShape(4.dp),
             ),
         containerColor = Color.Transparent,
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (isAnom) {
                     WireframeGalaxy(
                         color = Color(0xFFD8B4FE),
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(16.dp),
                     )
                 }
                 Text(
@@ -367,12 +299,13 @@ fun StepSearchGeneDetailsPopup(
                     style = Typography.titleMedium,
                     fontFamily = FontFamily.Default,
                     color = if (isAnom) Color(0xFFD8B4FE) else activeColor,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
         },
         text = {
-            val geneSequence = viewModel.geneSequences.collectAsState().value.find { it.sequence == gene }
+            val geneSequencesList by viewModel.geneSequences.collectAsStateWithLifecycle()
+            val geneSequence = geneSequencesList.find { it.sequence == gene }
             val tm = remember(gene, geneSequence, viewModel.reactorSalt) {
                 geneSequence?.meltingTemp ?: GeneticsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
             }
@@ -390,7 +323,7 @@ fun StepSearchGeneDetailsPopup(
                     style = Typography.bodyMedium,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = if (isAnom) Color(0xFFD8B4FE) else activeColor
+                    color = if (isAnom) Color(0xFFD8B4FE) else activeColor,
                 )
 
                 Column(
@@ -399,35 +332,35 @@ fun StepSearchGeneDetailsPopup(
                         .border(1.dp, if (isAnom) Color(0xFFD8B4FE) else activeColor, RoundedCornerShape(4.dp))
                         .background(Color.Black.copy(alpha = 0.5f))
                         .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
                         text = "THERMODYNAMIC Tm: " + String.format(Locale.US, "%.2f°C", tm),
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = "MIN FREE ENERGY: " + String.format(Locale.US, "%.2f kcal/mol", mfe),
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = "AVERAGE Q-SCORE: " + String.format(Locale.US, "%.1f dB", qScore),
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = "INVENTORY YIELD STOCK: $count BLOCKS",
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 
@@ -437,14 +370,14 @@ fun StepSearchGeneDetailsPopup(
                         text = "ANOMALY SIGNAL CLUSTER DETECTED. BIOLOGICAL PAYLOAD BENEFITS EMANATING FROM THIS NODE:",
                         style = Typography.labelSmall,
                         fontFamily = FontFamily.Default,
-                        color = Color(0xFFD8B4FE)
+                        color = Color(0xFFD8B4FE),
                     )
                     Text(
                         text = benefit.description.uppercase(),
                         style = Typography.labelSmall,
                         fontFamily = FontFamily.Default,
                         color = Color.LightGray,
-                        lineHeight = 12.sp
+                        lineHeight = 12.sp,
                     )
                 }
 
@@ -458,16 +391,16 @@ fun StepSearchGeneDetailsPopup(
                         modifier = Modifier.fillMaxWidth().height(34.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CyberRed,
-                            contentColor = Color.Black
+                            contentColor = Color.Black,
                         ),
-                        shape = RoundedCornerShape(4.dp)
+                        shape = RoundedCornerShape(4.dp),
                     ) {
                         Text(
                             text = "♺ DECONSTRUCT GENE BLOCK",
                             color = Color.Black,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                 }
@@ -482,17 +415,17 @@ fun StepSearchGeneDetailsPopup(
                 modifier = Modifier.height(28.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CyberRed,
-                    contentColor = Color.Black
+                    contentColor = Color.Black,
                 ),
                 shape = RoundedCornerShape(4.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp)
+                contentPadding = PaddingValues(horizontal = 8.dp),
             ) {
                 Text(
                     text = "CLOSE",
                     color = Color.Black,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Default
+                    fontFamily = FontFamily.Default,
                 )
             }
         },
@@ -504,7 +437,7 @@ fun StepSearchGeneDetailsPopup(
                         val geneSequence = viewModel.geneSequences.value.find { it.sequence == gene } ?: GeneSequence(
                             sequence = gene,
                             count = 1,
-                            discoveredAt = System.currentTimeMillis()
+                            discoveredAt = System.currentTimeMillis(),
                         )
                         viewModel.setComposerAttachedGene(geneSequence)
                         viewModel.setActiveCreature(null, "vault")
@@ -514,17 +447,17 @@ fun StepSearchGeneDetailsPopup(
                     modifier = Modifier.height(28.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = CyberCyan,
-                        contentColor = Color.Black
+                        contentColor = Color.Black,
                     ),
                     shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
                     Text(
                         text = "ATTACH GENE",
                         color = Color.Black,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Default
+                        fontFamily = FontFamily.Default,
                     )
                 }
             } else if (openedFrom == "splicer_slot") {
@@ -541,17 +474,17 @@ fun StepSearchGeneDetailsPopup(
                     modifier = Modifier.height(28.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = CyberCyan,
-                        contentColor = Color.Black
+                        contentColor = Color.Black,
                     ),
                     shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
                     Text(
                         text = "LOAD INTO SPLICER",
                         color = Color.Black,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Default
+                        fontFamily = FontFamily.Default,
                     )
                 }
             } else {
@@ -564,21 +497,21 @@ fun StepSearchGeneDetailsPopup(
                     modifier = Modifier.height(28.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = CyberCyan,
-                        contentColor = Color.Black
+                        contentColor = Color.Black,
                     ),
                     shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
                     Text(
                         text = "TARGET IN BIO-LAB",
                         color = Color.Black,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Default
+                        fontFamily = FontFamily.Default,
                     )
                 }
             }
-        }
+        },
     )
 }
 
@@ -586,39 +519,39 @@ fun StepSearchGeneDetailsPopup(
 fun VaultGeneDetailsPopup(
     viewModel: MainViewModel,
     gene: String,
-    onClose: () -> Unit
+    onClose: () -> Unit,
 ) {
     val benefit = WaveMath.getBenefitForAnomalousGene(gene)
     val isAnom = WaveMath.isAnomalousGene(gene)
-    
+
     AlertDialog(
         onDismissRequest = onClose,
         modifier = Modifier
             .border(
                 1.dp,
                 CyberTheme.purple,
-                RoundedCornerShape(4.dp)
+                RoundedCornerShape(4.dp),
             )
             .background(
                 CyberTheme.purplePanel,
-                RoundedCornerShape(4.dp)
+                RoundedCornerShape(4.dp),
             ),
         containerColor = Color.Transparent,
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 WireframeGalaxy(
                     color = Color(0xFFD8B4FE),
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(16.dp),
                 )
                 Text(
                     text = "ANOMALY QUANTUM DECRYPT",
                     style = Typography.titleMedium,
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFD8B4FE)
+                    color = Color(0xFFD8B4FE),
                 )
             }
         },
@@ -629,12 +562,13 @@ fun VaultGeneDetailsPopup(
                     style = Typography.bodyMedium,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFD8B4FE)
+                    color = Color(0xFFD8B4FE),
                 )
 
                 // Biophysical parameters
-                val geneSequence = remember(gene, viewModel.geneSequences.collectAsState().value) {
-                    viewModel.geneSequences.value.find { it.sequence == gene }
+                val geneSequencesList by viewModel.geneSequences.collectAsStateWithLifecycle()
+                val geneSequence = remember(gene, geneSequencesList) {
+                    geneSequencesList.find { it.sequence == gene }
                 }
                 val tm = remember(gene, geneSequence) {
                     geneSequence?.meltingTemp ?: GeneticsEngine.calculateMeltingTemperature(gene, viewModel.reactorSalt.value.toDouble())
@@ -653,28 +587,28 @@ fun VaultGeneDetailsPopup(
                         .border(1.dp, Color(0xFFD8B4FE), RoundedCornerShape(4.dp))
                         .background(Color.Black.copy(alpha = 0.5f))
                         .padding(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         text = "THERMODYNAMIC Tm: " + String.format(Locale.US, "%.2f°C", tm),
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = "MIN FREE ENERGY: " + String.format(Locale.US, "%.2f kcal/mol", mfe),
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = "ACCURATE Q-SCORE: " + String.format(Locale.US, "%.1f (Phred)", qScore),
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 
@@ -682,21 +616,21 @@ fun VaultGeneDetailsPopup(
                     text = "PERK ID: ${benefit.id.uppercase()}",
                     style = Typography.labelSmall,
                     fontFamily = FontFamily.Default,
-                    color = Color(0xFFA855F7)
+                    color = Color(0xFFA855F7),
                 )
                 Text(
                     text = "DESIGNATION: ${benefit.name.uppercase()}",
                     style = Typography.bodySmall,
                     fontFamily = FontFamily.Default,
                     color = Color.White,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
                 Text(
                     text = benefit.description.uppercase(),
                     style = Typography.labelSmall,
                     fontFamily = FontFamily.Default,
                     color = Color.LightGray,
-                    lineHeight = 12.sp
+                    lineHeight = 12.sp,
                 )
             }
         },
@@ -709,17 +643,17 @@ fun VaultGeneDetailsPopup(
                 modifier = Modifier.height(28.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CyberRed,
-                    contentColor = Color.Black
+                    contentColor = Color.Black,
                 ),
                 shape = RoundedCornerShape(4.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp)
+                contentPadding = PaddingValues(horizontal = 8.dp),
             ) {
                 Text(
                     text = "CLOSE",
                     color = Color.Black,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Default
+                    fontFamily = FontFamily.Default,
                 )
             }
         },
@@ -733,20 +667,20 @@ fun VaultGeneDetailsPopup(
                 modifier = Modifier.height(28.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CyberCyan,
-                    contentColor = Color.Black
+                    contentColor = Color.Black,
                 ),
                 shape = RoundedCornerShape(4.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp)
+                contentPadding = PaddingValues(horizontal = 8.dp),
             ) {
                 Text(
                     text = "TARGET IN BIO-LAB",
                     color = Color.Black,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Default
+                    fontFamily = FontFamily.Default,
                 )
             }
-        }
+        },
     )
 }
 
@@ -755,7 +689,7 @@ fun GeneDeconstructPopup(
     viewModel: MainViewModel,
     gene: GeneSequence,
     onConfirm: (Int) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     var deconstructCount by remember { mutableStateOf(1) }
 
@@ -778,24 +712,24 @@ fun GeneDeconstructPopup(
             .border(
                 1.dp,
                 Color(0xFFEF4444),
-                RoundedCornerShape(4.dp)
+                RoundedCornerShape(4.dp),
             )
             .background(
                 Color(0xFF150808),
-                RoundedCornerShape(4.dp)
+                RoundedCornerShape(4.dp),
             ),
         containerColor = Color.Transparent,
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
                     text = "DECONSTRUCT GENE BLOCK",
                     color = Color.White,
                     style = Typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Default
+                    fontFamily = FontFamily.Default,
                 )
             }
         },
@@ -805,7 +739,7 @@ fun GeneDeconstructPopup(
                     text = "ARE YOU SURE YOU WANT TO RECYCLE STANDARD GENE SEQUENCE BLOCK:",
                     color = Color.LightGray,
                     style = Typography.bodySmall,
-                    fontSize = 10.sp
+                    fontSize = 10.sp,
                 )
                 Text(
                     text = gene.sequence,
@@ -815,27 +749,27 @@ fun GeneDeconstructPopup(
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 1.sp,
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
-                
+
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "BASE YIELD (PER BLOCK):",
                     color = Color.Gray,
                     fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
-                
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     listOf(
                         Triple("A", aCount, CyberGreen),
                         Triple("G", gCount, CyberGreen),
                         Triple("T", tCount, CyberGreen),
                         Triple("C", cCount, CyberGreen),
-                        Triple("WASTE", 2, Color.Yellow)
+                        Triple("WASTE", 2, Color.Yellow),
                     ).forEach { (name, count, color) ->
                         Box(
                             modifier = Modifier
@@ -843,11 +777,11 @@ fun GeneDeconstructPopup(
                                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                                 .background(Color.Black.copy(alpha = 0.3f))
                                 .padding(vertical = 4.dp),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(text = name, color = color, fontWeight = FontWeight.Bold, fontSize = 8.sp)
-                                Text(text = "+${count}", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                                Text(text = "+$count", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                             }
                         }
                     }
@@ -858,23 +792,23 @@ fun GeneDeconstructPopup(
                     Text(
                         text = "QUANTITY TO DECONSTRUCT: $deconstructCount / ${gene.count}",
                         color = Color.LightGray,
-                        style = Typography.labelSmall
+                        style = Typography.labelSmall,
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
                                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp)).background(CyberPanel, RoundedCornerShape(4.dp))
                                 .clickable { if (deconstructCount > 1) deconstructCount-- },
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text("-", color = CyberGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
-                        
+
                         Text(
                             text = "$deconstructCount",
                             color = Color.White,
@@ -882,15 +816,15 @@ fun GeneDeconstructPopup(
                             textAlign = TextAlign.Center,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
-                        
+
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
                                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp)).background(CyberPanel, RoundedCornerShape(4.dp))
                                 .clickable { if (deconstructCount < gene.count) deconstructCount++ },
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text("+", color = CyberGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
@@ -901,7 +835,7 @@ fun GeneDeconstructPopup(
         confirmButton = {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (gene.count > 1) {
                     Button(
@@ -912,18 +846,18 @@ fun GeneDeconstructPopup(
                         modifier = Modifier.height(28.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.Transparent,
-                            contentColor = Color.Red
+                            contentColor = Color.Red,
                         ),
                         border = BorderStroke(1.dp, Color.Red),
                         shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp)
+                        contentPadding = PaddingValues(horizontal = 8.dp),
                     ) {
                         Text(
                             text = "♺ DECONSTRUCT ALL",
                             color = Color.Red,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                 }
@@ -935,17 +869,17 @@ fun GeneDeconstructPopup(
                     modifier = Modifier.height(28.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = CyberRed,
-                        contentColor = Color.Black
+                        contentColor = Color.Black,
                     ),
                     shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
                     Text(
                         text = "✓ DECONSTRUCT",
                         color = Color.Black,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Default
+                        fontFamily = FontFamily.Default,
                     )
                 }
             }
@@ -959,20 +893,20 @@ fun GeneDeconstructPopup(
                 modifier = Modifier.height(28.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.Transparent,
-                    contentColor = Color.Gray
+                    contentColor = Color.Gray,
                 ),
                 border = BorderStroke(1.dp, Color.Gray),
                 shape = RoundedCornerShape(4.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp)
+                contentPadding = PaddingValues(horizontal = 8.dp),
             ) {
                 Text(
                     text = "✕ CANCEL",
                     color = Color.Gray,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Default
+                    fontFamily = FontFamily.Default,
                 )
             }
-        }
+        },
     )
 }

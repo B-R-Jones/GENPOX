@@ -1,19 +1,19 @@
 package com.example.genpox.data
 
-import kotlin.math.abs
-import kotlin.math.sin
-import kotlin.math.exp
-import kotlin.math.pow
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.util.TimeZone
-import java.util.Calendar
 import java.util.Random
+import java.util.TimeZone
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.pow
+import kotlin.math.sin
 
 object WaveMath {
     const val LUNAR_MONTH_DAYS = 29.53059
-    
+
     // Standard Reference New Moon: May 17, 2026, 01:54:00 UTC
     private val REFERENCE_NEW_MOON_MS: Long by lazy {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
@@ -28,7 +28,7 @@ object WaveMath {
         val eccentricity: Double,
         val orbitalPeriod: Double,
         val longitudeOfPerihelion: Double,
-        val siderealRotationPeriod: Double
+        val siderealRotationPeriod: Double,
     )
 
     val planetElements = mapOf(
@@ -39,14 +39,14 @@ object WaveMath {
         "JUPITER" to PlanetOrbitalElements("Jupiter", 5.2028, 0.0484, 4332.589, 14.754, 0.4135),
         "SATURN" to PlanetOrbitalElements("Saturn", 9.5388, 0.0541, 10759.22, 92.431, 0.4440),
         "URANUS" to PlanetOrbitalElements("Uranus", 19.1914, 0.0473, 30685.4, 170.964, -0.7183),
-        "NEPTUNE" to PlanetOrbitalElements("Neptune", 30.0611, 0.0086, 60189.0, 44.971, 0.6713)
+        "NEPTUNE" to PlanetOrbitalElements("Neptune", 30.0611, 0.0086, 60189.0, 44.971, 0.6713),
     )
 
     enum class AlignmentState {
         CONJUNCTION,
         OPPOSITION,
         QUADRATURE,
-        NEUTRAL
+        NEUTRAL,
     }
 
     fun getHeliocentricPosition(planetName: String, timeMs: Long): Pair<Double, Double> {
@@ -142,7 +142,6 @@ object WaveMath {
         }
     }
 
-
     data class WaveConfig(
         val pair: String,
         val primary: String,
@@ -154,14 +153,14 @@ object WaveMath {
         val isNewMoon: Boolean,
         val isFullMoon: Boolean,
         val primaryMultiplier: Double,
-        val secondaryMultiplier: Double
+        val secondaryMultiplier: Double,
     )
 
     data class AnomalyChance(
         val baseChance: Double,
         val peakBoost: Double,
         val harmonicModifier: Double,
-        val finalChance: Double
+        val finalChance: Double,
     )
 
     data class AnomalousBenefit(
@@ -172,7 +171,7 @@ object WaveMath {
         val magnitude: Double = 0.0,
         val chance: Double = 0.0,
         val triggerIndex: Int = 0,
-        val triggerDesc: String = ""
+        val triggerDesc: String = "",
     )
 
     fun getDeterministicHash(dateStr: String): Long {
@@ -232,12 +231,12 @@ object WaveMath {
         val dayOfMonth = cal.get(Calendar.DAY_OF_MONTH)
         val year = cal.get(Calendar.YEAR)
         val month = cal.get(Calendar.MONTH) // 0-indexed
-        
+
         val monthStr = String.format(Locale.US, "%04d-%02d", year, month + 1)
         val monthHash = getDeterministicHash(monthStr)
         val suppressionWeek = (monthHash % 4).toInt() // Selects Week 0, 1, 2, or 3
         val currentWeek = (dayOfMonth - 1) / 7 // Current day's week index (0 to 4)
-        
+
         val isSuppressed = if (currentWeek == suppressionWeek && dayOfMonth <= 28) {
             (hash % 100) < 50
         } else {
@@ -261,7 +260,7 @@ object WaveMath {
             isNewMoon = isNewMoon,
             isFullMoon = isFullMoon,
             primaryMultiplier = primaryMultiplier,
-            secondaryMultiplier = secondaryMultiplier
+            secondaryMultiplier = secondaryMultiplier,
         )
     }
 
@@ -351,7 +350,7 @@ object WaveMath {
             baseChance = baseChance,
             peakBoost = peakBoost,
             harmonicModifier = harmonicModifier,
-            finalChance = finalChance
+            finalChance = finalChance,
         )
     }
 
@@ -489,7 +488,7 @@ object WaveMath {
             magnitude = magnitude,
             chance = chance,
             triggerIndex = triggerIndex,
-            triggerDesc = triggerDesc
+            triggerDesc = triggerDesc,
         )
     }
 
@@ -507,5 +506,241 @@ object WaveMath {
             }
         }
         return benefits
+    }
+
+    fun hasCoherenceShield(creature: Creature?, originalSequence: String?): Boolean {
+        if (creature != null) {
+            if (getAnomalousBenefits(creature.sequence).any { it.id == "COHERENCE_SHIELD" }) {
+                return true
+            }
+            creature.appendedGenes.forEach { gene ->
+                if (isAnomalousGene(gene) && getBenefitForAnomalousGene(gene).id == "COHERENCE_SHIELD") {
+                    return true
+                }
+            }
+            return false
+        }
+        if (originalSequence != null) {
+            if (getAnomalousBenefits(originalSequence).any { it.id == "COHERENCE_SHIELD" }) {
+                return true
+            }
+        }
+        return false
+    }
+
+    data class AnomalyLifecycleMetrics(
+        val phase: AnomalyLifecyclePhase,
+        val progress: Float, // Progress within overall epoch [0.0, 1.0)
+        val phaseProgress: Float, // Progress within current phase [0.0, 1.0)
+        val timeRemainingMs: Long, // Time remaining in current phase
+        val epochTimeRemainingMs: Long, // Time remaining in current epoch
+        val radiusMultiplier: Float,
+        val heightMultiplier: Float,
+        val peakAltitudeMeters: Float,
+        val mutationFluxMod: Float,
+        val harvestYieldMod: Float,
+        val densityMod: Float,
+        val forcefieldResistanceMod: Float,
+    )
+
+    /**
+     * Evaluates the deterministic lifecycle metrics and morphological scaling factors for an anomaly
+     * based on its seed and the provided timestamp.
+     */
+    /**
+     * Evaluates the deterministic lifecycle metrics and morphological scaling factors for an anomaly
+     * based on its seed and the provided timestamp.
+     */
+    fun calculateAnomalyLifecycle(
+        seed: Long,
+        timeMs: Long,
+        epochDurationMs: Long = 6L * 3600L * 1000L, // 6 hour default epoch
+        baseSummitMeters: Float = 850f,
+    ): AnomalyLifecycleMetrics {
+        val safeEpochDuration = if (epochDurationMs > 0L) epochDurationMs else 6L * 3600L * 1000L
+        val phaseOffset = kotlin.math.abs(seed % safeEpochDuration)
+        val epochElapsed = ((timeMs + phaseOffset) % safeEpochDuration + safeEpochDuration) % safeEpochDuration
+        val progress = (epochElapsed.toDouble() / safeEpochDuration.toDouble()).toFloat().coerceIn(0f, 0.9999f)
+        val epochTimeRemainingMs = safeEpochDuration - epochElapsed
+
+        val inceptionEndMs = (0.15 * safeEpochDuration).toLong()
+        val activeEndMs = (0.70 * safeEpochDuration).toLong()
+        val destabilizingEndMs = (0.90 * safeEpochDuration).toLong()
+        val voidCollapseEndMs = safeEpochDuration
+
+        return when {
+            progress < 0.15f -> {
+                // 1. INCEPTION (0.00 to 0.15): Nascent seedling emerging from bedrock
+                val u = progress / 0.15f
+                val phaseRemaining = (inceptionEndMs - epochElapsed).coerceAtLeast(0L)
+                val ease = 0.5f * (1.0f - kotlin.math.cos((u * Math.PI).toFloat()))
+                val radiusMult = 0.35f + 0.65f * ease
+                val heightMult = 0.10f + 0.90f * ease
+                AnomalyLifecycleMetrics(
+                    phase = AnomalyLifecyclePhase.INCEPTION,
+                    progress = progress,
+                    phaseProgress = u,
+                    timeRemainingMs = phaseRemaining,
+                    epochTimeRemainingMs = epochTimeRemainingMs,
+                    radiusMultiplier = radiusMult,
+                    heightMultiplier = heightMult,
+                    peakAltitudeMeters = baseSummitMeters * heightMult,
+                    mutationFluxMod = 0.50f,
+                    harvestYieldMod = 0.70f,
+                    densityMod = -0.15f * (1.0f - u),
+                    forcefieldResistanceMod = 0.60f + 0.40f * u,
+                )
+            }
+            progress < 0.70f -> {
+                // 2. ACTIVE NEXUS (0.15 to 0.70): Stable colossal titan with organic biological breathing
+                val u = (progress - 0.15f) / 0.55f
+                val phaseRemaining = (activeEndMs - epochElapsed).coerceAtLeast(0L)
+                val breathWave = kotlin.math.sin((u * 6.0 * Math.PI).toFloat())
+                val heightBreath = kotlin.math.sin((u * 6.0 * Math.PI).toFloat())
+                val radiusMult = 1.0f + 0.025f * breathWave
+                val heightMult = 1.0f + 0.035f * heightBreath
+                AnomalyLifecycleMetrics(
+                    phase = AnomalyLifecyclePhase.ACTIVE_NEXUS,
+                    progress = progress,
+                    phaseProgress = u,
+                    timeRemainingMs = phaseRemaining,
+                    epochTimeRemainingMs = epochTimeRemainingMs,
+                    radiusMultiplier = radiusMult,
+                    heightMultiplier = heightMult,
+                    peakAltitudeMeters = baseSummitMeters * heightMult,
+                    mutationFluxMod = 1.0f,
+                    harvestYieldMod = 1.0f,
+                    densityMod = 0.0f,
+                    forcefieldResistanceMod = 1.0f,
+                )
+            }
+            progress < 0.90f -> {
+                // 3. DESTABILIZING (0.70 to 0.90): Overcharged volumetric caldera with energetic bulge and harmonic tremor
+                val u = (progress - 0.70f) / 0.20f
+                val phaseRemaining = (destabilizingEndMs - epochElapsed).coerceAtLeast(0L)
+                val bulge = kotlin.math.sin((u * Math.PI).toFloat())
+                val tremor = 0.02f * kotlin.math.sin((u * 16.0 * Math.PI).toFloat()) * bulge
+                val heightMult = 1.0f + 0.25f * bulge + tremor
+                val radiusMult = 1.0f + 0.10f * kotlin.math.sin((u * 2.0 * Math.PI).toFloat()) + tremor
+                AnomalyLifecycleMetrics(
+                    phase = AnomalyLifecyclePhase.DESTABILIZING,
+                    progress = progress,
+                    phaseProgress = u,
+                    timeRemainingMs = phaseRemaining,
+                    epochTimeRemainingMs = epochTimeRemainingMs,
+                    radiusMultiplier = radiusMult,
+                    heightMultiplier = heightMult,
+                    peakAltitudeMeters = baseSummitMeters * heightMult,
+                    mutationFluxMod = 2.0f,
+                    harvestYieldMod = 2.0f,
+                    densityMod = 0.20f,
+                    forcefieldResistanceMod = 1.35f,
+                )
+            }
+            else -> {
+                // 4. VOID COLLAPSE (0.90 to 1.00): Imploding singularity vortex connecting seamlessly from 1.0x
+                val u = (progress - 0.90f) / 0.10f
+                val phaseRemaining = (voidCollapseEndMs - epochElapsed).coerceAtLeast(0L)
+                val decay = (1.0f - u) * (1.0f - u)
+                val heightMult = 0.05f + 0.95f * decay
+                val radiusMult = 0.15f + 0.85f * (1.0f - u)
+                AnomalyLifecycleMetrics(
+                    phase = AnomalyLifecyclePhase.VOID_COLLAPSE,
+                    progress = progress,
+                    phaseProgress = u,
+                    timeRemainingMs = phaseRemaining,
+                    epochTimeRemainingMs = epochTimeRemainingMs,
+                    radiusMultiplier = radiusMult,
+                    heightMultiplier = heightMult,
+                    peakAltitudeMeters = baseSummitMeters * heightMult,
+                    mutationFluxMod = 3.0f,
+                    harvestYieldMod = 0.20f,
+                    densityMod = -0.30f,
+                    forcefieldResistanceMod = 0.40f,
+                )
+            }
+        }
+    }
+
+    /**
+     * Evaluates the deterministic lifecycle metrics and morphological scaling factors for an anomaly
+     * based on its latitude and longitude coordinate hash and the provided timestamp.
+     */
+    fun calculateAnomalyLifecycle(
+        lat: Double,
+        lng: Double,
+        timeMs: Long = getAdjustedTime(),
+        epochDurationMs: Long = 6L * 3600L * 1000L,
+        baseSummitMeters: Float = 850f,
+    ): AnomalyLifecycleMetrics {
+        val seed = (lat.hashCode().toLong() shl 32) xor (lng.hashCode().toLong() and 0xFFFFFFFFL)
+        return calculateAnomalyLifecycle(seed, timeMs, epochDurationMs, baseSummitMeters)
+    }
+
+    /**
+     * Evaluates the deterministic lifecycle metrics and morphological scaling factors for an anomaly
+     * based on its anomaly ID and the provided timestamp.
+     */
+    fun calculateAnomalyLifecycle(
+        anomalyId: String,
+        timeMs: Long = getAdjustedTime(),
+        epochDurationMs: Long = 6L * 3600L * 1000L,
+        baseSummitMeters: Float = 850f,
+    ): AnomalyLifecycleMetrics {
+        val seed = (anomalyId.hashCode().toLong() and 0xFFFFFFFFL)
+        return calculateAnomalyLifecycle(seed, timeMs, epochDurationMs, baseSummitMeters)
+    }
+
+    /**
+     * Evaluates the lifecycle metrics and morphological scaling factors for an anomaly
+     * based directly on a fractional lifecycle progress [0.0f, 1.0f).
+     */
+    fun calculateAnomalyLifecycleForProgress(
+        progress: Float,
+        epochDurationMs: Long = 6L * 3600L * 1000L,
+        baseSummitMeters: Float = 850f,
+    ): AnomalyLifecycleMetrics {
+        val safeEpochDuration = if (epochDurationMs > 0L) epochDurationMs else 6L * 3600L * 1000L
+        val p = progress.coerceIn(0f, 0.9999f)
+        val elapsed = (p * safeEpochDuration).toLong()
+        return calculateAnomalyLifecycle(seed = 0L, timeMs = elapsed, epochDurationMs = safeEpochDuration, baseSummitMeters = baseSummitMeters)
+    }
+
+    /**
+     * Applies pre-calculated lifecycle metrics directly to an anomaly.
+     */
+    fun updateAnomalyWithLifecycleMetrics(
+        anomaly: PoxAnomaly,
+        metrics: AnomalyLifecycleMetrics,
+    ): PoxAnomaly = anomaly.copy(
+        lifecyclePhase = metrics.phase,
+        lifecycleProgress = metrics.progress,
+        timeRemainingMs = metrics.timeRemainingMs,
+        peakAltitudeMeters = metrics.peakAltitudeMeters,
+        mutationFluxMod = metrics.mutationFluxMod,
+        harvestYieldMod = metrics.harvestYieldMod,
+        density = (anomaly.density + metrics.densityMod).coerceIn(-0.33, 0.33),
+    )
+
+    /**
+     * Updates an anomaly's lifecycle metrics (phase, progress, altitude, multipliers)
+     * based on its deterministic ID and gene hash and the provided or current adjusted time.
+     */
+    fun updateAnomalyWithLifecycle(
+        anomaly: PoxAnomaly,
+        timeMs: Long = getAdjustedTime(),
+        epochDurationMs: Long = 6L * 3600L * 1000L,
+    ): PoxAnomaly {
+        val rawRadius = if (anomaly.heatZoneDiameter > 0) {
+            (anomaly.heatZoneDiameter / 3.28084 / 2.0).toFloat()
+        } else {
+            1000.0f
+        }
+        val radiusMeters = rawRadius.coerceIn(2.5f, 4000.0f)
+        val spectralClass = anomaly.spectralClass
+        val baseSummitMeters = spectralClass.calculateBaseCeiling(radiusMeters, anomaly.morphology)
+        val seed = (anomaly.id.hashCode().toLong() and 0xFFFFFFFFL) xor (anomaly.gene.hashCode().toLong() shl 32)
+        val metrics = calculateAnomalyLifecycle(seed, timeMs, epochDurationMs, baseSummitMeters)
+        return updateAnomalyWithLifecycleMetrics(anomaly, metrics)
     }
 }

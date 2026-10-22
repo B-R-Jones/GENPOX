@@ -8,5 +8,5 @@ data class PeerNode(
     val name: String,
     val sector: String,
     val latency: String,
-    val status: String
+    val status: String,
 )

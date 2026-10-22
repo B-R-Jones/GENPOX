@@ -17,7 +17,7 @@ object ConflictEngine {
         val anomalousBenefits: List<WaveMath.AnomalousBenefit> = emptyList(),
         val moveset: List<String> = emptyList(),
         var isEvadedNext: Boolean = false,
-        var isDeflectedThisRound: Boolean = false
+        var isDeflectedThisRound: Boolean = false,
     )
 
     data class CombatResult(
@@ -27,7 +27,7 @@ object ConflictEngine {
         val totalTurns: Int,
         val logs: List<String>,
         val finalAttackerHp: Int,
-        val finalDefenderHp: Int
+        val finalDefenderHp: Int,
     )
 
     data class EnvironmentSimulationResult(
@@ -36,7 +36,7 @@ object ConflictEngine {
         val ticksSpent: Int,
         val decaySuffered: Double,
         val harvestedPayload: List<String>,
-        val logs: List<String>
+        val logs: List<String>,
     )
 
     data class HackingResult(
@@ -44,7 +44,7 @@ object ConflictEngine {
         val logs: List<String>,
         val siphonedPayload: List<String>,
         val finalHackerTelomeres: Int,
-        val directCombatResult: CombatResult? = null
+        val directCombatResult: CombatResult? = null,
     )
 
     /**
@@ -84,7 +84,7 @@ object ConflictEngine {
             defense = defense,
             speed = speed,
             anomalousBenefits = benefits,
-            moveset = moves
+            moveset = moves,
         )
     }
 
@@ -118,7 +118,7 @@ object ConflictEngine {
             defense = defense,
             speed = speed,
             anomalousBenefits = benefits,
-            moveset = moves
+            moveset = moves,
         )
     }
 
@@ -130,7 +130,7 @@ object ConflictEngine {
         defenderCreature: Creature,
         phaseName: String,
         waveCoupling: Double,
-        seed: Long = 42L
+        seed: Long = 42L,
     ): CombatResult {
         val random = Random(seed)
         val attacker = initializeCombatant(attackerCreature, phaseName, waveCoupling)
@@ -187,7 +187,7 @@ object ConflictEngine {
             totalTurns = turnCount,
             logs = logs,
             finalAttackerHp = attacker.currentHp,
-            finalDefenderHp = defender.currentHp
+            finalDefenderHp = defender.currentHp,
         )
     }
 
@@ -198,7 +198,7 @@ object ConflictEngine {
         phaseName: String,
         waveCoupling: Double,
         logs: MutableList<String>,
-        random: Random
+        random: Random,
     ) {
         val activePerks = actor.anomalousBenefits.filter {
             isPerkTriggered(it.triggerIndex, actor.currentHp, actor.maxHp, turnCount, phaseName, waveCoupling)
@@ -300,7 +300,7 @@ object ConflictEngine {
         turnCount: Int,
         phaseName: String,
         waveCoupling: Double,
-        logs: MutableList<String>
+        logs: MutableList<String>,
     ) {
         val activePerks = defeated.anomalousBenefits.filter {
             isPerkTriggered(it.triggerIndex, defeated.currentHp, defeated.maxHp, turnCount, phaseName, waveCoupling)
@@ -319,19 +319,17 @@ object ConflictEngine {
         maxHp: Int,
         turnCount: Int,
         phaseName: String,
-        waveCoupling: Double
-    ): Boolean {
-        return when (triggerIndex) {
-            0 -> true
-            1 -> phaseName.contains("New", true) || phaseName.contains("Crescent", true) || phaseName.contains("Quarter", true)
-            2 -> phaseName.contains("Full", true) || phaseName.contains("Gibbous", true)
-            3 -> currentHp < maxHp * 0.40
-            4 -> currentHp > maxHp * 0.70
-            5 -> turnCount <= 3
-            6 -> turnCount > 6
-            7 -> waveCoupling > 82.0
-            else -> true
-        }
+        waveCoupling: Double,
+    ): Boolean = when (triggerIndex) {
+        0 -> true
+        1 -> phaseName.contains("New", true) || phaseName.contains("Crescent", true) || phaseName.contains("Quarter", true)
+        2 -> phaseName.contains("Full", true) || phaseName.contains("Gibbous", true)
+        3 -> currentHp < maxHp * 0.40
+        4 -> currentHp > maxHp * 0.70
+        5 -> turnCount <= 3
+        6 -> turnCount > 6
+        7 -> waveCoupling > 82.0
+        else -> true
     }
 
     /**
@@ -344,7 +342,7 @@ object ConflictEngine {
         userLng: Double,
         totalTicks: Int,
         lunarAge: Double,
-        waveCoupling: Double
+        waveCoupling: Double,
     ): EnvironmentSimulationResult {
         val logs = mutableListOf<String>()
         val siphonedPayload = mutableListOf<String>()
@@ -360,7 +358,7 @@ object ConflictEngine {
                 ticksSpent = 0,
                 decaySuffered = 0.0,
                 harvestedPayload = emptyList(),
-                logs = logs
+                logs = logs,
             )
         }
 
@@ -415,13 +413,15 @@ object ConflictEngine {
             logs.add("Specimen survived the hazard dispatch run. Final Telomeres: $currentTelomeres%.")
             val harvestBoostPerk = benefits.find { it.id == "HARVEST_BOOST" }
             val dailyConfig = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
-            val isHarvestBoostActive = harvestBoostPerk != null && isPerkTriggered(
-                harvestBoostPerk.triggerIndex,
-                100, 100,
-                ticksToSimulate,
-                dailyConfig.phaseName,
-                waveCoupling
-            )
+            val isHarvestBoostActive = harvestBoostPerk != null &&
+                isPerkTriggered(
+                    harvestBoostPerk.triggerIndex,
+                    100,
+                    100,
+                    ticksToSimulate,
+                    dailyConfig.phaseName,
+                    waveCoupling,
+                )
 
             val payload = hazard.generateHarvestPayload(creature, waveCoupling, isHarvestBoostActive)
             siphonedPayload.addAll(payload)
@@ -434,7 +434,7 @@ object ConflictEngine {
             ticksSpent = ticksToSimulate,
             decaySuffered = totalDecaySuffered,
             harvestedPayload = siphonedPayload,
-            logs = logs
+            logs = logs,
         )
     }
 
@@ -449,7 +449,7 @@ object ConflictEngine {
         baseFirewallComplexity: Double,
         phaseName: String,
         waveCoupling: Double,
-        seed: Long = 42L
+        seed: Long = 42L,
     ): HackingResult {
         val logs = mutableListOf<String>()
         val siphoned = mutableListOf<String>()
@@ -471,7 +471,7 @@ object ConflictEngine {
                     logs = logs,
                     siphonedPayload = emptyList(),
                     finalHackerTelomeres = hackerTelomeres,
-                    directCombatResult = combatResult
+                    directCombatResult = combatResult,
                 )
             } else {
                 logs.add("Defender node security defeated. Initiating node firewall compromise phase.")
@@ -530,7 +530,7 @@ object ConflictEngine {
             logs = logs,
             siphonedPayload = siphoned,
             finalHackerTelomeres = hackerTelomeres,
-            directCombatResult = combatResult
+            directCombatResult = combatResult,
         )
     }
 }

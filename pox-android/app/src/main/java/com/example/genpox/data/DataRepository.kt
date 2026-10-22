@@ -1,82 +1,25 @@
 package com.example.genpox.data
 
 import android.content.Context
-import androidx.room.Room
+import com.example.genpox.data.repository.*
+import com.example.genpox.util.DispatchersProvider
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
+import javax.inject.Singleton
 
-interface DataRepository {
-    // Database access
-    val allCreatures: Flow<List<Creature>>
-    suspend fun getCreatureById(id: String): Creature?
-    suspend fun insertCreature(creature: Creature)
-    suspend fun updateCreature(creature: Creature)
-    suspend fun deleteCreature(creature: Creature)
-    suspend fun deleteAllCreatures()
+interface DataRepository :
+    CreatureRepository,
+    GeneStockRepository,
+    MissionRepository,
+    UserPreferencesRepository
 
-    val allGeneSequences: Flow<List<GeneSequence>>
-    suspend fun insertGeneSequence(sequence: GeneSequence)
-    suspend fun insertGeneSequences(sequences: List<GeneSequence>)
-    suspend fun updateGeneSequence(sequence: GeneSequence)
-    suspend fun deleteGeneSequence(sequence: GeneSequence)
-    suspend fun deleteAllGeneSequences()
-    suspend fun updateGeneStock(toInsertOrUpdate: List<GeneSequence>, toDelete: List<GeneSequence>)
-
-    val activeMissions: Flow<List<HarvestMission>>
-    val allMissions: Flow<List<HarvestMission>>
-    suspend fun insertMission(mission: HarvestMission)
-    suspend fun updateMission(mission: HarvestMission)
-
-    // Cached road cells
-    suspend fun getCachedRoadCell(cellKey: String): CachedRoadCell?
-    suspend fun getAllCachedRoadCells(): List<CachedRoadCell>
-    suspend fun insertCachedRoadCell(cell: CachedRoadCell)
-
-    // Cached building cells
-    suspend fun getCachedBuildingCell(cellKey: String): CachedBuildingCell?
-    suspend fun getAllCachedBuildingCells(): List<CachedBuildingCell>
-    suspend fun insertCachedBuildingCell(cell: CachedBuildingCell)
-
-    suspend fun clearMapCache()
-
-    // Settings access
-    val geminiApiKey: Flow<String>
-    val muteSound: Flow<Boolean>
-    val scanRadius: Flow<Float>
-    val targetSequence: Flow<String>
-    val rawStockA: Flow<Long>
-    val rawStockG: Flow<Long>
-    val rawStockT: Flow<Long>
-    val rawStockC: Flow<Long>
-    val bioWaste: Flow<Long>
-    val splicerSlots: Flow<List<String?>>
-    val splicerQScores: Flow<List<Double>>
-    val splicerSignatures: Flow<List<String>>
-    val selectedHostPlanet: Flow<String>
-    suspend fun saveGeminiApiKey(apiKey: String)
-    suspend fun setMuteSound(mute: Boolean)
-    suspend fun setScanRadius(radius: Float)
-    suspend fun saveTargetSequence(seq: String)
-    suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long)
-    suspend fun saveBioWaste(waste: Long)
-    suspend fun saveSplicerState(slots: List<String?>, qScores: List<Double>, signatures: List<String>)
-    suspend fun saveSelectedHostPlanet(planet: String)
-
-    // Reagent stockpile
-    val allReagentStock: Flow<List<ReagentStock>>
-    suspend fun insertReagentStock(reagents: List<ReagentStock>)
-    suspend fun decrementReagentStock(id: String)
-}
-
-class DefaultDataRepository(private val context: Context) : DataRepository {
-    private val database: PoxDatabase by lazy {
-        Room.databaseBuilder(
-            context.applicationContext,
-            PoxDatabase::class.java,
-            "pox_database"
-        ).fallbackToDestructiveMigration().build()
-    }
-
-    private val poxDao: PoxDao by lazy { database.poxDao() }
+@Singleton
+class DefaultDataRepository @Inject constructor(
+    private val poxDao: PoxDao,
+    @ApplicationContext private val context: Context,
+    private val dispatchers: DispatchersProvider,
+) : DataRepository {
     private val settings: PoxSettings by lazy { PoxSettings(context) }
 
     // Database access overrides
@@ -104,8 +47,7 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
     override suspend fun deleteGeneSequence(sequence: GeneSequence) = poxDao.deleteGeneSequence(sequence)
     override suspend fun deleteAllGeneSequences() = poxDao.deleteAllGeneSequences()
 
-    override suspend fun updateGeneStock(toInsertOrUpdate: List<GeneSequence>, toDelete: List<GeneSequence>) =
-        poxDao.updateGeneStock(toInsertOrUpdate, toDelete)
+    override suspend fun updateGeneStock(toInsertOrUpdate: List<GeneSequence>, toDelete: List<GeneSequence>) = poxDao.updateGeneStock(toInsertOrUpdate, toDelete)
 
     override val activeMissions: Flow<List<HarvestMission>>
         get() = poxDao.getActiveMissions()
@@ -116,23 +58,6 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
     override suspend fun insertMission(mission: HarvestMission) = poxDao.insertMission(mission)
 
     override suspend fun updateMission(mission: HarvestMission) = poxDao.updateMission(mission)
-
-    override suspend fun getCachedRoadCell(cellKey: String): CachedRoadCell? = poxDao.getCachedRoadCell(cellKey)
-
-    override suspend fun getAllCachedRoadCells(): List<CachedRoadCell> = poxDao.getAllCachedRoadCells()
-
-    override suspend fun insertCachedRoadCell(cell: CachedRoadCell) = poxDao.insertCachedRoadCell(cell)
-
-    override suspend fun getCachedBuildingCell(cellKey: String): CachedBuildingCell? = poxDao.getCachedBuildingCell(cellKey)
-
-    override suspend fun getAllCachedBuildingCells(): List<CachedBuildingCell> = poxDao.getAllCachedBuildingCells()
-
-    override suspend fun insertCachedBuildingCell(cell: CachedBuildingCell) = poxDao.insertCachedBuildingCell(cell)
-
-    override suspend fun clearMapCache() {
-        poxDao.clearCachedRoadCells()
-        poxDao.clearCachedBuildingCells()
-    }
 
     // Settings access overrides
     override val geminiApiKey: Flow<String>
@@ -182,24 +107,19 @@ class DefaultDataRepository(private val context: Context) : DataRepository {
 
     override suspend fun saveTargetSequence(seq: String) = settings.saveTargetSequence(seq)
 
-    override suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long) =
-        settings.saveRawStocks(a, g, t, c)
+    override suspend fun saveRawStocks(a: Long, g: Long, t: Long, c: Long) = settings.saveRawStocks(a, g, t, c)
 
     override suspend fun saveBioWaste(waste: Long) = settings.saveBioWaste(waste)
 
-    override suspend fun saveSplicerState(slots: List<String?>, qScores: List<Double>, signatures: List<String>) =
-        settings.saveSplicerState(slots, qScores, signatures)
+    override suspend fun saveSplicerState(slots: List<String?>, qScores: List<Double>, signatures: List<String>) = settings.saveSplicerState(slots, qScores, signatures)
 
-    override suspend fun saveSelectedHostPlanet(planet: String) =
-        settings.saveSelectedHostPlanet(planet)
+    override suspend fun saveSelectedHostPlanet(planet: String) = settings.saveSelectedHostPlanet(planet)
 
     // Reagent stockpile overrides
     override val allReagentStock: Flow<List<ReagentStock>>
         get() = poxDao.getAllReagentStock()
 
-    override suspend fun insertReagentStock(reagents: List<ReagentStock>) =
-        poxDao.insertReagentStock(reagents)
+    override suspend fun insertReagentStock(reagents: List<ReagentStock>) = poxDao.insertReagentStock(reagents)
 
-    override suspend fun decrementReagentStock(id: String) =
-        poxDao.decrementReagentStock(id)
+    override suspend fun decrementReagentStock(id: String) = poxDao.decrementReagentStock(id)
 }

@@ -4,17 +4,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.genpox.audio.PoxSynthManager
 import com.example.genpox.data.*
-import com.example.genpox.data.network.PoxNetworkManager
 import com.example.genpox.data.network.HydraPacket
+import com.example.genpox.data.repository.*
+import com.example.genpox.util.DispatchersProvider
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
+import javax.inject.Inject
 
-class NetworkViewModel(
-    private val repository: DataRepository,
+@HiltViewModel
+class NetworkViewModel @Inject constructor(
+    private val creatureRepository: CreatureRepository,
+    private val geneStockRepository: GeneStockRepository,
+    private val preferencesRepository: UserPreferencesRepository,
     private val synthManager: PoxSynthManager,
-    val reactorSalt: StateFlow<Float>
+    private val dispatchers: DispatchersProvider,
 ) : ViewModel() {
+    val reactorSalt: StateFlow<Float> = MutableStateFlow(0.05f)
 
     var onLog: ((String) -> Unit)? = null
 
@@ -41,7 +48,7 @@ class NetworkViewModel(
             nm.activeConnections.collect { currentConnections ->
                 val newlyAdded = currentConnections.keys - previousConnections.keys
                 previousConnections = currentConnections
-                
+
                 if (newlyAdded.isNotEmpty()) {
                     newlyAdded.forEach { endpointId ->
                         triggerPassiveHackIfPossible(nm, endpointId)
@@ -53,12 +60,12 @@ class NetworkViewModel(
 
     private fun triggerPassiveHackIfPossible(nm: com.example.genpox.data.network.PoxNetworkInterface, endpointId: String) {
         viewModelScope.launch {
-            val autoHacker = repository.allCreatures.first().find { it.isAutoHacker && it.telomeres > 0 }
+            val autoHacker = creatureRepository.allCreatures.first().find { it.isAutoHacker && it.telomeres > 0 }
             if (autoHacker != null) {
                 val targetNodeId = nm.activeConnections.value[endpointId] ?: "Remote Node"
                 val intrusionPacket = HydraPacket.HackingIntrusion(
                     hacker = autoHacker,
-                    targetNodeId = targetNodeId
+                    targetNodeId = targetNodeId,
                 )
                 nm.sendPacket(endpointId, intrusionPacket)
                 addLog("HACK: Designated Auto-Hacker \"${autoHacker.name}\" initiated passive intrusion on $targetNodeId.")
@@ -110,19 +117,19 @@ class NetworkViewModel(
 
     init {
         viewModelScope.launch {
-            repository.rawStockA.collect { _rawStockA.value = it }
+            preferencesRepository.rawStockA.collect { _rawStockA.value = it }
         }
         viewModelScope.launch {
-            repository.rawStockG.collect { _rawStockG.value = it }
+            preferencesRepository.rawStockG.collect { _rawStockG.value = it }
         }
         viewModelScope.launch {
-            repository.rawStockT.collect { _rawStockT.value = it }
+            preferencesRepository.rawStockT.collect { _rawStockT.value = it }
         }
         viewModelScope.launch {
-            repository.rawStockC.collect { _rawStockC.value = it }
+            preferencesRepository.rawStockC.collect { _rawStockC.value = it }
         }
         viewModelScope.launch {
-            repository.bioWaste.collect { _bioWaste.value = it }
+            preferencesRepository.bioWaste.collect { _bioWaste.value = it }
         }
         viewModelScope.launch {
             reactorSalt.collect { _reactorSalt.value = it }
@@ -181,9 +188,9 @@ class NetworkViewModel(
                     lore = "Received via peer network transmission from ${msg.from}.",
                     asciiArt = " [P2P CODON LINK] ",
                     discoveredAt = System.currentTimeMillis(),
-                    origin = msg.from
+                    origin = msg.from,
                 )
-                repository.insertCreature(newCreature)
+                creatureRepository.insertCreature(newCreature)
             }
 
             if (msg.attachedGeneSequence != null) {
@@ -195,9 +202,9 @@ class NetworkViewModel(
                     discoveredAt = System.currentTimeMillis(),
                     averageQScore = 30.0,
                     meltingTemp = tm,
-                    minimumFreeEnergy = mfe
+                    minimumFreeEnergy = mfe,
                 )
-                repository.insertGeneSequence(newSeq)
+                geneStockRepository.insertGeneSequence(newSeq)
             }
 
             if (msg.transferGenes > 0 || msg.transferWaste > 0) {
@@ -209,11 +216,11 @@ class NetworkViewModel(
                 _rawStockG.value = newG
                 _rawStockT.value = newT
                 _rawStockC.value = newC
-                repository.saveRawStocks(newA, newG, newT, newC)
+                preferencesRepository.saveRawStocks(newA, newG, newT, newC)
 
                 val newWaste = _bioWaste.value + msg.transferWaste
                 _bioWaste.value = newWaste
-                repository.saveBioWaste(newWaste)
+                preferencesRepository.saveBioWaste(newWaste)
             }
 
             val updated = _inboxMessages.value.map { m ->
@@ -228,29 +235,29 @@ class NetworkViewModel(
         when (packet) {
             is HydraPacket.HackingIntrusion -> {
                 viewModelScope.launch {
-                    val allCreatures = repository.allCreatures.first()
+                    val allCreatures = creatureRepository.allCreatures.first()
                     val autoDefenders = allCreatures.filter { it.isAutoDefender && it.telomeres > 0 }
                     val primaryDefender = autoDefenders.firstOrNull()
-                    
+
                     addLog("SECURITY: Hacking intrusion detected from $peerName using hacker spec \"${packet.hacker.name}\". Defender assigned: ${primaryDefender?.name ?: "NONE"}.")
-                    
+
                     val responsePacket = HydraPacket.HackingCounterResponse(
                         targetNodeId = packet.targetNodeId,
                         defender = primaryDefender,
                         vaultAutoDefenders = autoDefenders,
-                        baseFirewallComplexity = 50.0
+                        baseFirewallComplexity = 50.0,
                     )
                     networkManager?.sendPacket(endpointId, responsePacket)
                 }
             }
             is HydraPacket.HackingCounterResponse -> {
                 viewModelScope.launch {
-                    val autoHacker = repository.allCreatures.first().find { it.isAutoHacker && it.telomeres > 0 }
+                    val autoHacker = creatureRepository.allCreatures.first().find { it.isAutoHacker && it.telomeres > 0 }
                     if (autoHacker == null) {
                         addLog("HACK ERR: Active Auto-Hacker not found for counter response.")
                         return@launch
                     }
-                    
+
                     val waveConfig = WaveMath.getDailyWaveConfig(System.currentTimeMillis())
                     val waveCouplingVal = WaveMath.getSpectrumWaveCoupling(System.currentTimeMillis())
                     val hackingResult = ConflictEngine.simulateCreatureVsPlayerNode(
@@ -261,12 +268,12 @@ class NetworkViewModel(
                         baseFirewallComplexity = packet.baseFirewallComplexity,
                         phaseName = waveConfig.phaseName,
                         waveCoupling = waveCouplingVal,
-                        seed = System.currentTimeMillis()
+                        seed = System.currentTimeMillis(),
                     )
-                    
+
                     val updatedHacker = autoHacker.copy(telomeres = hackingResult.finalHackerTelomeres)
-                    repository.insertCreature(updatedHacker)
-                    
+                    creatureRepository.insertCreature(updatedHacker)
+
                     if (hackingResult.success && hackingResult.siphonedPayload.isNotEmpty()) {
                         hackingResult.siphonedPayload.forEach { gene ->
                             val tm = GeneticsEngine.calculateMeltingTemperature(gene, _reactorSalt.value.toDouble())
@@ -277,13 +284,13 @@ class NetworkViewModel(
                                 discoveredAt = System.currentTimeMillis(),
                                 averageQScore = 35.0,
                                 meltingTemp = tm,
-                                minimumFreeEnergy = mfe
+                                minimumFreeEnergy = mfe,
                             )
-                            repository.insertGeneSequence(newSeq)
+                            geneStockRepository.insertGeneSequence(newSeq)
                             addLog("HACK: Siphoned gene sequence $gene from target $peerName and saved to database.")
                         }
                     }
-                    
+
                     val defenderVal = packet.defender
                     val defenderFinalTelomeres = if (defenderVal != null) {
                         val combat = hackingResult.directCombatResult
@@ -303,17 +310,17 @@ class NetworkViewModel(
                     } else {
                         null
                     }
-                    
+
                     val reportPacket = HydraPacket.HackingResultReport(
                         targetNodeId = packet.targetNodeId,
                         success = hackingResult.success,
                         logs = hackingResult.logs,
                         siphonedPayload = hackingResult.siphonedPayload,
                         hackerFinalTelomeres = hackingResult.finalHackerTelomeres,
-                        defenderFinalTelomeres = defenderFinalTelomeres
+                        defenderFinalTelomeres = defenderFinalTelomeres,
                     )
                     networkManager?.sendPacket(endpointId, reportPacket)
-                    
+
                     addLog("HACK RESULT: Hacking on $peerName was a ${if (hackingResult.success) "SUCCESS" else "FAILURE"}. Final Hacker Telomeres: ${hackingResult.finalHackerTelomeres}%.")
                     hackingResult.logs.forEach { addLog("  $it") }
                 }
@@ -323,12 +330,12 @@ class NetworkViewModel(
                     addLog("SECURITY REPORT: Node security breach assessment on ${packet.targetNodeId} by $peerName.")
                     addLog("  Result: ${if (packet.success) "BREACHED" else "CONTAINED"}")
                     packet.logs.forEach { addLog("  $it") }
-                    
+
                     if (packet.defenderFinalTelomeres != null) {
-                        val defender = repository.allCreatures.first().find { it.isAutoDefender && it.telomeres > 0 }
+                        val defender = creatureRepository.allCreatures.first().find { it.isAutoDefender && it.telomeres > 0 }
                         if (defender != null) {
                             val updatedDefender = defender.copy(telomeres = packet.defenderFinalTelomeres)
-                            repository.insertCreature(updatedDefender)
+                            creatureRepository.insertCreature(updatedDefender)
                             addLog("SECURITY: Defender \"${defender.name}\" telomeres updated to ${packet.defenderFinalTelomeres}% after combat.")
                             if (packet.defenderFinalTelomeres <= 0) {
                                 addLog("FATAL: Defender \"${defender.name}\" disintegrated due to total telomere decay during security defense.")
@@ -372,7 +379,7 @@ class NetworkViewModel(
                     attachedCreatureFaction = packet.attachedCreatureFaction,
                     attachedGeneSequence = packet.attachedGeneSequence,
                     transferGenes = packet.transferGenes,
-                    transferWaste = packet.transferWaste
+                    transferWaste = packet.transferWaste,
                 )
 
                 _inboxMessages.value = listOf(newMsg) + _inboxMessages.value
@@ -387,7 +394,7 @@ class NetworkViewModel(
         text: String,
         creature: Creature?,
         gene: GeneSequence?,
-        transferResources: Boolean
+        transferResources: Boolean,
     ) {
         val nm = networkManager ?: return
 
@@ -396,8 +403,10 @@ class NetworkViewModel(
             var transWaste = 0
 
             if (transferResources) {
-                if (_rawStockA.value >= 10 && _rawStockG.value >= 10 &&
-                    _rawStockT.value >= 10 && _rawStockC.value >= 10 &&
+                if (_rawStockA.value >= 10 &&
+                    _rawStockG.value >= 10 &&
+                    _rawStockT.value >= 10 &&
+                    _rawStockC.value >= 10 &&
                     _bioWaste.value >= 25
                 ) {
                     val newA = _rawStockA.value - 10
@@ -408,11 +417,11 @@ class NetworkViewModel(
                     _rawStockG.value = newG
                     _rawStockT.value = newT
                     _rawStockC.value = newC
-                    repository.saveRawStocks(newA, newG, newT, newC)
+                    preferencesRepository.saveRawStocks(newA, newG, newT, newC)
 
                     val newWaste = _bioWaste.value - 25
                     _bioWaste.value = newWaste
-                    repository.saveBioWaste(newWaste)
+                    preferencesRepository.saveBioWaste(newWaste)
 
                     transGenes = 10
                     transWaste = 25
@@ -427,11 +436,11 @@ class NetworkViewModel(
                 attachedCreatureFaction = creature?.faction,
                 attachedGeneSequence = gene?.sequence,
                 transferGenes = transGenes,
-                transferWaste = transWaste
+                transferWaste = transWaste,
             )
 
             if (gene != null) {
-                repository.deleteGeneSequence(gene)
+                geneStockRepository.deleteGeneSequence(gene)
             }
 
             nm.sendPacket(endpointId, packet)

@@ -1,106 +1,46 @@
 package com.example.genpox.ui.main
 
-import android.content.Context
-import androidx.annotation.Keep
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.zIndex
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.ClipOp
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.genpox.data.Creature
 import com.example.genpox.data.GeneSequence
-import com.example.genpox.data.GeneticsEngine
-import com.example.genpox.data.HarvestMission
 import com.example.genpox.data.WaveMath
-import com.example.genpox.data.BuildingStructure
 import com.example.genpox.theme.*
 import com.example.genpox.ui.components.*
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
-import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlinx.coroutines.delay
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.coerceAtLeast
-import androidx.compose.ui.unit.coerceIn
-import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.foundation.gestures.forEachGesture
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlin.math.absoluteValue
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.SystemFontFamily
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.runtime.Immutable
 
 @Composable
 fun VaultView(viewModel: MainViewModel) {
-    val creatures by viewModel.creatures.collectAsState()
-    val activeCreature by viewModel.activeCreature.collectAsState()
-    val targetSequence by viewModel.targetSequence.collectAsState()
-    val geneSequences by viewModel.geneSequences.collectAsState()
-    val defenderId by viewModel.defenderCreatureId.collectAsState()
-    val openedFrom by viewModel.creatureCardOpenedFrom.collectAsState()
-    val harvestingCreatureIds by viewModel.harvestingCreatureIds.collectAsState()
-    val devForceAnomaly by viewModel.devForceAnomaly.collectAsState()
+    val creatures by viewModel.creatures.collectAsStateWithLifecycle(initialValue = emptyList())
+    val activeCreature by viewModel.activeCreature.collectAsStateWithLifecycle()
+    val targetSequence by viewModel.targetSequence.collectAsStateWithLifecycle()
+    val geneSequences by viewModel.geneSequences.collectAsStateWithLifecycle(initialValue = emptyList())
+    val defenderId by viewModel.defenderCreatureId.collectAsStateWithLifecycle()
+    val openedFrom by viewModel.creatureCardOpenedFrom.collectAsStateWithLifecycle()
+    val harvestingCreatureIds by viewModel.harvestingCreatureIds.collectAsStateWithLifecycle()
+    val devForceAnomaly by viewModel.devForceAnomaly.collectAsStateWithLifecycle()
     val activeTags = remember(activeCreature, targetSequence, defenderId, harvestingCreatureIds) {
         activeCreature?.let { getCreatureTags(it, targetSequence, defenderId, harvestingCreatureIds) } ?: emptyList()
     }
@@ -114,7 +54,7 @@ fun VaultView(viewModel: MainViewModel) {
     var libFilterType by remember { mutableStateOf("ALL") }
     var libFilterTag by remember { mutableStateOf("ALL") }
 
-    val vaultTab by viewModel.vaultSubTab.collectAsState()
+    val vaultTab by viewModel.vaultSubTab.collectAsStateWithLifecycle()
     var geneToDeconstruct by remember { mutableStateOf<GeneSequence?>(null) }
     var stepSearchSelectedGene by remember { mutableStateOf<String?>(null) }
 
@@ -125,7 +65,7 @@ fun VaultView(viewModel: MainViewModel) {
             }),
             PoxSubTab("search", "SEARCH", icon = { iconColor ->
                 WireframeStepSearchIcon(color = iconColor, modifier = Modifier.size(24.dp))
-            })
+            }),
         )
     }
 
@@ -136,7 +76,7 @@ fun VaultView(viewModel: MainViewModel) {
 
     // Filter and Sort logic
     val filteredSortedCreatures = remember(
-        creatures, applyLibFilters, libSortBy, libFilterFaction, libFilterType, libFilterTag, targetSequence, defenderId, harvestingCreatureIds
+        creatures, applyLibFilters, libSortBy, libFilterFaction, libFilterType, libFilterTag, targetSequence, defenderId, harvestingCreatureIds,
     ) {
         var result = creatures
         if (applyLibFilters) {
@@ -192,7 +132,9 @@ fun VaultView(viewModel: MainViewModel) {
                         viewModel.selectTab("network")
                     }
                 }
-            } else null,
+            } else {
+                null
+            },
             headerTitle = if (activeCreature != null) {
                 "${activeCreature!!.name.uppercase()} [${activeCreature!!.id}]"
             } else if (viewingArchiveSearch) {
@@ -231,7 +173,7 @@ fun VaultView(viewModel: MainViewModel) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         val factionColor = when (activeCreature!!.faction) {
                             "Infection" -> Color(0xFFEF4444)
@@ -242,7 +184,7 @@ fun VaultView(viewModel: MainViewModel) {
                         Box(
                             modifier = Modifier
                                 .background(factionColor, RoundedCornerShape(2.dp))
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
                         ) {
                             Text(
                                 text = activeCreature!!.faction.uppercase(),
@@ -250,13 +192,13 @@ fun VaultView(viewModel: MainViewModel) {
                                 style = Typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                fontSize = 8.5.sp
+                                fontSize = 8.5.sp,
                             )
                         }
 
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             activeTags.forEach { tag ->
                                 TagBadge(tag = tag)
@@ -264,14 +206,16 @@ fun VaultView(viewModel: MainViewModel) {
                         }
                     }
                 }
-            } else null
+            } else {
+                null
+            },
         ) {
             if (activeCreature != null) {
                 CreatureDetailCard(c = activeCreature!!, viewModel = viewModel)
             } else if (viewingArchiveSearch) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     // Summary metrics header
                     Row(
@@ -279,39 +223,39 @@ fun VaultView(viewModel: MainViewModel) {
                             .fillMaxWidth()
                             .padding(horizontal = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
                                 text = "SYSTEM TARGET MATCHES: ",
                                 color = CyberGreen,
                                 fontSize = 9.sp,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                             Text(
                                 text = "${filteredSortedCreatures.size}",
                                 color = CyberGreen,
                                 fontSize = 9.sp,
                                 fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                             Text(
                                 text = " SPECIMENS",
                                 color = CyberGreen,
                                 fontSize = 9.sp,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                         }
                         Text(
                             text = "STATUS: GEN-VAULT OPEN",
                             color = Color.Gray,
                             fontSize = 9.sp,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                         )
                     }
 
@@ -323,7 +267,7 @@ fun VaultView(viewModel: MainViewModel) {
                             .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                             .background(Color.Black.copy(alpha = 0.6f))
                             .padding(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         items(filteredSortedCreatures) { item ->
                             val currentTags = remember(item, targetSequence, defenderId, harvestingCreatureIds) {
@@ -340,19 +284,19 @@ fun VaultView(viewModel: MainViewModel) {
                                     }
                                     .padding(10.dp),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .size(40.dp)
                                         .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                                         .background(Color.Black.copy(alpha = 0.4f)),
-                                    contentAlignment = Alignment.Center
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     com.example.genpox.ui.components.CreatureWireframeView(
                                         dna = item.sequence,
                                         faction = item.faction,
-                                        modifier = Modifier.fillMaxSize().padding(4.dp)
+                                        modifier = Modifier.fillMaxSize().padding(4.dp),
                                     )
                                 }
 
@@ -362,12 +306,12 @@ fun VaultView(viewModel: MainViewModel) {
                                         color = Color.White,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Row(
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                        verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         currentTags.forEach { tag ->
                                             TagBadge(tag = tag)
@@ -380,7 +324,7 @@ fun VaultView(viewModel: MainViewModel) {
                                     color = CyberGreen,
                                     fontSize = 9.sp,
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
                                 )
                             }
                         }
@@ -389,12 +333,12 @@ fun VaultView(viewModel: MainViewModel) {
             } else {
                 Column(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f)
+                            .weight(1f),
                     ) {
                         when (vaultTab) {
                             "creatures" -> {
@@ -404,22 +348,22 @@ fun VaultView(viewModel: MainViewModel) {
                                             text = "GEN-VAULT DATABANKS OFFLINE.\nSEED GENETIC HOSTS IN COMBINATOR.",
                                             color = CyberGreenDim,
                                             style = Typography.bodyMedium,
-                                            textAlign = TextAlign.Center
+                                            textAlign = TextAlign.Center,
                                         )
                                     }
                                 } else {
                                     Column(
                                         modifier = Modifier.fillMaxSize(),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
-                                            verticalAlignment = Alignment.CenterVertically
+                                            verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             val activeFiltersCount = (if (libFilterFaction != "ALL") 1 else 0) +
-                                                    (if (libFilterType != "ALL") 1 else 0) +
-                                                    (if (libFilterTag != "ALL") 1 else 0)
+                                                (if (libFilterType != "ALL") 1 else 0) +
+                                                (if (libFilterTag != "ALL") 1 else 0)
                                             val exploreText = if (activeFiltersCount > 0) {
                                                 "EXPLORE FILTERS ($activeFiltersCount)"
                                             } else {
@@ -434,14 +378,14 @@ fun VaultView(viewModel: MainViewModel) {
                                                         viewModel.synthManager.playBeep(520f, 0.05f, "sine")
                                                         isFilterPanelExpanded = !isFilterPanelExpanded
                                                     }
-                                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                                                    .padding(horizontal = 6.dp, vertical = 3.dp),
                                             ) {
                                                 Text(
                                                     text = if (isFilterPanelExpanded) "COLLAPSE FILTERS" else exploreText,
                                                     color = CyberGreen,
                                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                                     fontSize = 8.sp,
-                                                    fontWeight = FontWeight.Bold
+                                                    fontWeight = FontWeight.Bold,
                                                 )
                                             }
 
@@ -449,21 +393,21 @@ fun VaultView(viewModel: MainViewModel) {
 
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
                                             ) {
                                                 Text(
                                                     text = "ACTIVE SELECTIONS: ",
                                                     color = CyberGreen,
                                                     fontSize = 8.sp,
                                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                                    fontWeight = FontWeight.Bold
+                                                    fontWeight = FontWeight.Bold,
                                                 )
                                                 Text(
                                                     text = "${filteredSortedCreatures.size} / ${creatures.size}",
                                                     color = CyberGreen,
                                                     fontSize = 8.sp,
                                                     fontFamily = FontFamily.Monospace,
-                                                    fontWeight = FontWeight.Bold
+                                                    fontWeight = FontWeight.Bold,
                                                 )
                                             }
                                         }
@@ -475,12 +419,12 @@ fun VaultView(viewModel: MainViewModel) {
                                                     .fillMaxWidth()
                                                     .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                                                     .background(Color.Black.copy(alpha = 0.6f))
-                                                    .padding(8.dp)
+                                                    .padding(8.dp),
                                             ) {
                                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                                     Row(
                                                         modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                     ) {
                                                         Box(modifier = Modifier.weight(1f)) {
                                                             PoxDropdown(
@@ -496,12 +440,12 @@ fun VaultView(viewModel: MainViewModel) {
                                                                     "attack-desc" to "Attack (High -> Low)",
                                                                     "defense-desc" to "Defense (High -> Low)",
                                                                     "speed-desc" to "Speed (High -> Low)",
-                                                                    "tags-desc" to "Tag Density"
+                                                                    "tags-desc" to "Tag Density",
                                                                 ),
                                                                 onOptionSelected = {
                                                                     viewModel.synthManager.playBeep(480f, 0.02f, "sine")
                                                                     libSortBy = it
-                                                                }
+                                                                },
                                                             )
                                                         }
                                                         Box(modifier = Modifier.weight(1f)) {
@@ -513,19 +457,19 @@ fun VaultView(viewModel: MainViewModel) {
                                                                     "Infection" to "Infection",
                                                                     "Mech" to "Mech",
                                                                     "Parasite" to "Parasite",
-                                                                    "Containment" to "Containment"
+                                                                    "Containment" to "Containment",
                                                                 ),
                                                                 onOptionSelected = {
                                                                     viewModel.synthManager.playBeep(480f, 0.02f, "sine")
                                                                     libFilterFaction = it
-                                                                }
+                                                                },
                                                             )
                                                         }
                                                     }
 
                                                     Row(
                                                         modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                     ) {
                                                         Box(modifier = Modifier.weight(1f)) {
                                                             val typeOptions = remember(uniqueTypes) {
@@ -538,7 +482,7 @@ fun VaultView(viewModel: MainViewModel) {
                                                                 onOptionSelected = {
                                                                     viewModel.synthManager.playBeep(480f, 0.02f, "sine")
                                                                     libFilterType = it
-                                                                }
+                                                                },
                                                             )
                                                         }
                                                         Box(modifier = Modifier.weight(1f)) {
@@ -553,7 +497,7 @@ fun VaultView(viewModel: MainViewModel) {
                                                                 "ALPHA GENE" to "Alpha Gene",
                                                                 "MODIFIED" to "Modified",
                                                                 "ORIGINAL" to "Original",
-                                                                "TRANSFER-ORIGIN" to "Transfer Origin"
+                                                                "TRANSFER-ORIGIN" to "Transfer Origin",
                                                             )
                                                             PoxDropdown(
                                                                 label = "Creature Tags:",
@@ -562,14 +506,14 @@ fun VaultView(viewModel: MainViewModel) {
                                                                 onOptionSelected = {
                                                                     viewModel.synthManager.playBeep(480f, 0.02f, "sine")
                                                                     libFilterTag = it
-                                                                }
+                                                                },
                                                             )
                                                         }
                                                     }
 
                                                     Row(
                                                         modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.End
+                                                        horizontalArrangement = Arrangement.End,
                                                     ) {
                                                         Box(
                                                             modifier = Modifier
@@ -582,14 +526,14 @@ fun VaultView(viewModel: MainViewModel) {
                                                                     libFilterType = "ALL"
                                                                     libFilterTag = "ALL"
                                                                 }
-                                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                                .padding(horizontal = 8.dp, vertical = 4.dp),
                                                         ) {
                                                             Text(
                                                                 text = "✕ CLEAR FILTERS",
                                                                 color = Color(0xFFEF4444),
                                                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                                                 fontSize = 8.sp,
-                                                                fontWeight = FontWeight.Bold
+                                                                fontWeight = FontWeight.Bold,
                                                             )
                                                         }
                                                     }
@@ -605,20 +549,20 @@ fun VaultView(viewModel: MainViewModel) {
                                                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                                                 .background(Color.Black.copy(alpha = 0.4f))
                                                 .padding(16.dp),
-                                            contentAlignment = Alignment.Center
+                                            contentAlignment = Alignment.Center,
                                         ) {
                                             Column(
                                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                                                verticalArrangement = Arrangement.spacedBy(16.dp),
                                             ) {
                                                 Column(
                                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp),
                                                 ) {
                                                     if (applyLibFilters) {
                                                         Row(
                                                             verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.Center
+                                                            horizontalArrangement = Arrangement.Center,
                                                         ) {
                                                             Text(
                                                                 text = "SEQUENCES FOUND: ",
@@ -626,7 +570,7 @@ fun VaultView(viewModel: MainViewModel) {
                                                                 fontSize = 16.sp,
                                                                 fontWeight = FontWeight.Black,
                                                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                                                textAlign = TextAlign.Center
+                                                                textAlign = TextAlign.Center,
                                                             )
                                                             Text(
                                                                 text = "${filteredSortedCreatures.size}",
@@ -634,7 +578,7 @@ fun VaultView(viewModel: MainViewModel) {
                                                                 fontSize = 16.sp,
                                                                 fontWeight = FontWeight.Black,
                                                                 fontFamily = FontFamily.Monospace,
-                                                                textAlign = TextAlign.Center
+                                                                textAlign = TextAlign.Center,
                                                             )
                                                         }
                                                         Text(
@@ -642,7 +586,7 @@ fun VaultView(viewModel: MainViewModel) {
                                                             color = CyberGreenDim,
                                                             fontSize = 10.sp,
                                                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                                            textAlign = TextAlign.Center
+                                                            textAlign = TextAlign.Center,
                                                         )
                                                     } else {
                                                         Text(
@@ -651,14 +595,14 @@ fun VaultView(viewModel: MainViewModel) {
                                                             fontSize = 16.sp,
                                                             fontWeight = FontWeight.Black,
                                                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                                            textAlign = TextAlign.Center
+                                                            textAlign = TextAlign.Center,
                                                         )
                                                         Text(
                                                             text = "Enable filters or reconfigure search parameters using the filter options above.",
                                                             color = CyberGreenDim,
                                                             fontSize = 10.sp,
                                                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                                            textAlign = TextAlign.Center
+                                                            textAlign = TextAlign.Center,
                                                         )
                                                     }
                                                 }
@@ -673,20 +617,20 @@ fun VaultView(viewModel: MainViewModel) {
                                                         .height(44.dp),
                                                     colors = ButtonDefaults.buttonColors(
                                                         containerColor = CyberGreen,
-                                                        contentColor = Color.Black
+                                                        contentColor = Color.Black,
                                                     ),
-                                                    shape = RoundedCornerShape(4.dp)
+                                                    shape = RoundedCornerShape(4.dp),
                                                 ) {
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                                                     ) {
                                                         WireframeSearchIcon(Color.Black)
                                                         Text(
                                                             text = "VIEW SEQUENCES",
                                                             style = Typography.labelLarge,
                                                             fontWeight = FontWeight.Black,
-                                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                                         )
                                                     }
                                                 }
@@ -700,7 +644,7 @@ fun VaultView(viewModel: MainViewModel) {
                                             fontSize = 8.sp,
                                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                             lineHeight = 11.sp,
-                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                                         )
                                     }
                                 }
@@ -720,7 +664,7 @@ fun VaultView(viewModel: MainViewModel) {
                                     modifier = Modifier.fillMaxSize(),
                                     onDeconstructGene = { gene ->
                                         geneToDeconstruct = gene
-                                    }
+                                    },
                                 )
                             }
                         }
@@ -733,7 +677,7 @@ fun VaultView(viewModel: MainViewModel) {
                                 .fillMaxWidth()
                                 .padding(bottom = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Button(
                                 onClick = {
@@ -743,17 +687,17 @@ fun VaultView(viewModel: MainViewModel) {
                                 modifier = Modifier.weight(1f).height(28.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color.Red,
-                                    contentColor = Color.Black
+                                    contentColor = Color.Black,
                                 ),
                                 shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(0.dp)
+                                contentPadding = PaddingValues(0.dp),
                             ) {
                                 Text(
                                     text = "CLEAR STOCK",
                                     color = Color.Black,
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Default
+                                    fontFamily = FontFamily.Default,
                                 )
                             }
                             Button(
@@ -764,17 +708,17 @@ fun VaultView(viewModel: MainViewModel) {
                                 modifier = Modifier.weight(1f).height(28.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color.Red,
-                                    contentColor = Color.Black
+                                    contentColor = Color.Black,
                                 ),
                                 shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(0.dp)
+                                contentPadding = PaddingValues(0.dp),
                             ) {
                                 Text(
                                     text = "CLEAR GENES",
                                     color = Color.Black,
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Default
+                                    fontFamily = FontFamily.Default,
                                 )
                             }
                             Button(
@@ -785,17 +729,17 @@ fun VaultView(viewModel: MainViewModel) {
                                 modifier = Modifier.weight(1f).height(28.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color.Red,
-                                    contentColor = Color.Black
+                                    contentColor = Color.Black,
                                 ),
                                 shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(0.dp)
+                                contentPadding = PaddingValues(0.dp),
                             ) {
                                 Text(
                                     text = "CLEAR CREATURES",
                                     color = Color.Black,
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Default
+                                    fontFamily = FontFamily.Default,
                                 )
                             }
                         }
@@ -803,7 +747,6 @@ fun VaultView(viewModel: MainViewModel) {
                 }
             }
         }
-
 
         // Step Search Gene Details Popup
         stepSearchSelectedGene?.let { gene ->
@@ -816,7 +759,7 @@ fun VaultView(viewModel: MainViewModel) {
                 onDeconstructGene = { geneSeq ->
                     geneToDeconstruct = geneSeq
                     stepSearchSelectedGene = null
-                }
+                },
             )
         }
     }
@@ -832,16 +775,15 @@ fun VaultView(viewModel: MainViewModel) {
             },
             onDismiss = {
                 geneToDeconstruct = null
-            }
+            },
         )
     }
 }
 
-
 @Composable
 fun CreatureDetailCard(
     c: Creature,
-    viewModel: MainViewModel
+    viewModel: MainViewModel,
 ) {
     var showEnlargedQr by remember { mutableStateOf(false) }
     var showWireframeModel by remember { mutableStateOf(false) }
@@ -856,11 +798,11 @@ fun CreatureDetailCard(
     val effSpeed = maxOf(5, Math.round(c.speed * factor))
     val isDegraded = telomeres < 100
 
-    val geneSequences by viewModel.geneSequences.collectAsState()
-    val targetSequence by viewModel.targetSequence.collectAsState()
-    val defenderId by viewModel.defenderCreatureId.collectAsState()
-    val openedFrom by viewModel.creatureCardOpenedFrom.collectAsState()
-    val harvestingCreatureIds by viewModel.harvestingCreatureIds.collectAsState()
+    val geneSequences by viewModel.geneSequences.collectAsStateWithLifecycle(initialValue = emptyList())
+    val targetSequence by viewModel.targetSequence.collectAsStateWithLifecycle()
+    val defenderId by viewModel.defenderCreatureId.collectAsStateWithLifecycle()
+    val openedFrom by viewModel.creatureCardOpenedFrom.collectAsStateWithLifecycle()
+    val harvestingCreatureIds by viewModel.harvestingCreatureIds.collectAsStateWithLifecycle()
     val activeTags = remember(c, targetSequence, defenderId, harvestingCreatureIds) {
         getCreatureTags(c, targetSequence, defenderId, harvestingCreatureIds)
     }
@@ -869,14 +811,12 @@ fun CreatureDetailCard(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-
-
         // Sub-panel layout: Side-by-side ASCII art and QR code
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Box 1: BIO-PHYSICAL RECON
             Column(
@@ -891,7 +831,7 @@ fun CreatureDetailCard(
                     .padding(8.dp)
                     .height(115.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     text = "BIO-PHYSICAL RECON",
@@ -899,16 +839,16 @@ fun CreatureDetailCard(
                     color = CyberGreenDim,
                     fontSize = 7.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                 )
                 Box(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     com.example.genpox.ui.components.CreatureWireframeView(
                         dna = c.sequence,
                         faction = c.faction,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -928,7 +868,7 @@ fun CreatureDetailCard(
                     .padding(8.dp)
                     .height(115.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     text = "GENETIC QR COUPLING",
@@ -937,12 +877,12 @@ fun CreatureDetailCard(
                     fontSize = 7.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
                 QrRevealVisual(
                     modifier = Modifier
                         .size(60.dp)
-                        .padding(vertical = 2.dp)
+                        .padding(vertical = 2.dp),
                 )
                 Text(
                     text = "[ CLICK TO ENLARGE ]",
@@ -951,7 +891,7 @@ fun CreatureDetailCard(
                     fontSize = 6.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
             }
         }
@@ -962,7 +902,7 @@ fun CreatureDetailCard(
                 .fillMaxWidth()
                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.6f))
-                .padding(10.dp)
+                .padding(10.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
@@ -971,14 +911,14 @@ fun CreatureDetailCard(
                     color = CyberGreenDim,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                 )
                 Text(
                     text = c.primaryWeapon,
                     style = Typography.bodyMedium,
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                     color = Color.White,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
                 Text(
                     text = "\"${c.lore}\"",
@@ -986,7 +926,7 @@ fun CreatureDetailCard(
                     color = CyberGreen,
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                    lineHeight = 14.sp
+                    lineHeight = 14.sp,
                 )
             }
         }
@@ -995,7 +935,7 @@ fun CreatureDetailCard(
         val isHarvesting = remember(harvestingCreatureIds, c.id) {
             harvestingCreatureIds.contains(c.id)
         }
-        val selectedAnomaly by viewModel.selectedAnomaly.collectAsState()
+        val selectedAnomaly by viewModel.selectedAnomaly.collectAsStateWithLifecycle()
 
         if (isHarvesting) {
             HarvestingCountdownTimer(viewModel = viewModel, creatureId = c.id)
@@ -1006,7 +946,7 @@ fun CreatureDetailCard(
                     .padding(bottom = 8.dp)
                     .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                     .background(Color.Black.copy(alpha = 0.4f))
-                    .padding(10.dp)
+                    .padding(10.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
@@ -1014,13 +954,13 @@ fun CreatureDetailCard(
                         color = CyberCyan,
                         style = Typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
                     )
                     Text(
                         text = "ATTACH SPECIMEN ${c.name} TO ACTIVE TRANSMISSION COMPILER.",
                         color = Color.LightGray,
                         fontSize = 9.sp,
-                        fontFamily = FontFamily.Default
+                        fontFamily = FontFamily.Default,
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Button(
@@ -1033,16 +973,16 @@ fun CreatureDetailCard(
                         modifier = Modifier.fillMaxWidth().height(42.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CyberCyan,
-                            contentColor = Color.Black
+                            contentColor = Color.Black,
                         ),
-                        shape = RoundedCornerShape(4.dp)
+                        shape = RoundedCornerShape(4.dp),
                     ) {
                         Text(
                             text = "ATTACH SPECIMEN",
                             color = Color.Black,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                 }
@@ -1054,7 +994,7 @@ fun CreatureDetailCard(
                     .padding(bottom = 8.dp)
                     .border(1.dp, Color(0xFFA855F7), RoundedCornerShape(4.dp))
                     .background(Color.Black.copy(alpha = 0.4f))
-                    .padding(10.dp)
+                    .padding(10.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
@@ -1062,7 +1002,7 @@ fun CreatureDetailCard(
                         color = Color(0xFFA855F7),
                         style = Typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
                     )
 
                     if (selectedAnomaly != null) {
@@ -1071,7 +1011,7 @@ fun CreatureDetailCard(
                             text = "Ready to dispatch to Anomaly ${lockedAnom.id} (Gene: ${lockedAnom.gene}). Dispatch duration scaled by Speed stat.",
                             color = Color.LightGray,
                             fontSize = 9.sp,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Button(
@@ -1085,16 +1025,16 @@ fun CreatureDetailCard(
                             modifier = Modifier.fillMaxWidth().height(42.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFFA855F7), // Purple
-                                contentColor = Color.Black
+                                contentColor = Color.Black,
                             ),
-                            shape = RoundedCornerShape(4.dp)
+                            shape = RoundedCornerShape(4.dp),
                         ) {
                             Text(
                                 text = "DISPATCH SEQUENCE TO ANOMALY",
                                 color = Color.Black,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Default
+                                fontFamily = FontFamily.Default,
                             )
                         }
                     } else {
@@ -1102,7 +1042,7 @@ fun CreatureDetailCard(
                             text = "NO ANOMALY TARGET LOCKED. SCAN FOR ANOMALIES FIRST.",
                             color = Color.Gray,
                             fontSize = 9.sp,
-                            fontFamily = FontFamily.Default
+                            fontFamily = FontFamily.Default,
                         )
                     }
                 }
@@ -1115,25 +1055,25 @@ fun CreatureDetailCard(
                 .fillMaxWidth()
                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.4f))
-                .padding(10.dp)
+                .padding(10.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 // HP
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         WireframeHeart(color = Color(0xFFEF4444))
                         Text(
                             text = "VITALITY:",
                             color = CyberGreen,
                             style = Typography.labelSmall,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                         )
                     }
                     Text(
@@ -1144,7 +1084,7 @@ fun CreatureDetailCard(
                         color = if (isDegraded) Color(0xFFEF4444) else Color.White,
                         style = Typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
                     )
                 }
 
@@ -1152,35 +1092,35 @@ fun CreatureDetailCard(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         WireframeClaws(color = Color(0xFFF59E0B))
                         Text(
                             text = "AGGRESSION:",
                             color = CyberGreen,
                             style = Typography.labelSmall,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                         )
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Box(
                             modifier = Modifier
                                 .width(80.dp)
                                 .height(6.dp)
-                                .background(Color(0xFF262626), RoundedCornerShape(3.dp))
+                                .background(Color(0xFF262626), RoundedCornerShape(3.dp)),
                         ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .fillMaxWidth((effAttack / 100f).coerceIn(0f, 1f))
-                                    .background(Color(0xFFF59E0B), RoundedCornerShape(3.dp))
+                                    .background(Color(0xFFF59E0B), RoundedCornerShape(3.dp)),
                             )
                         }
                         Text(
@@ -1191,7 +1131,7 @@ fun CreatureDetailCard(
                             color = if (isDegraded) Color(0xFFEF4444) else Color.White,
                             style = Typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
                         )
                     }
                 }
@@ -1200,35 +1140,35 @@ fun CreatureDetailCard(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         WireframeShield(color = Color(0xFF60A5FA))
                         Text(
                             text = "BLOCK SHELLS:",
                             color = CyberGreen,
                             style = Typography.labelSmall,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                         )
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Box(
                             modifier = Modifier
                                 .width(80.dp)
                                 .height(6.dp)
-                                .background(Color(0xFF262626), RoundedCornerShape(3.dp))
+                                .background(Color(0xFF262626), RoundedCornerShape(3.dp)),
                         ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .fillMaxWidth((effDefense / 100f).coerceIn(0f, 1f))
-                                    .background(Color(0xFF60A5FA), RoundedCornerShape(3.dp))
+                                    .background(Color(0xFF60A5FA), RoundedCornerShape(3.dp)),
                             )
                         }
                         Text(
@@ -1239,7 +1179,7 @@ fun CreatureDetailCard(
                             color = if (isDegraded) Color(0xFFEF4444) else Color.White,
                             style = Typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
                         )
                     }
                 }
@@ -1248,35 +1188,35 @@ fun CreatureDetailCard(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         WireframeLightning(color = Color(0xFFFBBF24))
                         Text(
                             text = "SPEED RATE:",
                             color = CyberGreen,
                             style = Typography.labelSmall,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                         )
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Box(
                             modifier = Modifier
                                 .width(80.dp)
                                 .height(6.dp)
-                                .background(Color(0xFF262626), RoundedCornerShape(3.dp))
+                                .background(Color(0xFF262626), RoundedCornerShape(3.dp)),
                         ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .fillMaxWidth((effSpeed / 100f).coerceIn(0f, 1f))
-                                    .background(Color(0xFFFBBF24), RoundedCornerShape(3.dp))
+                                    .background(Color(0xFFFBBF24), RoundedCornerShape(3.dp)),
                             )
                         }
                         Text(
@@ -1287,7 +1227,7 @@ fun CreatureDetailCard(
                             color = if (isDegraded) Color(0xFFEF4444) else Color.White,
                             style = Typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
                         )
                     }
                 }
@@ -1297,16 +1237,16 @@ fun CreatureDetailCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             WireframeDna(color = Color(0xFF22C55E))
                             Text(
@@ -1314,7 +1254,7 @@ fun CreatureDetailCard(
                                 color = Color(0xFF22C55E),
                                 style = Typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                             )
                         }
                         Text(
@@ -1322,7 +1262,7 @@ fun CreatureDetailCard(
                             color = Color.White,
                             style = Typography.labelSmall,
                             fontWeight = FontWeight.ExtraBold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
                         )
                     }
                     val telomereColor = when {
@@ -1334,13 +1274,13 @@ fun CreatureDetailCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(6.dp)
-                            .background(Color(0xFF262626), RoundedCornerShape(3.dp))
+                            .background(Color(0xFF262626), RoundedCornerShape(3.dp)),
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .fillMaxWidth((telomeres / 100f).coerceIn(0f, 1f))
-                                .background(telomereColor, RoundedCornerShape(3.dp))
+                                .background(telomereColor, RoundedCornerShape(3.dp)),
                         )
                     }
                 }
@@ -1353,7 +1293,7 @@ fun CreatureDetailCard(
                 .fillMaxWidth()
                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.6f))
-                .padding(8.dp)
+                .padding(8.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
@@ -1362,7 +1302,7 @@ fun CreatureDetailCard(
                     color = CyberGreenDim,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                 )
                 val sequenceBlocks = (0 until (c.sequence.length / 8)).map { i ->
                     c.sequence.substring(i * 8, minOf(c.sequence.length, (i + 1) * 8))
@@ -1371,13 +1311,13 @@ fun CreatureDetailCard(
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     sequenceRows.forEachIndexed { rowIndex, rowBlocks ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             rowBlocks.forEachIndexed { colIndex, block ->
                                 val blockIdx = rowIndex * 4 + colIndex
@@ -1395,7 +1335,7 @@ fun CreatureDetailCard(
                                     modifier = Modifier
                                         .then(if (borderStroke != null) Modifier.border(borderStroke, RoundedCornerShape(4.dp)) else Modifier)
                                         .background(bg, RoundedCornerShape(2.dp))
-                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        .padding(horizontal = 4.dp, vertical = 2.dp),
                                 ) {
                                     Text(
                                         text = block,
@@ -1403,7 +1343,7 @@ fun CreatureDetailCard(
                                         style = Typography.bodySmall,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Monospace,
-                                        letterSpacing = 1.sp
+                                        letterSpacing = 1.sp,
                                     )
                                 }
                             }
@@ -1416,7 +1356,7 @@ fun CreatureDetailCard(
         if (c.isMutated && c.originalSequence != null) {
             DnaComparisonGrid(
                 original = c.originalSequence,
-                current = c.sequence
+                current = c.sequence,
             )
         }
 
@@ -1427,13 +1367,13 @@ fun CreatureDetailCard(
                 .fillMaxWidth()
                 .border(1.dp, Color(0xFF7F1D1D), RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.6f))
-                .padding(10.dp)
+                .padding(10.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         WireframeWarning(color = Color(0xFFEF4444))
@@ -1442,7 +1382,7 @@ fun CreatureDetailCard(
                             style = Typography.labelSmall,
                             color = Color(0xFFF87171),
                             fontWeight = FontWeight.Bold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                         )
                     }
                     Text(
@@ -1450,7 +1390,7 @@ fun CreatureDetailCard(
                         style = Typography.labelSmall,
                         color = Color.Gray,
                         fontSize = 7.sp,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                     )
                 }
 
@@ -1460,7 +1400,7 @@ fun CreatureDetailCard(
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                     color = Color.LightGray,
                     fontSize = 9.sp,
-                    lineHeight = 13.sp
+                    lineHeight = 13.sp,
                 )
 
                 val numBlocks = c.sequence.length / 8
@@ -1471,13 +1411,13 @@ fun CreatureDetailCard(
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     matrixRows.forEach { rowItems ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             rowItems.forEach { (i, gene) ->
                                 val isSelected = selectedGeneIndex == i
@@ -1516,7 +1456,7 @@ fun CreatureDetailCard(
                                         }
                                         .padding(horizontal = 4.dp, vertical = 6.dp)
                                         .width(72.dp)
-                                        .height(42.dp)
+                                        .height(42.dp),
                                 ) {
                                     Box(modifier = Modifier.fillMaxSize()) {
                                         Text(
@@ -1525,7 +1465,7 @@ fun CreatureDetailCard(
                                             fontSize = 7.sp,
                                             style = Typography.labelSmall,
                                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                            modifier = Modifier.align(Alignment.TopStart)
+                                            modifier = Modifier.align(Alignment.TopStart),
                                         )
                                         if (isNew && !isSelected) {
                                             Text(
@@ -1534,7 +1474,7 @@ fun CreatureDetailCard(
                                                 fontSize = 6.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                                modifier = Modifier.align(Alignment.TopEnd)
+                                                modifier = Modifier.align(Alignment.TopEnd),
                                             )
                                         }
                                         Text(
@@ -1544,7 +1484,7 @@ fun CreatureDetailCard(
                                             fontWeight = FontWeight.Bold,
                                             fontFamily = FontFamily.Monospace,
                                             letterSpacing = 0.5.sp,
-                                            modifier = Modifier.align(Alignment.BottomCenter)
+                                            modifier = Modifier.align(Alignment.BottomCenter),
                                         )
                                     }
                                 }
@@ -1560,13 +1500,13 @@ fun CreatureDetailCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Box(
                             modifier = Modifier
                                 .height(1.dp)
                                 .fillMaxWidth()
-                                .background(Color(0xFF7F1D1D).copy(alpha = 0.3f))
+                                .background(Color(0xFF7F1D1D).copy(alpha = 0.3f)),
                         )
                         Text(
                             text = "CONVERT GENE \"$geneToHarvest\" INTO ARCHIVE STOCK. THIS CREATURE WILL BE PURGED.",
@@ -1574,7 +1514,7 @@ fun CreatureDetailCard(
                             fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                            lineHeight = 12.sp
+                            lineHeight = 12.sp,
                         )
                         Button(
                             onClick = {
@@ -1582,13 +1522,13 @@ fun CreatureDetailCard(
                             },
                             modifier = Modifier.fillMaxWidth().height(36.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C), contentColor = Color.White),
-                            shape = RoundedCornerShape(4.dp)
+                            shape = RoundedCornerShape(4.dp),
                         ) {
                             Text(
                                 text = "ACTIVATE HARVEST INCINERATION",
                                 style = Typography.labelSmall,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                         }
                     }
@@ -1605,14 +1545,14 @@ fun CreatureDetailCard(
                 .fillMaxWidth()
                 .border(1.dp, Color(0xFF78350F), RoundedCornerShape(4.dp))
                 .background(Color.Black.copy(alpha = 0.6f))
-                .padding(10.dp)
+                .padding(10.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val activeExtensionsCount = maxOf(0, (c.sequence.length - 64) / 8)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         WireframeSparkle(color = Color(0xFFFBBF24))
@@ -1621,7 +1561,7 @@ fun CreatureDetailCard(
                             style = Typography.labelSmall,
                             color = Color(0xFFFBBF24),
                             fontWeight = FontWeight.Bold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                         )
                     }
                     Text(
@@ -1629,7 +1569,7 @@ fun CreatureDetailCard(
                         style = Typography.labelSmall,
                         color = Color.Gray,
                         fontSize = 7.sp,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                     )
                 }
 
@@ -1639,7 +1579,7 @@ fun CreatureDetailCard(
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                     color = Color.LightGray,
                     fontSize = 9.sp,
-                    lineHeight = 13.sp
+                    lineHeight = 13.sp,
                 )
 
                 if (c.sequence.length < 80) {
@@ -1651,11 +1591,11 @@ fun CreatureDetailCard(
                                 .fillMaxWidth()
                                 .border(1.dp, Color(0xFF78350F), RoundedCornerShape(4.dp))
                                 .background(Color(0xFF78350F).copy(alpha = 0.1f))
-                                .padding(8.dp)
+                                .padding(8.dp),
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
                                 WireframeDna(color = Color(0xFFFBBF24))
                                 Text(
@@ -1664,7 +1604,7 @@ fun CreatureDetailCard(
                                     fontSize = 8.5.sp,
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                     lineHeight = 12.sp,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
                                 )
                             }
                         }
@@ -1674,7 +1614,7 @@ fun CreatureDetailCard(
                             val stepLabels = listOf("1-2bp", "3-4bp", "5-6bp", "7-8bp")
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                                 stepLabels.forEachIndexed { idx, stepLabel ->
                                     val isCompleted = activeStep > idx
@@ -1684,12 +1624,18 @@ fun CreatureDetailCard(
                                             .weight(1f)
                                             .border(
                                                 1.dp,
-                                                if (isActive) Color(0xFFFBBF24) else if (isCompleted) Color(0xFF78350F) else Color.DarkGray,
-                                                RoundedCornerShape(4.dp)
+                                                if (isActive) {
+                                                    Color(0xFFFBBF24)
+                                                } else if (isCompleted) {
+                                                    Color(0xFF78350F)
+                                                } else {
+                                                    Color.DarkGray
+                                                },
+                                                RoundedCornerShape(4.dp),
                                             )
                                             .background(if (isActive) Color(0xFFFBBF24).copy(alpha = 0.15f) else Color.Transparent)
                                             .padding(vertical = 4.dp),
-                                        contentAlignment = Alignment.Center
+                                        contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
                                             text = stepLabel,
@@ -1697,7 +1643,7 @@ fun CreatureDetailCard(
                                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                             color = if (isActive || isCompleted) Color(0xFFFBBF24) else Color.Gray,
                                             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                            fontSize = 8.5.sp
+                                            fontSize = 8.5.sp,
                                         )
                                     }
                                 }
@@ -1710,11 +1656,11 @@ fun CreatureDetailCard(
                                     .background(Color.Black)
                                     .padding(8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     for (i in 0 until 4) {
                                         val block = if (extensionSearchPrefix.length >= (i + 1) * 2) {
@@ -1728,14 +1674,14 @@ fun CreatureDetailCard(
                                             modifier = Modifier
                                                 .border(1.dp, color, RoundedCornerShape(4.dp))
                                                 .background(if (isFilled) Color(0xFF78350F).copy(alpha = 0.15f) else Color.Transparent)
-                                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                                                .padding(horizontal = 6.dp, vertical = 4.dp),
                                         ) {
                                             Text(
                                                 text = block,
                                                 color = color,
                                                 style = Typography.bodySmall,
                                                 fontWeight = FontWeight.Bold,
-                                                fontFamily = FontFamily.Monospace
+                                                fontFamily = FontFamily.Monospace,
                                             )
                                         }
                                     }
@@ -1752,13 +1698,13 @@ fun CreatureDetailCard(
                                             colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color(0xFFFBBF24)),
                                             border = BorderStroke(1.dp, Color(0xFFFBBF24)),
                                             shape = RoundedCornerShape(4.dp),
-                                            contentPadding = PaddingValues(horizontal = 8.dp)
+                                            contentPadding = PaddingValues(horizontal = 8.dp),
                                         ) {
                                             Text(
                                                 text = "BACK",
                                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                                 fontSize = 8.sp,
-                                                fontWeight = FontWeight.Bold
+                                                fontWeight = FontWeight.Bold,
                                             )
                                         }
                                         Button(
@@ -1770,13 +1716,13 @@ fun CreatureDetailCard(
                                             colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.Red),
                                             border = BorderStroke(1.dp, Color.Red),
                                             shape = RoundedCornerShape(4.dp),
-                                            contentPadding = PaddingValues(horizontal = 8.dp)
+                                            contentPadding = PaddingValues(horizontal = 8.dp),
                                         ) {
                                             Text(
                                                 text = "RESET",
                                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                                 fontSize = 8.sp,
-                                                fontWeight = FontWeight.Bold
+                                                fontWeight = FontWeight.Bold,
                                             )
                                         }
                                     }
@@ -1797,12 +1743,12 @@ fun CreatureDetailCard(
                                         color = Color(0xFFFBBF24),
                                         fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                     )
                                     androidx.compose.foundation.layout.FlowRow(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                         verticalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.fillMaxWidth()
+                                        modifier = Modifier.fillMaxWidth(),
                                     ) {
                                         options.forEach { opt ->
                                             Box(
@@ -1815,14 +1761,14 @@ fun CreatureDetailCard(
                                                     }
                                                     .padding(horizontal = 8.dp, vertical = 6.dp)
                                                     .width(52.dp),
-                                                contentAlignment = Alignment.Center
+                                                contentAlignment = Alignment.Center,
                                             ) {
                                                 Text(
                                                     text = opt,
                                                     color = Color.White,
                                                     fontSize = 9.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    fontFamily = FontFamily.Monospace
+                                                    fontFamily = FontFamily.Monospace,
                                                 )
                                             }
                                         }
@@ -1835,13 +1781,13 @@ fun CreatureDetailCard(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(top = 4.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     Box(
                                         modifier = Modifier
                                             .height(1.dp)
                                             .fillMaxWidth()
-                                            .background(Color(0xFF78350F).copy(alpha = 0.3f))
+                                            .background(Color(0xFF78350F).copy(alpha = 0.3f)),
                                     )
                                     Text(
                                         text = "APPEND GENE \"$finalGene\" (INVENTORY: $ownedCount AVAILABLE) TO INSTANCE RECTIFIER BLOCK.",
@@ -1849,7 +1795,7 @@ fun CreatureDetailCard(
                                         fontSize = 8.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                        lineHeight = 12.sp
+                                        lineHeight = 12.sp,
                                     )
                                     Button(
                                         onClick = {
@@ -1857,13 +1803,13 @@ fun CreatureDetailCard(
                                         },
                                         modifier = Modifier.fillMaxWidth().height(36.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706), contentColor = Color.Black),
-                                        shape = RoundedCornerShape(4.dp)
+                                        shape = RoundedCornerShape(4.dp),
                                     ) {
                                         Text(
                                             text = "APPLY EXTENSION",
                                             style = Typography.labelSmall,
                                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = FontWeight.Bold,
                                         )
                                     }
                                 }
@@ -1874,7 +1820,7 @@ fun CreatureDetailCard(
                                     .fillMaxWidth()
                                     .border(1.dp, Color(0xFF262626), RoundedCornerShape(4.dp))
                                     .background(Color(0xFF0A0A0A))
-                                    .padding(8.dp)
+                                    .padding(8.dp),
                             ) {
                                 Text(
                                     text = buildString {
@@ -1884,7 +1830,7 @@ fun CreatureDetailCard(
                                     color = Color(0xFFEA580C),
                                     fontSize = 8.sp,
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                    lineHeight = 12.sp
+                                    lineHeight = 12.sp,
                                 )
                             }
                         }
@@ -1896,7 +1842,7 @@ fun CreatureDetailCard(
                             .border(1.dp, Color(0xFF065F46), RoundedCornerShape(4.dp))
                             .background(Color(0xFF065F46).copy(alpha = 0.15f))
                             .padding(10.dp),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
@@ -1904,14 +1850,14 @@ fun CreatureDetailCard(
                                 color = Color(0xFF10B981),
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                             )
                             Text(
                                 text = "Specimen sequence has been appended with exactly 2 maximum additional genes. Signal capacity stabilized.",
                                 color = Color(0xFF047857),
                                 fontSize = 8.5.sp,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
                             )
                         }
                     }
@@ -1927,12 +1873,12 @@ fun CreatureDetailCard(
                     .fillMaxWidth()
                     .border(1.dp, Color(0xFF78350F), RoundedCornerShape(4.dp))
                     .background(Color(0xFF78350F).copy(alpha = 0.1f))
-                    .padding(10.dp)
+                    .padding(10.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         WireframeSparkle(color = Color(0xFFFBBF24))
                         Text(
@@ -1940,7 +1886,7 @@ fun CreatureDetailCard(
                             style = Typography.labelSmall,
                             color = Color(0xFFFBBF24),
                             fontWeight = FontWeight.Bold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                         )
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1950,25 +1896,25 @@ fun CreatureDetailCard(
                                     .fillMaxWidth()
                                     .border(1.dp, Color(0xFF78350F), RoundedCornerShape(4.dp))
                                     .background(Color.Black.copy(alpha = 0.4f))
-                                    .padding(6.dp)
+                                    .padding(6.dp),
                             ) {
                                 Column {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                        horizontalArrangement = Arrangement.SpaceBetween,
                                     ) {
                                         Text(
                                             text = "[${mv.type.uppercase()}] ${mv.name}",
                                             color = Color(0xFFFBBF24),
                                             fontSize = 8.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                         )
                                         Text(
                                             text = "ACTIVE IN HACKS",
                                             color = Color.Gray,
                                             fontSize = 7.sp,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                                         )
                                     }
                                     Text(
@@ -1976,7 +1922,7 @@ fun CreatureDetailCard(
                                         color = Color(0xFF00FF41),
                                         fontSize = 8.sp,
                                         fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                        modifier = Modifier.padding(top = 2.dp)
+                                        modifier = Modifier.padding(top = 2.dp),
                                     )
                                 }
                             }
@@ -1987,45 +1933,44 @@ fun CreatureDetailCard(
         }
 
         // Box 9: Footer Actions
-        val defenderId by viewModel.defenderCreatureId.collectAsState()
+        val defenderId by viewModel.defenderCreatureId.collectAsStateWithLifecycle()
         val isDefender = defenderId == c.id
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Button(
                     onClick = { viewModel.toggleDefenderCreature(c.id) },
                     modifier = Modifier.weight(1f).height(38.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isDefender) Color(0xFF3B82F6) else Color.Transparent,
-                        contentColor = if (isDefender) Color.Black else Color.Gray
+                        contentColor = if (isDefender) Color.Black else Color.Gray,
                     ),
                     border = if (isDefender) null else BorderStroke(1.dp, CyberBorder),
                     shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 4.dp),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         WireframeShield(
                             color = if (isDefender) Color.Black else Color.Gray,
-                            modifier = Modifier.size(10.dp)
+                            modifier = Modifier.size(10.dp),
                         )
                         Text(
                             text = if (isDefender) "DEFENDER READY" else "DEFENDER",
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                             fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
@@ -2035,26 +1980,26 @@ fun CreatureDetailCard(
                     modifier = Modifier.weight(1f).height(38.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (c.isAutoHacker) Color(0xFFD97706) else Color.Transparent,
-                        contentColor = if (c.isAutoHacker) Color.Black else Color.Gray
+                        contentColor = if (c.isAutoHacker) Color.Black else Color.Gray,
                     ),
                     border = if (c.isAutoHacker) null else BorderStroke(1.dp, CyberBorder),
                     shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 4.dp),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         WireframeClaws(
                             color = if (c.isAutoHacker) Color.Black else Color.Gray,
-                            modifier = Modifier.size(10.dp)
+                            modifier = Modifier.size(10.dp),
                         )
                         Text(
                             text = if (c.isAutoHacker) "AUTO-HACKER READY" else "AUTO-HACKER",
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                             fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
@@ -2062,33 +2007,33 @@ fun CreatureDetailCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Button(
                     onClick = { viewModel.toggleFavoriteCreature(c) },
                     modifier = Modifier.weight(1f).height(38.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (c.isFavorite) Color(0xFFEAB308) else Color.Transparent,
-                        contentColor = if (c.isFavorite) Color.Black else Color.Gray
+                        contentColor = if (c.isFavorite) Color.Black else Color.Gray,
                     ),
                     border = if (c.isFavorite) null else BorderStroke(1.dp, CyberBorder),
                     shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 4.dp),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         WireframeStar(
                             color = if (c.isFavorite) Color.Black else Color.Gray,
-                            filled = c.isFavorite
+                            filled = c.isFavorite,
                         )
                         Text(
                             text = if (c.isFavorite) "FAVORITED" else "FAVORITE",
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                             fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
@@ -2098,21 +2043,20 @@ fun CreatureDetailCard(
                     modifier = Modifier.weight(1f).height(38.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.Transparent,
-                        contentColor = CyberGreen
+                        contentColor = CyberGreen,
                     ),
                     border = BorderStroke(1.dp, CyberGreen),
-                    shape = RoundedCornerShape(4.dp)
+                    shape = RoundedCornerShape(4.dp),
                 ) {
                     Text(
                         text = "AUDIO EMIT",
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
-
         }
     }
 
@@ -2125,35 +2069,35 @@ fun CreatureDetailCard(
                     .border(2.dp, CyberGreen, RoundedCornerShape(8.dp))
                     .background(Color.Black)
                     .padding(16.dp),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
                         text = "GENETIC TRANSPONDER DATA",
                         color = CyberGreen,
                         style = Typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                     )
                     QrCodeImage(
                         content = qrContent,
-                        sizeDp = 180
+                        sizeDp = 180,
                     )
                     Box(
                         modifier = Modifier
                             .background(CyberRed, RoundedCornerShape(4.dp))
                             .clickable { showEnlargedQr = false }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                     ) {
                         Text(
                             text = "CLOSE",
                             color = Color.Black,
                             style = Typography.labelSmall,
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -2174,13 +2118,13 @@ fun CreatureDetailCard(
                     .size(320.dp)
                     .border(2.dp, fColor, RoundedCornerShape(8.dp))
                     .background(Color.Black),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 // Background: full-frame scanner static + 3D creature
                 com.example.genpox.ui.components.CreatureWireframeView(
                     dna = c.sequence,
                     faction = c.faction,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 )
 
                 // Foreground: Text overlay elements
@@ -2189,30 +2133,30 @@ fun CreatureDetailCard(
                         .fillMaxSize()
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween
+                    verticalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = "3D HOLO-STRUCT RECON",
                         color = Color.White,
                         style = Typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                     )
-                    
+
                     Spacer(modifier = Modifier.weight(1f))
-                    
+
                     Box(
                         modifier = Modifier
                             .background(CyberRed, RoundedCornerShape(4.dp))
                             .clickable { showWireframeModel = false }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                     ) {
                         Text(
                             text = "CLOSE",
                             color = Color.Black,
                             style = Typography.labelSmall,
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -2259,7 +2203,7 @@ fun getCreatureTags(
     item: Creature,
     targetSequence: String,
     defenderId: String? = null,
-    harvestingCreatureIds: Set<String> = emptySet()
+    harvestingCreatureIds: Set<String> = emptySet(),
 ): List<String> {
     val tags = mutableListOf<String>()
     if (item.isFavorite) tags.add("FAVORITE")
@@ -2298,7 +2242,7 @@ private fun PoxDropdown(
     label: String,
     selectedOption: String,
     options: List<Pair<String, String>>,
-    onOptionSelected: (String) -> Unit
+    onOptionSelected: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -2309,7 +2253,7 @@ private fun PoxDropdown(
             fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 2.dp)
+            modifier = Modifier.padding(bottom = 2.dp),
         )
         Box(
             modifier = Modifier
@@ -2317,24 +2261,24 @@ private fun PoxDropdown(
                 .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
                 .background(Color.Black)
                 .clickable { expanded = true }
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = options.find { it.first == selectedOption }?.second?.uppercase() ?: selectedOption.uppercase(),
                     color = Color.White,
                     style = Typography.bodySmall,
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                    fontSize = 10.sp
+                    fontSize = 10.sp,
                 )
                 Text(
                     text = "▼",
                     color = CyberGreen,
-                    fontSize = 8.sp
+                    fontSize = 8.sp,
                 )
             }
             DropdownMenu(
@@ -2342,7 +2286,7 @@ private fun PoxDropdown(
                 onDismissRequest = { expanded = false },
                 modifier = Modifier
                     .background(Color.Black)
-                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp))
+                    .border(1.dp, CyberBorder, RoundedCornerShape(4.dp)),
             ) {
                 options.forEach { (value, displayName) ->
                     DropdownMenuItem(
@@ -2351,14 +2295,14 @@ private fun PoxDropdown(
                                 text = displayName.uppercase(),
                                 color = Color.White,
                                 style = Typography.bodySmall,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                             )
                         },
                         onClick = {
                             onOptionSelected(value)
                             expanded = false
                         },
-                        modifier = Modifier.background(Color.Black)
+                        modifier = Modifier.background(Color.Black),
                     )
                 }
             }

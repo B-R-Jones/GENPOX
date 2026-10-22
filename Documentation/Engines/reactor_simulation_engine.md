@@ -42,6 +42,36 @@ At each step of transcription, the engine runs a suite of biophysical checks to 
 When transcribing under a specific host planet at its associated step (e.g. Venus at step 2), the engine rolls for environmental mutations:
 - If the Phred Q-score is sufficiently high, there is a chance ($15\%$ to $40\%$ depending on planetary alignment) of incorporating an anomalous base (`X`, `Z`, `Y`, or `W`) into the strand.
 
+### D. Reagent & Enzyme Costs
+The engine deterministically calculates feedstock base consumption prior to reaction ignition (Bio-Waste is not required for enzyme programming):
+
+1. **Polymerase Enzyme Costs (`calculatePolymeraseCost`)**:
+   - **Taq Polymerase**: Free ($0$ cost across all bases).
+   - **Tth Polymerase**:
+     - *Base Cost*: **100 units from all bases** ($A, G, T, C$).
+     - *Multiplier Additionals*: Multiplies each occurrence of a base in the target sequence by **100 units** ($N_{\text{base}} \times 100$).
+     - *Formula*: $\text{Cost}(B) = 100 + \text{count}(B) \times 100$.
+     - *Example Sequence (`AATGCGTG`)*:
+       - $A: 100 + 2 \times 100 = 300$
+       - $C: 100 + 1 \times 100 = 200$
+       - $G: 100 + 3 \times 100 = 400$
+       - $T: 100 + 2 \times 100 = 300$
+   - **Pfu Polymerase**:
+     - *Base Cost*: **200 units from all bases** ($A, G, T, C$).
+     - *Multiplier Additionals*: Multiplies each occurrence of a base in the target sequence by **200 units** ($N_{\text{base}} \times 200$).
+     - *Formula*: $\text{Cost}(B) = 200 + \text{count}(B) \times 200$.
+     - *Example Sequence (`AATGCGTG`)*:
+       - $A: 200 + 2 \times 200 = 600$
+       - $C: 200 + 1 \times 200 = 400$
+       - $G: 200 + 3 \times 200 = 800$
+       - $T: 200 + 2 \times 200 = 600$
+   - *Bio-Waste Cost*: **0** (Bio-waste is not consumed for enzyme programming).
+
+2. **Chemical Solute Cofactor Costs (`calculateSoluteCost`)**:
+   - **None**: Free ($0$ cost).
+   - **DMSO**: Requires **100 units of each base** ($A, G, T, C$) per synthesis run.
+   - **Netropsin**: Requires **100 units of each base** ($A, G, T, C$) per synthesis run.
+
 ---
 
 ## 2. Integration and Usage

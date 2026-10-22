@@ -27,7 +27,7 @@ fun PoxSlider(
     steps: Int = 0,
     onValueChangeFinished: (() -> Unit)? = null,
     activeColor: Color = CyberTheme.green,
-    inactiveColor: Color = Color.DarkGray
+    inactiveColor: Color = Color.DarkGray,
 ) {
     Slider(
         value = value,
@@ -44,7 +44,7 @@ fun PoxSlider(
                     .background(Color.Black, shape = CutCornerShape(3.dp))
                     .border(1.dp, activeColor, shape = CutCornerShape(3.dp))
                     .padding(2.dp)
-                    .background(activeColor, shape = CutCornerShape(1.dp))
+                    .background(activeColor, shape = CutCornerShape(1.dp)),
             )
         },
         track = { sliderState ->
@@ -53,9 +53,9 @@ fun PoxSlider(
                 enabled = enabled,
                 colors = SliderDefaults.colors(
                     activeTrackColor = activeColor,
-                    inactiveTrackColor = inactiveColor.copy(alpha = 0.5f)
-                )
+                    inactiveTrackColor = inactiveColor.copy(alpha = 0.5f),
+                ),
             )
-        }
+        },
     )
 }

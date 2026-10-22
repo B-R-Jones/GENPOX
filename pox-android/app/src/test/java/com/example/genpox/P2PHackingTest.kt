@@ -3,16 +3,16 @@ package com.example.genpox
 import com.example.genpox.audio.PoxSynthManager
 import com.example.genpox.data.*
 import com.example.genpox.data.network.HydraPacket
-import com.example.genpox.data.network.PoxNetworkManager
 import com.example.genpox.data.network.PoxNetworkInterface
+import com.example.genpox.data.network.PoxNetworkManager
 import com.example.genpox.ui.main.NetworkViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -23,7 +23,6 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import java.util.UUID
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class P2PHackingTest {
@@ -100,15 +99,6 @@ class P2PHackingTest {
         override suspend fun insertMission(mission: HarvestMission) {}
         override suspend fun updateMission(mission: HarvestMission) {}
 
-        override suspend fun getCachedRoadCell(cellKey: String): CachedRoadCell? = null
-        override suspend fun getAllCachedRoadCells(): List<CachedRoadCell> = emptyList()
-        override suspend fun insertCachedRoadCell(cell: CachedRoadCell) {}
-
-        override suspend fun getCachedBuildingCell(cellKey: String): CachedBuildingCell? = null
-        override suspend fun getAllCachedBuildingCells(): List<CachedBuildingCell> = emptyList()
-        override suspend fun insertCachedBuildingCell(cell: CachedBuildingCell) {}
-        override suspend fun clearMapCache() {}
-
         override val geminiApiKey: Flow<String> = flowOf("")
         override val muteSound: Flow<Boolean> = flowOf(false)
         override val scanRadius: Flow<Float> = flowOf(55f)
@@ -144,7 +134,7 @@ class P2PHackingTest {
 
     private class FakeNetworkManager(
         override val activeConnections: StateFlow<Map<String, String>> = MutableStateFlow(emptyMap()),
-        private val onPacketSent: (String, HydraPacket) -> Unit
+        private val onPacketSent: (String, HydraPacket) -> Unit,
     ) : PoxNetworkInterface {
         override val isAdvertising: StateFlow<Boolean> = MutableStateFlow(false)
         override val isDiscovering: StateFlow<Boolean> = MutableStateFlow(false)
@@ -176,34 +166,39 @@ class P2PHackingTest {
         attack: Int = 30,
         defense: Int = 20,
         vitality: Int = 100,
-        telomeres: Int = 100
-    ): Creature {
-        return Creature(
-            id = id,
-            sequence = "A".repeat(80),
-            name = name,
-            faction = "Infection",
-            type = "Heavy Hybrid",
-            vitality = vitality,
-            attack = attack,
-            defense = defense,
-            speed = speed,
-            primaryWeapon = "Jaw",
-            lore = "Test lore",
-            asciiArt = "...",
-            discoveredAt = System.currentTimeMillis(),
-            origin = "Local test",
-            isAutoHacker = isAutoHacker,
-            isAutoDefender = isAutoDefender,
-            telomeres = telomeres
-        )
-    }
+        telomeres: Int = 100,
+    ): Creature = Creature(
+        id = id,
+        sequence = "A".repeat(80),
+        name = name,
+        faction = "Infection",
+        type = "Heavy Hybrid",
+        vitality = vitality,
+        attack = attack,
+        defense = defense,
+        speed = speed,
+        primaryWeapon = "Jaw",
+        lore = "Test lore",
+        asciiArt = "...",
+        discoveredAt = System.currentTimeMillis(),
+        origin = "Local test",
+        isAutoHacker = isAutoHacker,
+        isAutoDefender = isAutoDefender,
+        telomeres = telomeres,
+    )
 
     @Test
     fun testHackingIntrusionFiresCounterResponse() = testScope.runTest {
         val repo = TestDataRepository()
         val synth = PoxSynthManager().apply { isMuted = true }
-        val viewModel = NetworkViewModel(repo, synth, MutableStateFlow(0.05f))
+        val dispatchers = com.example.genpox.util.TestDispatchersProvider()
+        val viewModel = NetworkViewModel(
+            creatureRepository = repo,
+            geneStockRepository = repo,
+            preferencesRepository = repo,
+            synthManager = synth,
+            dispatchers = dispatchers,
+        )
 
         // Set up local defender
         val defender = createTestCreature("def-1", "DefenderSpecimen", isAutoDefender = true)
@@ -236,7 +231,14 @@ class P2PHackingTest {
     fun testHackingCounterResponseRunsSimulationAndSendsReport() = testScope.runTest {
         val repo = TestDataRepository()
         val synth = PoxSynthManager().apply { isMuted = true }
-        val viewModel = NetworkViewModel(repo, synth, MutableStateFlow(0.05f))
+        val dispatchers = com.example.genpox.util.TestDispatchersProvider()
+        val viewModel = NetworkViewModel(
+            creatureRepository = repo,
+            geneStockRepository = repo,
+            preferencesRepository = repo,
+            synthManager = synth,
+            dispatchers = dispatchers,
+        )
 
         // Set up local auto-hacker
         val hacker = createTestCreature("hack-1", "HackerSpecimen", isAutoHacker = true, speed = 80, attack = 40)
@@ -254,7 +256,7 @@ class P2PHackingTest {
             targetNodeId = "RemoteNodeId",
             defender = remoteDefender,
             vaultAutoDefenders = listOf(remoteDefender),
-            baseFirewallComplexity = 40.0
+            baseFirewallComplexity = 40.0,
         )
 
         viewModel.receiveIncomingPacket("endpoint-123", "RemoteNode", counterResponse)
@@ -276,7 +278,14 @@ class P2PHackingTest {
     fun testHackingResultReportAppliesDefenderDamage() = testScope.runTest {
         val repo = TestDataRepository()
         val synth = PoxSynthManager().apply { isMuted = true }
-        val viewModel = NetworkViewModel(repo, synth, MutableStateFlow(0.05f))
+        val dispatchers = com.example.genpox.util.TestDispatchersProvider()
+        val viewModel = NetworkViewModel(
+            creatureRepository = repo,
+            geneStockRepository = repo,
+            preferencesRepository = repo,
+            synthManager = synth,
+            dispatchers = dispatchers,
+        )
 
         // Set up local defender
         val defender = createTestCreature("def-1", "MyDefenderSpecimen", isAutoDefender = true, telomeres = 100)
@@ -289,7 +298,7 @@ class P2PHackingTest {
             logs = listOf("Combat logged"),
             siphonedPayload = emptyList(),
             hackerFinalTelomeres = 85,
-            defenderFinalTelomeres = 80
+            defenderFinalTelomeres = 80,
         )
 
         viewModel.receiveIncomingPacket("endpoint-123", "RemoteNode", report)

@@ -3,27 +3,30 @@ package com.example.genpox.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
-
-private val DarkColorScheme = darkColorScheme(
-    primary = CyberGreen,
-    onPrimary = Color.Black,
-    secondary = CyberGreenDim,
-    onSecondary = Color.Black,
-    background = CyberBackground,
-    onBackground = CyberGreen,
-    surface = CyberPanel,
-    onSurface = CyberGreen
-)
 
 @Composable
 fun GENPOXTheme(
+    cyberColors: CyberColors = CyberColors(),
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = DarkColorScheme,
-        typography = Typography,
-        content = content
+    val darkColorScheme = darkColorScheme(
+        primary = cyberColors.green,
+        onPrimary = Color.Black,
+        secondary = cyberColors.greenDim,
+        onSecondary = Color.Black,
+        background = cyberColors.background,
+        onBackground = cyberColors.green,
+        surface = cyberColors.greenPanel,
+        onSurface = cyberColors.green,
     )
-}
 
+    CompositionLocalProvider(LocalCyberColors provides cyberColors) {
+        MaterialTheme(
+            colorScheme = darkColorScheme,
+            typography = Typography,
+            content = content,
+        )
+    }
+}

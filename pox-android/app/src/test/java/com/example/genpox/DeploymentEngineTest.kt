@@ -2,9 +2,9 @@ package com.example.genpox
 
 import com.example.genpox.data.DeploymentEngine
 import com.example.genpox.data.PoxAnomaly
-import org.junit.Test
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class DeploymentEngineTest {
 
@@ -82,7 +82,7 @@ class DeploymentEngineTest {
             boundaryRadius = 200.0,
             stalledDepth = 50.0,
             effectiveDensity = 0.1,
-            hasCoherenceShield = false
+            hasCoherenceShield = false,
         )
 
         assertTrue("Travel velocity should be positive", metrics.travelVelocity > 0.0)
@@ -94,7 +94,7 @@ class DeploymentEngineTest {
         assertEquals(metrics.travelDuration, metrics.returnDuration)
         assertEquals(
             metrics.travelDuration + metrics.descentDuration + metrics.harvestDuration + metrics.ascentDuration + metrics.returnDuration,
-            metrics.totalDuration
+            metrics.totalDuration,
         )
     }
 
@@ -113,8 +113,8 @@ class DeploymentEngineTest {
                 faction = "Infection",
                 distance = 0.0,
                 heatZoneDiameter = 500.0,
-                density = 0.3
-            )
+                density = 0.3,
+            ),
         )
 
         val density = DeploymentEngine.calculateCombinedWaveDensity(landingLat, landingLng, anomalies)

@@ -16,5 +16,5 @@ data class MailMessage(
     val attachedGeneSequence: String? = null,
     val transferGenes: Int = 0,
     val transferWaste: Int = 0,
-    val isClaimed: Boolean = false
+    val isClaimed: Boolean = false,
 )

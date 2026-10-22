@@ -24,7 +24,7 @@ data class PoxSubTab(
     val id: String,
     val tag: String,
     val bounce: Boolean = false,
-    val icon: @Composable (Color) -> Unit
+    val icon: @Composable (Color) -> Unit,
 )
 
 /**
@@ -38,7 +38,7 @@ data class HoloNavButton(
     val enabled: Boolean = true,
     val onClick: () -> Unit,
     val bounce: Boolean = false,
-    val content: @Composable (Color) -> Unit
+    val content: @Composable (Color) -> Unit,
 )
 
 /**
@@ -57,7 +57,7 @@ fun PoxUnifiedHoloNav(
     activeButtonId: String = "",
     activeButtonIds: Set<String> = emptySet(),
     allowStacking: Boolean = true,
-    viewModel: MainViewModel
+    viewModel: MainViewModel,
 ) {
     if (rows.isEmpty()) return
 
@@ -75,9 +75,9 @@ fun PoxUnifiedHoloNav(
         targetValue = if (isStacked) 1f else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = Spring.StiffnessLow,
         ),
-        label = "stackedProgress"
+        label = "stackedProgress",
     )
 
     // Infinite bouncing animation while offscreen to indicate swipeability
@@ -88,9 +88,9 @@ fun PoxUnifiedHoloNav(
             targetValue = -8f,
             animationSpec = infiniteRepeatable(
                 animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
+                repeatMode = RepeatMode.Reverse,
             ),
-            label = "stackedBounce"
+            label = "stackedBounce",
         )
     } else {
         remember { mutableStateOf(0f) }
@@ -104,14 +104,14 @@ fun PoxUnifiedHoloNav(
                 delay(6000L)
                 verticalBounceAnimatable.animateTo(
                     targetValue = -8f,
-                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
                 )
                 verticalBounceAnimatable.animateTo(
                     targetValue = 0f,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    )
+                        stiffness = Spring.StiffnessMedium,
+                    ),
                 )
             }
         } else {
@@ -127,9 +127,9 @@ fun PoxUnifiedHoloNav(
         targetValue = -4f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
+            repeatMode = RepeatMode.Reverse,
         ),
-        label = "btnBounceVal"
+        label = "btnBounceVal",
     )
 
     val maxRowSize = rows.maxOfOrNull { it.size } ?: 0
@@ -139,7 +139,7 @@ fun PoxUnifiedHoloNav(
         modifier = modifier
             .zIndex(10f)
             .fillMaxWidth()
-            .height(120.dp)
+            .height(46.dp),
     ) {
         Box(
             modifier = Modifier
@@ -167,9 +167,9 @@ fun PoxUnifiedHoloNav(
                             change.consume()
                             totalDragX += dragAmount.x
                             totalDragY += dragAmount.y
-                        }
+                        },
                     )
-                }
+                },
         ) {
             rows.forEachIndexed { rowIndex, rowButtons ->
                 val isActive = rowIndex == activeRowIndex
@@ -177,9 +177,9 @@ fun PoxUnifiedHoloNav(
                     targetValue = if (isActive) 1f else 0f,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioLowBouncy,
-                        stiffness = Spring.StiffnessLow
+                        stiffness = Spring.StiffnessLow,
                     ),
-                    label = "isActiveProgress_$rowIndex"
+                    label = "isActiveProgress_$rowIndex",
                 )
 
                 val scale = 0.85f + 0.15f * isActiveProgress
@@ -200,7 +200,7 @@ fun PoxUnifiedHoloNav(
                     val finalX = targetX + currentShift + (stackedBounceOffset * stackedProgress)
 
                     val isButtonActive = (activeButtonId.isNotEmpty() && activeButtonId == button.id) ||
-                            activeButtonIds.contains(button.id)
+                        activeButtonIds.contains(button.id)
                     val buttonAlphaFactor = if (isStacked && buttonIndex < M - 1) 0.5f else 1f
                     val finalAlpha = alpha * buttonAlphaFactor
 
@@ -227,7 +227,7 @@ fun PoxUnifiedHoloNav(
                             } else {
                                 button.onClick()
                             }
-                        }
+                        },
                     ) {
                         button.content(if (isButtonActive) Color.Black else button.borderColor)
                     }
@@ -240,14 +240,14 @@ fun PoxUnifiedHoloNav(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .requiredSize(width = 180.dp, height = 120.dp)
+                    .requiredSize(width = 180.dp, height = 46.dp)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
-                        indication = null
+                        indication = null,
                     ) {
                         viewModel.synthManager.playCombinatorTick()
                         isStacked = false
-                    }
+                    },
             )
         }
     }
@@ -265,7 +265,7 @@ fun PoxHoloNav(
     onSubTabClick: (String, String) -> Unit,
     viewModel: MainViewModel,
     activeColor: Color = CyberGreen,
-    inactiveColor: Color = CyberGreenDim
+    inactiveColor: Color = CyberGreenDim,
 ) {
     val buttons = subTabs.map { tab ->
         val isActive = activeSubTab == tab.id
@@ -284,7 +284,7 @@ fun PoxHoloNav(
             bounce = tab.bounce,
             content = { iconColor ->
                 tab.icon(iconColor)
-            }
+            },
         )
     }
 
@@ -293,6 +293,6 @@ fun PoxHoloNav(
         rows = listOf(buttons),
         activeButtonId = activeSubTab,
         allowStacking = true,
-        viewModel = viewModel
+        viewModel = viewModel,
     )
 }

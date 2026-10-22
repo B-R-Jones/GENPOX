@@ -22,7 +22,7 @@ fun PoxHoloButton(
     backgroundColor: Color = Color(0xFF0F172A).copy(alpha = 0.85f),
     enabled: Boolean = true,
     onClick: () -> Unit,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     Box(
         modifier = modifier
@@ -30,12 +30,12 @@ fun PoxHoloButton(
             .cyberglass(
                 borderColor = borderColor,
                 glowColor = glowColor,
-                backgroundColor = backgroundColor
+                backgroundColor = backgroundColor,
             )
             .clickable(enabled = enabled) {
                 onClick()
             },
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         content()
     }

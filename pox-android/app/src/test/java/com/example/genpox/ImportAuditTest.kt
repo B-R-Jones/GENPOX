@@ -1,8 +1,7 @@
 package com.example.genpox
 
-import org.junit.Test
-import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import org.junit.Test
 import java.io.File
 import java.io.FileNotFoundException
 
@@ -14,7 +13,7 @@ class ImportAuditTest {
         "android.widget",
         "androidx.activity",
         "androidx.fragment",
-        "androidx.lifecycle"
+        "androidx.lifecycle",
     )
 
     private fun findEngineFile(relativePath: String): File {
@@ -23,7 +22,7 @@ class ImportAuditTest {
             File("app/$relativePath"),
             File("../app/$relativePath"),
             File("pox-android/app/$relativePath"),
-            File("../../pox-android/app/$relativePath")
+            File("../../pox-android/app/$relativePath"),
         )
         for (file in searchPaths) {
             if (file.exists() && file.isFile) {
@@ -50,8 +49,10 @@ class ImportAuditTest {
         }
 
         if (violations.isNotEmpty()) {
-            fail("Import violation in ${file.name}: Forbidden package imported:\n" +
-                 violations.joinToString("\n"))
+            fail(
+                "Import violation in ${file.name}: Forbidden package imported:\n" +
+                    violations.joinToString("\n"),
+            )
         }
     }
 

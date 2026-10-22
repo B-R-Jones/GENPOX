@@ -47,15 +47,22 @@ The reactor console features interactive sliders and selectors allowing players 
   - Immune/Buffered (Neutral): `15°C - 50°C`
 
 ### Polymerase Chamber Selector
-The selected polymerase enzyme dictates cycle speed, copy fidelity, and mutation discovery rates:
+The selected polymerase enzyme dictates cycle speed, copy fidelity, mutation discovery rates, and feedstock programming costs:
 *   **Taq Polymerase**: Fast cycles (**8 seconds**). Lacks proofreading (low Phred $Q$-scores of $15-25$), yielding high mutation frequencies that help discover new sequences.
+    - *Programming Cost*: **Free** ($0$ feedstock).
 *   **Tth Polymerase**: Medium-Fast cycles (**12 seconds**). Moderate fidelity (Phred $Q$-scores of $25-33$) and high thermal stability, optimal for hot GC-runs.
+    - *Programming Cost*: **100 units from all bases** ($A, G, T, C$) plus **100 units per instance of that base in the target sequence** ($100 + N_{\text{base}} \times 100$). No bio-waste required.
 *   **Pfu Polymerase**: Slow cycles (**32 seconds**). Proofreading active, extremely high fidelity (Phred $Q$-scores of $35-40$) to duplicate stable templates without alterations.
+    - *Programming Cost*: **200 units from all bases** ($A, G, T, C$) plus **200 units per instance of that base in the target sequence** ($200 + N_{\text{base}} \times 200$). No bio-waste required.
 
 ### Chemical Solutes
 Solutes act as protective buffers to override biophysical limits:
+*   **None**: Standard unbuffered synthesis chamber.
+    - *Reagent Cost*: **Free** ($0$).
 *   **DMSO (Dimethyl Sulfoxide)**: GC-destabilizer. Added to prevent **GC Hairpin Stalling** in cold chambers ($< 28.3^\circ\text{C} - 32.5^\circ\text{C}$ depending on salt).
+    - *Reagent Cost*: **100 units from all bases** ($A, G, T, C$).
 *   **Netropsin**: AT-stabilizer. Binds to the minor groove of AT-rich DNA to prevent **AT Denaturation** in hot chambers ($> 22.3^\circ\text{C} - 26.5^\circ\text{C}$ depending on salt).
+    - *Reagent Cost*: **100 units from all bases** ($A, G, T, C$).
 
 ### Inlet Sliders ($I_A, I_G, I_T, I_C$)
 - **Purpose**: Adjusting these sliders controls the raw base feed rate into the reaction chamber.

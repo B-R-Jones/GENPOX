@@ -1,43 +1,63 @@
 package com.example.genpox.ui.main
 
-import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.genpox.MainTab
 import com.example.genpox.audio.PoxSynthManager
 import com.example.genpox.data.*
+import com.example.genpox.data.location.LocationRepository
 import com.example.genpox.data.network.PoxNetworkManager
-import com.example.genpox.data.network.HydraPacket
+import com.example.genpox.data.repository.*
 import com.example.genpox.ui.components.MapProfilerState
+import com.example.genpox.util.DispatchersProvider
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import com.google.ai.client.generativeai.type.generationConfig
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
-import java.util.UUID
 import java.util.Locale
+import java.util.UUID
+import javax.inject.Inject
 
-class MainViewModel(
-    private val repository: DataRepository,
-    val synthManager: PoxSynthManager = PoxSynthManager()
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    private val creatureRepository: CreatureRepository,
+    private val geneStockRepository: GeneStockRepository,
+    private val missionRepository: MissionRepository,
+    private val preferencesRepository: UserPreferencesRepository,
+    val synthManager: PoxSynthManager,
+    private val locationRepository: LocationRepository,
+    val tileStreamManager: com.example.genpox.map.tile.TileStreamManager,
+    private val dispatchers: DispatchersProvider,
 ) : ViewModel() {
 
-    // Backing flows for unit test reflection access
-    private val _bioWaste = MutableStateFlow(0L)
-    private val _targetSynthesisSequence = MutableStateFlow("GCAATAGC")
-
     // Feature ViewModels Instantiation
-    val reactor = ReactorViewModel(repository, synthManager, _bioWaste, _targetSynthesisSequence)
-    val splicer = SplicerViewModel(repository, synthManager, reactor.reactorSalt)
-    val network = NetworkViewModel(repository, synthManager, reactor.reactorSalt)
-    val scanner = ScannerViewModel(repository, synthManager, reactor.reactorSalt)
+    val reactor = ReactorViewModel(geneStockRepository, preferencesRepository, creatureRepository, synthManager, dispatchers)
+    val splicer = SplicerViewModel(geneStockRepository, preferencesRepository, creatureRepository, synthManager, dispatchers)
+    val network = NetworkViewModel(creatureRepository, geneStockRepository, preferencesRepository, synthManager, dispatchers)
+    val scanner = ScannerViewModel(
+        missionRepository = missionRepository,
+        creatureRepository = creatureRepository,
+        preferencesRepository = preferencesRepository,
+        geneStockRepository = geneStockRepository,
+        synthManager = synthManager,
+        locationRepository = locationRepository,
+        tileStreamManager = tileStreamManager,
+        dispatchers = dispatchers,
+    )
+
+    // Backing flows for unit test reflection access
+    val _bioWaste get() = reactor._bioWaste
+    val _targetSynthesisSequence get() = reactor._targetSynthesisSequence
 
     // Navigation and tab states
-    private val _selectedTab = MutableStateFlow("combinator")
-    val selectedTab: StateFlow<String> = _selectedTab.asStateFlow()
+    private val _selectedTab = MutableStateFlow<MainTab>(MainTab.Combinator)
+    val selectedTab: StateFlow<MainTab> = _selectedTab.asStateFlow()
 
     private val _activeCreature = MutableStateFlow<Creature?>(null)
     val activeCreature: StateFlow<Creature?> = _activeCreature.asStateFlow()
@@ -53,6 +73,21 @@ class MainViewModel(
 
     private val _terminalLogs = MutableStateFlow<List<String>>(listOf("GENPOX COMPILER SYSTEM v2.0 READY."))
     val terminalLogs: StateFlow<List<String>> = _terminalLogs.asStateFlow()
+
+    private val _isLogWindowOpen = MutableStateFlow(false)
+    val isLogWindowOpen: StateFlow<Boolean> = _isLogWindowOpen.asStateFlow()
+
+    fun openLogWindow() {
+        _isLogWindowOpen.value = true
+    }
+
+    fun closeLogWindow() {
+        _isLogWindowOpen.value = false
+    }
+
+    fun toggleLogWindow() {
+        _isLogWindowOpen.value = !_isLogWindowOpen.value
+    }
 
     private val _logFlashTrigger = MutableSharedFlow<String>(extraBufferCapacity = 16)
     val logFlashTrigger: SharedFlow<String> = _logFlashTrigger.asSharedFlow()
@@ -115,23 +150,23 @@ class MainViewModel(
 
     fun setCrtScanlineOpacity(value: Float) {
         _crtScanlineOpacity.value = value
-        com.example.genpox.theme.CyberTheme.crtScanlineOpacity = value
+        com.example.genpox.theme.CyberTheme.update { copy(crtScanlineOpacity = value) }
     }
     fun setCrtGrilleOpacity(value: Float) {
         _crtGrilleOpacity.value = value
-        com.example.genpox.theme.CyberTheme.crtGrilleOpacity = value
+        com.example.genpox.theme.CyberTheme.update { copy(crtGrilleOpacity = value) }
     }
     fun setCrtBloomIntensity(value: Float) {
         _crtBloomIntensity.value = value
-        com.example.genpox.theme.CyberTheme.crtBloomIntensity = value
+        com.example.genpox.theme.CyberTheme.update { copy(crtBloomIntensity = value) }
     }
     fun setCrtCurvatureBezel(value: Float) {
         _crtCurvatureBezel.value = value
-        com.example.genpox.theme.CyberTheme.crtCurvatureBezel = value
+        com.example.genpox.theme.CyberTheme.update { copy(crtCurvatureBezel = value) }
     }
     fun setCrtGlitchIntensity(value: Float) {
         _crtGlitchIntensity.value = value
-        com.example.genpox.theme.CyberTheme.crtGlitchIntensity = value
+        com.example.genpox.theme.CyberTheme.update { copy(crtGlitchIntensity = value) }
     }
 
     fun syncPhosphorSettingsFromTheme() {
@@ -162,18 +197,18 @@ class MainViewModel(
     }
 
     // Gemini API keys and mute settings collected from DB
-    val geminiApiKey: StateFlow<String> = repository.geminiApiKey
+    val geminiApiKey: StateFlow<String> = preferencesRepository.geminiApiKey
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
-    val muteSound: StateFlow<Boolean> = repository.muteSound
+    val muteSound: StateFlow<Boolean> = preferencesRepository.muteSound
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     // Observe database/repository stocks to initialize and keep in-sync
-    val creatures: StateFlow<List<Creature>> = repository.allCreatures
+    val creatures: StateFlow<List<Creature>> = creatureRepository.allCreatures
         .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val geneSequences: StateFlow<List<GeneSequence>> = repository.allGeneSequences
+    val geneSequences: StateFlow<List<GeneSequence>> = geneStockRepository.allGeneSequences
         .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -196,7 +231,7 @@ class MainViewModel(
     // REACTOR VIEWMODEL DELEGATES
     val poxReactorActive get() = reactor.poxReactorActive
     val reactorTemperature get() = reactor.reactorTemperature
-    val reactorSalt get() = reactor.reactorSalt
+    val reactorSalt: StateFlow<Float> get() = reactor.reactorSalt
     val activePolymerase get() = reactor.activePolymerase
     val activeChemicalSolute get() = reactor.activeChemicalSolute
     val inletRatioA get() = reactor.inletRatioA
@@ -257,31 +292,32 @@ class MainViewModel(
             val startOffset = WaveMath.manualOffsetMs
             if (startOffset == 0L && WaveMath.timeScale == 1.0) {
                 synthManager.playBeep(300f, 0.05f, "sine")
+                addLog("ORRERY: Chronological alignment already at real-time zero")
                 return@launch
             }
-            
+
             addLog("ORRERY: Initiating chronological rewind sequence...")
             _orreryTimeScaleIndex.value = 0
             WaveMath.timeScale = 1.0
-            
+
             val durationMs = 1500L
             val stepDelay = 16L
             val steps = durationMs / stepDelay
-            
+
             for (i in 1..steps) {
                 val progress = i.toDouble() / steps.toDouble()
                 val easeOutProgress = 1.0 - Math.pow(1.0 - progress, 2.0)
                 val currentOffset = startOffset - (startOffset * easeOutProgress).toLong()
                 WaveMath.manualOffsetMs = currentOffset
-                
+
                 if (i % 8L == 0L) {
                     val freq = 180f + (1.0f - easeOutProgress.toFloat()) * 420f
                     synthManager.playBeep(freq, 0.04f, "sine")
                 }
-                
+
                 kotlinx.coroutines.delay(stepDelay)
             }
-            
+
             WaveMath.manualOffsetMs = 0L
             addLog("ORRERY: Temporal alignment restored to standard epoch.")
             synthManager.playBeep(220f, 0.15f, "sine")
@@ -370,8 +406,7 @@ class MainViewModel(
     fun registerPeerNode(name: String, sector: String) = network.registerPeerNode(name, sector)
     fun markMessageAsRead(messageId: String) = network.markMessageAsRead(messageId)
     fun claimMessageAttachment(messageId: String) = network.claimMessageAttachment(messageId)
-    fun transmitP2PMessage(endpointId: String, text: String, creature: Creature?, gene: GeneSequence?, transferResources: Boolean) =
-        network.transmitP2PMessage(endpointId, text, creature, gene, transferResources)
+    fun transmitP2PMessage(endpointId: String, text: String, creature: Creature?, gene: GeneSequence?, transferResources: Boolean) = network.transmitP2PMessage(endpointId, text, creature, gene, transferResources)
     fun setComposerRecipient(id: String?, name: String?, isConnected: Boolean) = network.setComposerRecipient(id, name, isConnected)
     fun setComposerMessageText(text: String) = network.setComposerMessageText(text)
     fun setComposerAttachedCreature(creature: Creature?) = network.setComposerAttachedCreature(creature)
@@ -380,38 +415,37 @@ class MainViewModel(
     fun clearComposer() = network.clearComposer()
 
     // SCANNER VIEWMODEL DELEGATES
-    val activeMissions get() = scanner.activeMissions
-    val harvestingCreatureIds get() = scanner.harvestingCreatureIds
-    val activeMissionCoords get() = scanner.activeMissionCoords
-    val allMissions get() = scanner.allMissions
-    val depletedAnomalyCoords get() = scanner.depletedAnomalyCoords
-    val scanRadius get() = scanner.scanRadius
-    val trackedMissionId get() = scanner.trackedMissionId
-    val selectedAnomalyId get() = scanner.selectedAnomalyId
-    val scannerSubTab get() = scanner.scannerSubTab
-    val listSubTab get() = scanner.listSubTab
-    val showAnomaliesOnMap get() = scanner.showAnomaliesOnMap
-    val showFontsOnMap get() = scanner.showFontsOnMap
-    val showWellsOnMap get() = scanner.showWellsOnMap
+    val activeMissions: StateFlow<List<HarvestMission>> get() = scanner.activeMissions
+    val harvestingCreatureIds: StateFlow<Set<String>> get() = scanner.harvestingCreatureIds
+    val activeMissionCoords: StateFlow<Set<String>> get() = scanner.activeMissionCoords
+    val allMissions: StateFlow<List<HarvestMission>> get() = scanner.allMissions
+    val depletedAnomalyCoords: StateFlow<Set<String>> get() = scanner.depletedAnomalyCoords
+    val scanRadius: StateFlow<Float> get() = scanner.scanRadius
+    val trackedMissionId: StateFlow<String?> get() = scanner.trackedMissionId
+    val selectedAnomalyId: StateFlow<String?> get() = scanner.selectedAnomalyId
+    val scannerSubTab: StateFlow<String> get() = scanner.scannerSubTab
+    val listSubTab: StateFlow<String> get() = scanner.listSubTab
+    val showAnomaliesOnMap: StateFlow<Boolean> get() = scanner.showAnomaliesOnMap
+    val showFontsOnMap: StateFlow<Boolean> get() = scanner.showFontsOnMap
+    val showWellsOnMap: StateFlow<Boolean> get() = scanner.showWellsOnMap
 
     fun toggleAnomaliesOnMap() = scanner.toggleAnomaliesOnMap()
     fun toggleFontsOnMap() = scanner.toggleFontsOnMap()
     fun toggleWellsOnMap() = scanner.toggleWellsOnMap()
-    val latitude get() = scanner.latitude
-    val longitude get() = scanner.longitude
-    val zoomMultiplier get() = scanner.zoomMultiplier
-    val roads get() = scanner.roads
-    val buildings get() = scanner.buildings
-    val proceduralHeatwaves get() = scanner.proceduralHeatwaves
-    val rawAnomalies get() = scanner.rawAnomalies
-    val anomalies get() = scanner.anomalies
-    val selectedAnomaly get() = scanner.selectedAnomaly
-    val heatwaveCells get() = scanner.proceduralHeatwaves
+    val latitude: StateFlow<Double> get() = scanner.latitude
+    val longitude: StateFlow<Double> get() = scanner.longitude
+    val zoomMultiplier: StateFlow<Float> get() = scanner.zoomMultiplier
+
+    val proceduralHeatwaves: StateFlow<List<String>> get() = scanner.proceduralHeatwaves
+    val rawAnomalies: StateFlow<List<PoxAnomaly>> get() = scanner.rawAnomalies
+    val anomalies: StateFlow<List<PoxAnomaly>> get() = scanner.anomalies
+    val selectedAnomaly: StateFlow<PoxAnomaly?> get() = scanner.selectedAnomaly
+    val heatwaveCells: StateFlow<List<String>> get() = scanner.proceduralHeatwaves
 
     fun setTrackedMissionId(id: String?) {
         scanner.setTrackedMissionId(id)
         if (id != null) {
-            _selectedTab.value = "scanner"
+            _selectedTab.value = MainTab.Scanner
         }
     }
     fun setSelectedAnomalyId(id: String?) = scanner.setSelectedAnomalyId(id)
@@ -422,6 +456,7 @@ class MainViewModel(
         scanner.updateLocation(lat, lng)
     }
     fun updateZoom(zoom: Float) = scanner.updateZoom(zoom)
+    fun updateCameraPan(panWorldX: Float, panWorldY: Float) = scanner.updateCameraPan(panWorldX, panWorldY)
     fun refreshMap() = scanner.refreshMap()
     fun dispatchMission(creature: Creature, anomaly: PoxAnomaly) = scanner.dispatchMission(creature, anomaly)
     fun recallMission(mission: HarvestMission) = scanner.recallMission(mission)
@@ -429,16 +464,7 @@ class MainViewModel(
     fun getSynodicResonanceMod(faction: String, phaseName: String): Int = scanner.getSynodicResonanceMod(faction, phaseName)
 
     // Distance computation delegate helper
-    fun calculateDistanceInFeet(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLng = Math.toRadians(lng2 - lng1)
-        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                Math.sin(dLng / 2) * Math.sin(dLng / 2)
-        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        val earthRadiusFeet = 20902231.0
-        return earthRadiusFeet * c
-    }
+    fun calculateDistanceInFeet(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double = GeoMath.calculateHaversineDistanceInFeet(lat1, lng1, lat2, lng2)
 
     // Vault, Splicer, Network, Settings Tab setters
     fun setVaultSubTab(subTab: String) {
@@ -468,7 +494,7 @@ class MainViewModel(
         reactor.onLog = { addLog(it) }
         splicer.onLog = { addLog(it) }
         splicer.onSetActiveCreature = { creature, openedFrom -> setActiveCreature(creature, openedFrom) }
-        splicer.onSelectTab = { selectTab(it) }
+        splicer.onSelectTab = { selectTabByRoute(it) }
         network.onLog = { addLog(it) }
         scanner.onLog = { addLog(it) }
 
@@ -514,13 +540,13 @@ class MainViewModel(
         }
     }
 
-    fun selectTab(tab: String) {
+    fun selectTab(tab: MainTab) {
         if (_selectedTab.value != tab) {
             _selectedTab.value = tab
-            addLog("NAV: Transition to section [${tab.uppercase()}]")
+            addLog("NAV: Transition to section [${tab.route.uppercase()}]")
             synthManager.playCombinatorTick()
 
-            if (tab == "splicer") {
+            if (tab is MainTab.Splicer) {
                 if (splicer.isCustomScaffoldMode.value) {
                     splicer.selectSplicerSlot(null)
                 }
@@ -530,6 +556,15 @@ class MainViewModel(
                 }
             }
         }
+    }
+
+    @JvmName("selectTabByRouteString")
+    fun selectTab(route: String) {
+        selectTab(MainTab.fromRoute(route))
+    }
+
+    fun selectTabByRoute(route: String) {
+        selectTab(MainTab.fromRoute(route))
     }
 
     fun setActiveCreature(creature: Creature?, openedFrom: String = "vault") {
@@ -543,7 +578,7 @@ class MainViewModel(
     fun toggleFavoriteCreature(creature: Creature) {
         viewModelScope.launch {
             val updated = creature.copy(isFavorite = !creature.isFavorite)
-            repository.insertCreature(updated)
+            creatureRepository.insertCreature(updated)
             _activeCreature.value = updated
             synthManager.playCombinatorTick()
             addLog(if (updated.isFavorite) "FAV: Added \"${creature.name}\" to favorites." else "FAV: Removed \"${creature.name}\" from favorites.")
@@ -553,7 +588,7 @@ class MainViewModel(
     fun toggleAutoHackerCreature(creature: Creature) {
         viewModelScope.launch {
             val updated = creature.copy(isAutoHacker = !creature.isAutoHacker)
-            repository.insertCreature(updated)
+            creatureRepository.insertCreature(updated)
             _activeCreature.value = updated
             synthManager.playBeep(520f, 0.05f, "sine")
             addLog(if (updated.isAutoHacker) "HACK: Designated \"${creature.name}\" as Auto-Hacker." else "HACK: Deactivated Auto-Hacker for \"${creature.name}\".")
@@ -569,19 +604,19 @@ class MainViewModel(
 
     fun incinerateCreature(creature: Creature, harvestedGene: String) {
         viewModelScope.launch {
-            repository.deleteCreature(creature)
+            creatureRepository.deleteCreature(creature)
             val tm = GeneticsEngine.calculateMeltingTemperature(harvestedGene, reactorSalt.value.toDouble())
             val mfe = GeneticsEngine.calculateMinimumFreeEnergy(harvestedGene)
             val qScore = (creature.telomeres / 2.5).coerceIn(10.0, 45.0)
-            repository.insertGeneSequence(
+            geneStockRepository.insertGeneSequence(
                 GeneSequence(
                     sequence = harvestedGene,
                     count = 1,
                     discoveredAt = System.currentTimeMillis(),
                     averageQScore = qScore,
                     meltingTemp = tm,
-                    minimumFreeEnergy = mfe
-                )
+                    minimumFreeEnergy = mfe,
+                ),
             )
             addLog("PURGE: Purged specimen \"${creature.name}\". Segment cached in stock: $harvestedGene")
             synthManager.playBeep(400f, 0.4f, "sawtooth")
@@ -591,7 +626,7 @@ class MainViewModel(
 
     fun decreaseCreatureTelomeres(creatureId: String, amount: Int, reason: String) {
         viewModelScope.launch {
-            val creature = repository.getCreatureById(creatureId) ?: return@launch
+            val creature = creatureRepository.getCreatureById(creatureId) ?: return@launch
             val nextT = (creature.telomeres - amount).coerceAtLeast(0)
             if (nextT <= 0) {
                 val genome = creature.sequence
@@ -617,19 +652,19 @@ class MainViewModel(
                     val tm = GeneticsEngine.calculateMeltingTemperature(upper, reactorSalt.value.toDouble())
                     val mfe = GeneticsEngine.calculateMinimumFreeEnergy(upper)
                     val qScore = (creature.telomeres / 2.5).coerceIn(10.0, 45.0)
-                    repository.insertGeneSequence(
+                    geneStockRepository.insertGeneSequence(
                         GeneSequence(
                             sequence = upper,
                             count = 1,
                             discoveredAt = System.currentTimeMillis(),
                             averageQScore = qScore,
                             meltingTemp = tm,
-                            minimumFreeEnergy = mfe
-                        )
+                            minimumFreeEnergy = mfe,
+                        ),
                     )
                 }
 
-                repository.deleteCreature(creature)
+                creatureRepository.deleteCreature(creature)
                 if (_activeCreature.value?.id == creatureId) {
                     _activeCreature.value = null
                 }
@@ -640,14 +675,14 @@ class MainViewModel(
                 _disintegratedModal.value = DisintegratedModalData(
                     name = creature.name,
                     returnedBlocks = returnedBlocks,
-                    destroyedBlocks = destroyedBlocks
+                    destroyedBlocks = destroyedBlocks,
                 )
 
                 addLog("CHROMOSOMAL FAILURE: \"${creature.name}\" disintegrated! Telomeres reached 0%. Returned ${returnedBlocks.size} gene blocks, lost ${destroyedBlocks.size} permanently!")
                 synthManager.playReject()
             } else {
                 val updated = creature.copy(telomeres = nextT)
-                repository.insertCreature(updated)
+                creatureRepository.insertCreature(updated)
                 if (_activeCreature.value?.id == creatureId) {
                     _activeCreature.value = updated
                 }
@@ -666,7 +701,7 @@ class MainViewModel(
             }
 
             val weldedGeneQ = match.averageQScore
-            repository.deleteGeneSequence(match)
+            geneStockRepository.deleteGeneSequence(match)
 
             val newSeq = creature.sequence + gene
             val newAppended = creature.appendedGenes + gene
@@ -690,9 +725,9 @@ class MainViewModel(
                 type = details.type,
                 faction = details.faction,
                 lore = details.lore,
-                primaryWeapon = details.primaryWeapon
+                primaryWeapon = details.primaryWeapon,
             )
-            repository.insertCreature(updatedCreature)
+            creatureRepository.insertCreature(updatedCreature)
 
             addLog("MUTATION: Welded gene $gene to \"${creature.name}\". Stats updated (Q-score scaling applied).")
             synthManager.playSynthesisSuccess()
@@ -716,10 +751,15 @@ class MainViewModel(
 
         var faction = "Infection"
         val maxB = maxOf(countA, countG, countT, countC)
-        if (maxB == countA) faction = "Containment"
-        else if (maxB == countG) faction = "Infection"
-        else if (maxB == countT) faction = "Mech"
-        else if (maxB == countC) faction = "Parasite"
+        if (maxB == countA) {
+            faction = "Containment"
+        } else if (maxB == countG) {
+            faction = "Infection"
+        } else if (maxB == countT) {
+            faction = "Mech"
+        } else if (maxB == countC) {
+            faction = "Parasite"
+        }
 
         var type = "Parasitic Cyborg Insectoid"
         if (faction == "Infection") type = "Organic Swarm Pathogen"
@@ -745,7 +785,7 @@ class MainViewModel(
             defense = defense,
             speed = speed,
             primaryWeapon = primaryWeapon,
-            lore = lore
+            lore = lore,
         )
     }
 
@@ -757,7 +797,7 @@ class MainViewModel(
         val defense: Int,
         val speed: Int,
         val primaryWeapon: String,
-        val lore: String
+        val lore: String,
     )
 
     fun getUnlockedMoves(sequence: String): List<UnlockedMove> {
@@ -769,24 +809,27 @@ class MainViewModel(
             var ga = 0
             var tc = 0
             for (char in gene1.uppercase()) {
-                if (char == 'A' || char == 'G') ga++
-                else if (char == 'T' || char == 'C') tc++
+                if (char == 'A' || char == 'G') {
+                    ga++
+                } else if (char == 'T' || char == 'C') {
+                    tc++
+                }
             }
             if (ga >= tc) {
                 list.add(
                     UnlockedMove(
                         type = "healing",
                         name = "BIO-DRAIN REPAIR",
-                        description = "Repairs circuitry by siphoning 35 HP from defender."
-                    )
+                        description = "Repairs circuitry by siphoning 35 HP from defender.",
+                    ),
                 )
             } else {
                 list.add(
                     UnlockedMove(
                         type = "evasive",
                         name = "QUANTUM ESCAPE DEVIATION",
-                        description = "Evasive shift. Negates next attack damage in this round."
-                    )
+                        description = "Evasive shift. Negates next attack damage in this round.",
+                    ),
                 )
             }
         }
@@ -798,16 +841,16 @@ class MainViewModel(
                     UnlockedMove(
                         type = "evasive",
                         name = "ELECTROMAGNETIC SHELL DEFLECT",
-                        description = "Hardened shield. Negates defender damage for this round."
-                    )
+                        description = "Hardened shield. Negates defender damage for this round.",
+                    ),
                 )
             } else {
                 list.add(
                     UnlockedMove(
                         type = "healing",
                         name = "MICRO-PHAGE EXTRACTION",
-                        description = "Siphons 35 HP from opponent to mend system hardware."
-                    )
+                        description = "Siphons 35 HP from opponent to mend system hardware.",
+                    ),
                 )
             }
         }
@@ -885,17 +928,23 @@ class MainViewModel(
             put("ascii", creature.asciiArt)
             put("appended", JsonArray(creature.appendedGenes.map { JsonPrimitive(it) }))
             put("moves", JsonArray(moves.map { JsonPrimitive(it) }))
-            put("visual", buildJsonObject {
-                put("faction", creature.faction)
-                put("type", creature.type)
-                put("ascii", creature.asciiArt)
-            })
-            put("sound", buildJsonObject {
-                put("oscillator", sound.oscillator)
-                put("frequencies", JsonArray(sound.frequencies.map { JsonPrimitive(it) }))
-                put("noteDelay", sound.noteDelay)
-                put("noteDuration", sound.noteDuration)
-            })
+            put(
+                "visual",
+                buildJsonObject {
+                    put("faction", creature.faction)
+                    put("type", creature.type)
+                    put("ascii", creature.asciiArt)
+                },
+            )
+            put(
+                "sound",
+                buildJsonObject {
+                    put("oscillator", sound.oscillator)
+                    put("frequencies", JsonArray(sound.frequencies.map { JsonPrimitive(it) }))
+                    put("noteDelay", sound.noteDelay)
+                    put("noteDuration", sound.noteDuration)
+                },
+            )
             put("telomeres", creature.telomeres)
             put("isFullCoherence", creature.isFullCoherence)
             if (creature.coherenceType != null) {
@@ -920,13 +969,13 @@ class MainViewModel(
 
     fun setMute(mute: Boolean) {
         viewModelScope.launch {
-            repository.setMuteSound(mute)
+            preferencesRepository.setMuteSound(mute)
         }
     }
 
     fun saveApiKey(key: String) {
         viewModelScope.launch {
-            repository.saveGeminiApiKey(key)
+            preferencesRepository.saveGeminiApiKey(key)
             addLog("SYS: Secure Gemini API Credentials Saved.")
             synthManager.playSynthesisSuccess()
         }
@@ -946,10 +995,10 @@ class MainViewModel(
             val creature = decodeCreatureFromBase64(data)
             if (creature != null) {
                 val transferredCreature = creature.copy(telomeres = 99)
-                repository.insertCreature(transferredCreature)
+                creatureRepository.insertCreature(transferredCreature)
                 addLog("SCAN: Compiled creature \"${creature.name}\" [Telomeres: 99%]")
                 setActiveCreature(transferredCreature, "scanner")
-                _selectedTab.value = "vault"
+                _selectedTab.value = MainTab.Vault
             } else if (data.length == 64 && data.matches(Regex("[AGTCagtc]+"))) {
                 addLog("SCAN: Scanned raw DNA sequence. Compiling...")
                 compileCreature(data)
@@ -957,15 +1006,15 @@ class MainViewModel(
                 val upper = data.uppercase()
                 val tm = GeneticsEngine.calculateMeltingTemperature(upper, reactorSalt.value.toDouble())
                 val mfe = GeneticsEngine.calculateMinimumFreeEnergy(upper)
-                repository.insertGeneSequence(
+                geneStockRepository.insertGeneSequence(
                     GeneSequence(
                         sequence = upper,
                         count = 1,
                         discoveredAt = System.currentTimeMillis(),
                         averageQScore = 30.0,
                         meltingTemp = tm,
-                        minimumFreeEnergy = mfe
-                    )
+                        minimumFreeEnergy = mfe,
+                    ),
                 )
                 addLog("SCAN: Registered gene block $upper in inventory.")
             } else {
@@ -1015,7 +1064,7 @@ class MainViewModel(
                 appendedGenes = appended,
                 telomeres = telomeres,
                 isFullCoherence = isFullCoherence,
-                coherenceType = coherenceType
+                coherenceType = coherenceType,
             )
         } catch (e: Exception) {
             null
@@ -1049,18 +1098,19 @@ class MainViewModel(
             }?.let {
                 it.copy(
                     isFullCoherence = matchesTarget,
-                    coherenceType = if (matchesTarget) "Natural" else null
+                    coherenceType = if (matchesTarget) "Natural" else null,
                 )
             }
 
             if (creature != null) {
-                repository.insertCreature(creature)
+                creatureRepository.insertCreature(creature)
                 addLog("OK: Compiled creature \"${creature.name}\" of Sector [${creature.faction}]")
                 synthManager.playSynthesisSuccess()
                 setActiveCreature(creature, "combinator")
-                _selectedTab.value = "vault"
+                _selectedTab.value = MainTab.Vault
             } else {
                 addLog("ERR: Compilation reactor failure.")
+
                 synthManager.playReject()
             }
             _isCompiling.value = false
@@ -1078,7 +1128,7 @@ class MainViewModel(
                 generationConfig = config,
                 systemInstruction = content {
                     text("You are an expert compiler of retro sci-fi cyber-creatures. You output structured bios for bio-mechanical warriors, parasitic battle bugs, and cyber virus creatures in valid JSON.")
-                }
+                },
             )
 
             val prompt = """
@@ -1125,7 +1175,7 @@ class MainViewModel(
                 lore = lore,
                 asciiArt = ascii,
                 discoveredAt = System.currentTimeMillis(),
-                origin = "Compiled via AI Engine"
+                origin = "Compiled via AI Engine",
             )
         } catch (e: Exception) {
             e.printStackTrace()
@@ -1227,7 +1277,7 @@ class MainViewModel(
             lore = lore,
             asciiArt = grid.toString(),
             discoveredAt = System.currentTimeMillis(),
-            origin = "Local Compiled Unit"
+            origin = "Local Compiled Unit",
         )
     }
 
@@ -1256,12 +1306,26 @@ class MainViewModel(
 
 class MainViewModelFactory(
     private val repository: DataRepository,
-    private val synthManager: PoxSynthManager
+    private val synthManager: PoxSynthManager,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return MainViewModel(repository, synthManager) as T
+            val dispatchers = com.example.genpox.util.DefaultDispatchersProvider()
+            val locationDataSource = com.example.genpox.data.location.DefaultLocationDataSource(repository as Any as android.content.Context)
+            val locationRepository = com.example.genpox.data.location.DefaultLocationRepository(locationDataSource)
+            val tileDataProvider = com.example.genpox.map.tile.VectorTileRepository(repository as Any as android.content.Context, dispatchers)
+            val tileStreamManager = com.example.genpox.map.tile.TileStreamManager(tileDataProvider, dispatchers)
+            return MainViewModel(
+                creatureRepository = repository,
+                geneStockRepository = repository,
+                missionRepository = repository,
+                preferencesRepository = repository,
+                synthManager = synthManager,
+                locationRepository = locationRepository,
+                tileStreamManager = tileStreamManager,
+                dispatchers = dispatchers,
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
@@ -1272,33 +1336,33 @@ data class GenePacket(
     val genes: List<String>,
     val timestamp: Long,
     val isAnomalous: Boolean,
-    val newGenes: List<String> = emptyList()
+    val newGenes: List<String> = emptyList(),
 )
 
 data class UnlockedMove(
     val type: String,
     val name: String,
-    val description: String
+    val description: String,
 )
 
 data class EmotSound(
     val oscillator: String,
     val frequencies: List<Int>,
     val noteDelay: Double,
-    val noteDuration: Double
+    val noteDuration: Double,
 )
 
 data class DisintegratedModalData(
     val name: String,
     val returnedBlocks: List<String>,
-    val destroyedBlocks: List<String>
+    val destroyedBlocks: List<String>,
 )
 
 data class BuildingBBox(val minLat: Double, val maxLat: Double, val minLng: Double, val maxLng: Double) {
-    fun intersects(other: BuildingBBox): Boolean {
-        return minLat <= other.maxLat && maxLat >= other.minLat &&
-               minLng <= other.maxLng && maxLng >= other.minLng
-    }
+    fun intersects(other: BuildingBBox): Boolean = minLat <= other.maxLat &&
+        maxLat >= other.minLat &&
+        minLng <= other.maxLng &&
+        maxLng >= other.minLng
 }
 
 data class PoxBaseFont(
@@ -1309,11 +1373,9 @@ data class PoxBaseFont(
     val spawnTime: Long,
     val durationMs: Long = 90000L, // 90 seconds
     val maxRadiusFeet: Double = 500.0,
-    val isInverted: Boolean = false
+    val isInverted: Boolean = false,
 ) {
-    fun isExpired(now: Long): Boolean {
-        return now - spawnTime >= durationMs
-    }
+    fun isExpired(now: Long): Boolean = now - spawnTime >= durationMs
 
     fun getGatherAmount(distanceFeet: Double): Long {
         if (distanceFeet > maxRadiusFeet) return 0L

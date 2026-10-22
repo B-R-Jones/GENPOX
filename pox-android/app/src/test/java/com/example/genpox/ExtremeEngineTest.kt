@@ -1,12 +1,12 @@
 package com.example.genpox
 
 import com.example.genpox.data.ConflictEngine
-import com.example.genpox.data.DeploymentEngine
 import com.example.genpox.data.Creature
+import com.example.genpox.data.DeploymentEngine
 import com.example.genpox.data.PoxAnomaly
-import org.junit.Test
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class ExtremeEngineTest {
 
@@ -28,7 +28,7 @@ class ExtremeEngineTest {
             asciiArt = "[Bio]",
             discoveredAt = 123456789L,
             origin = "Sector 4",
-            telomeres = 10
+            telomeres = 10,
         )
 
         // Factor = 0.25 + 0.75 * 0.10 = 0.325
@@ -62,12 +62,12 @@ class ExtremeEngineTest {
             asciiArt = "[Infection]",
             discoveredAt = 123456789L,
             origin = "Swamp",
-            telomeres = 100
+            telomeres = 100,
         )
 
         // Infection gets +15 defense in Waxing Crescent, -10 in Waning Crescent.
         val baseDef = 40 // telomeres = 100 => factor = 1.0 => base defense = 40.
-        
+
         val combatantWaxing = ConflictEngine.initializeCombatant(infectionCreature, "Waxing Crescent", 80.0)
         val combatantWaning = ConflictEngine.initializeCombatant(infectionCreature, "Waning Crescent", 80.0)
 
@@ -92,7 +92,7 @@ class ExtremeEngineTest {
             asciiArt = "[Drone]",
             discoveredAt = 123456789L,
             origin = "Factory",
-            telomeres = 10
+            telomeres = 10,
         )
         val c2 = Creature(
             id = "low-hp-2",
@@ -109,7 +109,7 @@ class ExtremeEngineTest {
             asciiArt = "[Turret]",
             discoveredAt = 123456789L,
             origin = "Factory",
-            telomeres = 10
+            telomeres = 10,
         )
 
         // Combat with extremely low HP (they will only have around 16 HP)
@@ -135,7 +135,7 @@ class ExtremeEngineTest {
             faction = "Parasite",
             distance = 36.0,
             heatZoneDiameter = 100.0, // boundary = 50 feet
-            density = 80.0
+            density = 80.0,
         )
         val anom2 = PoxAnomaly(
             id = "anom-dense-2",
@@ -146,11 +146,11 @@ class ExtremeEngineTest {
             faction = "Parasite",
             distance = 36.0,
             heatZoneDiameter = 150.0, // boundary = 75 feet
-            density = 90.0
+            density = 90.0,
         )
 
         val combinedDensity = DeploymentEngine.calculateCombinedWaveDensity(lat, lng, listOf(anom1, anom2))
-        
+
         // Output should integrate both densities and fall off with distance.
         assertTrue("Combined wave density should be non-zero", combinedDensity != 0.0)
     }
@@ -161,7 +161,7 @@ class ExtremeEngineTest {
         val effectiveDef = 500
         val boundaryRadius = 20.0
         val lunarAge = 14.7 // Full Moon (cos = -1.0)
-        
+
         val stallDepth = DeploymentEngine.calculateStallDepth(effectiveDef, boundaryRadius, lunarAge)
         assertEquals(100.0, stallDepth, 0.001)
 
